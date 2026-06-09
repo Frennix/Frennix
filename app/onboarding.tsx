@@ -1,0 +1,326 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { Controller, useForm, type FieldErrors } from "react-hook-form";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { z } from "zod";
+import { upsertProfile, uploadAvatar } from "@frennix/api";
+import { ACTIVITIES, FITNESS_GOALS, type MatchPreference } from "@frennix/types";
+import { useAuth } from "@/providers/AuthProvider";
+import { formatActivity, formatGoal } from "@/lib/labels";
+import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui";
+
+const GENDERS = ["female", "male", "non_binary", "prefer_not_to_say"] as const;
+const MATCH_PREFS: { value: MatchPreference; label: string }[] = [
+  { value: "any", label: "Anyone" },
+  { value: "same", label: "Same gender" },
+  { value: "opposite", label: "Different gender" },
+];
+
+const onboardingSchema = z.object({
+  username: z
+    .string()
+    .min(3, "At least 3 characters")
+    .regex(/^[a-z0-9_]+$/, "Lowercase letters, numbers, underscores only"),
+  displayName: z.string().min(1, "Display name is required"),
+  bio: z.string().optional(),
+  city: z.string().optional(),
+  gender: z.enum(GENDERS, { required_error: "Select your gender" }),
+  matchPreference: z.enum(["same", "opposite", "any"]),
+  goals: z.array(z.string()).min(1, "Pick at least one goal"),
+  activities: z.array(z.string()).optional().default([]),
+});
+
+type OnboardingForm = z.infer<typeof onboardingSchema>;
+
+export default function OnboardingScreen() {
+  const { session, refreshProfile } = useAuth();
+  const [step, setStep] = useState(0);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState("");
+
+  const {
+    control,
+    handleSubmit,
+    watch,
+    getValues,
+    setValue,
+    trigger,
+    formState: { errors, isSubmitting },
+  } = useForm<OnboardingForm>({
+    resolver: zodResolver(onboardingSchema),
+    shouldUnregister: false,
+    defaultValues: {
+      username: "",
+      displayName: "",
+      bio: "",
+      city: "",
+      gender: undefined,
+      matchPreference: "any",
+      goals: [],
+      activities: [],
+    },
+  });
+
+  const goals = watch("goals");
+  const activities = watch("activities");
+  const gender = watch("gender");
+  const matchPreference = watch("matchPreference");
+
+  function toggleField(field: "goals" | "activities", value: string) {
+    const current = watch(field);
+    const next = current.includes(value)
+      ? current.filter((x) => x !== value)
+      : [...current, value];
+    setValue(field, next, { shouldValidate: true });
+  }
+
+  async function pickAvatar() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) setAvatarUri(result.assets[0].uri);
+  }
+
+  function onInvalid(fieldErrors: FieldErrors<OnboardingForm>) {
+    console.warn("[onboarding] validation failed:", fieldErrors);
+    const first = Object.values(fieldErrors).find((error) => error?.message);
+    setSubmitError(first?.message ?? "Please complete all steps");
+  }
+
+  async function onSubmit(data: OnboardingForm) {
+    if (!session?.user.id) {
+      setSubmitError("You must be signed in to save your profile");
+      return;
+    }
+    setSubmitError("");
+    try {
+      const formValues = getValues();
+      console.log("[onboarding] form values at submit:", {
+        username: formValues.username,
+        usernameLength: formValues.username?.length ?? 0,
+        displayName: formValues.displayName,
+      });
+
+      const upsertPayload = {
+        id: session.user.id,
+        username: data.username.toLowerCase(),
+        display_name: data.displayName,
+        bio: data.bio || null,
+        city: data.city || null,
+        fitness_goals: data.goals,
+        activities: data.activities,
+        gender: data.gender,
+        match_preference: data.matchPreference,
+        avatar_url: null as string | null,
+        onboarding_complete: true,
+        visibility: "public" as const,
+      };
+
+      console.log("[onboarding] upsertProfile payload:", upsertPayload);
+      let avatarUrl: string | null = null;
+      if (avatarUri) {
+        avatarUrl = await uploadAvatar(session.user.id, avatarUri, "image/jpeg");
+      }
+      upsertPayload.avatar_url = avatarUrl;
+
+      const saved = await upsertProfile(upsertPayload);
+      console.log("[onboarding] upsertProfile returned:", {
+        id: saved.id,
+        username: saved.username,
+        onboarding_complete: saved.onboarding_complete,
+      });
+
+      await refreshProfile(saved);
+
+      console.log("[onboarding] refreshProfile complete, navigating to tabs");
+      router.replace("/(tabs)")
+    } catch (e) {
+      console.error("[onboarding] submit failed:", e);
+      setSubmitError(e instanceof Error ? e.message : "Could not save profile");
+    }
+  }
+
+  async function nextStep() {
+    if (step === 0) {
+      const ok = await trigger(["username", "displayName"]);
+      if (ok) setStep(1);
+    } else if (step === 1) {
+      const ok = await trigger(["gender", "matchPreference"]);
+      if (ok) setStep(2);
+    } else if (step === 2) {
+      const ok = await trigger(["goals"]);
+      if (ok) setStep(3);
+    }
+  }
+
+  const stepTitles = ["Your profile", "About you", "Your goals", "Your activities"];
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>{stepTitles[step]}</Text>
+
+      <View style={step === 0 ? styles.stepPanel : styles.hiddenStep} pointerEvents={step === 0 ? "auto" : "none"}>
+          <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
+            <Avatar uri={avatarUri} name={watch("displayName")} size={96} />
+            <Text style={styles.avatarHint}>Tap to add photo</Text>
+          </Pressable>
+          <Controller
+            control={control}
+            name="username"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Username"
+                value={value}
+                onChangeText={(t) => onChange(t.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                autoCapitalize="none"
+                error={step === 0 ? errors.username?.message : undefined}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="displayName"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Display name"
+                value={value}
+                onChangeText={onChange}
+                error={step === 0 ? errors.displayName?.message : undefined}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="bio"
+            render={({ field: { onChange, value } }) => (
+              <Input label="Bio" value={value} onChangeText={onChange} multiline />
+            )}
+          />
+          <Controller
+            control={control}
+            name="city"
+            render={({ field: { onChange, value } }) => (
+              <Input label="City (optional)" value={value} onChangeText={onChange} />
+            )}
+          />
+      </View>
+
+      {step === 1 ? (
+        <View style={styles.stepPanel}>
+          <Text style={styles.sectionLabel}>Gender</Text>
+          <View style={styles.chips}>
+            {GENDERS.map((g) => (
+              <Pressable
+                key={g}
+                style={[styles.chip, gender === g && styles.chipActive]}
+                onPress={() => setValue("gender", g, { shouldValidate: true })}
+              >
+                <Text style={[styles.chipText, gender === g && styles.chipTextActive]}>
+                  {g.replace(/_/g, " ")}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {errors.gender ? <Text style={styles.error}>{errors.gender.message}</Text> : null}
+          <Text style={styles.sectionLabel}>Partner preference (for future matching)</Text>
+          <View style={styles.chips}>
+            {MATCH_PREFS.map(({ value, label }) => (
+              <Pressable
+                key={value}
+                style={[styles.chip, matchPreference === value && styles.chipActive]}
+                onPress={() => setValue("matchPreference", value)}
+              >
+                <Text
+                  style={[styles.chipText, matchPreference === value && styles.chipTextActive]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {step === 2 ? (
+        <View style={styles.stepPanel}>
+          <View style={styles.chips}>
+            {FITNESS_GOALS.map((g) => (
+              <Pressable
+                key={g}
+                style={[styles.chip, goals.includes(g) && styles.chipActive]}
+                onPress={() => toggleField("goals", g)}
+              >
+                <Text style={[styles.chipText, goals.includes(g) && styles.chipTextActive]}>
+                  {formatGoal(g)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {errors.goals ? <Text style={styles.error}>{errors.goals.message}</Text> : null}
+        </View>
+      ) : null}
+
+      {step === 3 ? (
+        <View style={styles.stepPanel}>
+          <View style={styles.chips}>
+            {ACTIVITIES.map((a) => (
+              <Pressable
+                key={a}
+                style={[styles.chip, activities.includes(a) && styles.chipActive]}
+                onPress={() => toggleField("activities", a)}
+              >
+                <Text style={[styles.chipText, activities.includes(a) && styles.chipTextActive]}>
+                  {formatActivity(a)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {errors.activities ? <Text style={styles.error}>{errors.activities.message}</Text> : null}
+        </View>
+      ) : null}
+
+      {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
+
+      <View style={styles.footer}>
+        {step < 3 ? (
+          <Button title="Continue" onPress={nextStep} />
+        ) : (
+          <Button
+            title="Start training together"
+            onPress={handleSubmit(onSubmit, onInvalid)}
+            loading={isSubmitting}
+          />
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxl },
+  title: { ...typography.title, marginBottom: spacing.sm },
+  stepPanel: { gap: spacing.md },
+  hiddenStep: { height: 0, overflow: "hidden", opacity: 0 },
+  sectionLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  avatarWrap: { alignItems: "center", gap: spacing.sm },
+  avatarHint: { ...typography.caption, color: colors.accent },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
+  chipText: { color: colors.textSecondary, textTransform: "capitalize" },
+  chipTextActive: { color: colors.accent, fontWeight: "600" },
+  error: { color: colors.danger },
+  footer: { marginTop: spacing.lg },
+});

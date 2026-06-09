@@ -1,0 +1,71 @@
+import type { ExpoConfig } from "expo/config";
+
+const config: ExpoConfig = {
+  name: "Frennix",
+  slug: "frennix",
+  version: "0.1.0",
+  orientation: "portrait",
+  icon: "./assets/icon.png",
+  scheme: "frennix",
+  userInterfaceStyle: "dark",
+  newArchEnabled: true,
+  splash: {
+    image: "./assets/splash-icon.png",
+    resizeMode: "contain",
+    backgroundColor: "#0A0A0B",
+  },
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "com.frennix.app",
+    usesAppleSignIn: true,
+    infoPlist: {
+      NSCameraUsageDescription:
+        "Frennix needs camera access to share workout photos and videos.",
+      NSPhotoLibraryUsageDescription:
+        "Frennix needs photo library access to share workout content.",
+      NSMicrophoneUsageDescription: "Frennix needs microphone access for workout videos.",
+    },
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#0A0A0B",
+    },
+    package: "com.frennix.app",
+  },
+  plugins: [
+    "expo-router",
+    "expo-secure-store",
+    [
+      "expo-notifications",
+      {
+        icon: "./assets/icon.png",
+        color: "#22C55E",
+      },
+    ],
+    "expo-apple-authentication",
+    [
+      "@sentry/react-native/expo",
+      {
+        organization: "frennix",
+        project: "frennix-mobile",
+      },
+    ],
+  ],
+  experiments: {
+    typedRoutes: true,
+  },
+  extra: {
+    router: { origin: false },
+    eas: {
+      projectId: process.env.EAS_PROJECT_ID ?? "YOUR_EAS_PROJECT_ID",
+    },
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
+    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
+    sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? "",
+    privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "https://frennix.app/privacy",
+    termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? "https://frennix.app/terms",
+  },
+};
+
+export default config;
