@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, router } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 import {
   followUser,
+  getErrorMessage,
   getOrCreateConversation,
   getProfileByUsername,
   getFollowers,
@@ -22,6 +24,7 @@ export default function UserProfileScreen() {
   const { session, profile: me } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
+  const [messaging, setMessaging] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", username],
@@ -62,10 +65,32 @@ export default function UserProfileScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["is-following"] }),
   });
 
+  function showAlert(title: string, message: string) {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined") window.alert(`${title}\n\n${message}`);
+      return;
+    }
+    Alert.alert(title, message);
+  }
+
   async function messageUser() {
     if (!profile) return;
-    const convId = await getOrCreateConversation(userId, profile.id);
-    router.push(`/chat/${convId}`);
+    if (!userId) {
+      showAlert("Sign in required", "Sign in to send messages.");
+      return;
+    }
+
+    setMessaging(true);
+    try {
+      console.log("[messageUser] opening chat:", { userId, targetUserId: profile.id, username: profile.username });
+      const convId = await getOrCreateConversation(userId, profile.id);
+      router.push(`/chat/${convId}`);
+    } catch (e) {
+      console.error("[messageUser] failed:", e);
+      showAlert("Could not open chat", getErrorMessage(e));
+    } finally {
+      setMessaging(false);
+    }
   }
 
   function showModeration() {
@@ -122,7 +147,7 @@ export default function UserProfileScreen() {
             onPress={() => followMutation.mutate()}
             loading={followMutation.isPending}
           />
-          <Button title="Message" variant="secondary" onPress={messageUser} />
+          <Button title="Message" variant="secondary" onPress={messageUser} loading={messaging} />
           <Button title="Report / Block" variant="ghost" onPress={showModeration} />
         </View>
       ) : null}

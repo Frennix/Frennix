@@ -3,10 +3,12 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { getSupabase, signInWithEmail } from "@frennix/api";
+import { useAuth } from "@/providers/AuthProvider";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 import { isSupabaseConfigured } from "@/lib/config";
 
 export default function LoginScreen() {
+  const { applySession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,7 +18,8 @@ export default function LoginScreen() {
     setError("");
     setLoading(true);
     try {
-      await signInWithEmail(email.trim(), password);
+      const { session } = await signInWithEmail(email.trim(), password);
+      await applySession(session);
       router.replace("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign in failed");
@@ -40,6 +43,8 @@ export default function LoginScreen() {
         token: credential.identityToken,
       });
       if (error) throw error;
+      const { data: sessionData } = await getSupabase().auth.getSession();
+      await applySession(sessionData.session);
       router.replace("/");
     } catch (e) {
       if ((e as { code?: string }).code !== "ERR_REQUEST_CANCELED") {

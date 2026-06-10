@@ -2,9 +2,11 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { signUpWithEmail } from "@frennix/api";
+import { useAuth } from "@/providers/AuthProvider";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 export default function SignupScreen() {
+  const { applySession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,7 +16,14 @@ export default function SignupScreen() {
     setError("");
     setLoading(true);
     try {
-      await signUpWithEmail(email.trim(), password);
+      const { session } = await signUpWithEmail(email.trim(), password);
+
+      if (!session) {
+        setError("Account created. Check your email to confirm, then sign in.");
+        return;
+      }
+
+      await applySession(session);
       router.replace("/onboarding");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign up failed");

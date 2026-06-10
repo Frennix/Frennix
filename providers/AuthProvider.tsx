@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Profile } from "@frennix/types";
-import { getProfile, getSession, initSupabase, onAuthStateChange } from "@frennix/api";
+import { getProfile, getSession, initSupabase, onAuthStateChange, signOut as supabaseSignOut } from "@frennix/api";
 import type { Session } from "@supabase/supabase-js";
 import { config, isSupabaseConfigured } from "@/lib/config";
 import { registerForPushNotifications } from "@/lib/notifications";
@@ -18,6 +18,8 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   refreshProfile: (userIdOrProfile?: string | Profile) => Promise<void>;
+  applySession: (session: Session | null) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,6 +56,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(p);
   }, [session?.user.id]);
 
+  const signOut = useCallback(async () => {
+    await supabaseSignOut();
+    setSession(null);
+    setProfile(null);
+  }, []);
+
+  const applySession = useCallback(async (nextSession: Session | null) => {
+    setSession(nextSession);
+    if (nextSession?.user.id) {
+      const p = await getProfile(nextSession.user.id);
+      setProfile(p);
+      registerForPushNotifications(nextSession.user.id).catch(() => undefined);
+    } else {
+      setProfile(null);
+    }
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseConfigured()) {
       setLoading(false);
@@ -62,33 +82,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initSupabase(config.supabaseUrl, config.supabaseAnonKey);
 
-    getSession().then(async (s) => {
-      setSession(s);
-      if (s?.user.id) {
-        const p = await getProfile(s.user.id);
-        setProfile(p);
-        registerForPushNotifications(s.user.id).catch(() => undefined);
-      }
-      setLoading(false);
-    });
+    getSession()
+      .then((s) => applySession(s))
+      .catch(() => setLoading(false));
 
-    const { data: sub } = onAuthStateChange(async (_event, s) => {
-      setSession(s);
-      if (s?.user.id) {
-        const p = await getProfile(s.user.id);
-        setProfile(p);
-        registerForPushNotifications(s.user.id).catch(() => undefined);
-      } else {
-        setProfile(null);
-      }
+    const { data: sub } = onAuthStateChange((_event, s) => {
+      void applySession(s);
     });
 
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [applySession]);
 
   const value = useMemo(
-    () => ({ session, profile, loading, refreshProfile }),
-    [session, profile, loading, refreshProfile]
+    () => ({ session, profile, loading, refreshProfile, applySession, signOut }),
+    [session, profile, loading, refreshProfile, applySession, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,11 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Controller, useForm, type FieldErrors } from "react-hook-form";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
-import { upsertProfile, uploadAvatar } from "@frennix/api";
+import { getSession, upsertProfile, uploadAvatar } from "@frennix/api";
 import { ACTIVITIES, FITNESS_GOALS, type MatchPreference } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatActivity, formatGoal } from "@/lib/labels";
@@ -35,7 +35,7 @@ const onboardingSchema = z.object({
 type OnboardingForm = z.infer<typeof onboardingSchema>;
 
 export default function OnboardingScreen() {
-  const { session, refreshProfile } = useAuth();
+  const { session, loading, refreshProfile, applySession } = useAuth();
   const [step, setStep] = useState(0);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState("");
@@ -93,10 +93,20 @@ export default function OnboardingScreen() {
   }
 
   async function onSubmit(data: OnboardingForm) {
-    if (!session?.user.id) {
+    if (loading) return;
+
+    let userId = session?.user.id;
+    if (!userId) {
+      const freshSession = await getSession();
+      userId = freshSession?.user.id;
+      if (freshSession) await applySession(freshSession);
+    }
+
+    if (!userId) {
       setSubmitError("You must be signed in to save your profile");
       return;
     }
+
     setSubmitError("");
     try {
       const formValues = getValues();
@@ -107,7 +117,7 @@ export default function OnboardingScreen() {
       });
 
       const upsertPayload = {
-        id: session.user.id,
+        id: userId,
         username: data.username.toLowerCase(),
         display_name: data.displayName,
         bio: data.bio || null,
@@ -124,7 +134,7 @@ export default function OnboardingScreen() {
       console.log("[onboarding] upsertProfile payload:", upsertPayload);
       let avatarUrl: string | null = null;
       if (avatarUri) {
-        avatarUrl = await uploadAvatar(session.user.id, avatarUri, "image/jpeg");
+        avatarUrl = await uploadAvatar(userId, avatarUri, "image/jpeg");
       }
       upsertPayload.avatar_url = avatarUrl;
 
@@ -159,6 +169,18 @@ export default function OnboardingScreen() {
   }
 
   const stepTitles = ["Your profile", "About you", "Your goals", "Your activities"];
+
+  if (loading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <Redirect href="/(auth)/login" />;
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -302,6 +324,12 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.background,
+  },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxl },
   title: { ...typography.title, marginBottom: spacing.sm },

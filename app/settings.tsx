@@ -1,6 +1,7 @@
 import { Link, router } from "expo-router";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { signOut } from "@frennix/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { config } from "@/lib/config";
 import { Button, colors, spacing, typography } from "@frennix/ui";
@@ -10,19 +11,48 @@ function formatUsername(username: string | null | undefined) {
   return trimmed ? `@${trimmed}` : "No username yet";
 }
 
+function confirmAction(title: string, message: string, onConfirm: () => void) {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Sign out", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+function showError(message: string) {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined") window.alert(message);
+    return;
+  }
+  Alert.alert("Sign out failed", message);
+}
+
 export default function SettingsScreen() {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
+  const queryClient = useQueryClient();
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
-    await signOut();
-    router.replace("/(auth)/login");
+    setSigningOut(true);
+    try {
+      await signOut();
+      queryClient.clear();
+      router.replace("/(auth)/login");
+    } catch (e) {
+      showError(e instanceof Error ? e.message : "Could not sign out");
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   function confirmSignOut() {
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: handleSignOut },
-    ]);
+    confirmAction("Sign out", "Are you sure you want to sign out?", handleSignOut);
   }
 
   function openUrl(url: string) {
@@ -51,7 +81,12 @@ export default function SettingsScreen() {
       <Text style={styles.muted}>Marketplace · Premium · Live stream</Text>
 
       <View style={styles.footer}>
-        <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
+        <Button
+          title="Sign out"
+          variant="danger"
+          onPress={confirmSignOut}
+          loading={signingOut}
+        />
       </View>
     </View>
   );
