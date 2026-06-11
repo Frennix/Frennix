@@ -36,23 +36,24 @@ function openNotification(n: Notification) {
 }
 
 export default function NotificationsScreen() {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
   const userId = session?.user.id ?? "";
+  const notificationsReady = !loading && !!userId;
   const queryClient = useQueryClient();
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", userId],
     queryFn: () => getNotifications(userId),
-    enabled: !!userId,
+    enabled: notificationsReady,
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!notificationsReady) return;
     const channel = subscribeToNotifications(userId, () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
     });
     return () => channel.unsubscribe();
-  }, [userId, queryClient]);
+  }, [notificationsReady, userId, queryClient]);
 
   const readMutation = useMutation({
     mutationFn: markNotificationRead,

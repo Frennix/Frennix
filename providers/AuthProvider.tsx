@@ -8,9 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import type { Profile } from "@frennix/types";
-import { getProfile, getSession, initSupabase, onAuthStateChange, signOut as supabaseSignOut } from "@frennix/api";
+import { getProfile, getSession, onAuthStateChange, signOut as supabaseSignOut } from "@frennix/api";
 import type { Session } from "@supabase/supabase-js";
-import { config, isSupabaseConfigured } from "@/lib/config";
+import { isSupabaseConfigured } from "@/lib/config";
+import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 
 interface AuthContextValue {
@@ -23,12 +24,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function ensureSupabaseInitialized() {
-  if (isSupabaseConfigured()) {
-    initSupabase(config.supabaseUrl, config.supabaseAnonKey);
-  }
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   ensureSupabaseInitialized();
