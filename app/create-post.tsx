@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
@@ -11,6 +12,7 @@ import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 export default function CreatePostScreen() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const [content, setContent] = useState("");
   const [workoutType, setWorkoutType] = useState<string | null>(null);
   const [mediaUri, setMediaUri] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export default function CreatePostScreen() {
         workout_type: workoutType,
       });
 
+      await queryClient.invalidateQueries({ queryKey: ["feed", session.user.id] });
       router.back();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to post");
