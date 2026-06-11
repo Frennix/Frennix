@@ -24,7 +24,14 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function ensureSupabaseInitialized() {
+  if (isSupabaseConfigured()) {
+    initSupabase(config.supabaseUrl, config.supabaseAnonKey);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  ensureSupabaseInitialized();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-
-    initSupabase(config.supabaseUrl, config.supabaseAnonKey);
 
     getSession()
       .then((s) => applySession(s))

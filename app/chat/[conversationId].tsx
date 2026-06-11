@@ -31,8 +31,9 @@ const TYPING_HIDE_MS = 3000;
 
 export default function ChatScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
   const userId = session?.user.id ?? "";
+  const chatReady = !loading && !!conversationId && !!userId;
   const [text, setText] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
   const [sendingMedia, setSendingMedia] = useState(false);
@@ -43,10 +44,10 @@ export default function ChatScreen() {
   const hideTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingBroadcastRef = useRef(0);
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", conversationId],
     queryFn: () => getMessages(conversationId!),
-    enabled: !!conversationId,
+    enabled: chatReady,
   });
 
   const markRead = useCallback(() => {
@@ -58,7 +59,7 @@ export default function ChatScreen() {
   }, [conversationId, userId, queryClient]);
 
   useEffect(() => {
-    if (!conversationId) return;
+    if (!chatReady) return;
 
     markRead();
 
@@ -79,7 +80,7 @@ export default function ChatScreen() {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
     };
-  }, [conversationId, userId, queryClient, markRead]);
+  }, [chatReady, conversationId, userId, queryClient, markRead]);
 
   const sendMutation = useMutation({
     mutationFn: (payload: { content: string; mediaUrl?: string | null }) =>
@@ -145,6 +146,14 @@ export default function ChatScreen() {
     );
   }
 
+  if (loading || (chatReady && messagesLoading && messages.length === 0)) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -190,6 +199,12 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.background,
+  },
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.md, flexGrow: 1 },
   typing: { ...typography.caption, color: colors.textMuted, fontStyle: "italic", paddingVertical: spacing.xs },
