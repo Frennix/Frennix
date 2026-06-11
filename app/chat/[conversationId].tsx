@@ -23,6 +23,7 @@ import {
 } from "@frennix/api";
 import type { Message } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { ImageLightbox } from "@/components/ImageLightbox";
 import { Button, Input, MessageBubble, colors, spacing, typography } from "@frennix/ui";
 
 const TYPING_DEBOUNCE_MS = 1500;
@@ -35,6 +36,7 @@ export default function ChatScreen() {
   const [text, setText] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
   const [sendingMedia, setSendingMedia] = useState(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const listRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,6 +140,7 @@ export default function ChatScreen() {
         isOwn={isOwn}
         timestamp={time}
         mediaUrl={item.media_url}
+        onMediaPress={item.media_url ? () => setPreviewUri(item.media_url) : undefined}
       />
     );
   }
@@ -148,6 +151,7 @@ export default function ChatScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={90}
     >
+      <ImageLightbox uri={previewUri} onClose={() => setPreviewUri(null)} />
       <FlatList
         ref={listRef}
         data={messages}
