@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import {
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -76,25 +77,19 @@ export function ImageLightbox({ uri, onClose }: ImageLightboxProps) {
           </Pressable>
 
           {uri ? (
-            Platform.OS === "web" ? (
-              <Animated.Image
-                source={{ uri }}
-                style={[styles.image, { maxWidth: imageMaxWidth, maxHeight: imageMaxHeight }]}
-                resizeMode="contain"
-              />
-            ) : (
-              <GestureDetector gesture={pinch}>
-                <Animated.Image
-                  source={{ uri }}
-                  style={[
-                    styles.image,
-                    { maxWidth: imageMaxWidth, maxHeight: imageMaxHeight },
-                    animatedStyle,
-                  ]}
-                  resizeMode="contain"
-                />
-              </GestureDetector>
-            )
+            <View style={[styles.imageFrame, { width: imageMaxWidth, height: imageMaxHeight }]}>
+              {Platform.OS === "web" ? (
+                <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+              ) : (
+                <GestureDetector gesture={pinch}>
+                  <Animated.Image
+                    source={{ uri }}
+                    style={[styles.image, animatedStyle]}
+                    resizeMode="contain"
+                  />
+                </GestureDetector>
+              )}
+            </View>
           ) : null}
         </View>
       </View>
@@ -117,6 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.xl,
+    zIndex: 1,
   },
   closeButton: {
     position: "absolute",
@@ -138,8 +134,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 20,
   },
-  image: {
+  imageFrame: {
     zIndex: 1,
     alignSelf: "center",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
   },
 });

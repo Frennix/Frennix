@@ -44,7 +44,6 @@ export default function OnboardingScreen() {
     control,
     handleSubmit,
     watch,
-    getValues,
     setValue,
     trigger,
     formState: { errors, isSubmitting },
@@ -87,7 +86,6 @@ export default function OnboardingScreen() {
   }
 
   function onInvalid(fieldErrors: FieldErrors<OnboardingForm>) {
-    console.warn("[onboarding] validation failed:", fieldErrors);
     const first = Object.values(fieldErrors).find((error) => error?.message);
     setSubmitError(first?.message ?? "Please complete all steps");
   }
@@ -109,13 +107,6 @@ export default function OnboardingScreen() {
 
     setSubmitError("");
     try {
-      const formValues = getValues();
-      console.log("[onboarding] form values at submit:", {
-        username: formValues.username,
-        usernameLength: formValues.username?.length ?? 0,
-        displayName: formValues.displayName,
-      });
-
       const upsertPayload = {
         id: userId,
         username: data.username.toLowerCase(),
@@ -131,7 +122,6 @@ export default function OnboardingScreen() {
         visibility: "public" as const,
       };
 
-      console.log("[onboarding] upsertProfile payload:", upsertPayload);
       let avatarUrl: string | null = null;
       if (avatarUri) {
         avatarUrl = await uploadAvatar(userId, avatarUri, "image/jpeg");
@@ -139,18 +129,9 @@ export default function OnboardingScreen() {
       upsertPayload.avatar_url = avatarUrl;
 
       const saved = await upsertProfile(upsertPayload);
-      console.log("[onboarding] upsertProfile returned:", {
-        id: saved.id,
-        username: saved.username,
-        onboarding_complete: saved.onboarding_complete,
-      });
-
       await refreshProfile(saved);
-
-      console.log("[onboarding] refreshProfile complete, navigating to tabs");
       router.replace("/(tabs)")
     } catch (e) {
-      console.error("[onboarding] submit failed:", e);
       setSubmitError(e instanceof Error ? e.message : "Could not save profile");
     }
   }

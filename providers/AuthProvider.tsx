@@ -31,28 +31,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async (userIdOrProfile?: string | Profile) => {
     if (userIdOrProfile && typeof userIdOrProfile === "object") {
-      console.log("[refreshProfile] applied upsert result:", {
-        id: userIdOrProfile.id,
-        username: userIdOrProfile.username,
-        onboarding_complete: userIdOrProfile.onboarding_complete,
-      });
       setProfile(userIdOrProfile);
       return;
     }
 
     const id =
       (typeof userIdOrProfile === "string" ? userIdOrProfile : undefined) ?? session?.user.id;
-    if (!id) {
-      console.warn("[refreshProfile] skipped: no user id");
-      return;
-    }
+    if (!id) return;
 
     const p = await getProfile(id);
-    console.log("[refreshProfile] fetched from Supabase:", {
-      id,
-      username: p?.username ?? null,
-      onboarding_complete: p?.onboarding_complete ?? null,
-    });
     setProfile(p);
   }, [session?.user.id]);
 
