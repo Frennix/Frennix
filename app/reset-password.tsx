@@ -41,7 +41,7 @@ export default function ResetPasswordScreen() {
     }
   }
 
-  if (loading) {
+  if (loading || (passwordRecovery && !session)) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.accent} size="large" />

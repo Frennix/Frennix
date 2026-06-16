@@ -2,7 +2,7 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
-import { getSupabase, signInWithEmail } from "@frennix/api";
+import { formatLoginError, getSupabase, signInWithEmail } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -22,7 +22,7 @@ export default function LoginScreen() {
       await applySession(session);
       router.replace("/");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign in failed");
+      setError(formatLoginError(e));
     } finally {
       setLoading(false);
     }

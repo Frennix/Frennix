@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd ../.. && pnpm --filter @frennix/mobile run build:web",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/((?!_expo/).*)", "destination": "/index.html" }]
+}

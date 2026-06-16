@@ -11,7 +11,7 @@ export default function Index() {
     return <Redirect href="/(auth)/welcome" />;
   }
 
-  if (loading) {
+  if (loading || (passwordRecovery && !session)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />

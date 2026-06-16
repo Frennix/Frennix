@@ -98,17 +98,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    Linking.getInitialURL().then((url) => {
-      if (url) void handleRecoveryUrl(url);
-    });
+    async function bootstrapAuth() {
+      // Web recovery links carry tokens in the URL hash; Expo Linking omits the hash.
+      if (typeof window !== "undefined" && isWebRecoveryHash()) {
+        try {
+          const isRecovery = await establishSessionFromUrl(window.location.href);
+          if (isRecovery) setPasswordRecovery(true);
+        } catch {
+          // detectSessionInUrl may have already handled it.
+        }
+      }
+
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) await handleRecoveryUrl(initialUrl);
+
+      const s = await getSession();
+      await applySession(s);
+    }
 
     const linkSub = Linking.addEventListener("url", ({ url }) => {
       void handleRecoveryUrl(url);
     });
 
-    getSession()
-      .then((s) => applySession(s))
-      .catch(() => setLoading(false));
+    void bootstrapAuth().catch(() => setLoading(false));
 
     const { data: sub } = onAuthStateChange((event, s) => {
       if (event === "PASSWORD_RECOVERY") {
