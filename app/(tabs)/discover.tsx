@@ -1,30 +1,61 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { discoverProfiles, getChallenges, getGroups } from "@frennix/api";
-import { ChallengeCard, EmptyState, GroupCard, Input, UserRow, colors, spacing, typography } from "@frennix/ui";
+import { useEffect, useState, useCallback } from "react";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { discoverProfiles, getChallenges, getGroups, searchProfiles } from "@frennix/api";
+import { useAuth } from "@/providers/AuthProvider";
+import { formatActivity } from "@/lib/labels";
+import {
+  ChallengeCard,
+  DiscoverProfileCard,
+  EmptyState,
+  GroupCard,
+  Input,
+  colors,
+  spacing,
+  typography,
+} from "@frennix/ui";
 
 type Tab = "people" | "groups" | "challenges";
 
+function profileInterestLabels(activities: string[] | undefined, limit = 4) {
+  return (activities ?? []).slice(0, limit).map(formatActivity);
+}
+
 export default function DiscoverScreen() {
+  const { session } = useAuth();
+  const userId = session?.user.id ?? "";
   const [tab, setTab] = useState<Tab>("people");
-  const [query, setQuery] = useState("");
-  const [activity, setActivity] = useState("");
+  const [peopleSearch, setPeopleSearch] = useState("");
+  const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
+  const [groupQuery, setGroupQuery] = useState("");
 
-  const { data: people = [] } = useQuery({
-    queryKey: ["discover-people", query, activity],
-    queryFn: () => discoverProfiles({ city: query || undefined, activity: activity || undefined }),
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPeopleSearch(peopleSearch.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [peopleSearch]);
+
+  const isSearchingPeople = debouncedPeopleSearch.length > 0;
+
+  const { data: people = [], isFetching: peopleLoading, refetch: refetchPeople, isRefetching: peopleRefetching } = useQuery({
+    queryKey: ["discover-people", debouncedPeopleSearch],
+    queryFn: () =>
+      isSearchingPeople
+        ? searchProfiles(debouncedPeopleSearch, 30, userId)
+        : discoverProfiles(undefined, userId),
+    enabled: tab === "people",
   });
 
-  const { data: groups = [] } = useQuery({
-    queryKey: ["discover-groups", query],
-    queryFn: () => getGroups({ query: query || undefined }),
+  const { data: groups = [], refetch: refetchGroups, isRefetching: groupsRefetching } = useQuery({
+    queryKey: ["discover-groups", groupQuery],
+    queryFn: () => getGroups({ query: groupQuery || undefined }),
+    enabled: tab === "groups",
   });
 
-  const { data: challenges = [] } = useQuery({
+  const { data: challenges = [], refetch: refetchChallenges, isRefetching: challengesRefetching } = useQuery({
     queryKey: ["discover-challenges"],
     queryFn: getChallenges,
+    enabled: tab === "challenges",
   });
 
   const tabs: { key: Tab; label: string }[] = [
@@ -33,14 +64,30 @@ export default function DiscoverScreen() {
     { key: "challenges", label: "Challenges" },
   ];
 
+  const onRefreshPeople = useCallback(() => refetchPeople(), [refetchPeople]);
+  const onRefreshGroups = useCallback(() => refetchGroups(), [refetchGroups]);
+  const onRefreshChallenges = useCallback(() => refetchChallenges(), [refetchChallenges]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Find your training community</Text>
-      <Input
-        placeholder={tab === "people" ? "Search city..." : "Search..."}
-        value={query}
-        onChangeText={setQuery}
-      />
+
+      {tab === "people" ? (
+        <View style={styles.searchBlock}>
+          <Input
+            placeholder="Search by name, interests, workout type, or bio..."
+            value={peopleSearch}
+            onChangeText={setPeopleSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.searchHint}>
+            Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio
+          </Text>
+        </View>
+      ) : tab === "groups" ? (
+        <Input placeholder="Search groups..." value={groupQuery} onChangeText={setGroupQuery} />
+      ) : null}
 
       <View style={styles.tabRow}>
         {tabs.map((t) => (
@@ -59,17 +106,32 @@ export default function DiscoverScreen() {
           data={people}
           keyExtractor={(p) => p.id}
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={peopleRefetching} onRefresh={onRefreshPeople} tintColor={colors.accent} />
+          }
+          ListHeaderComponent={
+            peopleLoading && isSearchingPeople ? (
+              <ActivityIndicator color={colors.accent} style={styles.loader} />
+            ) : null
+          }
           ListEmptyComponent={
-            <EmptyState
-              title="No partners yet"
-              description="Try another city or activity filter to find people with similar fitness goals."
-            />
+            !peopleLoading ? (
+              <EmptyState
+                title={isSearchingPeople ? "No people found" : "Search for athletes"}
+                description={
+                  isSearchingPeople
+                    ? "Try a different name, fitness interest, workout type, or bio keyword."
+                    : "Use the search bar to find people by name, interests, workout type, or bio."
+                }
+              />
+            ) : null
           }
           renderItem={({ item }) => (
-            <UserRow
+            <DiscoverProfileCard
               profile={item}
-              subtitle={[...(item.activities ?? [])].slice(0, 2).join(", ")}
-              onPress={() => router.push(`/user/${item.username}`)}
+              interestLabels={profileInterestLabels(item.activities)}
+              onViewProfile={() => router.push(`/user/${item.username}`)}
             />
           )}
         />
@@ -80,6 +142,9 @@ export default function DiscoverScreen() {
           data={groups}
           keyExtractor={(g) => g.id}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={groupsRefetching} onRefresh={onRefreshGroups} tintColor={colors.accent} />
+          }
           ListHeaderComponent={
             <Pressable onPress={() => router.push("/create-group")}>
               <Text style={styles.createLink}>+ Create a group</Text>
@@ -104,6 +169,13 @@ export default function DiscoverScreen() {
           data={challenges}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={challengesRefetching}
+              onRefresh={onRefreshChallenges}
+              tintColor={colors.accent}
+            />
+          }
           ListHeaderComponent={
             <Pressable onPress={() => router.push("/create-challenge")}>
               <Text style={styles.createLink}>+ Create a challenge</Text>
@@ -129,6 +201,8 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
   header: { ...typography.heading, marginBottom: spacing.sm },
+  searchBlock: { gap: spacing.xs, marginBottom: spacing.xs },
+  searchHint: { ...typography.caption, color: colors.textMuted },
   tabRow: { flexDirection: "row", gap: spacing.sm, marginVertical: spacing.md },
   tab: {
     flex: 1,
@@ -142,4 +216,5 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.accent },
   list: { paddingBottom: spacing.xxl },
   createLink: { color: colors.accent, fontWeight: "600", marginBottom: spacing.md },
+  loader: { marginVertical: spacing.md },
 });

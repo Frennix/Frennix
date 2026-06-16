@@ -58,13 +58,14 @@ const config: ExpoConfig = {
   extra: {
     router: { origin: false },
     eas: {
-      projectId: process.env.EAS_PROJECT_ID ?? "YOUR_EAS_PROJECT_ID",
+      projectId: "7910ebf1-56ce-4fa0-9777-6c88602c89c6",
     },
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
     sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? "",
     privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "https://frennix.app/privacy",
     termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? "https://frennix.app/terms",
+    appUrl: process.env.EXPO_PUBLIC_APP_URL ?? "https://frennix.vercel.app",
   },
 };
 

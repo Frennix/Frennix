@@ -2,14 +2,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Redirect, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Controller, useForm, type FieldErrors } from "react-hook-form";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
-import { getSession, upsertProfile, uploadAvatar } from "@frennix/api";
+import { getSession, upsertProfile, uploadAvatar, claimReferral } from "@frennix/api";
 import { ACTIVITIES, FITNESS_GOALS, type MatchPreference } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatActivity, formatGoal } from "@/lib/labels";
+import { SubmitStatusBanner } from "@/components/SubmitStatusBanner";
+import { claimPendingReferral } from "@/lib/referral-storage";
 import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui";
+
+const SUCCESS_NAV_DELAY_MS = 2000;
 
 const GENDERS = ["female", "male", "non_binary", "prefer_not_to_say"] as const;
 const MATCH_PREFS: { value: MatchPreference; label: string }[] = [
@@ -39,6 +43,10 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(0);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const submittingRef = useRef(false);
+  const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     control,
@@ -91,7 +99,7 @@ export default function OnboardingScreen() {
   }
 
   async function onSubmit(data: OnboardingForm) {
-    if (loading) return;
+    if (loading || submittingRef.current || submitSuccess) return;
 
     let userId = session?.user.id;
     if (!userId) {
@@ -105,6 +113,7 @@ export default function OnboardingScreen() {
       return;
     }
 
+    submittingRef.current = true;
     setSubmitError("");
     try {
       const upsertPayload = {
@@ -124,16 +133,29 @@ export default function OnboardingScreen() {
 
       let avatarUrl: string | null = null;
       if (avatarUri) {
+        setUploadingAvatar(true);
         avatarUrl = await uploadAvatar(userId, avatarUri, "image/jpeg");
+        setUploadingAvatar(false);
       }
       upsertPayload.avatar_url = avatarUrl;
 
       const saved = await upsertProfile(upsertPayload);
+      await claimPendingReferral(claimReferral);
       await refreshProfile(saved);
-      router.replace("/(tabs)")
+      setSubmitSuccess(true);
+      navigateTimeoutRef.current = setTimeout(() => {
+        router.replace("/(tabs)");
+        submittingRef.current = false;
+      }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
+      setUploadingAvatar(false);
+      submittingRef.current = false;
       setSubmitError(e instanceof Error ? e.message : "Could not save profile");
     }
+  }
+
+  function prevStep() {
+    if (step > 0) setStep(step - 1);
   }
 
   async function nextStep() {
@@ -150,6 +172,12 @@ export default function OnboardingScreen() {
   }
 
   const stepTitles = ["Your profile", "About you", "Your goals", "Your activities"];
+
+  useEffect(() => {
+    return () => {
+      if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -289,14 +317,26 @@ export default function OnboardingScreen() {
 
       {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
 
+      <SubmitStatusBanner
+        isSubmitting={isSubmitting || uploadingAvatar}
+        isSuccess={submitSuccess}
+        submittingLabel={uploadingAvatar ? "Uploading photo…" : "Setting up your profile…"}
+        successLabel="Welcome to Frennix! Taking you to your feed…"
+      />
+
       <View style={styles.footer}>
+        {step > 0 ? (
+          <Button title="Back" variant="secondary" onPress={prevStep} disabled={isSubmitting || submitSuccess} />
+        ) : null}
         {step < 3 ? (
           <Button title="Continue" onPress={nextStep} />
         ) : (
           <Button
-            title="Start training together"
+            title={submitSuccess ? "Profile saved!" : "Start training together"}
+            loadingTitle="Saving…"
             onPress={handleSubmit(onSubmit, onInvalid)}
-            loading={isSubmitting}
+            loading={isSubmitting || uploadingAvatar}
+            disabled={submitSuccess}
           />
         )}
       </View>
@@ -331,5 +371,5 @@ const styles = StyleSheet.create({
   chipText: { color: colors.textSecondary, textTransform: "capitalize" },
   chipTextActive: { color: colors.accent, fontWeight: "600" },
   error: { color: colors.danger },
-  footer: { marginTop: spacing.lg },
+  footer: { marginTop: spacing.lg, gap: spacing.sm },
 });

@@ -4,12 +4,21 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "r
 import { getFeed, toggleLike } from "@frennix/api";
 import type { FeedPage } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
-import { EmptyState, PostCard, colors, spacing } from "@frennix/ui";
+import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { useSharePost } from "@/lib/useSharePost";
+import { useSavePost } from "@/lib/useSavePost";
+import { useModeration } from "@/lib/useModeration";
+import { PostActionSheet } from "@/components/PostActionSheet";
+import { EmptyState, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
+  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
+  const { openShare, shareSheet } = useSharePost(userId);
+  const { toggleSavePost } = useSavePost(userId);
+  const { moderationSheets, openPostModeration } = useModeration(userId);
 
   const {
     data,
@@ -69,6 +78,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <PostActionSheet {...actionSheetProps} />
+      {shareSheet}
+      {moderationSheets}
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -86,24 +98,31 @@ export default function HomeScreen() {
           ) : null
         }
         ListEmptyComponent={
-          !isLoading ? (
+          isLoading ? (
+            <ActivityIndicator color={colors.accent} style={styles.footer} />
+          ) : (
             <EmptyState
               title="Your feed is ready to move"
               description="Follow athletes and join groups to see workout wins, challenges, and community activity."
               actionLabel="Discover people"
               onAction={() => router.push("/(tabs)/discover")}
             />
-          ) : null
+          )
         }
         renderItem={({ item }) => (
           <PostCard
             post={item}
-            onPress={() => router.push(`/post/${item.id}`)}
+            isOwn={item.author_id === userId}
+            onOwnerActionsPress={() => openPostActions(item)}
+            onPress={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
             onAuthorPress={() => item.author && router.push(`/user/${item.author.username}`)}
             onLike={() =>
               likeMutation.mutate({ postId: item.id, liked: !!item.liked_by_me })
             }
-            onComment={() => router.push(`/post/${item.id}`)}
+            onComment={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
+            onShare={() => openShare(item.shared_post ?? item)}
+            onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
+            onModerationPress={() => openPostModeration(item.id, item.author_id)}
           />
         )}
       />

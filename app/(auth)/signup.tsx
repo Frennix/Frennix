@@ -1,16 +1,24 @@
-import { Link, router } from "expo-router";
-import { useState } from "react";
+import { Link, router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { signUpWithEmail } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { storePendingReferralCode } from "@/lib/referral-storage";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 export default function SignupScreen() {
+  const { ref } = useLocalSearchParams<{ ref?: string }>();
   const { applySession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (ref) {
+      void storePendingReferralCode(ref);
+    }
+  }, [ref]);
 
   async function handleSignup() {
     setError("");

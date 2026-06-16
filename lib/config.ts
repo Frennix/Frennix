@@ -13,6 +13,8 @@ export const config = {
     "https://frennix.app/privacy",
   termsUrl:
     (extra.termsUrl as string) || process.env.EXPO_PUBLIC_TERMS_URL || "https://frennix.app/terms",
+  appUrl:
+    (extra.appUrl as string) || process.env.EXPO_PUBLIC_APP_URL || "https://frennix.vercel.app",
 };
 
 export function isSupabaseConfigured() {

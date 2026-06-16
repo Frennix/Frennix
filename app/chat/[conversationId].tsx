@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import {
   broadcastTyping,
+  getConversationProfiles,
   getMessages,
   markMessagesAsRead,
   sendMessage,
@@ -49,6 +50,14 @@ export default function ChatScreen() {
     queryFn: () => getMessages(conversationId!),
     enabled: chatReady,
   });
+
+  const { data: participantProfiles = {} } = useQuery({
+    queryKey: ["conversation-profiles", conversationId],
+    queryFn: () => getConversationProfiles(conversationId!),
+    enabled: chatReady,
+  });
+
+  const myProfile = participantProfiles[userId];
 
   const markRead = useCallback(() => {
     if (!conversationId || !userId) return;
@@ -134,14 +143,22 @@ export default function ChatScreen() {
 
   function renderItem({ item }: { item: Message }) {
     const isOwn = item.sender_id === userId;
+    const sender = participantProfiles[item.sender_id];
     const time = new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const sharedPostId = item.shared_post?.id ?? item.post_id;
     return (
       <MessageBubble
         content={item.content}
         isOwn={isOwn}
         timestamp={time}
         mediaUrl={item.media_url}
+        sharedPost={item.shared_post}
+        onSharedPostPress={
+          sharedPostId ? () => router.push(`/post/${sharedPostId}`) : undefined
+        }
         onMediaPress={item.media_url ? () => setPreviewUri(item.media_url) : undefined}
+        senderAvatarUrl={isOwn ? myProfile?.avatar_url : sender?.avatar_url}
+        senderName={isOwn ? myProfile?.display_name : sender?.display_name}
       />
     );
   }

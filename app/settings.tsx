@@ -4,6 +4,7 @@ import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "rea
 import { useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { config } from "@/lib/config";
+import { unregisterPushNotifications } from "@/lib/notifications";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
 function formatUsername(username: string | null | undefined) {
@@ -34,13 +35,16 @@ function showError(message: string) {
 }
 
 export default function SettingsScreen() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, session } = useAuth();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
     setSigningOut(true);
     try {
+      if (session?.user.id) {
+        await unregisterPushNotifications(session.user.id);
+      }
       await signOut();
       queryClient.clear();
       router.replace("/(auth)/login");
@@ -63,6 +67,50 @@ export default function SettingsScreen() {
     <View style={styles.container}>
       <Text style={styles.section}>Account</Text>
       <Text style={styles.row}>{formatUsername(profile?.username)}</Text>
+
+      <Text style={styles.section}>Invite</Text>
+      <Link href="/invite-friends" asChild>
+        <Pressable>
+          <Text style={styles.link}>Invite friends</Text>
+        </Pressable>
+      </Link>
+
+      <Text style={styles.section}>Safety</Text>
+      <Link href="/blocked-users" asChild>
+        <Pressable>
+          <Text style={styles.link}>Blocked users</Text>
+        </Pressable>
+      </Link>
+
+      {profile?.is_admin ? (
+        <>
+          <Text style={styles.section}>Admin</Text>
+          <Link href="/admin-moderation" asChild>
+            <Pressable>
+              <Text style={styles.link}>Moderation panel</Text>
+            </Pressable>
+          </Link>
+          <Link href="/admin-feedback" asChild>
+            <Pressable>
+              <Text style={styles.link}>Feedback dashboard</Text>
+            </Pressable>
+          </Link>
+        </>
+      ) : null}
+
+      <Text style={styles.section}>Beta</Text>
+      <Link href="/beta-feedback" asChild>
+        <Pressable>
+          <Text style={styles.link}>Send feedback</Text>
+        </Pressable>
+      </Link>
+
+      <Text style={styles.section}>Notifications</Text>
+      <Link href="/notification-settings" asChild>
+        <Pressable>
+          <Text style={styles.link}>Push notification settings</Text>
+        </Pressable>
+      </Link>
 
       <Text style={styles.section}>Legal</Text>
       <Pressable onPress={() => openUrl(config.privacyPolicyUrl)}>

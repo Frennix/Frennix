@@ -1,17 +1,35 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Pressable } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { getUnreadMessageCount } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
-import { colors } from "@frennix/ui";
+import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
+import { useNotificationBadge } from "@/lib/useNotificationBadge";
+import { colors, typography } from "@frennix/ui";
+
+function NotificationBell({ unreadCount }: { unreadCount: number }) {
+  return (
+    <Pressable onPress={() => router.push("/notifications")} style={styles.bellButton} hitSlop={8}>
+      <Ionicons name="notifications-outline" size={24} color={colors.text} />
+      {unreadCount > 0 ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
 
 export default function TabsLayout() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
 
-  const { data: unreadCount = 0 } = useQuery({
+  useNotificationSubscription(userId);
+  const unreadNotifications = useNotificationBadge(userId);
+
+  const { data: unreadMessages = 0 } = useQuery({
     queryKey: ["unread-messages", userId],
     queryFn: () => getUnreadMessageCount(userId),
     enabled: !!userId,
@@ -34,9 +52,9 @@ export default function TabsLayout() {
           title: "Home",
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
           headerRight: () => (
-            <Pressable onPress={() => router.push("/notifications")} style={{ marginRight: 16 }}>
-              <Ionicons name="notifications-outline" size={24} color={colors.text} />
-            </Pressable>
+            <View style={{ marginRight: 16 }}>
+              <NotificationBell unreadCount={unreadNotifications} />
+            </View>
           ),
         }}
       />
@@ -45,6 +63,13 @@ export default function TabsLayout() {
         options={{
           title: "Discover",
           tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="events"
+        options={{
+          title: "Events",
+          tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -65,7 +90,7 @@ export default function TabsLayout() {
         options={{
           title: "Messages",
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
-          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
+          tabBarBadge: unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined,
         }}
       />
       <Tabs.Screen
@@ -83,3 +108,34 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  bellButton: {
+    position: "relative",
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  badgeText: {
+    ...typography.caption,
+    fontSize: 10,
+    lineHeight: 12,
+    color: colors.background,
+    fontWeight: "700",
+  },
+});

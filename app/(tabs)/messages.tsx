@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getConversations } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { Avatar, EmptyState, colors, spacing, typography } from "@frennix/ui";
@@ -9,14 +9,19 @@ export default function MessagesScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
 
-  const { data: conversations = [] } = useQuery({
+  const { data: conversations = [], refetch, isRefetching, isLoading } = useQuery({
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(userId),
     enabled: !!userId,
     refetchInterval: 10_000,
   });
 
-  function previewText(content: string | undefined, mediaUrl: string | null | undefined) {
+  function previewText(
+    content: string | undefined,
+    mediaUrl: string | null | undefined,
+    postId: string | null | undefined
+  ) {
+    if (postId) return "↗ Shared a post";
     if (mediaUrl && (!content || content === "📷 Photo")) return "📷 Photo";
     return content ?? "Start the conversation";
   }
@@ -27,13 +32,18 @@ export default function MessagesScreen() {
         data={conversations}
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+        }
         ListEmptyComponent={
-          <EmptyState
+          !isLoading ? (
+            <EmptyState
             title="No messages yet"
             description="Message someone from their profile to find a workout partner or training buddy."
             actionLabel="Discover people"
             onAction={() => router.push("/(tabs)/discover")}
           />
+          ) : null
         }
         renderItem={({ item }) => (
           <Pressable
@@ -48,7 +58,11 @@ export default function MessagesScreen() {
             <View style={styles.info}>
               <Text style={styles.name}>{item.other_participant?.display_name ?? "Chat"}</Text>
               <Text style={[styles.preview, (item.unread_count ?? 0) > 0 && styles.previewUnread]} numberOfLines={1}>
-                {previewText(item.last_message?.content, item.last_message?.media_url)}
+                {previewText(
+                  item.last_message?.content,
+                  item.last_message?.media_url,
+                  item.last_message?.post_id
+                )}
               </Text>
             </View>
             {(item.unread_count ?? 0) > 0 ? (

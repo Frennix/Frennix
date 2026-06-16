@@ -1,17 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getGroup, getGroupMembers, getGroupPosts, joinGroup, leaveGroup, isGroupMember } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
-import { Button, PostCard, UserRow, colors, spacing, typography } from "@frennix/ui";
+import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { useSharePost } from "@/lib/useSharePost";
+import { useModeration } from "@/lib/useModeration";
+import { useSavePost } from "@/lib/useSavePost";
+import { refetchQueryKeys } from "@/lib/refreshQueries";
+import { PostActionSheet } from "@/components/PostActionSheet";
+import { DetailLoading } from "@/components/DetailLoading";
+import { Button, EmptyState, PostCard, getSharedPostTargetId, UserRow, colors, spacing, typography } from "@frennix/ui";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
+  const { openShare, shareSheet } = useSharePost(userId);
+  const { toggleSavePost } = useSavePost(userId);
+  const { moderationSheets, openPostModeration } = useModeration(userId);
 
-  const { data: group } = useQuery({
+  const { data: group, isLoading: groupLoading } = useQuery({
     queryKey: ["group", id],
     queryFn: () => getGroup(id!),
     enabled: !!id,
@@ -31,7 +44,7 @@ export default function GroupDetailScreen() {
 
   const { data: posts = [] } = useQuery({
     queryKey: ["group-posts", id],
-    queryFn: () => getGroupPosts(id!),
+    queryFn: () => getGroupPosts(id!, userId),
     enabled: !!id,
   });
 
@@ -47,42 +60,119 @@ export default function GroupDetailScreen() {
     },
   });
 
-  if (!group) return null;
+  const onRefresh = useCallback(async () => {
+    if (!id) return;
+    setRefreshing(true);
+    try {
+      await refetchQueryKeys(queryClient, [
+        ["group", id],
+        ["group-member", id, userId],
+        ["group-members", id],
+        ["group-posts", id],
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id, userId, queryClient]);
+
+  if (groupLoading) return <DetailLoading />;
+  if (!group) {
+    return (
+      <View style={styles.emptyWrap}>
+        <EmptyState
+          title="Group not found"
+          description="This group may have been removed or you don't have access."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{group.name}</Text>
-      {group.description ? <Text style={styles.desc}>{group.description}</Text> : null}
-      <Text style={styles.meta}>{group.member_count} members · {group.sport_tags.join(", ")}</Text>
-
-      <Button
-        title={isMember ? "Leave group" : "Join group"}
-        variant={isMember ? "secondary" : "primary"}
-        onPress={() => membershipMutation.mutate()}
-        loading={membershipMutation.isPending}
-      />
-
-      <Text style={styles.section}>Members</Text>
-      {members.slice(0, 5).map((m) => (
-        <UserRow key={m.user_id} profile={m.profile!} />
-      ))}
-
-      <Text style={styles.section}>Group feed</Text>
+      <PostActionSheet {...actionSheetProps} />
+      {shareSheet}
+      {moderationSheets}
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <PostCard post={item} />}
-        ListEmptyComponent={<Text style={styles.empty}>No posts in this group yet.</Text>}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.title}>{group.name}</Text>
+            {group.description ? <Text style={styles.desc}>{group.description}</Text> : null}
+            <Text style={styles.meta}>
+              {group.member_count} members · {group.sport_tags.join(", ")}
+            </Text>
+
+            <Button
+              title={isMember ? "Leave group" : "Join group"}
+              variant={isMember ? "secondary" : "primary"}
+              onPress={() => membershipMutation.mutate()}
+              loading={membershipMutation.isPending}
+            />
+
+            {isMember ? (
+              <Button
+                title="Share post"
+                variant="secondary"
+                onPress={() =>
+                  router.push({ pathname: "/create-post", params: { groupId: id! } })
+                }
+              />
+            ) : null}
+
+            <Text style={styles.section}>Members</Text>
+            {members.slice(0, 5).map((m) => (
+              <UserRow key={m.user_id} profile={m.profile!} />
+            ))}
+
+            <Text style={styles.section}>Group feed</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            isOwn={item.author_id === userId}
+            onPress={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
+            onOwnerActionsPress={() => openPostActions(item)}
+            onShare={() => openShare(item.shared_post ?? item)}
+            onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
+            onModerationPress={() => openPostModeration(item.id, item.author_id)}
+          />
+        )}
+        ListEmptyComponent={
+          <EmptyState
+            title="No posts yet"
+            description={
+              isMember
+                ? "Be the first to share a workout or update with this group."
+                : "Join this group to see posts and share your own."
+            }
+            actionLabel={isMember ? "Share post" : undefined}
+            onAction={
+              isMember
+                ? () => router.push({ pathname: "/create-post", params: { groupId: id! } })
+                : undefined
+            }
+          />
+        }
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+  container: { flex: 1, backgroundColor: colors.background },
+  list: { padding: spacing.md, flexGrow: 1 },
+  header: { gap: spacing.sm, marginBottom: spacing.sm },
   title: { ...typography.title, fontSize: 24 },
-  desc: { ...typography.bodySmall, marginTop: spacing.sm },
-  meta: { ...typography.caption, marginBottom: spacing.md },
+  desc: { ...typography.bodySmall },
+  meta: { ...typography.caption, marginBottom: spacing.sm },
   section: { ...typography.heading, fontSize: 18, marginTop: spacing.lg, marginBottom: spacing.sm },
-  empty: { color: colors.textMuted },
+  emptyWrap: { flex: 1, backgroundColor: colors.background, justifyContent: "center" },
 });

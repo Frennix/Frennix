@@ -2,51 +2,108 @@ import "@/lib/init-supabase";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AuthProvider } from "@/providers/AuthProvider";
+import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
+import { StackBackButton } from "@/components/StackBackButton";
 import { colors } from "@frennix/ui";
 
 initSentry();
 
-export default function RootLayout() {
-  useEffect(() => {
-    return setupNotificationListeners();
-  }, []);
+const stackDefaults = {
+  headerStyle: { backgroundColor: colors.background },
+  headerTintColor: colors.text,
+  contentStyle: { backgroundColor: colors.background },
+  headerShadowVisible: false,
+} as const;
 
+function backScreen(title: string, extra?: object) {
+  return {
+    title,
+    headerBackVisible: false,
+    headerLeft: () => <StackBackButton />,
+    ...extra,
+  };
+}
+
+function NotificationBootstrap() {
+  const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const userId = session?.user.id ?? "";
+
+  useEffect(() => {
+    return setupNotificationListeners(() => {
+      if (!userId) return;
+      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+    });
+  }, [queryClient, userId]);
+
+  return null;
+}
+
+export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <QueryProvider>
         <AuthProvider>
+          <NotificationBootstrap />
           <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: colors.background },
-              headerTintColor: colors.text,
-              contentStyle: { backgroundColor: colors.background },
-              headerShadowVisible: false,
-            }}
-          >
+          <Stack screenOptions={stackDefaults}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ title: "Set up profile", headerBackVisible: false }} />
-            <Stack.Screen name="create-post" options={{ title: "Share workout", presentation: "modal" }} />
-            <Stack.Screen name="post/[id]" options={{ title: "Post" }} />
-            <Stack.Screen name="user/[username]" options={{ title: "Profile" }} />
-            <Stack.Screen name="group/[id]" options={{ title: "Group" }} />
-            <Stack.Screen name="challenge/[id]" options={{ title: "Challenge" }} />
-            <Stack.Screen name="chat/[conversationId]" options={{ title: "Chat" }} />
-            <Stack.Screen name="followers/[userId]" options={{ title: "Followers" }} />
-            <Stack.Screen name="following/[userId]" options={{ title: "Following" }} />
-            <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
-            <Stack.Screen name="create-group" options={{ title: "Create group", presentation: "modal" }} />
-            <Stack.Screen name="create-challenge" options={{ title: "Create challenge", presentation: "modal" }} />
-            <Stack.Screen name="edit-profile" options={{ title: "Edit profile", presentation: "modal" }} />
-            <Stack.Screen name="settings" options={{ title: "Settings" }} />
-            <Stack.Screen name="matching" options={{ title: "Partner matching" }} />
+            <Stack.Screen
+              name="create-post"
+              options={backScreen("Share workout", { presentation: "modal" })}
+            />
+            <Stack.Screen
+              name="edit-post/[id]"
+              options={backScreen("Edit post", { presentation: "modal" })}
+            />
+            <Stack.Screen
+              name="create-event"
+              options={backScreen("Create event", { presentation: "modal" })}
+            />
+            <Stack.Screen
+              name="edit-event/[id]"
+              options={backScreen("Edit event", { presentation: "modal" })}
+            />
+            <Stack.Screen name="event/[id]" options={backScreen("Event")} />
+            <Stack.Screen name="post/[id]" options={backScreen("Post")} />
+            <Stack.Screen name="user/[username]" options={backScreen("Profile")} />
+            <Stack.Screen name="group/[id]" options={backScreen("Group")} />
+            <Stack.Screen name="challenge/[id]" options={backScreen("Challenge")} />
+            <Stack.Screen name="chat/[conversationId]" options={backScreen("Chat")} />
+            <Stack.Screen name="followers/[userId]" options={backScreen("Followers")} />
+            <Stack.Screen name="following/[userId]" options={backScreen("Following")} />
+            <Stack.Screen name="notifications" options={backScreen("Notifications")} />
+            <Stack.Screen
+              name="create-group"
+              options={backScreen("Create group", { presentation: "modal" })}
+            />
+            <Stack.Screen
+              name="create-challenge"
+              options={backScreen("Create challenge", { presentation: "modal" })}
+            />
+            <Stack.Screen
+              name="edit-profile"
+              options={backScreen("Edit profile", { presentation: "modal" })}
+            />
+            <Stack.Screen name="settings" options={backScreen("Settings")} />
+            <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />
+            <Stack.Screen name="saved-posts" options={backScreen("Saved Posts")} />
+            <Stack.Screen name="invite-friends" options={backScreen("Invite Friends")} />
+            <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
+            <Stack.Screen name="blocked-users" options={backScreen("Blocked users")} />
+            <Stack.Screen name="admin-moderation" options={backScreen("Moderation")} />
+            <Stack.Screen name="beta-feedback" options={backScreen("Beta Feedback")} />
+            <Stack.Screen name="admin-feedback" options={backScreen("Feedback Dashboard")} />
+            <Stack.Screen name="matching" options={backScreen("Partner matching")} />
           </Stack>
         </AuthProvider>
       </QueryProvider>
