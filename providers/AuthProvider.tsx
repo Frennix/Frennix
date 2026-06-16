@@ -12,7 +12,7 @@ import * as Linking from "expo-linking";
 import type { Profile } from "@frennix/types";
 import { getProfile, getSession, onAuthStateChange, signOut as supabaseSignOut } from "@frennix/api";
 import type { Session } from "@supabase/supabase-js";
-import { isWebRecoveryHash } from "@/lib/auth-redirect";
+import { isWebRecoveryHash, clearWebRecoveryHash } from "@/lib/auth-redirect";
 import { isSupabaseConfigured } from "@/lib/config";
 import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
@@ -71,8 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback(async (nextSession: Session | null) => {
     setSession(nextSession);
     if (nextSession?.user.id) {
-      const p = await getProfile(nextSession.user.id);
-      setProfile(p);
+      try {
+        const p = await getProfile(nextSession.user.id);
+        setProfile(p);
+      } catch (e) {
+        console.error("[auth] getProfile failed after applySession", e);
+        setProfile(null);
+      }
       if (!passwordRecoveryRef.current) {
         registerForPushNotifications(nextSession.user.id).catch(() => undefined);
       }
@@ -103,7 +108,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof window !== "undefined" && isWebRecoveryHash()) {
         try {
           const isRecovery = await establishSessionFromUrl(window.location.href);
-          if (isRecovery) setPasswordRecovery(true);
+          if (isRecovery) {
+            setPasswordRecovery(true);
+            clearWebRecoveryHash();
+          }
         } catch {
           // detectSessionInUrl may have already handled it.
         }
@@ -125,6 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = onAuthStateChange((event, s) => {
       if (event === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
+      } else if (event === "SIGNED_IN") {
+        setPasswordRecovery(false);
+        clearWebRecoveryHash();
       }
       if (event === "SIGNED_OUT") {
         setPasswordRecovery(false);

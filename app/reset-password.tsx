@@ -1,17 +1,19 @@
 import { Redirect, router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
-import { updatePassword } from "@frennix/api";
+import { formatAuthErrorForDisplay, updatePassword } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { showAlert } from "@/lib/alerts";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 export default function ResetPasswordScreen() {
-  const { session, loading, passwordRecovery, signOut, clearPasswordRecovery } = useAuth();
+  const { session, loading, passwordRecovery, signOut } = useAuth();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetSucceeded, setResetSucceeded] = useState(false);
 
   async function handleSubmit() {
     setError("");
@@ -28,17 +30,29 @@ export default function ResetPasswordScreen() {
     setSubmitting(true);
     try {
       await updatePassword(password);
+      setResetSucceeded(true);
       setSuccessMessage("Password updated successfully.");
-      clearPasswordRecovery();
       await signOut();
       setTimeout(() => {
         router.replace("/(auth)/login");
-      }, 1500);
+      }, 2000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update password");
+      const message = formatAuthErrorForDisplay(e);
+      console.error("[password-reset] handleSubmit failed", e);
+      showAlert("Password reset failed", message);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (resetSucceeded) {
+    return (
+      <View style={styles.loading}>
+        <Text style={styles.success}>{successMessage}</Text>
+        <Text style={styles.subtitle}>Redirecting to sign in…</Text>
+      </View>
+    );
   }
 
   if (loading || (passwordRecovery && !session)) {
@@ -105,9 +119,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.background,
+    padding: spacing.xl,
+    gap: spacing.md,
   },
   title: { ...typography.title },
-  subtitle: { ...typography.bodySmall, marginBottom: spacing.md, lineHeight: 22 },
+  subtitle: { ...typography.bodySmall, marginBottom: spacing.md, lineHeight: 22, textAlign: "center" },
   error: { color: colors.danger, fontSize: 14 },
-  success: { ...typography.body, color: colors.accent },
+  success: { ...typography.body, color: colors.accent, textAlign: "center" },
 });

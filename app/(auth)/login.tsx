@@ -2,8 +2,15 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
-import { formatLoginError, getSupabase, signInWithEmail } from "@frennix/api";
+import {
+  formatAuthErrorForDisplay,
+  formatLoginError,
+  getAuthErrorDetails,
+  getSupabase,
+  signInWithEmail,
+} from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { showAlert } from "@/lib/alerts";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 import { isSupabaseConfigured } from "@/lib/config";
 
@@ -17,12 +24,36 @@ export default function LoginScreen() {
   async function handleLogin() {
     setError("");
     setLoading(true);
+
+    let session = null;
     try {
-      const { session } = await signInWithEmail(email.trim(), password);
+      const data = await signInWithEmail(email.trim(), password);
+      session = data.session;
+      if (!session) {
+        const err = new Error("Sign in succeeded but no session was returned.");
+        console.error("[sign-in] missing session after signInWithPassword", {
+          userId: data.user?.id,
+        });
+        throw err;
+      }
+    } catch (e) {
+      const message = formatLoginError(e);
+      console.error("[sign-in] signInWithPassword failed", getAuthErrorDetails(e));
+      showAlert("Sign in failed", formatAuthErrorForDisplay(e));
+      setError(message);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.info("[sign-in] applying session", { userId: session.user.id });
       await applySession(session);
       router.replace("/");
     } catch (e) {
-      setError(formatLoginError(e));
+      console.error("[sign-in] post-auth applySession failed", e);
+      const detail = formatAuthErrorForDisplay(e);
+      showAlert("Signed in, but setup failed", detail);
+      setError(`Signed in, but could not load your profile. ${detail}`);
     } finally {
       setLoading(false);
     }
