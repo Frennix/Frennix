@@ -39,7 +39,7 @@ const onboardingSchema = z.object({
 type OnboardingForm = z.infer<typeof onboardingSchema>;
 
 export default function OnboardingScreen() {
-  const { session, loading, refreshProfile, applySession } = useAuth();
+  const { session, loading, passwordRecovery, refreshProfile, applySession } = useAuth();
   const [step, setStep] = useState(0);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState("");
@@ -185,6 +185,10 @@ export default function OnboardingScreen() {
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
+  }
+
+  if (passwordRecovery) {
+    return <Redirect href="/reset-password" />;
   }
 
   if (!session) {

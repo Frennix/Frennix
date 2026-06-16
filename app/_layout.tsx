@@ -55,6 +55,7 @@ export default function RootLayout() {
           <Stack screenOptions={stackDefaults}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="reset-password" options={backScreen("New password")} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ title: "Set up profile", headerBackVisible: false }} />
             <Stack.Screen
