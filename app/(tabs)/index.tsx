@@ -7,6 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
+import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { EmptyState, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
+  const postReaction = usePostReaction(userId);
   const { moderationSheets, openPostModeration } = useModeration(userId);
 
   const {
@@ -122,6 +124,13 @@ export default function HomeScreen() {
             onComment={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
+            onReaction={(emoji) =>
+              postReaction.mutate({
+                postId: item.id,
+                emoji,
+                currentEmoji: item.my_reaction,
+              })
+            }
             onModerationPress={() => openPostModeration(item.id, item.author_id)}
           />
         )}

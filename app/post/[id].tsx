@@ -14,6 +14,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
+import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
@@ -44,6 +45,7 @@ export default function PostDetailScreen() {
   });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
+  const postReaction = usePostReaction(userId);
   const { moderationSheets, openPostModeration, openCommentModeration } = useModeration(userId);
 
   const { data: post, isLoading: postLoading } = useQuery({
@@ -144,6 +146,13 @@ export default function PostDetailScreen() {
           onComment={() => undefined}
           onShare={() => openShare(post.shared_post ?? post)}
           onSave={() => toggleSavePost(post.id, !!post.saved_by_me)}
+          onReaction={(emoji) =>
+            postReaction.mutate({
+              postId: post.id,
+              emoji,
+              currentEmoji: post.my_reaction,
+            })
+          }
           onModerationPress={() => openPostModeration(post.id, post.author_id)}
         />
 

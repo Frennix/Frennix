@@ -19,11 +19,13 @@ import {
   markMessagesAsRead,
   sendMessage,
   subscribeToMessages,
+  subscribeToMessageReactions,
   subscribeToTyping,
   uploadMessageMedia,
 } from "@frennix/api";
 import type { Message } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { useMessageReaction } from "@/lib/useMessageReaction";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { Button, Input, MessageBubble, colors, spacing, typography } from "@frennix/ui";
 
@@ -47,9 +49,11 @@ export default function ChatScreen() {
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", conversationId],
-    queryFn: () => getMessages(conversationId!),
+    queryFn: () => getMessages(conversationId!, userId),
     enabled: chatReady,
   });
+
+  const messageReaction = useMessageReaction(userId);
 
   const { data: participantProfiles = {} } = useQuery({
     queryKey: ["conversation-profiles", conversationId],
@@ -83,9 +87,14 @@ export default function ChatScreen() {
       hideTypingRef.current = setTimeout(() => setOtherTyping(false), TYPING_HIDE_MS);
     });
 
+    const reactionsChannel = subscribeToMessageReactions(() => {
+      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+    });
+
     return () => {
       channel.unsubscribe();
       typingChannel.unsubscribe();
+      reactionsChannel.unsubscribe();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
     };
@@ -157,6 +166,15 @@ export default function ChatScreen() {
           sharedPostId ? () => router.push(`/post/${sharedPostId}`) : undefined
         }
         onMediaPress={item.media_url ? () => setPreviewUri(item.media_url) : undefined}
+        reactions={item.reactions}
+        onReaction={(emoji) =>
+          messageReaction.mutate({
+            conversationId: conversationId!,
+            messageId: item.id,
+            emoji,
+            currentEmoji: item.my_reaction,
+          })
+        }
         senderAvatarUrl={isOwn ? myProfile?.avatar_url : sender?.avatar_url}
         senderName={isOwn ? myProfile?.display_name : sender?.display_name}
       />
