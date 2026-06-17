@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState, useCallback } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { discoverProfiles, getChallenges, getGroups, searchProfiles } from "@frennix/api";
+import { getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
+import type { SuggestedAthlete } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { formatActivity } from "@/lib/labels";
 import {
   ChallengeCard,
@@ -29,6 +31,7 @@ export default function DiscoverScreen() {
   const [peopleSearch, setPeopleSearch] = useState("");
   const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
   const [groupQuery, setGroupQuery] = useState("");
+  const { isFollowing, toggleFollow, followMutation } = useSuggestedFollow(userId);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedPeopleSearch(peopleSearch.trim()), 300);
@@ -37,13 +40,26 @@ export default function DiscoverScreen() {
 
   const isSearchingPeople = debouncedPeopleSearch.length > 0;
 
-  const { data: people = [], isFetching: peopleLoading, refetch: refetchPeople, isRefetching: peopleRefetching } = useQuery({
+  const {
+    data: searchResults = [],
+    isFetching: searchLoading,
+    refetch: refetchSearch,
+    isRefetching: searchRefetching,
+  } = useQuery({
     queryKey: ["discover-people", debouncedPeopleSearch],
-    queryFn: () =>
-      isSearchingPeople
-        ? searchProfiles(debouncedPeopleSearch, 30, userId)
-        : discoverProfiles(undefined, userId),
-    enabled: tab === "people",
+    queryFn: () => searchProfiles(debouncedPeopleSearch, 30, userId),
+    enabled: tab === "people" && isSearchingPeople,
+  });
+
+  const {
+    data: suggestions = [],
+    isFetching: suggestionsLoading,
+    refetch: refetchSuggestions,
+    isRefetching: suggestionsRefetching,
+  } = useQuery({
+    queryKey: ["discover-suggestions", userId],
+    queryFn: () => getSuggestedAthletes(userId, 20),
+    enabled: tab === "people" && !isSearchingPeople && !!userId,
   });
 
   const { data: groups = [], refetch: refetchGroups, isRefetching: groupsRefetching } = useQuery({
@@ -64,9 +80,27 @@ export default function DiscoverScreen() {
     { key: "challenges", label: "Challenges" },
   ];
 
-  const onRefreshPeople = useCallback(() => refetchPeople(), [refetchPeople]);
+  const onRefreshPeople = useCallback(async () => {
+    if (isSearchingPeople) await refetchSearch();
+    else await refetchSuggestions();
+  }, [isSearchingPeople, refetchSearch, refetchSuggestions]);
+
   const onRefreshGroups = useCallback(() => refetchGroups(), [refetchGroups]);
   const onRefreshChallenges = useCallback(() => refetchChallenges(), [refetchChallenges]);
+
+  const peopleData: SuggestedAthlete[] = isSearchingPeople
+    ? searchResults.map((profile) => ({
+        profile,
+        score: 0,
+        reason: "",
+        mutual_count: 0,
+        shared_activities: profile.activities ?? [],
+        shared_goals: profile.fitness_goals ?? [],
+      }))
+    : suggestions;
+
+  const peopleLoading = isSearchingPeople ? searchLoading : suggestionsLoading;
+  const peopleRefetching = isSearchingPeople ? searchRefetching : suggestionsRefetching;
 
   return (
     <View style={styles.container}>
@@ -103,37 +137,54 @@ export default function DiscoverScreen() {
 
       {tab === "people" ? (
         <FlatList
-          data={people}
-          keyExtractor={(p) => p.id}
+          data={peopleData}
+          keyExtractor={(item) => item.profile.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl refreshing={peopleRefetching} onRefresh={onRefreshPeople} tintColor={colors.accent} />
           }
           ListHeaderComponent={
-            peopleLoading && isSearchingPeople ? (
+            !isSearchingPeople ? (
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Suggested athletes</Text>
+                <Text style={styles.sectionBody}>
+                  Based on shared sports, workout interests, location, mutual connections, and activity.
+                </Text>
+              </View>
+            ) : peopleLoading ? (
               <ActivityIndicator color={colors.accent} style={styles.loader} />
             ) : null
           }
           ListEmptyComponent={
             !peopleLoading ? (
               <EmptyState
-                title={isSearchingPeople ? "No people found" : "Search for athletes"}
+                title={isSearchingPeople ? "No people found" : "No suggestions yet"}
                 description={
                   isSearchingPeople
                     ? "Try a different name, fitness interest, workout type, or bio keyword."
-                    : "Use the search bar to find people by name, interests, workout type, or bio."
+                    : "Complete your profile with activities and city to get better athlete recommendations."
                 }
               />
             ) : null
           }
-          renderItem={({ item }) => (
-            <DiscoverProfileCard
-              profile={item}
-              interestLabels={profileInterestLabels(item.activities)}
-              onViewProfile={() => router.push(`/user/${item.username}`)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const profile = item.profile;
+            const following = isFollowing(profile.id);
+            return (
+              <DiscoverProfileCard
+                profile={profile}
+                interestLabels={profileInterestLabels(profile.activities)}
+                reason={item.reason || undefined}
+                onViewProfile={() => router.push(`/user/${profile.username}`)}
+                followLabel={following ? "Following" : "Follow"}
+                onFollow={() => toggleFollow(profile.id)}
+                followLoading={
+                  followMutation.isPending && followMutation.variables?.targetUserId === profile.id
+                }
+              />
+            );
+          }}
         />
       ) : null}
 
@@ -214,6 +265,9 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.accentMuted },
   tabText: { color: colors.textMuted, fontWeight: "600" },
   tabTextActive: { color: colors.accent },
+  sectionHeader: { gap: 4, marginBottom: spacing.md },
+  sectionTitle: { ...typography.body, fontWeight: "700", color: colors.text },
+  sectionBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   list: { paddingBottom: spacing.xxl },
   createLink: { color: colors.accent, fontWeight: "600", marginBottom: spacing.md },
   loader: { marginVertical: spacing.md },

@@ -125,6 +125,9 @@ export function useFollowUser(currentUserId: string) {
       queryClient.invalidateQueries({ queryKey: ["notifications", currentUserId] });
       queryClient.invalidateQueries({ queryKey: ["unread-notifications", currentUserId] });
       queryClient.invalidateQueries({ queryKey: ["feed", currentUserId] });
+      queryClient.invalidateQueries({ queryKey: ["suggested-athletes", currentUserId] });
+      queryClient.invalidateQueries({ queryKey: ["discover-people"] });
+      queryClient.invalidateQueries({ queryKey: ["discover-suggestions", currentUserId] });
     },
   });
 }

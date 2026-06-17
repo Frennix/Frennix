@@ -1,14 +1,25 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import type { FeedStory } from "@frennix/types";
-import { FeedStoriesRow, colors, spacing, typography } from "@frennix/ui";
+import type { FeedStory, SuggestedAthlete } from "@frennix/types";
+import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, spacing, typography } from "@frennix/ui";
 
 interface FeedHeaderProps {
   stories?: FeedStory[];
+  suggestions?: SuggestedAthlete[];
+  followingIds?: string[];
+  followLoadingId?: string | null;
   onStoryPress?: (story: FeedStory) => void;
+  onFollowPress?: (profileId: string, isFollowing: boolean) => void;
 }
 
-export function FeedHeader({ stories = [], onStoryPress }: FeedHeaderProps) {
+export function FeedHeader({
+  stories = [],
+  suggestions = [],
+  followingIds = [],
+  followLoadingId = null,
+  onStoryPress,
+  onFollowPress,
+}: FeedHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
@@ -25,6 +36,14 @@ export function FeedHeader({ stories = [], onStoryPress }: FeedHeaderProps) {
           <Text style={styles.createIcon}>＋</Text>
         </Pressable>
       </View>
+
+      <PeopleYouMayKnowCarousel
+        suggestions={suggestions}
+        followingIds={followingIds}
+        onProfilePress={(username) => router.push(`/user/${username}`)}
+        onFollowPress={onFollowPress}
+        followLoadingId={followLoadingId}
+      />
 
       <FeedStoriesRow
         stories={stories}

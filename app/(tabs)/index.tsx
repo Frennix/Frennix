@@ -2,11 +2,12 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteD
 import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { getFeed, getFeedStories, toggleLike } from "@frennix/api";
+import { getFeed, getFeedStories, getSuggestedAthletes, toggleLike } from "@frennix/api";
 import type { FeedPage, FeedStory } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
+import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
@@ -25,6 +26,17 @@ export default function HomeScreen() {
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
   const { moderationSheets, openPostModeration } = useModeration(userId);
+  const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
+
+  const {
+    data: suggestions = [],
+    refetch: refetchSuggestions,
+    isRefetching: isSuggestionsRefetching,
+  } = useQuery({
+    queryKey: ["suggested-athletes", userId],
+    queryFn: () => getSuggestedAthletes(userId, 10),
+    enabled: !!userId,
+  });
 
   const {
     data: stories = [],
@@ -55,7 +67,7 @@ export default function HomeScreen() {
   const posts = data?.pages.flatMap((page) => page.posts) ?? [];
 
   async function handleRefresh() {
-    await Promise.all([refetch(), refetchStories()]);
+    await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
   }
 
   const likeMutation = useMutation({
@@ -124,7 +136,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching || isStoriesRefetching}
+            refreshing={isRefetching || isStoriesRefetching || isSuggestionsRefetching}
             onRefresh={handleRefresh}
             tintColor={colors.accent}
           />
@@ -134,7 +146,16 @@ export default function HomeScreen() {
         }}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
-          <FeedHeader stories={stories} onStoryPress={(story) => setActiveStory(story)} />
+          <FeedHeader
+            stories={stories}
+            suggestions={suggestions}
+            followingIds={followingIds}
+            followLoadingId={
+              followMutation.isPending ? (followMutation.variables?.targetUserId ?? null) : null
+            }
+            onStoryPress={(story) => setActiveStory(story)}
+            onFollowPress={(profileId) => toggleFollow(profileId)}
+          />
         }
         ListFooterComponent={
           isFetchingNextPage ? (
