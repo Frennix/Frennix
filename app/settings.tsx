@@ -1,7 +1,8 @@
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useState } from "react";
+import { redirectToLogin } from "@/lib/auth-navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { config } from "@/lib/config";
 import { unregisterPushNotifications } from "@/lib/notifications";
@@ -47,7 +48,7 @@ export default function SettingsScreen() {
       }
       await signOut();
       queryClient.clear();
-      router.replace("/(auth)/login");
+      redirectToLogin();
     } catch (e) {
       showError(e instanceof Error ? e.message : "Could not sign out");
     } finally {

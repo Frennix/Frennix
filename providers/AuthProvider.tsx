@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(() => isWebRecoveryHash());
   const passwordRecoveryRef = useRef(passwordRecovery);
+  const authEpochRef = useRef(0);
 
   useEffect(() => {
     passwordRecoveryRef.current = passwordRecovery;
@@ -62,29 +63,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session?.user.id]);
 
   const signOut = useCallback(async () => {
+    authEpochRef.current += 1;
     await supabaseSignOut();
     setSession(null);
     setProfile(null);
     setPasswordRecovery(false);
+    setLoading(false);
   }, []);
 
   const applySession = useCallback(async (nextSession: Session | null) => {
+    const epoch = authEpochRef.current;
     setSession(nextSession);
     if (nextSession?.user.id) {
       try {
         const p = await getProfile(nextSession.user.id);
+        if (epoch !== authEpochRef.current) return;
         setProfile(p);
       } catch (e) {
+        if (epoch !== authEpochRef.current) return;
         console.error("[auth] getProfile failed after applySession", e);
         setProfile(null);
       }
+      if (epoch !== authEpochRef.current) return;
       if (!passwordRecoveryRef.current) {
         registerForPushNotifications(nextSession.user.id).catch(() => undefined);
       }
     } else {
       setProfile(null);
     }
-    setLoading(false);
+    if (epoch === authEpochRef.current) {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {

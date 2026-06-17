@@ -9,6 +9,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
 import { StackBackButton } from "@/components/StackBackButton";
+import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { colors } from "@frennix/ui";
 
 initSentry();
@@ -51,6 +52,7 @@ export default function RootLayout() {
       <QueryProvider>
         <AuthProvider>
           <NotificationBootstrap />
+          <AuthNavigationGuard />
           <StatusBar style="light" />
           <Stack screenOptions={stackDefaults}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
