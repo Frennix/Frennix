@@ -1,7 +1,16 @@
 import { router } from "expo-router";
-import { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ReactNode, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  ImageBackground,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import type { Post, Profile, ProfileStats } from "@frennix/types";
+import { computeProfileAchievements } from "@frennix/api";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { getProfileBio } from "@/lib/profile";
 import { avatarDisplayUri } from "@/lib/avatar";
@@ -10,8 +19,12 @@ import {
   Chip,
   EditableAvatar,
   PostGrid,
+  ProfileAchievementBadges,
+  ProfileContentTab,
+  ProfileContentTabs,
   WorkoutStreakBadge,
   colors,
+  isVideoMedia,
   radius,
   spacing,
   typography,
@@ -25,6 +38,9 @@ interface ProfileScreenContentProps {
   onAvatarPress?: () => void;
   avatarUploading?: boolean;
   avatarError?: string | null;
+  onCoverPress?: () => void;
+  coverUploading?: boolean;
+  coverError?: string | null;
   following?: boolean;
   onFollow?: () => void;
   onMessage?: () => void;
@@ -34,6 +50,17 @@ interface ProfileScreenContentProps {
   currentUserId?: string;
   onOwnerActionsPress?: (post: Post) => void;
   postActionSheet?: ReactNode;
+}
+
+const COVER_HEIGHT = 200;
+const AVATAR_SIZE = 112;
+
+function isPhotoPost(post: Post): boolean {
+  if (post.post_type === "video") return false;
+  if (post.post_type === "photo") return true;
+  const url = post.media_urls?.[0];
+  if (!url) return false;
+  return !isVideoMedia(post.post_type, url);
 }
 
 function ProfileSection({ title, children }: { title: string; children: ReactNode }) {
@@ -53,6 +80,9 @@ export function ProfileScreenContent({
   onAvatarPress,
   avatarUploading,
   avatarError,
+  onCoverPress,
+  coverUploading,
+  coverError,
   following,
   onFollow,
   onMessage,
@@ -63,74 +93,151 @@ export function ProfileScreenContent({
   onOwnerActionsPress,
   postActionSheet,
 }: ProfileScreenContentProps) {
+  const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
   const avatarUri = avatarDisplayUri(profile.avatar_url, profile.updated_at);
+  const coverUri = avatarDisplayUri(profile.cover_image_url, profile.updated_at);
+  const achievements = useMemo(() => computeProfileAchievements(stats), [stats]);
+  const photoPosts = useMemo(() => posts.filter(isPhotoPost), [posts]);
+
+  const coverContent = (
+    <>
+      {!coverUri ? (
+        <View style={styles.coverFallback}>
+          <View style={styles.coverAccentBand} />
+          <View style={styles.coverPattern}>
+            <Text style={styles.coverPatternText}>FRENNIX ATHLETE</Text>
+          </View>
+        </View>
+      ) : null}
+      {isOwn && onCoverPress ? (
+        <Pressable
+          style={styles.coverEditButton}
+          onPress={onCoverPress}
+          disabled={coverUploading}
+          accessibilityLabel="Change cover photo"
+        >
+          {coverUploading ? (
+            <ActivityIndicator color={colors.white} size="small" />
+          ) : (
+            <Text style={styles.coverEditText}>Change cover</Text>
+          )}
+        </Pressable>
+      ) : null}
+    </>
+  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {postActionSheet}
-      <View style={styles.hero}>
-        <EditableAvatar
-          uri={avatarUri}
-          name={profile.display_name}
-          size={128}
-          onPress={isOwn ? onAvatarPress : undefined}
-          uploading={avatarUploading}
-        />
-        {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
-        <Text style={styles.name}>{profile.display_name}</Text>
-        <Text style={styles.username}>@{profile.username}</Text>
-        {bio ? <Text style={styles.bio}>{bio}</Text> : null}
 
-        {isOwn ? (
-          <>
-            <Button
-              title="Edit Profile"
-              variant="secondary"
-              onPress={() => router.push("/edit-profile")}
-              style={styles.editButton}
-            />
-            <Button
-              title="Saved Posts"
-              variant="secondary"
-              onPress={() => router.push("/saved-posts")}
-              style={styles.savedButton}
-            />
-            <Button
-              title="Invite Friends"
-              variant="secondary"
-              onPress={() => router.push("/invite-friends")}
-              style={styles.savedButton}
-            />
-          </>
-        ) : null}
+      <View style={styles.coverWrap}>
+        {coverUri ? (
+          <ImageBackground source={{ uri: coverUri }} style={styles.cover} resizeMode="cover">
+            <View style={styles.coverOverlay} />
+            {coverContent}
+          </ImageBackground>
+        ) : (
+          <View style={[styles.cover, styles.coverEmpty]}>{coverContent}</View>
+        )}
+        {coverError ? <Text style={styles.coverError}>{coverError}</Text> : null}
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>{stats.posts}</Text>
-          <Text style={styles.statLabel}>Posts</Text>
+      <View style={styles.identityBlock}>
+        <View style={styles.avatarWrap}>
+          <EditableAvatar
+            uri={avatarUri}
+            name={profile.display_name}
+            size={AVATAR_SIZE}
+            onPress={isOwn ? onAvatarPress : undefined}
+            uploading={avatarUploading}
+          />
         </View>
-        <Pressable
-          style={styles.stat}
-          onPress={() => router.push(`/followers/${profile.id}`)}
-        >
-          <Text style={styles.statNum}>{stats.followers}</Text>
-          <Text style={styles.statLabel}>Followers</Text>
-        </Pressable>
-        <Pressable
-          style={styles.stat}
-          onPress={() => router.push(`/following/${profile.id}`)}
-        >
-          <Text style={styles.statNum}>{stats.following}</Text>
-          <Text style={styles.statLabel}>Following</Text>
-        </Pressable>
+        {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
+
+        <View style={styles.nameBlock}>
+          <Text style={styles.name}>{profile.display_name}</Text>
+          <Text style={styles.username}>@{profile.username}</Text>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.stat}>
+            <Text style={styles.statNum}>{stats.posts}</Text>
+            <Text style={styles.statLabel}>Posts</Text>
+          </View>
+          <Pressable
+            style={styles.stat}
+            onPress={() => router.push(`/followers/${profile.id}`)}
+          >
+            <Text style={styles.statNum}>{stats.followers}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </Pressable>
+          <Pressable
+            style={styles.stat}
+            onPress={() => router.push(`/following/${profile.id}`)}
+          >
+            <Text style={styles.statNum}>{stats.following}</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.actionRow}>
+          {isOwn ? (
+            <>
+              <Button
+                title="Edit Profile"
+                variant="secondary"
+                onPress={() => router.push("/edit-profile")}
+                style={styles.actionButton}
+              />
+              <Button
+                title="Saved"
+                variant="ghost"
+                onPress={() => router.push("/saved-posts")}
+                style={styles.actionButtonCompact}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                title={following ? "Following" : "Follow"}
+                variant={following ? "secondary" : "primary"}
+                onPress={onFollow}
+                loading={followLoading}
+                style={styles.actionButton}
+              />
+              <Button
+                title="Message"
+                variant="secondary"
+                onPress={onMessage}
+                loading={messageLoading}
+                style={styles.actionButton}
+              />
+            </>
+          )}
+        </View>
+
+        {!isOwn ? (
+          <Button title="Report / Block" variant="ghost" onPress={onModeration} />
+        ) : (
+          <Button
+            title="Invite Friends"
+            variant="ghost"
+            onPress={() => router.push("/invite-friends")}
+          />
+        )}
       </View>
 
       <WorkoutStreakBadge streak={stats.workoutStreak} />
 
+      {bio ? (
+        <ProfileSection title="About">
+          <Text style={styles.aboutText}>{bio}</Text>
+        </ProfileSection>
+      ) : null}
+
       {profile.fitness_goals?.length ? (
-        <ProfileSection title="Fitness Goals">
+        <ProfileSection title="Sports & Goals">
           <View style={styles.chips}>
             {profile.fitness_goals.map((goal) => (
               <Chip key={goal} label={formatGoal(goal)} selected />
@@ -158,30 +265,22 @@ export function ProfileScreenContent({
         </ProfileSection>
       ) : null}
 
-      {!isOwn ? (
-        <View style={styles.actions}>
-          <Button
-            title={following ? "Following" : "Follow"}
-            variant={following ? "secondary" : "primary"}
-            onPress={onFollow}
-            loading={followLoading}
-          />
-          <Button
-            title="Message"
-            variant="secondary"
-            onPress={onMessage}
-            loading={messageLoading}
-          />
-          <Button title="Report / Block" variant="ghost" onPress={onModeration} />
-        </View>
-      ) : null}
+      <ProfileAchievementBadges achievements={achievements} />
 
-      <Text style={styles.postsTitle}>Posts</Text>
+      <ProfileContentTabs
+        active={activeTab}
+        onChange={setActiveTab}
+        postCount={posts.length}
+        photoCount={photoPosts.length}
+      />
+
       <PostGrid
-        posts={posts}
+        posts={activeTab === "photos" ? photoPosts : posts}
         onPressPost={(id) => router.push(`/post/${id}`)}
         currentUserId={currentUserId}
         onOwnerActionsPress={onOwnerActionsPress}
+        fullWidth
+        emptyLabel={activeTab === "photos" ? "No photos yet" : "No posts yet"}
       />
     </ScrollView>
   );
@@ -190,36 +289,91 @@ export function ProfileScreenContent({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { paddingBottom: spacing.xxl },
-  hero: {
+  coverWrap: { position: "relative" },
+  cover: {
+    height: COVER_HEIGHT,
+    width: "100%",
+    justifyContent: "flex-end",
+    backgroundColor: colors.surfaceElevated,
+  },
+  coverEmpty: {
+    overflow: "hidden",
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  coverFallback: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0F1A14",
+  },
+  coverAccentBand: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 80,
+    backgroundColor: colors.accentMuted,
+    opacity: 0.55,
+  },
+  coverPattern: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    gap: spacing.sm,
   },
-  name: { ...typography.title, fontSize: 26, marginTop: spacing.sm },
-  username: { ...typography.caption, color: colors.accent },
-  bio: {
-    ...typography.body,
-    textAlign: "center",
-    color: colors.textSecondary,
-    lineHeight: 24,
-    marginTop: spacing.xs,
-    maxWidth: 340,
+  coverPatternText: {
+    ...typography.caption,
+    letterSpacing: 4,
+    color: "rgba(34, 197, 94, 0.35)",
+    fontWeight: "700",
   },
-  editButton: { width: "100%", marginTop: spacing.md },
-  savedButton: { width: "100%" },
-  avatarError: {
+  coverEditButton: {
+    alignSelf: "flex-end",
+    margin: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    minWidth: 120,
+    alignItems: "center",
+  },
+  coverEditText: {
+    ...typography.caption,
+    color: colors.white,
+    fontWeight: "700",
+  },
+  coverError: {
     ...typography.bodySmall,
     color: colors.danger,
     textAlign: "center",
-    marginTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+  },
+  identityBlock: {
+    paddingHorizontal: spacing.lg,
+    marginTop: -AVATAR_SIZE / 2,
+    gap: spacing.sm,
+  },
+  avatarWrap: {
+    alignSelf: "flex-start",
+    borderRadius: radius.full,
+    borderWidth: 4,
+    borderColor: colors.background,
+    overflow: "hidden",
+  },
+  nameBlock: { marginTop: spacing.xs },
+  name: { ...typography.title, fontSize: 24 },
+  username: { ...typography.caption, color: colors.accent, marginTop: 2 },
+  avatarError: {
+    ...typography.bodySmall,
+    color: colors.danger,
     maxWidth: 320,
   },
   statsRow: {
     flexDirection: "row",
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -229,6 +383,13 @@ const styles = StyleSheet.create({
   stat: { flex: 1, alignItems: "center" },
   statNum: { ...typography.heading, color: colors.accent },
   statLabel: { ...typography.caption, marginTop: 2 },
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  actionButton: { flex: 1 },
+  actionButtonCompact: { minWidth: 88 },
   section: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
@@ -244,19 +405,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     color: colors.text,
   },
+  aboutText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    lineHeight: 24,
+  },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   locationRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   locationIcon: { fontSize: 16 },
   locationText: { ...typography.body, color: colors.textSecondary },
-  actions: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
-  },
-  postsTitle: {
-    ...typography.heading,
-    fontSize: 18,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
 });

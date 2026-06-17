@@ -7,6 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { useAvatarUpload } from "@/lib/useAvatarUpload";
+import { useCoverUpload } from "@/lib/useCoverUpload";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { colors } from "@frennix/ui";
 
@@ -23,6 +24,7 @@ export default function ProfileTabScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
+  const { pickAndUploadCover, uploading: coverUploading, error: coverError } = useCoverUpload();
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
 
   const { data: stats } = useQuery({
@@ -74,6 +76,9 @@ export default function ProfileTabScreen() {
       onAvatarPress={pickAndUploadAvatar}
       avatarUploading={uploading}
       avatarError={error}
+      onCoverPress={pickAndUploadCover}
+      coverUploading={coverUploading}
+      coverError={coverError}
       currentUserId={userId}
       onOwnerActionsPress={openPostActions}
       postActionSheet={<PostActionSheet {...actionSheetProps} />}
