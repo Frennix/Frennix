@@ -84,7 +84,7 @@ export default function RootLayout() {
             <Stack.Screen name="chat/[conversationId]" options={backScreen("Chat")} />
             <Stack.Screen name="followers/[userId]" options={backScreen("Followers")} />
             <Stack.Screen name="following/[userId]" options={backScreen("Following")} />
-            <Stack.Screen name="notifications" options={backScreen("Notifications")} />
+            <Stack.Screen name="notifications" options={backScreen("Notifications Center")} />
             <Stack.Screen
               name="create-group"
               options={backScreen("Create group", { presentation: "modal" })}

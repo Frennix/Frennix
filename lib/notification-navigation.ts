@@ -21,7 +21,13 @@ export function openNotificationTarget(notification: Notification) {
     }
   }
 
-  if ((type === "like" || type === "comment" || type === "comment_reply") && payload.post_id) {
+  if (
+    (type === "like" ||
+      type === "reaction" ||
+      type === "comment" ||
+      type === "comment_reply") &&
+    payload.post_id
+  ) {
     router.push(`/post/${payload.post_id as string}`);
     return;
   }
@@ -76,7 +82,11 @@ export function openNotificationFromPushData(data: Record<string, unknown>) {
 
   if (
     data.post_id &&
-    (type === "like" || type === "comment" || type === "comment_reply" || type === "post_share")
+    (type === "like" ||
+      type === "reaction" ||
+      type === "comment" ||
+      type === "comment_reply" ||
+      type === "post_share")
   ) {
     router.push(`/post/${data.post_id as string}`);
     return;

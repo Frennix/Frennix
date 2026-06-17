@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
   getNotificationActorName,
   getNotifications,
+  getUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
   notificationText,
@@ -11,6 +11,7 @@ import {
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTarget } from "@/lib/notification-navigation";
+import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
 import { EmptyState, NotificationRow, colors, spacing, typography } from "@frennix/ui";
 
@@ -20,22 +21,42 @@ export default function NotificationsScreen() {
   const notificationsReady = !loading && !!userId;
   const queryClient = useQueryClient();
 
+  useNotificationSubscription(userId);
+
   const { data: notifications = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["notifications", userId],
     queryFn: () => getNotifications(userId),
     enabled: notificationsReady,
   });
 
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
-
-  useEffect(() => {
-    if (!notificationsReady) return;
-    queryClient.setQueryData(["unread-notifications", userId], unreadCount);
-  }, [notificationsReady, unreadCount, userId, queryClient]);
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["unread-notifications", userId],
+    queryFn: () => getUnreadNotificationCount(userId),
+    enabled: notificationsReady,
+  });
 
   const readMutation = useMutation({
     mutationFn: markNotificationRead,
-    onSuccess: () => {
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications", userId] });
+      const previous = queryClient.getQueryData<Notification[]>(["notifications", userId]);
+      queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
+        (current ?? []).map((item) =>
+          item.id === notificationId ? { ...item, read_at: new Date().toISOString() } : item
+        )
+      );
+      queryClient.setQueryData<number>(["unread-notifications", userId], (current) =>
+        Math.max(0, (current ?? 0) - 1)
+      );
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications", userId], context.previous);
+      }
+      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
     },
@@ -43,10 +64,28 @@ export default function NotificationsScreen() {
 
   const markAllMutation = useMutation({
     mutationFn: () => markAllNotificationsRead(userId),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["notifications", userId] });
+      const previous = queryClient.getQueryData<Notification[]>(["notifications", userId]);
+      const readAt = new Date().toISOString();
+      queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
+        (current ?? []).map((item) => ({ ...item, read_at: item.read_at ?? readAt }))
+      );
+      queryClient.setQueryData(["unread-notifications", userId], 0);
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications", userId], context.previous);
+      }
+      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+    },
     onSuccess: () => {
+      void syncNotificationBadgeCount(0);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
-      void syncNotificationBadgeCount(0);
     },
   });
 
@@ -59,9 +98,18 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.summary}>
+        <Text style={styles.summaryTitle}>Stay on top of your fitness community</Text>
+        <Text style={styles.summaryBody}>
+          Follows, likes, reactions, comments, replies, and messages appear here in real time.
+        </Text>
+      </View>
+
       {unreadCount > 0 ? (
         <View style={styles.header}>
-          <Text style={styles.headerText}>{unreadCount} unread</Text>
+          <Text style={styles.headerText}>
+            {unreadCount} unread notification{unreadCount === 1 ? "" : "s"}
+          </Text>
           <Pressable onPress={() => markAllMutation.mutate()} hitSlop={8}>
             <Text style={styles.markAll}>Mark all read</Text>
           </Pressable>
@@ -79,7 +127,7 @@ export default function NotificationsScreen() {
           !isLoading ? (
             <EmptyState
               title="All caught up"
-              description="Likes, comments, matches, and messages will show up here."
+              description="When someone follows you, likes or reacts to a post, comments, replies, or sends a message, you'll see it here instantly."
             />
           ) : null
         }
@@ -97,6 +145,17 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  summary: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  summaryTitle: { ...typography.body, fontWeight: "700", color: colors.text },
+  summaryBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -105,9 +164,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
   },
-  headerText: { ...typography.caption, color: colors.textMuted },
-  markAll: { ...typography.caption, color: colors.accent, fontWeight: "600" },
+  headerText: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
+  markAll: { ...typography.caption, color: colors.accent, fontWeight: "700" },
   list: { flexGrow: 1 },
 });

@@ -8,9 +8,14 @@ export function useNotificationSubscription(userId: string) {
   useEffect(() => {
     if (!userId) return;
 
-    const channel = subscribeToNotifications(userId, () => {
+    function refreshNotifications() {
       queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+    }
+
+    const channel = subscribeToNotifications(userId, {
+      onInsert: refreshNotifications,
+      onUpdate: refreshNotifications,
     });
 
     return () => {
