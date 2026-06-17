@@ -1,29 +1,59 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
-  getNotificationActorName,
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  buildNotificationRowText,
+  getErrorMessage,
   getNotifications,
   getUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
-  notificationText,
 } from "@frennix/api";
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTarget } from "@/lib/notification-navigation";
 import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { showAlert } from "@/lib/alerts";
 import { EmptyState, NotificationRow, colors, spacing, typography } from "@frennix/ui";
 
+function SafeNotificationRow({
+  notification,
+  onPress,
+}: {
+  notification: Notification;
+  onPress: () => void;
+}) {
+  const text = buildNotificationRowText(notification);
+
+  return (
+    <NotificationRow notification={notification} text={text} onPress={onPress} />
+  );
+}
+
 export default function NotificationsScreen() {
-  const { session, loading } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const userId = session?.user.id ?? "";
-  const notificationsReady = !loading && !!userId;
+  const notificationsReady = !authLoading && !!userId;
   const queryClient = useQueryClient();
 
   useNotificationSubscription(userId);
 
-  const { data: notifications = [], isLoading, refetch, isRefetching } = useQuery({
+  const {
+    data: notifications = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useQuery({
     queryKey: ["notifications", userId],
     queryFn: () => getNotifications(userId),
     enabled: notificationsReady,
@@ -93,7 +123,50 @@ export default function NotificationsScreen() {
     if (!notification.read_at) {
       readMutation.mutate(notification.id);
     }
-    openNotificationTarget(notification);
+
+    const result = openNotificationTarget(notification);
+    if (!result.ok) {
+      showAlert("Unavailable", result.message);
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Sign in to view notifications.</Text>
+      </View>
+    );
+  }
+
+  if (isLoading && !notifications.length) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={colors.accent} size="large" />
+        <Text style={styles.loadingText}>Loading notifications…</Text>
+      </View>
+    );
+  }
+
+  if (isError) {
+    const message = getErrorMessage(error);
+    console.error("[notifications] failed to load notifications", error);
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorTitle}>Could not load notifications</Text>
+        <Text style={styles.errorText}>{message}</Text>
+        <Pressable onPress={() => refetch()} style={styles.retryButton}>
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
@@ -117,6 +190,7 @@ export default function NotificationsScreen() {
       ) : null}
 
       <FlatList
+        style={styles.listView}
         data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -124,19 +198,13 @@ export default function NotificationsScreen() {
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
         }
         ListEmptyComponent={
-          !isLoading ? (
-            <EmptyState
-              title="All caught up"
-              description="When someone follows you, likes or reacts to a post, comments, replies, or sends a message, you'll see it here instantly."
-            />
-          ) : null
+          <EmptyState
+            title="All caught up"
+            description="When someone follows you, likes or reacts to a post, comments, replies, or sends a message, you'll see it here instantly."
+          />
         }
         renderItem={({ item }) => (
-          <NotificationRow
-            notification={item}
-            text={notificationText(item, getNotificationActorName(item.actor))}
-            onPress={() => handlePress(item)}
-          />
+          <SafeNotificationRow notification={item} onPress={() => handlePress(item)} />
         )}
       />
     </View>
@@ -145,6 +213,27 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  loadingText: { ...typography.bodySmall, color: colors.textMuted, marginTop: spacing.sm },
+  errorTitle: { ...typography.heading, textAlign: "center" },
+  errorText: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center" },
+  retryButton: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  retryText: { ...typography.bodySmall, color: colors.accent, fontWeight: "700" },
   summary: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
@@ -168,5 +257,6 @@ const styles = StyleSheet.create({
   },
   headerText: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
   markAll: { ...typography.caption, color: colors.accent, fontWeight: "700" },
+  listView: { flex: 1 },
   list: { flexGrow: 1 },
 });

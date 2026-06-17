@@ -13,13 +13,19 @@ export function useNotificationSubscription(userId: string) {
       queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
     }
 
-    const channel = subscribeToNotifications(userId, {
-      onInsert: refreshNotifications,
-      onUpdate: refreshNotifications,
-    });
+    let channel: ReturnType<typeof subscribeToNotifications> | null = null;
+
+    try {
+      channel = subscribeToNotifications(userId, {
+        onInsert: refreshNotifications,
+        onUpdate: refreshNotifications,
+      });
+    } catch (error) {
+      console.warn("[notifications] realtime subscription failed", error);
+    }
 
     return () => {
-      channel.unsubscribe();
+      channel?.unsubscribe();
     };
   }, [userId, queryClient]);
 }

@@ -1,127 +1,172 @@
 import { router } from "expo-router";
 import type { Notification } from "@frennix/types";
-import { markNotificationRead } from "@frennix/api";
+import { markNotificationRead, safeNotificationPayload } from "@frennix/api";
 
-export function openNotificationTarget(notification: Notification) {
-  const { type, payload, actor } = notification;
+export type NotificationNavResult =
+  | { ok: true }
+  | { ok: false; message: string };
 
-  if (type === "message" && payload.conversation_id) {
-    router.push(`/chat/${payload.conversation_id as string}`);
-    return;
-  }
-
-  if (type === "post_share") {
-    if (payload.destination === "message" && payload.conversation_id) {
-      router.push(`/chat/${payload.conversation_id as string}`);
-      return;
-    }
-    if (payload.post_id) {
-      router.push(`/post/${payload.post_id as string}`);
-      return;
-    }
-  }
-
-  if (
-    (type === "like" ||
-      type === "reaction" ||
-      type === "comment" ||
-      type === "comment_reply") &&
-    payload.post_id
-  ) {
-    router.push(`/post/${payload.post_id as string}`);
-    return;
-  }
-
-  if (type === "match" && actor?.username) {
-    router.push(`/user/${actor.username}`);
-    return;
-  }
-
-  if (type === "follow" && actor?.username) {
-    router.push(`/user/${actor.username}`);
-    return;
-  }
-
-  if (type === "event_join" && payload.event_id) {
-    router.push(`/event/${payload.event_id as string}`);
-    return;
-  }
-
-  if (type === "event_invite" && payload.event_id) {
-    router.push(`/event/${payload.event_id as string}`);
-    return;
-  }
-
-  if (type === "challenge_join" && payload.challenge_id) {
-    router.push(`/challenge/${payload.challenge_id as string}`);
-    return;
-  }
-
-  if (payload.post_id) {
-    router.push(`/post/${payload.post_id as string}`);
-    return;
-  }
-
-  router.push("/notifications");
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-export function openNotificationFromPushData(data: Record<string, unknown>) {
-  const type = data.type as string | undefined;
-  const actorUsername = data.actor_username as string | undefined;
+function pushHref(href: string): NotificationNavResult {
+  try {
+    router.push(href as never);
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Could not open that screen. Try again." };
+  }
+}
 
-  if (type === "message" && data.conversation_id) {
-    router.push(`/chat/${data.conversation_id as string}`);
-    return;
+function actorProfileHref(notification: Notification): string | undefined {
+  const username = asString(notification.actor?.username);
+  if (username) return `/user/${username}`;
+  return undefined;
+}
+
+function postHref(payload: Record<string, unknown>): string | undefined {
+  const postId = asString(payload.post_id);
+  if (!postId) return undefined;
+
+  const commentId = asString(payload.comment_id) ?? asString(payload.parent_id);
+  if (commentId) {
+    return `/post/${postId}?commentId=${encodeURIComponent(commentId)}`;
+  }
+
+  return `/post/${postId}`;
+}
+
+export function openNotificationTarget(notification: Notification): NotificationNavResult {
+  const { type } = notification;
+  const payload = safeNotificationPayload(notification.payload);
+
+  if (type === "message") {
+    const conversationId = asString(payload.conversation_id);
+    if (conversationId) return pushHref(`/chat/${conversationId}`);
+    return { ok: false, message: "This message conversation is no longer available." };
   }
 
   if (type === "post_share") {
-    if (data.destination === "message" && data.conversation_id) {
-      router.push(`/chat/${data.conversation_id as string}`);
-      return;
+    if (payload.destination === "message") {
+      const conversationId = asString(payload.conversation_id);
+      if (conversationId) return pushHref(`/chat/${conversationId}`);
+      return { ok: false, message: "This shared post message is no longer available." };
     }
-    if (data.post_id) {
-      router.push(`/post/${data.post_id as string}`);
-      return;
-    }
+
+    const postTarget = postHref(payload);
+    if (postTarget) return pushHref(postTarget);
+
+    const groupId = asString(payload.group_id);
+    if (groupId) return pushHref(`/group/${groupId}`);
+
+    const challengeId = asString(payload.challenge_id);
+    if (challengeId) return pushHref(`/challenge/${challengeId}`);
+
+    return { ok: false, message: "This shared post is no longer available." };
   }
 
+  if (type === "like" || type === "reaction" || type === "comment" || type === "comment_reply") {
+    const postTarget = postHref(payload);
+    if (postTarget) return pushHref(postTarget);
+    return { ok: false, message: "This post is no longer available." };
+  }
+
+  if (type === "follow" || type === "match") {
+    const profileHref = actorProfileHref(notification);
+    if (profileHref) return pushHref(profileHref);
+    return { ok: false, message: "This profile is no longer available." };
+  }
+
+  if (type === "event_join" || type === "event_invite") {
+    const eventId = asString(payload.event_id);
+    if (eventId) return pushHref(`/event/${eventId}`);
+    return { ok: false, message: "This event is no longer available." };
+  }
+
+  if (type === "challenge_join" || type === "challenge_reminder") {
+    const challengeId = asString(payload.challenge_id);
+    if (challengeId) return pushHref(`/challenge/${challengeId}`);
+    return { ok: false, message: "This challenge is no longer available." };
+  }
+
+  if (type === "group_invite") {
+    const groupId = asString(payload.group_id);
+    if (groupId) return pushHref(`/group/${groupId}`);
+    return { ok: false, message: "This group is no longer available." };
+  }
+
+  const fallbackPost = postHref(payload);
+  if (fallbackPost) return pushHref(fallbackPost);
+
+  const fallbackProfile = actorProfileHref(notification);
+  if (fallbackProfile) return pushHref(fallbackProfile);
+
+  return { ok: false, message: "This notification is no longer available." };
+}
+
+export function openNotificationFromPushData(data: Record<string, unknown>): NotificationNavResult {
+  const type = asString(data.type);
+  const actorUsername = asString(data.actor_username);
+  const payload = safeNotificationPayload(data);
+
+  if (type === "message") {
+    const conversationId = asString(data.conversation_id) ?? asString(payload.conversation_id);
+    if (conversationId) return pushHref(`/chat/${conversationId}`);
+    return { ok: false, message: "This message conversation is no longer available." };
+  }
+
+  if (type === "post_share") {
+    if (data.destination === "message" || payload.destination === "message") {
+      const conversationId = asString(data.conversation_id) ?? asString(payload.conversation_id);
+      if (conversationId) return pushHref(`/chat/${conversationId}`);
+      return { ok: false, message: "This shared post message is no longer available." };
+    }
+
+    const postId = asString(data.post_id) ?? asString(payload.post_id);
+    if (postId) return pushHref(`/post/${postId}`);
+    return { ok: false, message: "This shared post is no longer available." };
+  }
+
+  const postId = asString(data.post_id) ?? asString(payload.post_id);
   if (
-    data.post_id &&
+    postId &&
     (type === "like" ||
       type === "reaction" ||
       type === "comment" ||
       type === "comment_reply" ||
       type === "post_share")
   ) {
-    router.push(`/post/${data.post_id as string}`);
-    return;
+    return pushHref(`/post/${postId}`);
   }
 
-  if (type === "event_join" && data.event_id) {
-    router.push(`/event/${data.event_id as string}`);
-    return;
+  if (type === "event_join" || type === "event_invite") {
+    const eventId = asString(data.event_id) ?? asString(payload.event_id);
+    if (eventId) return pushHref(`/event/${eventId}`);
+    return { ok: false, message: "This event is no longer available." };
   }
 
-  if (type === "event_invite" && data.event_id) {
-    router.push(`/event/${data.event_id as string}`);
-    return;
+  if (type === "challenge_join" || type === "challenge_reminder") {
+    const challengeId = asString(data.challenge_id) ?? asString(payload.challenge_id);
+    if (challengeId) return pushHref(`/challenge/${challengeId}`);
+    return { ok: false, message: "This challenge is no longer available." };
   }
 
-  if (type === "challenge_join" && data.challenge_id) {
-    router.push(`/challenge/${data.challenge_id as string}`);
-    return;
+  if (type === "group_invite") {
+    const groupId = asString(data.group_id) ?? asString(payload.group_id);
+    if (groupId) return pushHref(`/group/${groupId}`);
+    return { ok: false, message: "This group is no longer available." };
   }
 
   if ((type === "follow" || type === "match") && actorUsername) {
-    router.push(`/user/${actorUsername}`);
-    return;
+    return pushHref(`/user/${actorUsername}`);
   }
 
-  router.push("/notifications");
+  return { ok: false, message: "This notification is no longer available." };
 }
 
 export async function handlePushNotificationOpen(data: Record<string, unknown>) {
-  const notificationId = data.notification_id as string | undefined;
+  const notificationId = asString(data.notification_id);
   if (notificationId) {
     try {
       await markNotificationRead(notificationId);
@@ -129,5 +174,9 @@ export async function handlePushNotificationOpen(data: Record<string, unknown>) 
       // Non-blocking — navigation still proceeds
     }
   }
-  openNotificationFromPushData(data);
+
+  const result = openNotificationFromPushData(data);
+  if (!result.ok) {
+    router.push("/notifications");
+  }
 }
