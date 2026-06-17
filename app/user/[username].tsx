@@ -1,22 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, router } from "expo-router";
 import { View, StyleSheet } from "react-native";
 import { useState } from "react";
 import {
-  followUser,
   getErrorMessage,
   getOrCreateConversation,
   getProfileByUsername,
   getProfileStats,
   getPostsByUser,
   isFollowing,
-  unfollowUser,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useModeration } from "@/lib/useModeration";
+import { useFollowUser } from "@/lib/useFollowUser";
 import { DetailLoading } from "@/components/DetailLoading";
 import { showAlert } from "@/lib/alerts";
 import { EmptyState, colors } from "@frennix/ui";
@@ -25,7 +24,6 @@ export default function UserProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const queryClient = useQueryClient();
   const [messaging, setMessaging] = useState(false);
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { moderationSheets, openUserModeration } = useModeration(userId);
@@ -54,23 +52,7 @@ export default function UserProfileScreen() {
     enabled: !!profile?.id && !!userId,
   });
 
-  const followMutation = useMutation({
-    mutationFn: async () => {
-      if (!profile) return;
-      if (following) await unfollowUser(userId, profile.id);
-      else await followUser(userId, profile.id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["is-following"] });
-      queryClient.invalidateQueries({ queryKey: ["profile-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["followers"] });
-      queryClient.invalidateQueries({ queryKey: ["following"] });
-      queryClient.invalidateQueries({ queryKey: ["following-ids", userId] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
-      queryClient.invalidateQueries({ queryKey: ["feed", userId] });
-    },
-  });
+  const followMutation = useFollowUser(userId);
 
   function showModerationAlert(title: string, message: string) {
     showAlert(title, message);
@@ -129,7 +111,7 @@ export default function UserProfileScreen() {
             showModerationAlert("Sign in required", "Sign in to follow people.");
             return;
           }
-          followMutation.mutate();
+          followMutation.mutate({ targetUserId: profile.id, isFollowing: !!following });
         }}
         onMessage={messageUser}
         onModeration={showModeration}
