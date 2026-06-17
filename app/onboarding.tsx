@@ -5,9 +5,10 @@ import { Controller, useForm, type FieldErrors } from "react-hook-form";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
-import { getSession, upsertProfile, uploadAvatar, claimReferral } from "@frennix/api";
+import { getSession, getErrorMessage, upsertProfile, uploadAvatar, claimReferral } from "@frennix/api";
 import { ACTIVITIES, FITNESS_GOALS, type MatchPreference } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { showAlert } from "@/lib/alerts";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { SubmitStatusBanner } from "@/components/SubmitStatusBanner";
 import { claimPendingReferral } from "@/lib/referral-storage";
@@ -139,6 +140,11 @@ export default function OnboardingScreen() {
       }
       upsertPayload.avatar_url = avatarUrl;
 
+      console.info("[onboarding] saving profile", {
+        userId,
+        username: upsertPayload.username,
+        onboarding_complete: upsertPayload.onboarding_complete,
+      });
       const saved = await upsertProfile(upsertPayload);
       await claimPendingReferral(claimReferral);
       await refreshProfile(saved);
@@ -150,7 +156,10 @@ export default function OnboardingScreen() {
     } catch (e) {
       setUploadingAvatar(false);
       submittingRef.current = false;
-      setSubmitError(e instanceof Error ? e.message : "Could not save profile");
+      console.error("[onboarding] save profile failed", e);
+      const detail = getErrorMessage(e);
+      showAlert("Could not save profile", detail);
+      setSubmitError(detail);
     }
   }
 
