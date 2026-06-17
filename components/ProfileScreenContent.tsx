@@ -41,6 +41,7 @@ interface ProfileScreenContentProps {
   onCoverPress?: () => void;
   coverUploading?: boolean;
   coverError?: string | null;
+  coverPreviewUri?: string | null;
   following?: boolean;
   onFollow?: () => void;
   onMessage?: () => void;
@@ -83,6 +84,7 @@ export function ProfileScreenContent({
   onCoverPress,
   coverUploading,
   coverError,
+  coverPreviewUri,
   following,
   onFollow,
   onMessage,
@@ -96,36 +98,15 @@ export function ProfileScreenContent({
   const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
   const avatarUri = avatarDisplayUri(profile.avatar_url, profile.updated_at);
-  const coverUri = avatarDisplayUri(profile.cover_image_url, profile.updated_at);
+  const storedCoverUri = avatarDisplayUri(profile.cover_image_url, profile.updated_at);
+  const coverUri = coverPreviewUri ?? storedCoverUri;
   const achievements = useMemo(() => computeProfileAchievements(stats), [stats]);
   const photoPosts = useMemo(() => posts.filter(isPhotoPost), [posts]);
 
-  const coverContent = (
-    <>
-      {!coverUri ? (
-        <View style={styles.coverFallback}>
-          <View style={styles.coverAccentBand} />
-          <View style={styles.coverPattern}>
-            <Text style={styles.coverPatternText}>FRENNIX ATHLETE</Text>
-          </View>
-        </View>
-      ) : null}
-      {isOwn && onCoverPress ? (
-        <Pressable
-          style={styles.coverEditButton}
-          onPress={onCoverPress}
-          disabled={coverUploading}
-          accessibilityLabel="Change cover photo"
-        >
-          {coverUploading ? (
-            <ActivityIndicator color={colors.white} size="small" />
-          ) : (
-            <Text style={styles.coverEditText}>Change cover</Text>
-          )}
-        </Pressable>
-      ) : null}
-    </>
-  );
+  function handleCoverPress() {
+    if (!onCoverPress || coverUploading) return;
+    void onCoverPress();
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -134,16 +115,39 @@ export function ProfileScreenContent({
       <View style={styles.coverWrap}>
         {coverUri ? (
           <ImageBackground source={{ uri: coverUri }} style={styles.cover} resizeMode="cover">
-            <View style={styles.coverOverlay} />
-            {coverContent}
+            <View style={styles.coverOverlay} pointerEvents="none" />
           </ImageBackground>
         ) : (
-          <View style={[styles.cover, styles.coverEmpty]}>{coverContent}</View>
+          <View style={[styles.cover, styles.coverEmpty]}>
+            <View style={styles.coverFallback} pointerEvents="none">
+              <View style={styles.coverAccentBand} />
+              <View style={styles.coverPattern}>
+                <Text style={styles.coverPatternText}>FRENNIX ATHLETE</Text>
+              </View>
+            </View>
+          </View>
         )}
+
+        {isOwn && onCoverPress ? (
+          <Pressable
+            style={styles.coverEditButton}
+            onPress={handleCoverPress}
+            disabled={coverUploading}
+            accessibilityLabel="Change cover photo"
+            accessibilityRole="button"
+          >
+            {coverUploading ? (
+              <ActivityIndicator color={colors.white} size="small" />
+            ) : (
+              <Text style={styles.coverEditText}>Change cover</Text>
+            )}
+          </Pressable>
+        ) : null}
+
         {coverError ? <Text style={styles.coverError}>{coverError}</Text> : null}
       </View>
 
-      <View style={styles.identityBlock}>
+      <View style={styles.identityBlock} pointerEvents="box-none">
         <View style={styles.avatarWrap}>
           <EditableAvatar
             uri={avatarUri}
@@ -328,8 +332,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   coverEditButton: {
-    alignSelf: "flex-end",
-    margin: spacing.md,
+    position: "absolute",
+    right: spacing.md,
+    bottom: spacing.md,
+    zIndex: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,

@@ -24,7 +24,7 @@ export default function ProfileTabScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
-  const { pickAndUploadCover, uploading: coverUploading, error: coverError } = useCoverUpload();
+  const { pickAndUploadCover, uploading: coverUploading, error: coverError, previewUri: coverPreviewUri } = useCoverUpload();
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
 
   const { data: stats } = useQuery({
@@ -79,6 +79,7 @@ export default function ProfileTabScreen() {
       onCoverPress={pickAndUploadCover}
       coverUploading={coverUploading}
       coverError={coverError}
+      coverPreviewUri={coverPreviewUri}
       currentUserId={userId}
       onOwnerActionsPress={openPostActions}
       postActionSheet={<PostActionSheet {...actionSheetProps} />}
