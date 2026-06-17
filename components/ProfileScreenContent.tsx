@@ -13,6 +13,7 @@ import type { Post, Profile, ProfileStats } from "@frennix/types";
 import { computeProfileAchievements } from "@frennix/api";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { getProfileBio } from "@/lib/profile";
+import { splitProfileActivities } from "@/lib/profile-interests";
 import { avatarDisplayUri } from "@/lib/avatar";
 import {
   Button,
@@ -97,6 +98,7 @@ export function ProfileScreenContent({
 }: ProfileScreenContentProps) {
   const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
+  const { sports, workoutInterests } = splitProfileActivities(profile.activities);
   const avatarUri = avatarDisplayUri(profile.avatar_url, profile.updated_at);
   const storedCoverUri = avatarDisplayUri(profile.cover_image_url, profile.updated_at);
   const coverUri = coverPreviewUri ?? storedCoverUri;
@@ -240,8 +242,18 @@ export function ProfileScreenContent({
         </ProfileSection>
       ) : null}
 
+      {sports.length ? (
+        <ProfileSection title="Sports">
+          <View style={styles.chips}>
+            {sports.map((sport) => (
+              <Chip key={sport} label={formatActivity(sport)} selected />
+            ))}
+          </View>
+        </ProfileSection>
+      ) : null}
+
       {profile.fitness_goals?.length ? (
-        <ProfileSection title="Sports & Goals">
+        <ProfileSection title="Fitness Goals">
           <View style={styles.chips}>
             {profile.fitness_goals.map((goal) => (
               <Chip key={goal} label={formatGoal(goal)} selected />
@@ -250,10 +262,10 @@ export function ProfileScreenContent({
         </ProfileSection>
       ) : null}
 
-      {profile.activities?.length ? (
+      {workoutInterests.length ? (
         <ProfileSection title="Workout Interests">
           <View style={styles.chips}>
-            {profile.activities.map((activity) => (
+            {workoutInterests.map((activity) => (
               <Chip key={activity} label={formatActivity(activity)} selected />
             ))}
           </View>

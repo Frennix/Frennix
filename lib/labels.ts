@@ -1,4 +1,4 @@
-import { ACTIVITIES, FITNESS_GOALS } from "@frennix/types";
+import { ACTIVITIES, FITNESS_GOALS, SPORTS, WORKOUT_INTERESTS } from "@frennix/types";
 
 const goalLabels: Record<string, string> = {
   lose_weight: "Lose weight",
@@ -33,4 +33,4 @@ export function formatActivity(activity: string) {
   return activityLabels[activity] ?? activity;
 }
 
-export { FITNESS_GOALS, ACTIVITIES };
+export { FITNESS_GOALS, SPORTS, WORKOUT_INTERESTS, ACTIVITIES };

@@ -1,13 +1,14 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { getErrorMessage, updateProfile } from "@frennix/api";
-import { ACTIVITIES, FITNESS_GOALS } from "@frennix/types";
+import { FITNESS_GOALS, SPORTS, WORKOUT_INTERESTS } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { getDefaultBioForEdit } from "@/lib/profile";
+import { mergeProfileActivities, splitProfileActivities } from "@/lib/profile-interests";
 import { avatarDisplayUri } from "@/lib/avatar";
 import { useAvatarUpload } from "@/lib/useAvatarUpload";
 import { showAlert } from "@/lib/alerts";
@@ -18,6 +19,24 @@ const usernameSchema = z
   .min(3, "At least 3 characters")
   .regex(/^[a-z0-9_]+$/, "Lowercase letters, numbers, underscores only");
 
+function ChipSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.label}>{title}</Text>
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      <View style={styles.chips}>{children}</View>
+    </View>
+  );
+}
+
 export default function EditProfileScreen() {
   const { profile, session, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -27,9 +46,25 @@ export default function EditProfileScreen() {
   const [bio, setBio] = useState(getDefaultBioForEdit(profile));
   const [city, setCity] = useState(profile?.city ?? "");
   const [goals, setGoals] = useState<string[]>(profile?.fitness_goals ?? []);
-  const [activities, setActivities] = useState<string[]>(profile?.activities ?? []);
+  const [sports, setSports] = useState<string[]>([]);
+  const [workoutInterests, setWorkoutInterests] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!profile) return;
+
+    const { sports: profileSports, workoutInterests: profileWorkoutInterests } =
+      splitProfileActivities(profile.activities);
+
+    setUsername(profile.username);
+    setDisplayName(profile.display_name);
+    setBio(getDefaultBioForEdit(profile));
+    setCity(profile.city ?? "");
+    setGoals(profile.fitness_goals ?? []);
+    setSports(profileSports);
+    setWorkoutInterests(profileWorkoutInterests);
+  }, [profile?.id, profile?.updated_at]);
 
   function toggleItem(list: string[], value: string, setter: (next: string[]) => void) {
     setter(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
@@ -51,17 +86,18 @@ export default function EditProfileScreen() {
     setLoading(true);
     setError("");
     try {
-      await updateProfile(session.user.id, {
+      const updated = await updateProfile(session.user.id, {
         username: parsedUsername.data,
         display_name: displayName.trim(),
         bio: bio.trim() || null,
         city: city.trim() || null,
         fitness_goals: goals,
-        activities,
+        activities: mergeProfileActivities(sports, workoutInterests),
       });
-      await refreshProfile(session.user.id);
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["profile-stats"] });
+
+      await refreshProfile(updated);
+      queryClient.setQueryData(["profile", updated.username], updated);
+      queryClient.invalidateQueries({ queryKey: ["profile-stats", session.user.id] });
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
       router.back();
     } catch (e) {
@@ -87,6 +123,7 @@ export default function EditProfileScreen() {
         {avatarError ? <Text style={styles.error}>{avatarError}</Text> : null}
       </View>
 
+      <Text style={styles.sectionHeading}>Basics</Text>
       <Input label="Display name" value={displayName} onChangeText={setDisplayName} />
       <Input
         label="Username"
@@ -95,6 +132,8 @@ export default function EditProfileScreen() {
         autoCapitalize="none"
         autoCorrect={false}
       />
+
+      <Text style={styles.sectionHeading}>About</Text>
       <Input
         label="Bio"
         value={bio}
@@ -102,10 +141,25 @@ export default function EditProfileScreen() {
         multiline
         placeholder="Tell the community about your fitness journey..."
       />
-      <Input label="City" value={city} onChangeText={setCity} placeholder="Where do you train?" />
+      <Input
+        label="Location"
+        value={city}
+        onChangeText={setCity}
+        placeholder="City or area where you train"
+      />
 
-      <Text style={styles.label}>Fitness goals</Text>
-      <View style={styles.chips}>
+      <ChipSection title="Sports" hint="Tap to add or remove sports you play or follow.">
+        {SPORTS.map((sport) => (
+          <Chip
+            key={sport}
+            label={formatActivity(sport)}
+            selected={sports.includes(sport)}
+            onPress={() => toggleItem(sports, sport, setSports)}
+          />
+        ))}
+      </ChipSection>
+
+      <ChipSection title="Fitness goals" hint="What are you working toward right now?">
         {FITNESS_GOALS.map((goal) => (
           <Chip
             key={goal}
@@ -114,19 +168,18 @@ export default function EditProfileScreen() {
             onPress={() => toggleItem(goals, goal, setGoals)}
           />
         ))}
-      </View>
+      </ChipSection>
 
-      <Text style={styles.label}>Workout interests</Text>
-      <View style={styles.chips}>
-        {ACTIVITIES.map((activity) => (
+      <ChipSection title="Workout interests" hint="How do you like to train?">
+        {WORKOUT_INTERESTS.map((activity) => (
           <Chip
             key={activity}
             label={formatActivity(activity)}
-            selected={activities.includes(activity)}
-            onPress={() => toggleItem(activities, activity, setActivities)}
+            selected={workoutInterests.includes(activity)}
+            onPress={() => toggleItem(workoutInterests, activity, setWorkoutInterests)}
           />
         ))}
-      </View>
+      </ChipSection>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button title="Save changes" onPress={save} loading={loading} />
@@ -139,7 +192,15 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   avatarSection: { alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
   avatarHint: { ...typography.caption, color: colors.textMuted },
+  sectionHeading: {
+    ...typography.body,
+    fontWeight: "700",
+    color: colors.text,
+    marginTop: spacing.sm,
+  },
+  section: { gap: spacing.sm },
   label: { ...typography.body, fontWeight: "600" },
+  hint: { ...typography.caption, color: colors.textMuted },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   error: { color: colors.danger },
 });
