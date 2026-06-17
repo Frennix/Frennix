@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes, toggleLike } from "@frennix/api";
-import type { FeedPage, FeedStory } from "@frennix/types";
+import type { FeedPage, FeedStory, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
+import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
@@ -14,7 +15,8 @@ import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
-import { EmptyState, FeedPostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { deferNavigation, navigateTo } from "@/lib/press-utils";
+import { EmptyState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
   const { session } = useAuth();
@@ -64,7 +66,7 @@ export default function HomeScreen() {
     enabled: !!userId,
   });
 
-  const posts = data?.pages.flatMap((page) => page.posts) ?? [];
+  const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
 
   async function handleRefresh() {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
@@ -103,10 +105,103 @@ export default function HomeScreen() {
         queryClient.setQueryData(["feed", userId], context.previous);
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["feed", userId] });
-    },
   });
+
+  const feedActionsRef = useRef<FeedListItemActions>({
+    onPress: () => undefined,
+    onAuthorPress: () => undefined,
+    onCommentAuthorPress: () => undefined,
+    onLike: () => undefined,
+    onComment: () => undefined,
+    onShare: () => undefined,
+    onSave: () => undefined,
+    onReaction: () => undefined,
+    onModerationPress: () => undefined,
+    onOwnerActionsPress: () => undefined,
+  });
+
+  feedActionsRef.current = {
+    onPress: (post: Post) => {
+      navigateTo(`/post/${getSharedPostTargetId(post)}`);
+    },
+    onAuthorPress: (post: Post) => {
+      if (post.author?.username) navigateTo(`/user/${post.author.username}`);
+    },
+    onCommentAuthorPress: (username: string) => {
+      navigateTo(`/user/${username}`);
+    },
+    onLike: (post: Post) => {
+      likeMutation.mutate({ postId: post.id, liked: !!post.liked_by_me });
+    },
+    onComment: (post: Post) => {
+      navigateTo(`/post/${getSharedPostTargetId(post)}`);
+    },
+    onShare: (post: Post) => {
+      openShare(post.shared_post ?? post);
+    },
+    onSave: (post: Post) => {
+      toggleSavePost(post.id, !!post.saved_by_me);
+    },
+    onReaction: (post: Post, emoji: string) => {
+      postReaction.mutate({
+        postId: post.id,
+        emoji,
+        currentEmoji: post.my_reaction,
+      });
+    },
+    onModerationPress: (post: Post) => {
+      openPostModeration(post.id, post.author_id);
+    },
+    onOwnerActionsPress: (post: Post) => {
+      openPostActions(post);
+    },
+  };
+
+  const feedActions = useMemo<FeedListItemActions>(
+    () => ({
+      onPress: (post) => feedActionsRef.current.onPress(post),
+      onAuthorPress: (post) => feedActionsRef.current.onAuthorPress(post),
+      onCommentAuthorPress: (username) => feedActionsRef.current.onCommentAuthorPress(username),
+      onLike: (post) => feedActionsRef.current.onLike(post),
+      onComment: (post) => feedActionsRef.current.onComment(post),
+      onShare: (post) => feedActionsRef.current.onShare(post),
+      onSave: (post) => feedActionsRef.current.onSave(post),
+      onReaction: (post, emoji) => feedActionsRef.current.onReaction(post, emoji),
+      onModerationPress: (post) => feedActionsRef.current.onModerationPress(post),
+      onOwnerActionsPress: (post) => feedActionsRef.current.onOwnerActionsPress(post),
+    }),
+    []
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Post }) => (
+      <FeedListItem post={item} userId={userId} actions={feedActions} />
+    ),
+    [feedActions, userId]
+  );
+
+  const listHeader = useMemo(
+    () => (
+      <FeedHeader
+        stories={stories}
+        suggestions={suggestions}
+        followingIds={followingIds}
+        followLoadingId={
+          followMutation.isPending ? (followMutation.variables?.targetUserId ?? null) : null
+        }
+        onStoryPress={(story) => setActiveStory(story)}
+        onFollowPress={(profileId) => toggleFollow(profileId)}
+      />
+    ),
+    [
+      stories,
+      suggestions,
+      followingIds,
+      followMutation.isPending,
+      followMutation.variables?.targetUserId,
+      toggleFollow,
+    ]
+  );
 
   return (
     <View style={styles.container}>
@@ -119,21 +214,26 @@ export default function HomeScreen() {
         onClose={() => setActiveStory(null)}
         onViewProfile={(username) => {
           setActiveStory(null);
-          router.push(`/user/${username}`);
+          deferNavigation(() => router.push(`/user/${username}`));
         }}
         onViewPost={(postId) => {
           setActiveStory(null);
-          router.push(`/post/${postId}`);
+          deferNavigation(() => router.push(`/post/${postId}`));
         }}
         onShareWorkout={() => {
           setActiveStory(null);
-          router.push("/create-post");
+          deferNavigation(() => router.push("/create-post"));
         }}
       />
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        initialNumToRender={5}
+        maxToRenderPerBatch={4}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS !== "web"}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching || isStoriesRefetching || isSuggestionsRefetching}
@@ -145,18 +245,7 @@ export default function HomeScreen() {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
-        ListHeaderComponent={
-          <FeedHeader
-            stories={stories}
-            suggestions={suggestions}
-            followingIds={followingIds}
-            followLoadingId={
-              followMutation.isPending ? (followMutation.variables?.targetUserId ?? null) : null
-            }
-            onStoryPress={(story) => setActiveStory(story)}
-            onFollowPress={(profileId) => toggleFollow(profileId)}
-          />
-        }
+        ListHeaderComponent={listHeader}
         ListFooterComponent={
           isFetchingNextPage ? (
             <ActivityIndicator color={colors.accent} style={styles.footer} />
@@ -171,38 +260,12 @@ export default function HomeScreen() {
                 title="Your feed is ready"
                 description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
                 actionLabel="Share a workout"
-                onAction={() => router.push("/create-post")}
+                onAction={() => navigateTo("/create-post")}
               />
             </View>
           )
         }
-        renderItem={({ item }) => {
-          const postId = getSharedPostTargetId(item);
-          return (
-            <FeedPostCard
-              post={item}
-              isOwn={item.author_id === userId}
-              onOwnerActionsPress={() => openPostActions(item)}
-              onPress={() => router.push(`/post/${postId}`)}
-              onAuthorPress={() => item.author && router.push(`/user/${item.author.username}`)}
-              onCommentAuthorPress={(username) => router.push(`/user/${username}`)}
-              onLike={() =>
-                likeMutation.mutate({ postId: item.id, liked: !!item.liked_by_me })
-              }
-              onComment={() => router.push(`/post/${postId}`)}
-              onShare={() => openShare(item.shared_post ?? item)}
-              onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-              onReaction={(emoji) =>
-                postReaction.mutate({
-                  postId: item.id,
-                  emoji,
-                  currentEmoji: item.my_reaction,
-                })
-              }
-              onModerationPress={() => openPostModeration(item.id, item.author_id)}
-            />
-          );
-        }}
+        renderItem={renderItem}
       />
     </View>
   );

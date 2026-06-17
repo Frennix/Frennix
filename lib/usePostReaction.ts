@@ -69,9 +69,5 @@ export function usePostReaction(userId: string) {
       }
       showAlert("Reaction failed", getErrorMessage(error));
     },
-    onSettled: (_data, _error, { postId }) => {
-      queryClient.invalidateQueries({ queryKey: ["feed", userId] });
-      queryClient.invalidateQueries({ queryKey: ["post", postId] });
-    },
   });
 }

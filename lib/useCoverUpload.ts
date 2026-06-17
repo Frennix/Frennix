@@ -22,6 +22,8 @@ export function useCoverUpload() {
       return null;
     }
 
+    setUploading(true);
+
     let picked;
     try {
       picked = await pickImageFromLibrary({ aspect: [16, 9], quality: 0.85 });
@@ -30,12 +32,13 @@ export function useCoverUpload() {
       setError(message);
       showAlert("Cover photo", message);
       return null;
+    } finally {
+      if (!picked) setUploading(false);
     }
 
     if (!picked) return null;
 
     setPreviewUri(picked.uri);
-    setUploading(true);
 
     try {
       const url = await uploadCoverImage(

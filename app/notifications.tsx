@@ -1,13 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { memo, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   buildNotificationRowText,
   getErrorMessage,
@@ -21,22 +23,27 @@ import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTarget } from "@/lib/notification-navigation";
 import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { deferNavigation } from "@/lib/press-utils";
 import { showAlert } from "@/lib/alerts";
 import { EmptyState, NotificationRow, colors, spacing, typography } from "@frennix/ui";
 
-function SafeNotificationRow({
+const SafeNotificationRow = memo(function SafeNotificationRow({
   notification,
+  text,
   onPress,
 }: {
   notification: Notification;
-  onPress: () => void;
+  text: string;
+  onPress: (id: string) => void;
 }) {
-  const text = buildNotificationRowText(notification);
-
   return (
-    <NotificationRow notification={notification} text={text} onPress={onPress} />
+    <NotificationRow
+      notification={notification}
+      text={text}
+      onPress={() => onPress(notification.id)}
+    />
   );
-}
+});
 
 export default function NotificationsScreen() {
   const { session, loading: authLoading } = useAuth();
@@ -86,10 +93,6 @@ export default function NotificationsScreen() {
       }
       queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
-    },
   });
 
   const markAllMutation = useMutation({
@@ -113,22 +116,53 @@ export default function NotificationsScreen() {
     onSuccess: () => {
       void syncNotificationBadgeCount(0);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
-    },
   });
 
-  function handlePress(notification: Notification) {
-    if (!notification.read_at) {
-      readMutation.mutate(notification.id);
+  const notificationsById = useMemo(() => {
+    const map = new Map<string, Notification>();
+    for (const item of notifications) {
+      map.set(item.id, item);
     }
+    return map;
+  }, [notifications]);
 
-    const result = openNotificationTarget(notification);
-    if (!result.ok) {
-      showAlert("Unavailable", result.message);
+  const rowTextById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of notifications) {
+      map.set(item.id, buildNotificationRowText(item));
     }
-  }
+    return map;
+  }, [notifications]);
+
+  const handlePressById = useCallback(
+    (notificationId: string) => {
+      const notification = notificationsById.get(notificationId);
+      if (!notification) return;
+
+      if (!notification.read_at) {
+        readMutation.mutate(notification.id);
+      }
+
+      deferNavigation(() => {
+        const result = openNotificationTarget(notification);
+        if (!result.ok) {
+          showAlert("Unavailable", result.message);
+        }
+      });
+    },
+    [notificationsById, readMutation]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Notification }) => (
+      <SafeNotificationRow
+        notification={item}
+        text={rowTextById.get(item.id) ?? "New activity on Frennix"}
+        onPress={handlePressById}
+      />
+    ),
+    [handlePressById, rowTextById]
+  );
 
   if (authLoading) {
     return (
@@ -194,6 +228,10 @@ export default function NotificationsScreen() {
         data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS !== "web"}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
         }
@@ -203,9 +241,7 @@ export default function NotificationsScreen() {
             description="When someone follows you, likes or reacts to a post, comments, replies, or sends a message, you'll see it here instantly."
           />
         }
-        renderItem={({ item }) => (
-          <SafeNotificationRow notification={item} onPress={() => handlePress(item)} />
-        )}
+        renderItem={renderItem}
       />
     </View>
   );

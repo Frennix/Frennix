@@ -1,16 +1,20 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { subscribeToNotifications } from "@frennix/api";
 
 export function useNotificationSubscription(userId: string) {
   const queryClient = useQueryClient();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!userId) return;
 
     function refreshNotifications() {
-      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+        queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+      }, 350);
     }
 
     let channel: ReturnType<typeof subscribeToNotifications> | null = null;
@@ -25,6 +29,7 @@ export function useNotificationSubscription(userId: string) {
     }
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       channel?.unsubscribe();
     };
   }, [userId, queryClient]);

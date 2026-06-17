@@ -93,15 +93,6 @@ export function useSavePost(userId: string) {
         queryClient.setQueryData(["saved-posts", userId], context.previousSaved);
       }
     },
-    onSettled: (_data, _err, { postId }) => {
-      queryClient.invalidateQueries({ queryKey: ["feed", userId] });
-      queryClient.invalidateQueries({ queryKey: ["saved-posts", userId] });
-      queryClient.invalidateQueries({ queryKey: ["post", postId] });
-      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["group-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["challenge-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["event-posts"] });
-    },
   });
 
   function toggleSavePost(postId: string, saved: boolean) {

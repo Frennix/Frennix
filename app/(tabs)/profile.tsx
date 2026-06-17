@@ -42,8 +42,10 @@ export default function ProfileTabScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
-      void queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] });
-      void queryClient.invalidateQueries({ queryKey: ["following-ids", userId] });
+      const statsState = queryClient.getQueryState(["profile-stats", userId]);
+      if (statsState?.isInvalidated || statsState?.status === "pending") {
+        void queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] });
+      }
     }, [queryClient, userId])
   );
 

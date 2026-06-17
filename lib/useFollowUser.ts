@@ -115,18 +115,14 @@ export function useFollowUser(currentUserId: string) {
         getErrorMessage(error)
       );
     },
-    onSettled: (_data, _error, { targetUserId }) => {
-      queryClient.invalidateQueries({ queryKey: ["is-following", currentUserId, targetUserId] });
-      queryClient.invalidateQueries({ queryKey: ["following-ids", currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ["profile-stats", targetUserId] });
-      queryClient.invalidateQueries({ queryKey: ["profile-stats", currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ["followers"] });
-      queryClient.invalidateQueries({ queryKey: ["following"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications", currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ["feed", currentUserId] });
+    onSettled: (_data, error, { targetUserId }) => {
+      if (error) {
+        queryClient.invalidateQueries({ queryKey: ["is-following", currentUserId, targetUserId] });
+        queryClient.invalidateQueries({ queryKey: ["following-ids", currentUserId] });
+        queryClient.invalidateQueries({ queryKey: ["profile-stats", targetUserId] });
+        queryClient.invalidateQueries({ queryKey: ["profile-stats", currentUserId] });
+      }
       queryClient.invalidateQueries({ queryKey: ["suggested-athletes", currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ["discover-people"] });
       queryClient.invalidateQueries({ queryKey: ["discover-suggestions", currentUserId] });
     },
   });

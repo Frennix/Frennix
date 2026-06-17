@@ -21,8 +21,11 @@ export function useAvatarUpload() {
       return null;
     }
 
+    setUploading(true);
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
+      setUploading(false);
       const message = "Photo library access is required to choose a profile picture";
       setError(message);
       showAlert("Profile photo", message);
@@ -36,9 +39,11 @@ export function useAvatarUpload() {
       quality: 0.8,
     });
 
-    if (result.canceled) return null;
+    if (result.canceled) {
+      setUploading(false);
+      return null;
+    }
 
-    setUploading(true);
     try {
       const asset = result.assets[0];
       const mimeType = asset.mimeType ?? "image/jpeg";
