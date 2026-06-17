@@ -211,6 +211,10 @@ export default function EventDetailScreen() {
       {isCreator && !isCancelled ? (
         <View style={styles.creatorActions}>
           <Button
+            title="Invite athletes"
+            onPress={() => router.push(`/event/${event.id}/invite`)}
+          />
+          <Button
             title="Edit event"
             variant="secondary"
             onPress={() => router.push({ pathname: "/edit-event/[id]", params: { id: event.id } })}

@@ -24,6 +24,7 @@ const config: ExpoConfig = {
       NSPhotoLibraryUsageDescription:
         "Frennix needs photo library access to share workout content.",
       NSMicrophoneUsageDescription: "Frennix needs microphone access for workout videos.",
+      UIBackgroundModes: ["remote-notification"],
     },
   },
   android: {

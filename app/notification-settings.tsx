@@ -66,8 +66,9 @@ export default function NotificationSettingsScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.intro}>
-        Choose which activities send push notifications to your device. In-app notifications always
-        appear in your notification list.
+        Push notifications alert you instantly when someone follows you, reacts to or comments on
+        your posts, replies, sends a message, or invites you to an event — even when Frennix is
+        closed.
       </Text>
 
       {NOTIFICATION_SETTING_ITEMS.map((item) => (

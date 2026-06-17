@@ -47,6 +47,11 @@ export function openNotificationTarget(notification: Notification) {
     return;
   }
 
+  if (type === "event_invite" && payload.event_id) {
+    router.push(`/event/${payload.event_id as string}`);
+    return;
+  }
+
   if (type === "challenge_join" && payload.challenge_id) {
     router.push(`/challenge/${payload.challenge_id as string}`);
     return;
@@ -93,6 +98,11 @@ export function openNotificationFromPushData(data: Record<string, unknown>) {
   }
 
   if (type === "event_join" && data.event_id) {
+    router.push(`/event/${data.event_id as string}`);
+    return;
+  }
+
+  if (type === "event_invite" && data.event_id) {
     router.push(`/event/${data.event_id as string}`);
     return;
   }

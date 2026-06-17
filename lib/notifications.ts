@@ -1,7 +1,7 @@
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
-import { Platform } from "react-native";
-import { getSupabase } from "@frennix/api";
+import { AppState, Platform } from "react-native";
+import { removePushTokens, savePushToken, type PushPlatform } from "@frennix/api";
 import { handlePushNotificationOpen } from "@/lib/notification-navigation";
 
 Notifications.setNotificationHandler({
@@ -9,6 +9,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -16,12 +18,27 @@ function getExpoProjectId(): string | undefined {
   return Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
 }
 
+function resolvePlatform(): PushPlatform | null {
+  if (Platform.OS === "ios") return "ios";
+  if (Platform.OS === "android") return "android";
+  return null;
+}
+
 export async function registerForPushNotifications(userId: string) {
+  const platform = resolvePlatform();
+  if (!platform) return null;
+
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
 
   if (existing !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await Notifications.requestPermissionsAsync({
+      ios: {
+        allowAlert: true,
+        allowBadge: true,
+        allowSound: true,
+      },
+    });
     finalStatus = status;
   }
 
@@ -37,30 +54,23 @@ export async function registerForPushNotifications(userId: string) {
   }
 
   const projectId = getExpoProjectId();
-  const tokenData = projectId
-    ? await Notifications.getExpoPushTokenAsync({ projectId })
-    : await Notifications.getExpoPushTokenAsync();
-  const token = tokenData.data;
-  const platform = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "web";
+  let token: string;
+  try {
+    const tokenData = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+    token = tokenData.data;
+  } catch (error) {
+    console.warn("[push] Failed to get Expo push token", error);
+    return null;
+  }
 
-  await getSupabase().from("push_tokens").upsert(
-    {
-      user_id: userId,
-      expo_token: token,
-      platform,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,expo_token" }
-  );
-
-  await getSupabase().from("profiles").update({ push_token: token }).eq("id", userId);
-
+  await savePushToken(userId, token, platform);
   return token;
 }
 
 export async function unregisterPushNotifications(userId: string) {
-  await getSupabase().from("push_tokens").delete().eq("user_id", userId);
-  await getSupabase().from("profiles").update({ push_token: null }).eq("id", userId);
+  await removePushTokens(userId);
 
   if (Platform.OS !== "web") {
     await Notifications.setBadgeCountAsync(0).catch(() => undefined);
@@ -92,4 +102,16 @@ export function setupNotificationListeners(onReceived?: () => void) {
     receivedSub.remove();
     responseSub.remove();
   };
+}
+
+export function setupPushRegistration(userId: string) {
+  void registerForPushNotifications(userId);
+
+  const subscription = AppState.addEventListener("change", (nextState) => {
+    if (nextState === "active") {
+      void registerForPushNotifications(userId);
+    }
+  });
+
+  return () => subscription.remove();
 }

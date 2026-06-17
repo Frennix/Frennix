@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
+import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
 import { StackBackButton } from "@/components/StackBackButton";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { colors } from "@frennix/ui";
@@ -52,6 +53,7 @@ export default function RootLayout() {
       <QueryProvider>
         <AuthProvider>
           <NotificationBootstrap />
+          <PushRegistrationBootstrap />
           <AuthNavigationGuard />
           <StatusBar style="light" />
           <Stack screenOptions={stackDefaults}>
@@ -77,6 +79,7 @@ export default function RootLayout() {
               options={backScreen("Edit event", { presentation: "modal" })}
             />
             <Stack.Screen name="event/[id]" options={backScreen("Event")} />
+            <Stack.Screen name="event/[id]/invite" options={backScreen("Invite athletes")} />
             <Stack.Screen name="post/[id]" options={backScreen("Post")} />
             <Stack.Screen name="user/[username]" options={backScreen("Profile")} />
             <Stack.Screen name="group/[id]" options={backScreen("Group")} />
