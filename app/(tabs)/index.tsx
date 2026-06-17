@@ -1,26 +1,40 @@
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useState } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { getFeed, toggleLike } from "@frennix/api";
-import type { FeedPage } from "@frennix/types";
+import { getFeed, getFeedStories, toggleLike } from "@frennix/api";
+import type { FeedPage, FeedStory } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { FeedHeader } from "@/components/FeedHeader";
+import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
-import { EmptyState, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { EmptyState, FeedPostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
+  const [activeStory, setActiveStory] = useState<FeedStory | null>(null);
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
   const { moderationSheets, openPostModeration } = useModeration(userId);
+
+  const {
+    data: stories = [],
+    refetch: refetchStories,
+    isRefetching: isStoriesRefetching,
+  } = useQuery({
+    queryKey: ["feed-stories", userId],
+    queryFn: () => getFeedStories(userId),
+    enabled: !!userId,
+  });
 
   const {
     data,
@@ -39,6 +53,10 @@ export default function HomeScreen() {
   });
 
   const posts = data?.pages.flatMap((page) => page.posts) ?? [];
+
+  async function handleRefresh() {
+    await Promise.all([refetch(), refetchStories()]);
+  }
 
   const likeMutation = useMutation({
     mutationFn: ({ postId, liked }: { postId: string; liked: boolean }) =>
@@ -83,17 +101,41 @@ export default function HomeScreen() {
       <PostActionSheet {...actionSheetProps} />
       {shareSheet}
       {moderationSheets}
+      <FeedStoryViewer
+        story={activeStory}
+        visible={Boolean(activeStory)}
+        onClose={() => setActiveStory(null)}
+        onViewProfile={(username) => {
+          setActiveStory(null);
+          router.push(`/user/${username}`);
+        }}
+        onViewPost={(postId) => {
+          setActiveStory(null);
+          router.push(`/post/${postId}`);
+        }}
+        onShareWorkout={() => {
+          setActiveStory(null);
+          router.push("/create-post");
+        }}
+      />
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl
+            refreshing={isRefetching || isStoriesRefetching}
+            onRefresh={handleRefresh}
+            tintColor={colors.accent}
+          />
         }
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
+        ListHeaderComponent={
+          <FeedHeader stories={stories} onStoryPress={(story) => setActiveStory(story)} />
+        }
         ListFooterComponent={
           isFetchingNextPage ? (
             <ActivityIndicator color={colors.accent} style={styles.footer} />
@@ -103,16 +145,18 @@ export default function HomeScreen() {
           isLoading ? (
             <ActivityIndicator color={colors.accent} style={styles.footer} />
           ) : (
-            <EmptyState
-              title="Your feed is ready to move"
-              description="Follow athletes and join groups to see workout wins, challenges, and community activity."
-              actionLabel="Discover people"
-              onAction={() => router.push("/(tabs)/discover")}
-            />
+            <View style={styles.emptyWrap}>
+              <EmptyState
+                title="Your feed is ready"
+                description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
+                actionLabel="Share a workout"
+                onAction={() => router.push("/create-post")}
+              />
+            </View>
           )
         }
         renderItem={({ item }) => (
-          <PostCard
+          <FeedPostCard
             post={item}
             isOwn={item.author_id === userId}
             onOwnerActionsPress={() => openPostActions(item)}
@@ -141,6 +185,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  list: { padding: spacing.md, flexGrow: 1 },
+  list: { flexGrow: 1, paddingBottom: spacing.xl },
+  emptyWrap: { padding: spacing.lg },
   footer: { paddingVertical: spacing.lg },
 });

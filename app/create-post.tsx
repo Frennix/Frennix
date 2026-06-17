@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { ACTIVITIES } from "@frennix/types";
-import { createPost, getErrorMessage, isVideoMime, postTypeFromMime, uploadPostMedia } from "@frennix/api";
+import { createPost, getErrorMessage, isVideoMime, uploadPostMedia } from "@frennix/api";
 import { generateAndUploadVideoThumbnail } from "@/lib/video-thumbnail";
 import type { PostType } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -26,11 +26,20 @@ import {
 } from "@/lib/media-duration";
 import { showAlert } from "@/lib/alerts";
 import { logCreatePostError, logCreatePostInfo } from "@/lib/create-post-logging";
+import { stackBackOptions } from "@/lib/stack-navigation";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const CAPTION_MAX = 500;
 const SUCCESS_NAV_DELAY_MS = 2000;
+const MAX_PHOTOS = 10;
+
+type SelectedMediaItem = {
+  uri: string;
+  mimeType: string;
+  file?: File;
+  durationSeconds?: number | null;
+};
 
 type UploadStage = "idle" | "uploading_media" | "creating_post" | "success";
 
@@ -91,6 +100,7 @@ async function refreshFeedForDestination(
   }
 
   await queryClient.invalidateQueries({ queryKey: ["feed", userId] });
+  await queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] });
   await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
   await queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] });
   await queryClient.refetchQueries({ queryKey: ["feed", userId] });
@@ -114,6 +124,7 @@ export default function CreatePostScreen() {
   const [loading, setLoading] = useState(false);
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
   const [error, setError] = useState("");
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMediaItem[]>([]);
 
   const {
     hydrated,
@@ -143,11 +154,25 @@ export default function CreatePostScreen() {
   const destination = resolveDestination(groupId, challengeId, eventId);
   const contextId = groupId ?? challengeId ?? eventId;
   const isContextPost = destination !== "home";
-  const isVideo = isVideoMime(mimeType);
-  const mediaTypeLabel = isVideo ? "Video" : "Photo";
+  const hasVideo = selectedMedia.some((item) => isVideoMime(item.mimeType));
+  const hasPhotos = selectedMedia.some((item) => !isVideoMime(item.mimeType));
   const isSubmitting = loading;
   const isSuccess = uploadStage === "success";
   const isFormLocked = isSubmitting || isSuccess;
+
+  useEffect(() => {
+    if (!hydrated || selectedMedia.length) return;
+    if (mediaUri) {
+      setSelectedMedia([
+        {
+          uri: mediaUri,
+          mimeType,
+          file: pickedFile,
+          durationSeconds: videoDurationSeconds,
+        },
+      ]);
+    }
+  }, [hydrated, mediaUri, mimeType, pickedFile, videoDurationSeconds, selectedMedia.length]);
 
   useEffect(() => {
     return () => {
@@ -166,36 +191,87 @@ export default function CreatePostScreen() {
       return;
     }
 
+    const pickingVideo = selectedMedia.length === 0 || hasVideo;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: pickingVideo ? ImagePicker.MediaTypeOptions.All : ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
+      allowsMultipleSelection: !pickingVideo,
+      selectionLimit: pickingVideo ? 1 : MAX_PHOTOS - selectedMedia.length,
       quality: 0.8,
       videoMaxDuration: 60,
     });
 
     if (result.canceled) return;
 
-    const asset = result.assets[0];
-    const mime = mimeFromAsset(asset);
+    const nextItems: SelectedMediaItem[] = [];
 
-    if (isVideoMime(mime)) {
-      const durationSeconds = await getVideoDurationSeconds(asset, mime);
-      if (isVideoTooLong(durationSeconds)) {
-        showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
-        return;
-      }
+    for (const asset of result.assets) {
+      const mime = mimeFromAsset(asset);
       const file = "file" in asset ? asset.file ?? undefined : undefined;
-      await applyPickedMedia(asset, mime, file, durationSeconds);
+
+      if (isVideoMime(mime)) {
+        const durationSeconds = await getVideoDurationSeconds(asset, mime);
+        if (isVideoTooLong(durationSeconds)) {
+          showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
+          return;
+        }
+        nextItems.push({ uri: asset.uri, mimeType: mime, file, durationSeconds });
+        break;
+      }
+
+      nextItems.push({ uri: asset.uri, mimeType: mime, file, durationSeconds: null });
+    }
+
+    if (!nextItems.length) return;
+
+    if (nextItems.some((item) => isVideoMime(item.mimeType))) {
+      setSelectedMedia(nextItems.slice(0, 1));
+      const video = nextItems[0];
+      await applyPickedMedia(
+        { uri: video.uri } as ImagePicker.ImagePickerAsset,
+        video.mimeType,
+        video.file,
+        video.durationSeconds ?? null
+      );
       return;
     }
 
-    const file = "file" in asset ? asset.file ?? undefined : undefined;
-    await applyPickedMedia(asset, mime, file, null);
+    const merged = [...selectedMedia.filter((item) => !isVideoMime(item.mimeType)), ...nextItems].slice(
+      0,
+      MAX_PHOTOS
+    );
+    setSelectedMedia(merged);
+    const first = merged[0];
+    await applyPickedMedia(
+      { uri: first.uri } as ImagePicker.ImagePickerAsset,
+      first.mimeType,
+      first.file,
+      null
+    );
+  }
+
+  async function removeMediaAt(index: number) {
+    if (isFormLocked) return;
+    setError("");
+    const next = selectedMedia.filter((_, itemIndex) => itemIndex !== index);
+    setSelectedMedia(next);
+    if (!next.length) {
+      await clearMedia();
+      return;
+    }
+    const first = next[0];
+    await applyPickedMedia(
+      { uri: first.uri } as ImagePicker.ImagePickerAsset,
+      first.mimeType,
+      first.file,
+      first.durationSeconds ?? null
+    );
   }
 
   async function handleClearMedia() {
     if (isFormLocked) return;
     setError("");
+    setSelectedMedia([]);
     await clearMedia();
   }
 
@@ -208,11 +284,11 @@ export default function CreatePostScreen() {
       showAlert("Create post", message);
       return;
     }
-    if (!content && !mediaUri && !workoutType) {
+    if (!content && !selectedMedia.length && !workoutType) {
       setError("Add a caption, workout type, or photo/video");
       return;
     }
-    if (mediaUri && isVideo && isVideoTooLong(videoDurationSeconds)) {
+    if (hasVideo && selectedMedia.some((item) => isVideoTooLong(item.durationSeconds ?? null))) {
       showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
       return;
     }
@@ -233,19 +309,22 @@ export default function CreatePostScreen() {
       let thumbnailUrl: string | null = null;
       let postType: PostType = "text";
 
-      if (mediaUri) {
+      if (selectedMedia.length) {
         setUploadStage("uploading_media");
         try {
-          const url = await uploadPostMedia(session.user.id, mediaUri, mimeType, pickedFile);
-          mediaUrls = [url];
-          postType = postTypeFromMime(mimeType);
+          for (const item of selectedMedia) {
+            const url = await uploadPostMedia(session.user.id, item.uri, item.mimeType, item.file);
+            mediaUrls.push(url);
+          }
 
-          if (isVideo) {
+          if (hasVideo) {
+            const video = selectedMedia[0];
+            postType = "video";
             thumbnailUrl = await generateAndUploadVideoThumbnail(
               session.user.id,
-              mediaUri,
-              mimeType,
-              pickedFile
+              video.uri,
+              video.mimeType,
+              video.file
             );
             if (!thumbnailUrl) {
               logCreatePostInfo(
@@ -253,10 +332,12 @@ export default function CreatePostScreen() {
                 "Video thumbnail generation failed; feed will use first-frame fallback"
               );
             }
+          } else {
+            postType = "photo";
           }
         } catch (uploadError) {
           logCreatePostError("media_upload", uploadError, {
-            mimeType,
+            mimeType: selectedMedia[0]?.mimeType,
             hasMedia: true,
             destination: postDestination,
           });
@@ -284,15 +365,15 @@ export default function CreatePostScreen() {
         logCreatePostError("post_save", saveError, {
           postType,
           destination: postDestination,
-          hasMedia: Boolean(mediaUri),
+          hasMedia: Boolean(selectedMedia.length),
         });
         throw saveError;
       }
 
-      if (mediaUri && !created.media_urls?.[0]) {
+      if (selectedMedia.length && !created.media_urls?.length) {
         throw new Error("Post saved but media URL is missing from the response");
       }
-      if (mediaUri && isVideo && created.post_type !== "video") {
+      if (hasVideo && created.post_type !== "video") {
         throw new Error(`Post saved but post_type is "${created.post_type}" instead of video`);
       }
 
@@ -306,6 +387,7 @@ export default function CreatePostScreen() {
       }
 
       await clearDraft();
+      setSelectedMedia([]);
       setLoading(false);
       setUploadStage("success");
       logCreatePostInfo("navigation", "Post created", {
@@ -337,11 +419,14 @@ export default function CreatePostScreen() {
 
   const progressLabel = uploadStageLabel(uploadStage, isContextPost);
   const showSubmittingUi = isSubmitting || uploadStage === "uploading_media" || uploadStage === "creating_post";
+  const screenOptions = stackBackOptions(isContextPost ? "Share post" : "Share workout", {
+    presentation: "modal",
+  });
 
   if (!hydrated) {
     return (
       <>
-        <Stack.Screen options={{ title: isContextPost ? "Share post" : "Share workout" }} />
+        <Stack.Screen options={screenOptions} />
         <View style={styles.loading}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
@@ -351,7 +436,7 @@ export default function CreatePostScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isContextPost ? "Share post" : "Share workout" }} />
+      <Stack.Screen options={screenOptions} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.sectionLabel}>Workout type</Text>
         <View style={styles.chips}>
@@ -384,50 +469,69 @@ export default function CreatePostScreen() {
           </Text>
         </View>
 
-        {mediaUri ? (
+        {selectedMedia.length ? (
           <View style={styles.mediaSection}>
-            <View style={styles.previewWrapper}>
-              {isVideo ? (
-                <Video
-                  source={{ uri: mediaUri }}
-                  style={styles.preview}
-                  useNativeControls
-                  resizeMode={ResizeMode.CONTAIN}
-                  isLooping={false}
-                />
-              ) : (
-                <Image source={{ uri: mediaUri }} style={styles.preview} resizeMode="cover" />
-              )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
+              {selectedMedia.map((item, index) => {
+                const itemIsVideo = isVideoMime(item.mimeType);
+                return (
+                  <View key={`${item.uri}-${index}`} style={styles.previewWrapper}>
+                    {itemIsVideo ? (
+                      <Video
+                        source={{ uri: item.uri }}
+                        style={styles.preview}
+                        useNativeControls
+                        resizeMode={ResizeMode.CONTAIN}
+                        isLooping={false}
+                      />
+                    ) : (
+                      <Image source={{ uri: item.uri }} style={styles.preview} resizeMode="cover" />
+                    )}
 
-              <Pressable
-                style={styles.previewClose}
-                onPress={handleClearMedia}
-                disabled={isFormLocked}
-                accessibilityRole="button"
-                accessibilityLabel="Remove media"
-              >
-                <Text style={styles.previewCloseText}>✕</Text>
-              </Pressable>
+                    <Pressable
+                      style={styles.previewClose}
+                      onPress={() => removeMediaAt(index)}
+                      disabled={isFormLocked}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove media"
+                    >
+                      <Text style={styles.previewCloseText}>✕</Text>
+                    </Pressable>
 
-              <View style={styles.typeBadge}>
-                <Text style={styles.typeBadgeText}>{mediaTypeLabel}</Text>
-              </View>
-            </View>
+                    <View style={styles.typeBadge}>
+                      <Text style={styles.typeBadgeText}>
+                        {itemIsVideo ? "Video" : `Photo ${index + 1}`}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
 
             <Text style={styles.mediaHint}>
-              {isVideo && videoDurationSeconds != null
-                ? `Video selected · ${formatVideoDuration(videoDurationSeconds)}`
-                : `${mediaTypeLabel} selected`}
+              {hasVideo && selectedMedia[0]?.durationSeconds != null
+                ? `Video selected · ${formatVideoDuration(selectedMedia[0].durationSeconds)}`
+                : hasPhotos
+                  ? `${selectedMedia.length} photo${selectedMedia.length === 1 ? "" : "s"} selected`
+                  : "Media selected"}
             </Text>
 
+            {!hasVideo && selectedMedia.length < MAX_PHOTOS ? (
+              <Button
+                title="Add more photos"
+                variant="secondary"
+                onPress={pickMedia}
+                disabled={isFormLocked}
+              />
+            ) : null}
             <Button
-              title="Replace Media"
+              title={hasVideo ? "Replace video" : "Replace photos"}
               variant="secondary"
               onPress={pickMedia}
               disabled={isFormLocked}
             />
             <Button
-              title="Remove Media"
+              title="Remove all media"
               variant="danger"
               onPress={handleClearMedia}
               disabled={isFormLocked}
@@ -436,12 +540,14 @@ export default function CreatePostScreen() {
         ) : (
           <View style={styles.addMediaBlock}>
             <Button
-              title="Add photo or video"
+              title="Add photos or video"
               variant="secondary"
               onPress={pickMedia}
               disabled={isFormLocked}
             />
-            <Text style={styles.mediaHelper}>Videos can be up to 60 seconds.</Text>
+            <Text style={styles.mediaHelper}>
+              Add up to {MAX_PHOTOS} photos or one workout video up to 60 seconds.
+            </Text>
           </View>
         )}
 
@@ -512,8 +618,10 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   mediaSection: { gap: spacing.sm },
+  mediaRow: { gap: spacing.sm },
   previewWrapper: {
     position: "relative",
+    width: 220,
     borderRadius: radius.md,
     overflow: "hidden",
     backgroundColor: colors.surfaceElevated,

@@ -41,6 +41,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
+        headerShadowVisible: false,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
@@ -49,7 +50,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Feed",
+          headerTitle: "Feed",
+          tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
           headerRight: () => (
             <View style={{ marginRight: 16 }}>
