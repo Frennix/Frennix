@@ -149,6 +149,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         setPasswordRecovery(false);
       }
+      // Token refresh on tab resume only updates the JWT; skip profile refetch + push re-register.
+      if (event === "TOKEN_REFRESHED") {
+        setSession(s);
+        setLoading(false);
+        return;
+      }
       void applySession(s);
     });
 

@@ -48,6 +48,7 @@ export default function TabsLayout() {
     queryFn: () => getUnreadMessageCount(userId),
     enabled: !!userId,
     refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   return (

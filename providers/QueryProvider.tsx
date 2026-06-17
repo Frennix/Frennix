@@ -6,7 +6,14 @@ export function QueryProvider({ children }: { children: ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 30_000, retry: 2 },
+          queries: {
+            staleTime: 30_000,
+            retry: 2,
+            // Avoid refetch storms when the browser tab regains focus (root cause of blank hangs).
+            refetchOnWindowFocus: false,
+            refetchOnReconnect: false,
+            refetchIntervalInBackground: false,
+          },
         },
       })
   );

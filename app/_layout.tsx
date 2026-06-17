@@ -9,6 +9,8 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
+import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StackBackButton } from "@/components/StackBackButton";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { colors } from "@frennix/ui";
@@ -50,13 +52,16 @@ function NotificationBootstrap() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
-      <QueryProvider>
-        <AuthProvider>
-          <NotificationBootstrap />
-          <PushRegistrationBootstrap />
-          <AuthNavigationGuard />
-          <StatusBar style="light" />
-          <Stack screenOptions={stackDefaults}>
+      <AppErrorBoundary scope="root">
+        <QueryProvider>
+          <AppResumeCoordinator />
+          <AuthProvider>
+            <AppErrorBoundary scope="navigation">
+              <NotificationBootstrap />
+              <PushRegistrationBootstrap />
+              <AuthNavigationGuard />
+              <StatusBar style="light" />
+              <Stack screenOptions={stackDefaults}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="reset-password" options={backScreen("New password")} />
@@ -110,9 +115,11 @@ export default function RootLayout() {
             <Stack.Screen name="beta-feedback" options={backScreen("Beta Feedback")} />
             <Stack.Screen name="admin-feedback" options={backScreen("Feedback Dashboard")} />
             <Stack.Screen name="matching" options={backScreen("Partner matching")} />
-          </Stack>
-        </AuthProvider>
-      </QueryProvider>
+              </Stack>
+            </AppErrorBoundary>
+          </AuthProvider>
+        </QueryProvider>
+      </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }
