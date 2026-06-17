@@ -155,29 +155,33 @@ export default function HomeScreen() {
             </View>
           )
         }
-        renderItem={({ item }) => (
-          <FeedPostCard
-            post={item}
-            isOwn={item.author_id === userId}
-            onOwnerActionsPress={() => openPostActions(item)}
-            onPress={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
-            onAuthorPress={() => item.author && router.push(`/user/${item.author.username}`)}
-            onLike={() =>
-              likeMutation.mutate({ postId: item.id, liked: !!item.liked_by_me })
-            }
-            onComment={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
-            onShare={() => openShare(item.shared_post ?? item)}
-            onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onReaction={(emoji) =>
-              postReaction.mutate({
-                postId: item.id,
-                emoji,
-                currentEmoji: item.my_reaction,
-              })
-            }
-            onModerationPress={() => openPostModeration(item.id, item.author_id)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const postId = getSharedPostTargetId(item);
+          return (
+            <FeedPostCard
+              post={item}
+              isOwn={item.author_id === userId}
+              onOwnerActionsPress={() => openPostActions(item)}
+              onPress={() => router.push(`/post/${postId}`)}
+              onAuthorPress={() => item.author && router.push(`/user/${item.author.username}`)}
+              onCommentAuthorPress={(username) => router.push(`/user/${username}`)}
+              onLike={() =>
+                likeMutation.mutate({ postId: item.id, liked: !!item.liked_by_me })
+              }
+              onComment={() => router.push(`/post/${postId}`)}
+              onShare={() => openShare(item.shared_post ?? item)}
+              onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
+              onReaction={(emoji) =>
+                postReaction.mutate({
+                  postId: item.id,
+                  emoji,
+                  currentEmoji: item.my_reaction,
+                })
+              }
+              onModerationPress={() => openPostModeration(item.id, item.author_id)}
+            />
+          );
+        }}
       />
     </View>
   );
