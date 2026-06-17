@@ -8,6 +8,25 @@ type FollowMutationVars = {
   isFollowing: boolean;
 };
 
+const EMPTY_PROFILE_STATS: ProfileStats = {
+  posts: 0,
+  followers: 0,
+  following: 0,
+  eventsJoined: 0,
+  workoutStreak: 0,
+};
+
+function adjustProfileStats(
+  stats: ProfileStats,
+  delta: { followers?: number; following?: number }
+): ProfileStats {
+  return {
+    ...stats,
+    followers: Math.max(0, stats.followers + (delta.followers ?? 0)),
+    following: Math.max(0, stats.following + (delta.following ?? 0)),
+  };
+}
+
 export function useFollowUser(currentUserId: string) {
   const queryClient = useQueryClient();
 
@@ -52,21 +71,21 @@ export function useFollowUser(currentUserId: string) {
         return old.filter((id) => id !== targetUserId);
       });
 
-      queryClient.setQueryData<ProfileStats>(["profile-stats", targetUserId], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          followers: Math.max(0, old.followers + (nextFollowing ? 1 : -1)),
-        };
-      });
+      queryClient.setQueryData<ProfileStats>(
+        ["profile-stats", targetUserId],
+        (old) =>
+          adjustProfileStats(old ?? EMPTY_PROFILE_STATS, {
+            followers: nextFollowing ? 1 : -1,
+          })
+      );
 
-      queryClient.setQueryData<ProfileStats>(["profile-stats", currentUserId], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          following: Math.max(0, old.following + (nextFollowing ? 1 : -1)),
-        };
-      });
+      queryClient.setQueryData<ProfileStats>(
+        ["profile-stats", currentUserId],
+        (old) =>
+          adjustProfileStats(old ?? EMPTY_PROFILE_STATS, {
+            following: nextFollowing ? 1 : -1,
+          })
+      );
 
       return {
         previousIsFollowing,
