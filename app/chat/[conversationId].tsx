@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsFocused } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -19,7 +20,7 @@ import {
   subscribeToMessageReactions,
   subscribeToTyping,
 } from "@frennix/api";
-import type { Message } from "@frennix/types";
+import type { Conversation, Message } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useMessageReaction } from "@/lib/useMessageReaction";
 import { ChatComposer, type ChatComposerHandle, type ChatSendPayload } from "@/components/ChatComposer";
@@ -95,45 +96,62 @@ export default function ChatScreen() {
   const messageReaction = useMessageReaction(userId);
   const messageReactionRef = useRef(messageReaction);
   messageReactionRef.current = messageReaction;
+  const isFocused = useIsFocused();
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", conversationId],
     queryFn: () => getMessages(conversationId!, userId),
-    enabled: chatReady,
+    enabled: chatReady && isFocused,
   });
 
   const { data: participantProfiles = {} } = useQuery({
     queryKey: ["conversation-profiles", conversationId],
     queryFn: () => getConversationProfiles(conversationId!),
-    enabled: chatReady,
+    enabled: chatReady && isFocused,
   });
 
   const markRead = useCallback(() => {
     if (!conversationId || !userId) return;
-    markMessagesAsRead(conversationId, userId).then(() => {
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["unread-messages"] });
+    void markMessagesAsRead(conversationId, userId).then(() => {
+      const convUnread =
+        queryClient
+          .getQueryData<Conversation[]>(["conversations", userId])
+          ?.find((c) => c.id === conversationId)?.unread_count ?? 0;
+
+      queryClient.setQueryData<Conversation[]>(["conversations", userId], (old) => {
+        if (!old) return old;
+        return old.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c));
+      });
+
+      if (convUnread > 0) {
+        queryClient.setQueryData<number>(["unread-messages", userId], (old = 0) =>
+          Math.max(0, old - convUnread)
+        );
+      }
     });
   }, [conversationId, userId, queryClient]);
 
   useEffect(() => {
-    if (!chatReady) return;
+    if (!chatReady || !isFocused) return;
 
     markRead();
 
-    const channel = subscribeToMessages(conversationId, () => {
-      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+    const channel = subscribeToMessages(conversationId!, (message) => {
+      queryClient.setQueryData<Message[]>(["messages", conversationId], (old = []) => {
+        if (old.some((m) => m.id === message.id)) return old;
+        return [...old, message];
+      });
       markRead();
     });
 
-    const typingChannel = subscribeToTyping(conversationId, userId, () => {
+    const typingChannel = subscribeToTyping(conversationId!, userId, () => {
       setOtherTyping(true);
       if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
       hideTypingRef.current = setTimeout(() => setOtherTyping(false), TYPING_HIDE_MS);
     });
 
     const reactionsChannel = subscribeToMessageReactions(() => {
-      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
     });
 
     return () => {
@@ -142,7 +160,7 @@ export default function ChatScreen() {
       reactionsChannel.unsubscribe();
       if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
     };
-  }, [chatReady, conversationId, userId, queryClient, markRead]);
+  }, [chatReady, isFocused, conversationId, userId, queryClient, markRead]);
 
   const sendMutation = useMutation({
     mutationFn: (payload: ChatSendPayload) =>

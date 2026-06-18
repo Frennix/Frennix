@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { usePathname } from "expo-router";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { getUnreadMessageCount, getUnreadNotificationCount } from "@frennix/api";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
@@ -15,6 +16,10 @@ const TabBadgeContext = createContext<TabBadgeContextValue>({
 
 /** Single subscriber for tab/header badges — avoids duplicating queries across tab layout + headers. */
 export function TabBadgeProvider({ userId, children }: { userId: string; children: ReactNode }) {
+  const pathname = usePathname();
+  const messagesRouteActive =
+    pathname === "/messages" || pathname.startsWith("/chat/") || pathname.includes("/messages");
+
   const { data: unreadNotifications = 0 } = useQuery({
     queryKey: ["unread-notifications", userId],
     queryFn: () => getUnreadNotificationCount(userId),
@@ -28,7 +33,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
     queryFn: () => getUnreadMessageCount(userId),
     enabled: !!userId,
     staleTime: 45_000,
-    refetchInterval: 60_000,
+    refetchInterval: messagesRouteActive ? 60_000 : false,
     refetchIntervalInBackground: false,
   });
 

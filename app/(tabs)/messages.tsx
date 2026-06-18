@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
+import { usePathname } from "expo-router";
 import { memo, useCallback } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getConversations } from "@frennix/api";
@@ -60,13 +61,15 @@ export default function MessagesScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const isFocused = useIsFocused();
+  const pathname = usePathname();
+  const isListActive = isFocused && !pathname.startsWith("/chat/");
 
   const { data: conversations = [], refetch, isRefetching, isLoading } = useQuery({
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(userId),
-    enabled: !!userId && isFocused,
+    enabled: !!userId && isListActive,
     staleTime: 30_000,
-    refetchInterval: isFocused ? 30_000 : false,
+    refetchInterval: isListActive ? 30_000 : false,
     refetchIntervalInBackground: false,
   });
 

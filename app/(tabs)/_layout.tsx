@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
+import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
@@ -73,6 +74,7 @@ const TabsShell = memo(function TabsShell() {
           tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
           headerRight: renderHeaderBell,
+          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)" />,
         }}
       />
       <Tabs.Screen
@@ -81,6 +83,7 @@ const TabsShell = memo(function TabsShell() {
           title: "Discover",
           tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
           headerRight: renderHeaderBell,
+          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/discover" />,
         }}
       />
       <Tabs.Screen
@@ -89,6 +92,7 @@ const TabsShell = memo(function TabsShell() {
           title: "Events",
           tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
           headerRight: renderHeaderBell,
+          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/events" />,
         }}
       />
       <Tabs.Screen
@@ -113,6 +117,7 @@ const TabsShell = memo(function TabsShell() {
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
           tabBarBadge: messagesBadge,
           headerRight: renderHeaderBell,
+          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/messages" />,
         }}
       />
       <Tabs.Screen
@@ -121,6 +126,7 @@ const TabsShell = memo(function TabsShell() {
           title: "Profile",
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
           headerRight: renderProfileHeader,
+          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/profile" />,
         }}
       />
     </Tabs>

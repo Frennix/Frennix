@@ -7,6 +7,9 @@ export function pushScreen(href: Href) {
 
 /** Switch an existing bottom tab without stacking duplicate tab routes. */
 export function switchTab(href: Href) {
+  if (router.canDismiss()) {
+    router.dismissAll();
+  }
   router.navigate(href);
 }
 
