@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd ../.. && pnpm --filter @frennix/mobile run build:web",
-  "installCommand": "cd ../.. && pnpm install",
+  "installCommand": "echo \"Using prebuilt dist from repo — workspace packages are built locally before push\"",
+  "buildCommand": "test -f dist/index.html || (echo \"dist/index.html missing — run pnpm run build:web locally and commit dist\" && exit 1)",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/((?!_expo/).*)", "destination": "/index.html" }]
 }
