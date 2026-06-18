@@ -1,8 +1,8 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
-import { getFeed, getFeedStories, getSuggestedAthletes, toggleLike } from "@frennix/api";
-import type { FeedPage, FeedStory, Post } from "@frennix/types";
+import { getFeed, getFeedStories, getSuggestedAthletes } from "@frennix/api";
+import type { FeedStory, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
@@ -15,12 +15,12 @@ import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
+import { useFeedLike } from "@/lib/useFeedLike";
 import { EmptyState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const queryClient = useQueryClient();
   const [activeStory, setActiveStory] = useState<FeedStory | null>(null);
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
@@ -28,9 +28,11 @@ export default function HomeScreen() {
   const postReaction = usePostReaction(userId);
   const { moderationSheets, openPostModeration } = useModeration(userId);
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
+  const { toggleLikePost } = useFeedLike(userId);
 
   const {
     data,
+    dataUpdatedAt,
     isLoading,
     isSuccess: isFeedReady,
     refetch,
@@ -75,41 +77,6 @@ export default function HomeScreen() {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
   }
 
-  const likeMutation = useMutation({
-    mutationFn: ({ postId, liked }: { postId: string; liked: boolean }) =>
-      toggleLike(postId, userId, liked),
-    onMutate: async ({ postId, liked }) => {
-      await queryClient.cancelQueries({ queryKey: ["feed", userId] });
-      const previous = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-
-      queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            posts: page.posts.map((p) =>
-              p.id === postId
-                ? {
-                    ...p,
-                    liked_by_me: !liked,
-                    like_count: Math.max(0, (p.like_count ?? 0) + (liked ? -1 : 1)),
-                  }
-                : p
-            ),
-          })),
-        };
-      });
-
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["feed", userId], context.previous);
-      }
-    },
-  });
-
   const feedActionsRef = useRef<FeedListItemActions>({
     onPress: () => undefined,
     onAuthorPress: () => undefined,
@@ -134,7 +101,7 @@ export default function HomeScreen() {
       pushScreen(`/user/${username}`);
     },
     onLike: (post: Post) => {
-      likeMutation.mutate({ postId: post.id, liked: !!post.liked_by_me });
+      toggleLikePost(post.id);
     },
     onComment: (post: Post) => {
       pushScreen(`/post/${getSharedPostTargetId(post)}`);
@@ -230,6 +197,7 @@ export default function HomeScreen() {
       />
       <FlatList
         data={posts}
+        extraData={dataUpdatedAt}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         initialNumToRender={5}
