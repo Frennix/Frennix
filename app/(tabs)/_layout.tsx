@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Pressable, StyleSheet, View } from "react-native";
-import { router } from "expo-router";
 import { getUnreadMessageCount } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
-import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { useNotificationBadge } from "@/lib/useNotificationBadge";
+import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 
 function HeaderBell() {
@@ -16,7 +16,7 @@ function HeaderBell() {
   const unreadNotifications = useNotificationBadge(userId);
   return (
     <View style={styles.headerRight}>
-      <NotificationBellButton unreadCount={unreadNotifications} />
+      <NotificationBellButton userId={userId} unreadCount={unreadNotifications} />
     </View>
   );
 }
@@ -28,8 +28,8 @@ function ProfileHeaderActions() {
 
   return (
     <View style={styles.profileHeader}>
-      <NotificationBellButton unreadCount={unreadNotifications} />
-      <Pressable onPress={() => router.push("/settings")} hitSlop={8}>
+      <NotificationBellButton userId={userId} unreadCount={unreadNotifications} />
+      <Pressable onPress={() => pushScreen("/settings")} hitSlop={8}>
         <Ionicons name="settings-outline" size={24} color={colors.text} />
       </Pressable>
     </View>
@@ -40,7 +40,6 @@ export default function TabsLayout() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
 
-  useNotificationSubscription(userId);
   useNotificationBadge(userId);
 
   const { data: unreadMessages = 0 } = useQuery({
@@ -60,6 +59,7 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
+        tabBarItemStyle: { minWidth: 56 },
       }}
     >
       <Tabs.Screen
@@ -92,12 +92,14 @@ export default function TabsLayout() {
         name="create"
         options={{
           title: "Post",
+          tabBarLabel: "Post",
           tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size} color={color} />,
+          tabBarButton: (props) => <CreateTabBarButton {...props} />,
         }}
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            router.push("/create-post");
+            openCreatePost();
           },
         }}
       />

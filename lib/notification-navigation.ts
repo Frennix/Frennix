@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import type { Notification } from "@frennix/types";
 import { markNotificationRead, safeNotificationPayload } from "@frennix/api";
-import { deferNavigation } from "@/lib/press-utils";
+import { pushScreen } from "@/lib/press-utils";
 
 export type NotificationNavResult =
   | { ok: true }
@@ -13,9 +13,7 @@ function asString(value: unknown): string | undefined {
 
 function pushHref(href: string): NotificationNavResult {
   try {
-    deferNavigation(() => {
-      router.push(href as never);
-    });
+    pushScreen(href);
     return { ok: true };
   } catch {
     return { ok: false, message: "Could not open that screen. Try again." };

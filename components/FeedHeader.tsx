@@ -1,7 +1,7 @@
-import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, spacing, typography } from "@frennix/ui";
+import { openCreatePost, pushScreen, switchTab } from "@/lib/press-utils";
 
 interface FeedHeaderProps {
   stories?: FeedStory[];
@@ -29,7 +29,7 @@ export function FeedHeader({
         </View>
         <Pressable
           style={styles.createButton}
-          onPress={() => router.push("/create-post")}
+          onPress={openCreatePost}
           accessibilityRole="button"
           accessibilityLabel="Create post"
         >
@@ -40,7 +40,7 @@ export function FeedHeader({
       <PeopleYouMayKnowCarousel
         suggestions={suggestions}
         followingIds={followingIds}
-        onProfilePress={(username) => router.push(`/user/${username}`)}
+        onProfilePress={(username) => pushScreen(`/user/${username}`)}
         onFollowPress={onFollowPress}
         followLoadingId={followLoadingId}
       />
@@ -48,17 +48,17 @@ export function FeedHeader({
       <FeedStoriesRow
         stories={stories}
         onStoryPress={onStoryPress}
-        onAddStoryPress={() => router.push("/create-post")}
+        onAddStoryPress={openCreatePost}
       />
 
       <View style={styles.quickActions}>
-        <Pressable style={styles.chip} onPress={() => router.push("/create-post")}>
+        <Pressable style={styles.chip} onPress={openCreatePost}>
           <Text style={styles.chipText}>Share workout</Text>
         </Pressable>
-        <Pressable style={styles.chip} onPress={() => router.push("/(tabs)/discover")}>
+        <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/discover")}>
           <Text style={styles.chipText}>Find athletes</Text>
         </Pressable>
-        <Pressable style={styles.chip} onPress={() => router.push("/(tabs)/events")}>
+        <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/events")}>
           <Text style={styles.chipText}>Events</Text>
         </Pressable>
       </View>

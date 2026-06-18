@@ -6,6 +6,7 @@ import { redirectToLogin } from "@/lib/auth-navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { config } from "@/lib/config";
 import { unregisterPushNotifications } from "@/lib/notifications";
+import { pushScreen } from "@/lib/press-utils";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
 function formatUsername(username: string | null | undefined) {
@@ -122,11 +123,9 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Text style={styles.section}>Coming soon</Text>
-      <Link href="/matching" asChild>
-        <Pressable>
-          <Text style={styles.link}>Partner matching</Text>
-        </Pressable>
-      </Link>
+      <Pressable onPress={() => pushScreen("/matching")}>
+        <Text style={styles.link}>Partner matching</Text>
+      </Pressable>
       <Text style={styles.muted}>Marketplace · Premium · Live stream</Text>
 
       <View style={styles.footer}>

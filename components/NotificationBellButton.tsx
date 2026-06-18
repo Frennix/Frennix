@@ -1,16 +1,33 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { getNotifications } from "@frennix/api";
+import { guardDoublePress, pushScreen } from "@/lib/press-utils";
 import { colors, typography } from "@frennix/ui";
 
 interface NotificationBellButtonProps {
+  userId: string;
   unreadCount: number;
 }
 
-export function NotificationBellButton({ unreadCount }: NotificationBellButtonProps) {
+export function NotificationBellButton({ userId, unreadCount }: NotificationBellButtonProps) {
+  const queryClient = useQueryClient();
+
+  const handlePress = guardDoublePress(() => {
+    if (userId) {
+      void queryClient.prefetchQuery({
+        queryKey: ["notifications", userId],
+        queryFn: () => getNotifications(userId),
+        staleTime: 15_000,
+      });
+    }
+    pushScreen("/notifications");
+  });
+
   return (
     <Pressable
-      onPress={() => router.push("/notifications")}
+      onPress={handlePress}
       style={styles.bellButton}
       hitSlop={8}
       accessibilityRole="button"

@@ -1,14 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { Pressable, StyleSheet } from "react-native";
 import { colors, spacing } from "@frennix/ui";
+import { guardDoublePress } from "@/lib/press-utils";
 
-export function StackBackButton() {
-  if (!router.canGoBack()) return null;
+type StackBackButtonProps = {
+  /** Used when there is no history entry (common on mobile web). */
+  fallbackHref?: Href;
+};
+
+export function StackBackButton({ fallbackHref = "/(tabs)" }: StackBackButtonProps) {
+  const handlePress = guardDoublePress(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace(fallbackHref);
+  });
 
   return (
     <Pressable
-      onPress={() => router.back()}
+      onPress={handlePress}
       style={styles.button}
       hitSlop={8}
       accessibilityRole="button"

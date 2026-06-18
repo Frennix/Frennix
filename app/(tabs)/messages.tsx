@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getConversations } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { pushScreen, switchTab } from "@/lib/press-utils";
 import { Avatar, EmptyState, colors, spacing, typography } from "@frennix/ui";
 
 export default function MessagesScreen() {
@@ -41,14 +41,14 @@ export default function MessagesScreen() {
             title="No messages yet"
             description="Message someone from their profile to find a workout partner or training buddy."
             actionLabel="Discover people"
-            onAction={() => router.push("/(tabs)/discover")}
+            onAction={() => switchTab("/(tabs)/discover")}
           />
           ) : null
         }
         renderItem={({ item }) => (
           <Pressable
             style={styles.row}
-            onPress={() => router.push(`/chat/${item.id}`)}
+            onPress={() => pushScreen(`/chat/${item.id}`)}
           >
             <Avatar
               uri={item.other_participant?.avatar_url}

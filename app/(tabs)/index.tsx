@@ -1,5 +1,4 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes, toggleLike } from "@frennix/api";
@@ -15,7 +14,7 @@ import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
-import { deferNavigation, navigateTo } from "@/lib/press-utils";
+import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { EmptyState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
@@ -31,28 +30,9 @@ export default function HomeScreen() {
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
 
   const {
-    data: suggestions = [],
-    refetch: refetchSuggestions,
-    isRefetching: isSuggestionsRefetching,
-  } = useQuery({
-    queryKey: ["suggested-athletes", userId],
-    queryFn: () => getSuggestedAthletes(userId, 10),
-    enabled: !!userId,
-  });
-
-  const {
-    data: stories = [],
-    refetch: refetchStories,
-    isRefetching: isStoriesRefetching,
-  } = useQuery({
-    queryKey: ["feed-stories", userId],
-    queryFn: () => getFeedStories(userId),
-    enabled: !!userId,
-  });
-
-  const {
     data,
     isLoading,
+    isSuccess: isFeedReady,
     refetch,
     isRefetching,
     fetchNextPage,
@@ -64,6 +44,29 @@ export default function HomeScreen() {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!userId,
+    staleTime: 60_000,
+  });
+
+  const {
+    data: stories = [],
+    refetch: refetchStories,
+    isRefetching: isStoriesRefetching,
+  } = useQuery({
+    queryKey: ["feed-stories", userId],
+    queryFn: () => getFeedStories(userId),
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
+
+  const {
+    data: suggestions = [],
+    refetch: refetchSuggestions,
+    isRefetching: isSuggestionsRefetching,
+  } = useQuery({
+    queryKey: ["suggested-athletes", userId],
+    queryFn: () => getSuggestedAthletes(userId, 10),
+    enabled: !!userId && isFeedReady,
+    staleTime: 120_000,
   });
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
@@ -122,19 +125,19 @@ export default function HomeScreen() {
 
   feedActionsRef.current = {
     onPress: (post: Post) => {
-      navigateTo(`/post/${getSharedPostTargetId(post)}`);
+      pushScreen(`/post/${getSharedPostTargetId(post)}`);
     },
     onAuthorPress: (post: Post) => {
-      if (post.author?.username) navigateTo(`/user/${post.author.username}`);
+      if (post.author?.username) pushScreen(`/user/${post.author.username}`);
     },
     onCommentAuthorPress: (username: string) => {
-      navigateTo(`/user/${username}`);
+      pushScreen(`/user/${username}`);
     },
     onLike: (post: Post) => {
       likeMutation.mutate({ postId: post.id, liked: !!post.liked_by_me });
     },
     onComment: (post: Post) => {
-      navigateTo(`/post/${getSharedPostTargetId(post)}`);
+      pushScreen(`/post/${getSharedPostTargetId(post)}`);
     },
     onShare: (post: Post) => {
       openShare(post.shared_post ?? post);
@@ -214,15 +217,15 @@ export default function HomeScreen() {
         onClose={() => setActiveStory(null)}
         onViewProfile={(username) => {
           setActiveStory(null);
-          deferNavigation(() => router.push(`/user/${username}`));
+          pushScreen(`/user/${username}`);
         }}
         onViewPost={(postId) => {
           setActiveStory(null);
-          deferNavigation(() => router.push(`/post/${postId}`));
+          pushScreen(`/post/${postId}`);
         }}
         onShareWorkout={() => {
           setActiveStory(null);
-          deferNavigation(() => router.push("/create-post"));
+          openCreatePost();
         }}
       />
       <FlatList
@@ -260,7 +263,7 @@ export default function HomeScreen() {
                 title="Your feed is ready"
                 description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
                 actionLabel="Share a workout"
-                onAction={() => navigateTo("/create-post")}
+                onAction={() => openCreatePost()}
               />
             </View>
           )

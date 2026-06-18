@@ -21,9 +21,7 @@ import {
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTarget } from "@/lib/notification-navigation";
-import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
-import { deferNavigation } from "@/lib/press-utils";
 import { showAlert } from "@/lib/alerts";
 import { EmptyState, NotificationRow, colors, spacing, typography } from "@frennix/ui";
 
@@ -51,8 +49,6 @@ export default function NotificationsScreen() {
   const notificationsReady = !authLoading && !!userId;
   const queryClient = useQueryClient();
 
-  useNotificationSubscription(userId);
-
   const {
     data: notifications = [],
     isLoading,
@@ -64,12 +60,14 @@ export default function NotificationsScreen() {
     queryKey: ["notifications", userId],
     queryFn: () => getNotifications(userId),
     enabled: notificationsReady,
+    staleTime: 30_000,
   });
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ["unread-notifications", userId],
     queryFn: () => getUnreadNotificationCount(userId),
     enabled: notificationsReady,
+    staleTime: 30_000,
   });
 
   const readMutation = useMutation({
@@ -143,12 +141,10 @@ export default function NotificationsScreen() {
         readMutation.mutate(notification.id);
       }
 
-      deferNavigation(() => {
-        const result = openNotificationTarget(notification);
-        if (!result.ok) {
-          showAlert("Unavailable", result.message);
-        }
-      });
+      const result = openNotificationTarget(notification);
+      if (!result.ok) {
+        showAlert("Unavailable", result.message);
+      }
     },
     [notificationsById, readMutation]
   );
@@ -184,7 +180,6 @@ export default function NotificationsScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator color={colors.accent} size="large" />
-        <Text style={styles.loadingText}>Loading notifications…</Text>
       </View>
     );
   }
