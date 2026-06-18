@@ -13,8 +13,17 @@ import {
   View,
 } from "react-native";
 import { ACTIVITIES } from "@frennix/types";
-import { createPost, getErrorMessage, isVideoMime, uploadPostMedia } from "@frennix/api";
+import {
+  createPost,
+  getErrorMessage,
+  isVideoMime,
+  uploadPostMedia,
+  withTimeout,
+  POST_CREATE_TIMEOUT_MS,
+  THUMBNAIL_CAPTURE_TIMEOUT_MS,
+} from "@frennix/api";
 import { generateAndUploadVideoThumbnail } from "@/lib/video-thumbnail";
+import { resolveVideoUploadFile } from "@/lib/video-upload";
 import type { PostType } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatActivity } from "@/lib/labels";
@@ -57,8 +66,14 @@ function mimeFromAsset(asset: ImagePicker.ImagePickerAsset): string {
   return "image/jpeg";
 }
 
-function uploadStageLabel(stage: UploadStage, isContextPost: boolean) {
-  if (stage === "uploading_media") return "Uploading media…";
+function uploadStageLabel(
+  stage: UploadStage,
+  isContextPost: boolean,
+  uploadingVideo: boolean
+) {
+  if (stage === "uploading_media") {
+    return uploadingVideo ? "Uploading video…" : "Uploading media…";
+  }
   if (stage === "creating_post") return "Sharing…";
   if (stage === "success") {
     const shared = isContextPost ? "Post shared successfully" : "Workout shared successfully";
@@ -210,7 +225,8 @@ export default function CreatePostScreen() {
     if (videoAssets.length > 0) {
       const asset = videoAssets[0];
       const mime = mimeFromAsset(asset);
-      const file = "file" in asset ? asset.file ?? undefined : undefined;
+      const pickedFile = "file" in asset ? asset.file ?? undefined : undefined;
+      const file = await resolveVideoUploadFile(asset.uri, mime, pickedFile);
       const durationSeconds = await getVideoDurationSeconds(asset, mime);
       if (isVideoTooLong(durationSeconds)) {
         showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
@@ -328,16 +344,28 @@ export default function CreatePostScreen() {
           if (hasVideo) {
             const video = selectedMedia[0];
             postType = "video";
-            thumbnailUrl = await generateAndUploadVideoThumbnail(
-              session.user.id,
-              video.uri,
-              video.mimeType,
-              video.file
-            );
+            try {
+              thumbnailUrl = await withTimeout(
+                generateAndUploadVideoThumbnail(
+                  session.user.id,
+                  video.uri,
+                  video.mimeType,
+                  video.file
+                ),
+                THUMBNAIL_CAPTURE_TIMEOUT_MS + 30_000,
+                "Video thumbnail upload"
+              );
+            } catch (thumbError) {
+              logCreatePostInfo(
+                "media_upload",
+                `Video thumbnail skipped: ${getErrorMessage(thumbError)}`
+              );
+              thumbnailUrl = null;
+            }
             if (!thumbnailUrl) {
               logCreatePostInfo(
                 "media_upload",
-                "Video thumbnail generation failed; feed will use first-frame fallback"
+                "Video thumbnail unavailable; feed will use first-frame fallback"
               );
             }
           } else {
@@ -358,17 +386,21 @@ export default function CreatePostScreen() {
       setUploadStage("creating_post");
       let created;
       try {
-        created = await createPost({
-          author_id: session.user.id,
-          content: content || undefined,
-          media_urls: mediaUrls,
-          thumbnail_url: thumbnailUrl,
-          post_type: postType,
-          workout_type: workoutType,
-          group_id: groupId ?? null,
-          challenge_id: challengeId ?? null,
-          event_id: eventId ?? null,
-        });
+        created = await withTimeout(
+          createPost({
+            author_id: session.user.id,
+            content: content || undefined,
+            media_urls: mediaUrls,
+            thumbnail_url: thumbnailUrl,
+            post_type: postType,
+            workout_type: workoutType,
+            group_id: groupId ?? null,
+            challenge_id: challengeId ?? null,
+            event_id: eventId ?? null,
+          }),
+          POST_CREATE_TIMEOUT_MS,
+          "Creating post"
+        );
       } catch (saveError) {
         logCreatePostError("post_save", saveError, {
           postType,
@@ -417,6 +449,7 @@ export default function CreatePostScreen() {
     } catch (e) {
       const message = getErrorMessage(e);
       setError(message);
+      showAlert("Could not post", message);
       setUploadStage("idle");
       setLoading(false);
       submittingRef.current = false;
@@ -425,7 +458,7 @@ export default function CreatePostScreen() {
     }
   }
 
-  const progressLabel = uploadStageLabel(uploadStage, isContextPost);
+  const progressLabel = uploadStageLabel(uploadStage, isContextPost, hasVideo);
   const showSubmittingUi = isSubmitting || uploadStage === "uploading_media" || uploadStage === "creating_post";
   const screenOptions = stackBackOptions(isContextPost ? "Share post" : "Share workout", {
     presentation: "modal",

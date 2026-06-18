@@ -4,13 +4,19 @@ import {
   dataUrlToBytes,
   isVideoMime,
   readImageBytes,
+  THUMBNAIL_CAPTURE_TIMEOUT_MS,
   uploadPostThumbnail,
+  withTimeout,
 } from "@frennix/api";
 
 async function captureVideoPosterNative(videoUri: string): Promise<string | null> {
   try {
     const VideoThumbnails = require("expo-video-thumbnails") as typeof import("expo-video-thumbnails");
-    const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, { time: 500, quality: 0.85 });
+    const { uri } = await withTimeout(
+      VideoThumbnails.getThumbnailAsync(videoUri, { time: 500, quality: 0.85 }),
+      THUMBNAIL_CAPTURE_TIMEOUT_MS,
+      "Video thumbnail capture"
+    );
     return uri;
   } catch {
     return null;
