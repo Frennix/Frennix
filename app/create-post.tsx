@@ -26,6 +26,7 @@ import {
 } from "@/lib/media-duration";
 import { showAlert } from "@/lib/alerts";
 import { logCreatePostError, logCreatePostInfo } from "@/lib/create-post-logging";
+import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
@@ -203,40 +204,47 @@ export default function CreatePostScreen() {
 
     if (result.canceled) return;
 
-    const nextItems: SelectedMediaItem[] = [];
+    const videoAssets = result.assets.filter((asset) => isVideoMime(mimeFromAsset(asset)));
+    const photoAssets = result.assets.filter((asset) => !isVideoMime(mimeFromAsset(asset)));
 
-    for (const asset of result.assets) {
+    if (videoAssets.length > 0) {
+      const asset = videoAssets[0];
       const mime = mimeFromAsset(asset);
       const file = "file" in asset ? asset.file ?? undefined : undefined;
-
-      if (isVideoMime(mime)) {
-        const durationSeconds = await getVideoDurationSeconds(asset, mime);
-        if (isVideoTooLong(durationSeconds)) {
-          showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
-          return;
-        }
-        nextItems.push({ uri: asset.uri, mimeType: mime, file, durationSeconds });
-        break;
+      const durationSeconds = await getVideoDurationSeconds(asset, mime);
+      if (isVideoTooLong(durationSeconds)) {
+        showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
+        return;
       }
-
-      nextItems.push({ uri: asset.uri, mimeType: mime, file, durationSeconds: null });
-    }
-
-    if (!nextItems.length) return;
-
-    if (nextItems.some((item) => isVideoMime(item.mimeType))) {
-      setSelectedMedia(nextItems.slice(0, 1));
-      const video = nextItems[0];
+      setSelectedMedia([{ uri: asset.uri, mimeType: mime, file, durationSeconds }]);
       await applyPickedMedia(
-        { uri: video.uri } as ImagePicker.ImagePickerAsset,
-        video.mimeType,
-        video.file,
-        video.durationSeconds ?? null
+        { uri: asset.uri } as ImagePicker.ImagePickerAsset,
+        mime,
+        file,
+        durationSeconds ?? null
       );
       return;
     }
 
-    const merged = [...selectedMedia.filter((item) => !isVideoMime(item.mimeType)), ...nextItems].slice(
+    if (!photoAssets.length) return;
+
+    const adjustedPhotos: SelectedMediaItem[] = [];
+
+    for (const asset of photoAssets) {
+      const mime = mimeFromAsset(asset);
+      const file = "file" in asset ? asset.file ?? undefined : undefined;
+      const adjusted = await requestPhotoAdjustment({ uri: asset.uri, mimeType: mime });
+      if (!adjusted) return;
+
+      adjustedPhotos.push({
+        uri: adjusted.uri,
+        mimeType: adjusted.mimeType,
+        file: adjusted.file ?? file,
+        durationSeconds: null,
+      });
+    }
+
+    const merged = [...selectedMedia.filter((item) => !isVideoMime(item.mimeType)), ...adjustedPhotos].slice(
       0,
       MAX_PHOTOS
     );

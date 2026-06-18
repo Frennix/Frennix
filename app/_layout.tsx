@@ -83,6 +83,10 @@ export default function RootLayout() {
               options={backScreen("Share workout", { presentation: "modal" })}
             />
             <Stack.Screen
+              name="adjust-photo"
+              options={backScreen("Adjust photo", { presentation: "modal" })}
+            />
+            <Stack.Screen
               name="edit-post/[id]"
               options={backScreen("Edit post", { presentation: "modal" })}
             />

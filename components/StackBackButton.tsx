@@ -7,10 +7,16 @@ import { guardDoublePress } from "@/lib/press-utils";
 type StackBackButtonProps = {
   /** Used when there is no history entry (common on mobile web). */
   fallbackHref?: Href;
+  /** Override default back navigation (e.g. cancel a modal flow). */
+  onBack?: () => void;
 };
 
-export function StackBackButton({ fallbackHref = "/(tabs)" }: StackBackButtonProps) {
+export function StackBackButton({ fallbackHref = "/(tabs)", onBack }: StackBackButtonProps) {
   const handlePress = guardDoublePress(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
       return;
