@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes } from "@frennix/api";
 import type { FeedStory, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -16,7 +16,7 @@ import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { useFeedLike } from "@/lib/useFeedLike";
-import { EmptyState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { EmptyState, FeedPostCardSkeleton, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
   const { session } = useAuth();
@@ -47,6 +47,7 @@ export default function HomeScreen() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!userId,
     staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const {
@@ -200,10 +201,10 @@ export default function HomeScreen() {
         extraData={dataUpdatedAt}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        initialNumToRender={5}
-        maxToRenderPerBatch={4}
-        windowSize={7}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        windowSize={11}
+        updateCellsBatchingPeriod={32}
         removeClippedSubviews={Platform.OS !== "web"}
         refreshControl={
           <RefreshControl
@@ -215,16 +216,23 @@ export default function HomeScreen() {
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={0.65}
         ListHeaderComponent={listHeader}
         ListFooterComponent={
           isFetchingNextPage ? (
-            <ActivityIndicator color={colors.accent} style={styles.footer} />
+            <View style={styles.footerSkeletons}>
+              <FeedPostCardSkeleton />
+              <FeedPostCardSkeleton />
+            </View>
           ) : null
         }
         ListEmptyComponent={
           isLoading ? (
-            <ActivityIndicator color={colors.accent} style={styles.footer} />
+            <View style={styles.initialSkeletons}>
+              <FeedPostCardSkeleton />
+              <FeedPostCardSkeleton />
+              <FeedPostCardSkeleton />
+            </View>
           ) : (
             <View style={styles.emptyWrap}>
               <EmptyState
@@ -247,4 +255,6 @@ const styles = StyleSheet.create({
   list: { flexGrow: 1, paddingBottom: spacing.xl },
   emptyWrap: { padding: spacing.lg },
   footer: { paddingVertical: spacing.lg },
+  initialSkeletons: { gap: 0 },
+  footerSkeletons: { gap: 0 },
 });
