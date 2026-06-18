@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
+import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
@@ -37,6 +38,8 @@ function NotificationBootstrap() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+
+  useNotificationSubscription(userId);
 
   useEffect(() => {
     return setupNotificationListeners(() => {
@@ -92,7 +95,11 @@ export default function RootLayout() {
             <Stack.Screen name="chat/[conversationId]" options={backScreen("Chat")} />
             <Stack.Screen name="followers/[userId]" options={backScreen("Followers")} />
             <Stack.Screen name="following/[userId]" options={backScreen("Following")} />
-            <Stack.Screen name="notifications" options={backScreen("Notifications Center")} />
+            <Stack.Screen name="notifications" options={{
+              ...backScreen("Notifications Center"),
+              animation: "fade",
+              animationDuration: 150,
+            }} />
             <Stack.Screen
               name="create-group"
               options={backScreen("Create group", { presentation: "modal" })}
@@ -114,7 +121,14 @@ export default function RootLayout() {
             <Stack.Screen name="admin-moderation" options={backScreen("Moderation")} />
             <Stack.Screen name="beta-feedback" options={backScreen("Beta Feedback")} />
             <Stack.Screen name="admin-feedback" options={backScreen("Feedback Dashboard")} />
-            <Stack.Screen name="matching" options={backScreen("Partner matching")} />
+            <Stack.Screen
+              name="matching"
+              options={{
+                ...backScreen("Partner matching"),
+                animation: "fade",
+                animationDuration: 150,
+              }}
+            />
               </Stack>
             </AppErrorBoundary>
           </AuthProvider>
