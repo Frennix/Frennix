@@ -1,8 +1,16 @@
 import * as ImagePicker from "expo-image-picker";
-import { forwardRef, memo, useImperativeHandle, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { broadcastTyping, sendMessage, uploadMessageMedia } from "@frennix/api";
-import { Button, Input, colors, spacing } from "@frennix/ui";
+import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInput as TextInputType,
+} from "react-native";
+import { broadcastTyping, uploadMessageMedia } from "@frennix/api";
+import { colors, radius, spacing } from "@frennix/ui";
 
 const TYPING_DEBOUNCE_MS = 1500;
 
@@ -22,81 +30,150 @@ export type ChatComposerHandle = {
   clear: () => void;
 };
 
+type ChatSendButtonProps = {
+  canSend: boolean;
+  sending: boolean;
+  onPress: () => void;
+};
+
+/** Isolated from the text field — only re-renders when empty↔non-empty or sending changes. */
+const ChatSendButton = memo(function ChatSendButton({ canSend, sending, onPress }: ChatSendButtonProps) {
+  const disabled = !canSend || sending;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.sendButton,
+        disabled && styles.sendButtonDisabled,
+        pressed && !disabled && styles.sendButtonPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Send message"
+    >
+      {sending ? (
+        <ActivityIndicator color={colors.black} size="small" />
+      ) : (
+        <Text style={styles.sendLabel}>Send</Text>
+      )}
+    </Pressable>
+  );
+});
+
 export const ChatComposer = memo(
   forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
     { conversationId, userId, onSend, sending },
     ref
   ) {
-  const [text, setText] = useState("");
-  const [sendingMedia, setSendingMedia] = useState(false);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTypingBroadcastRef = useRef(0);
+    const inputRef = useRef<TextInputType>(null);
+    const textRef = useRef("");
+    const canSendRef = useRef(false);
+    const [canSend, setCanSend] = useState(false);
+    const [sendingMedia, setSendingMedia] = useState(false);
+    const onSendRef = useRef(onSend);
+    const sendingRef = useRef(sending);
 
-  useImperativeHandle(ref, () => ({
-    clear: () => setText(""),
-  }));
+    onSendRef.current = onSend;
+    sendingRef.current = sending;
 
-  function handleTextChange(value: string) {
-    setText(value);
+    const scheduleTypingRef = useRef<() => void>(() => undefined);
 
-    if (!value.trim()) return;
+    useEffect(() => {
+      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+      let lastBroadcast = 0;
 
-    const now = Date.now();
-    if (now - lastTypingBroadcastRef.current > TYPING_DEBOUNCE_MS) {
-      lastTypingBroadcastRef.current = now;
-      broadcastTyping(conversationId, userId).catch(() => undefined);
+      scheduleTypingRef.current = () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          debounceTimer = null;
+          if (!textRef.current.trim()) return;
+
+          const now = Date.now();
+          if (now - lastBroadcast < TYPING_DEBOUNCE_MS) return;
+          lastBroadcast = now;
+          void broadcastTyping(conversationId, userId).catch(() => undefined);
+        }, 300);
+      };
+
+      return () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+      };
+    }, [conversationId, userId]);
+
+    function syncCanSend(value: string) {
+      const next = value.trim().length > 0;
+      if (next === canSendRef.current) return;
+      canSendRef.current = next;
+      setCanSend(next);
     }
 
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      lastTypingBroadcastRef.current = 0;
-    }, TYPING_DEBOUNCE_MS);
-  }
-
-  function handleSend() {
-    const content = text.trim();
-    if (!content || sending) return;
-    onSend({ content });
-  }
-
-  async function pickAndSendMedia() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (result.canceled) return;
-
-    setSendingMedia(true);
-    try {
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType ?? "image/jpeg";
-      const mediaUrl = await uploadMessageMedia(userId, asset.uri, mimeType);
-      onSend({ content: text.trim(), mediaUrl });
-    } finally {
-      setSendingMedia(false);
+    function handleTextChange(value: string) {
+      textRef.current = value;
+      syncCanSend(value);
+      scheduleTypingRef.current();
     }
-  }
 
-  return (
-    <View style={styles.inputRow}>
-      <Pressable onPress={pickAndSendMedia} disabled={sendingMedia || sending} style={styles.attach}>
-        {sendingMedia ? (
-          <ActivityIndicator color={colors.accent} size="small" />
-        ) : (
-          <Text style={styles.attachIcon}>📷</Text>
-        )}
-      </Pressable>
-      <Input
-        value={text}
-        onChangeText={handleTextChange}
-        placeholder="Message..."
-        style={styles.input}
-      />
-      <Button title="Send" onPress={handleSend} loading={sending} disabled={!text.trim()} />
-    </View>
-  );
+    function handleSend() {
+      const content = textRef.current.trim();
+      if (!content || sendingRef.current) return;
+      onSendRef.current({ content });
+    }
+
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        textRef.current = "";
+        inputRef.current?.clear();
+        syncCanSend("");
+      },
+    }));
+
+    async function pickAndSendMedia() {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
+      setSendingMedia(true);
+      try {
+        const asset = result.assets[0];
+        const mimeType = asset.mimeType ?? "image/jpeg";
+        const mediaUrl = await uploadMessageMedia(userId, asset.uri, mimeType);
+        onSendRef.current({ content: textRef.current.trim(), mediaUrl });
+      } finally {
+        setSendingMedia(false);
+      }
+    }
+
+    return (
+      <View style={styles.inputRow}>
+        <Pressable
+          onPress={pickAndSendMedia}
+          disabled={sendingMedia || sending}
+          style={styles.attach}
+        >
+          {sendingMedia ? (
+            <ActivityIndicator color={colors.accent} size="small" />
+          ) : (
+            <Text style={styles.attachIcon}>📷</Text>
+          )}
+        </Pressable>
+        <TextInput
+          ref={inputRef}
+          defaultValue=""
+          onChangeText={handleTextChange}
+          placeholder="Message..."
+          placeholderTextColor={colors.textMuted}
+          style={styles.textInput}
+          autoCorrect
+          autoCapitalize="sentences"
+        />
+        <ChatSendButton canSend={canSend} sending={sending} onPress={handleSend} />
+      </View>
+    );
   })
 );
 
@@ -108,8 +185,33 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    backgroundColor: colors.background,
   },
-  input: { flex: 1 },
+  textInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    color: colors.text,
+    fontSize: 16,
+    minHeight: 48,
+    maxHeight: 120,
+  },
   attach: { paddingBottom: 10, paddingHorizontal: 4 },
   attachIcon: { fontSize: 22 },
+  sendButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    minHeight: 48,
+    minWidth: 64,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonPressed: { opacity: 0.85 },
+  sendButtonDisabled: { opacity: 0.45 },
+  sendLabel: { fontSize: 16, fontWeight: "600", color: colors.black },
 });

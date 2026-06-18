@@ -154,12 +154,12 @@ export default function ChatScreen() {
     },
   });
 
-  const handleSend = useCallback(
-    (payload: ChatSendPayload) => {
-      sendMutation.mutate(payload);
-    },
-    [sendMutation]
-  );
+  const sendMutationRef = useRef(sendMutation);
+  sendMutationRef.current = sendMutation;
+
+  const handleSend = useCallback((payload: ChatSendPayload) => {
+    sendMutationRef.current.mutate(payload);
+  }, []);
 
   const handleMediaPress = useCallback((uri: string) => {
     setPreviewUri(uri);
@@ -186,28 +186,31 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={90}
-    >
+    <View style={styles.container}>
       <ImageLightbox uri={previewUri} onClose={() => setPreviewUri(null)} />
-      <ChatMessageList
-        messages={messages}
-        userId={userId}
-        participantProfiles={participantProfiles}
-        otherTyping={otherTyping}
-        onMediaPress={handleMediaPress}
-        onReaction={handleReaction}
-      />
-      <ChatComposer
-        ref={composerRef}
-        conversationId={conversationId!}
-        userId={userId}
-        onSend={handleSend}
-        sending={sendMutation.isPending}
-      />
-    </KeyboardAvoidingView>
+      <View style={styles.listWrap}>
+        <ChatMessageList
+          messages={messages}
+          userId={userId}
+          participantProfiles={participantProfiles}
+          otherTyping={otherTyping}
+          onMediaPress={handleMediaPress}
+          onReaction={handleReaction}
+        />
+      </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={90}
+      >
+        <ChatComposer
+          ref={composerRef}
+          conversationId={conversationId!}
+          userId={userId}
+          onSend={handleSend}
+          sending={sendMutation.isPending}
+        />
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -219,6 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   container: { flex: 1, backgroundColor: colors.background },
+  listWrap: { flex: 1 },
   list: { padding: spacing.md, flexGrow: 1 },
   typing: {
     ...typography.caption,
