@@ -1,30 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { memo, useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { getUnreadMessageCount } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
-import { useNotificationBadge } from "@/lib/useNotificationBadge";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 
-function HeaderBell() {
+const HeaderBell = memo(function HeaderBell() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const unreadNotifications = useNotificationBadge(userId);
+  const { unreadNotifications } = useTabBadges();
+
   return (
     <View style={styles.headerRight}>
       <NotificationBellButton userId={userId} unreadCount={unreadNotifications} />
     </View>
   );
-}
+});
 
-function ProfileHeaderActions() {
+const ProfileHeaderActions = memo(function ProfileHeaderActions() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const unreadNotifications = useNotificationBadge(userId);
+  const { unreadNotifications } = useTabBadges();
 
   return (
     <View style={styles.profileHeader}>
@@ -34,21 +34,22 @@ function ProfileHeaderActions() {
       </Pressable>
     </View>
   );
-}
+});
 
-export default function TabsLayout() {
-  const { session } = useAuth();
-  const userId = session?.user.id ?? "";
+const TabsShell = memo(function TabsShell() {
+  const { unreadMessages } = useTabBadges();
+  const messagesBadge =
+    unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
 
-  useNotificationBadge(userId);
-
-  const { data: unreadMessages = 0 } = useQuery({
-    queryKey: ["unread-messages", userId],
-    queryFn: () => getUnreadMessageCount(userId),
-    enabled: !!userId,
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
-  });
+  const renderHeaderBell = useCallback(() => <HeaderBell />, []);
+  const renderProfileHeader = useCallback(
+    () => (
+      <View style={styles.profileHeaderWrap}>
+        <ProfileHeaderActions />
+      </View>
+    ),
+    []
+  );
 
   return (
     <Tabs
@@ -60,6 +61,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarItemStyle: { minWidth: 56 },
+        lazy: true,
+        freezeOnBlur: true,
       }}
     >
       <Tabs.Screen
@@ -69,7 +72,7 @@ export default function TabsLayout() {
           headerTitle: "Feed",
           tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
-          headerRight: () => <HeaderBell />,
+          headerRight: renderHeaderBell,
         }}
       />
       <Tabs.Screen
@@ -77,7 +80,7 @@ export default function TabsLayout() {
         options={{
           title: "Discover",
           tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
-          headerRight: () => <HeaderBell />,
+          headerRight: renderHeaderBell,
         }}
       />
       <Tabs.Screen
@@ -85,7 +88,7 @@ export default function TabsLayout() {
         options={{
           title: "Events",
           tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
-          headerRight: () => <HeaderBell />,
+          headerRight: renderHeaderBell,
         }}
       />
       <Tabs.Screen
@@ -108,8 +111,8 @@ export default function TabsLayout() {
         options={{
           title: "Messages",
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
-          tabBarBadge: unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined,
-          headerRight: () => <HeaderBell />,
+          tabBarBadge: messagesBadge,
+          headerRight: renderHeaderBell,
         }}
       />
       <Tabs.Screen
@@ -117,19 +120,20 @@ export default function TabsLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
-          headerRight: () => (
-            <View style={{ marginRight: 16 }}>
-              <ProfileHeaderActions />
-            </View>
-          ),
+          headerRight: renderProfileHeader,
         }}
       />
     </Tabs>
   );
+});
+
+export default function TabsLayout() {
+  return <TabsShell />;
 }
 
 const styles = StyleSheet.create({
   headerRight: { marginRight: 16 },
+  profileHeaderWrap: { marginRight: 16 },
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",

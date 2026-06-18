@@ -1,30 +1,83 @@
 import { useQuery } from "@tanstack/react-query";
+import { useIsFocused } from "@react-navigation/native";
+import { memo, useCallback } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getConversations } from "@frennix/api";
+import type { Conversation } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { pushScreen, switchTab } from "@/lib/press-utils";
 import { Avatar, EmptyState, colors, spacing, typography } from "@frennix/ui";
 
+function previewText(
+  content: string | undefined,
+  mediaUrl: string | null | undefined,
+  postId: string | null | undefined
+) {
+  if (postId) return "↗ Shared a post";
+  if (mediaUrl && (!content || content === "📷 Photo")) return "📷 Photo";
+  return content ?? "Start the conversation";
+}
+
+const ConversationRow = memo(function ConversationRow({
+  item,
+  onPress,
+}: {
+  item: Conversation;
+  onPress: (id: string) => void;
+}) {
+  return (
+    <Pressable style={styles.row} onPress={() => onPress(item.id)}>
+      <Avatar
+        uri={item.other_participant?.avatar_url}
+        name={item.other_participant?.display_name}
+        size={52}
+      />
+      <View style={styles.info}>
+        <Text style={styles.name}>{item.other_participant?.display_name ?? "Chat"}</Text>
+        <Text
+          style={[styles.preview, (item.unread_count ?? 0) > 0 && styles.previewUnread]}
+          numberOfLines={1}
+        >
+          {previewText(
+            item.last_message?.content,
+            item.last_message?.media_url,
+            item.last_message?.post_id
+          )}
+        </Text>
+      </View>
+      {(item.unread_count ?? 0) > 0 ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {item.unread_count! > 99 ? "99+" : item.unread_count}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+});
+
 export default function MessagesScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+  const isFocused = useIsFocused();
 
   const { data: conversations = [], refetch, isRefetching, isLoading } = useQuery({
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(userId),
-    enabled: !!userId,
-    refetchInterval: 10_000,
+    enabled: !!userId && isFocused,
+    staleTime: 30_000,
+    refetchInterval: isFocused ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
 
-  function previewText(
-    content: string | undefined,
-    mediaUrl: string | null | undefined,
-    postId: string | null | undefined
-  ) {
-    if (postId) return "↗ Shared a post";
-    if (mediaUrl && (!content || content === "📷 Photo")) return "📷 Photo";
-    return content ?? "Start the conversation";
-  }
+  const handlePress = useCallback((id: string) => {
+    pushScreen(`/chat/${id}`);
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Conversation }) => <ConversationRow item={item} onPress={handlePress} />,
+    [handlePress]
+  );
 
   return (
     <View style={styles.container}>
@@ -32,48 +85,23 @@ export default function MessagesScreen() {
         data={conversations}
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={7}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
         }
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState
-            title="No messages yet"
-            description="Message someone from their profile to find a workout partner or training buddy."
-            actionLabel="Discover people"
-            onAction={() => switchTab("/(tabs)/discover")}
-          />
+              title="No messages yet"
+              description="Message someone from their profile to find a workout partner or training buddy."
+              actionLabel="Discover people"
+              onAction={() => switchTab("/(tabs)/discover")}
+            />
           ) : null
         }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() => pushScreen(`/chat/${item.id}`)}
-          >
-            <Avatar
-              uri={item.other_participant?.avatar_url}
-              name={item.other_participant?.display_name}
-              size={52}
-            />
-            <View style={styles.info}>
-              <Text style={styles.name}>{item.other_participant?.display_name ?? "Chat"}</Text>
-              <Text style={[styles.preview, (item.unread_count ?? 0) > 0 && styles.previewUnread]} numberOfLines={1}>
-                {previewText(
-                  item.last_message?.content,
-                  item.last_message?.media_url,
-                  item.last_message?.post_id
-                )}
-              </Text>
-            </View>
-            {(item.unread_count ?? 0) > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {item.unread_count! > 99 ? "99+" : item.unread_count}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-        )}
+        renderItem={renderItem}
       />
     </View>
   );

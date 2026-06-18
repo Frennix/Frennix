@@ -14,7 +14,6 @@ import {
   buildNotificationRowText,
   getErrorMessage,
   getNotifications,
-  getUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
 } from "@frennix/api";
@@ -22,6 +21,7 @@ import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTarget } from "@/lib/notification-navigation";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { showAlert } from "@/lib/alerts";
 import { EmptyState, NotificationRow, colors, spacing, typography } from "@frennix/ui";
 
@@ -48,6 +48,7 @@ export default function NotificationsScreen() {
   const userId = session?.user.id ?? "";
   const notificationsReady = !authLoading && !!userId;
   const queryClient = useQueryClient();
+  const { unreadNotifications: unreadCount } = useTabBadges();
 
   const {
     data: notifications = [],
@@ -59,13 +60,6 @@ export default function NotificationsScreen() {
   } = useQuery({
     queryKey: ["notifications", userId],
     queryFn: () => getNotifications(userId),
-    enabled: notificationsReady,
-    staleTime: 30_000,
-  });
-
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-notifications", userId],
-    queryFn: () => getUnreadNotificationCount(userId),
     enabled: notificationsReady,
     staleTime: 30_000,
   });

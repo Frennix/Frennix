@@ -1,11 +1,12 @@
 import "@/lib/init-supabase";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { TabBadgeProvider } from "@/providers/TabBadgeProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
 import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
@@ -34,6 +35,12 @@ function backScreen(title: string, extra?: object) {
   };
 }
 
+function TabBadgeRoot({ children }: { children: ReactNode }) {
+  const { session } = useAuth();
+  const userId = session?.user.id ?? "";
+  return <TabBadgeProvider userId={userId}>{children}</TabBadgeProvider>;
+}
+
 function NotificationBootstrap() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
@@ -59,6 +66,7 @@ export default function RootLayout() {
         <QueryProvider>
           <AppResumeCoordinator />
           <AuthProvider>
+            <TabBadgeRoot>
             <AppErrorBoundary scope="navigation">
               <NotificationBootstrap />
               <PushRegistrationBootstrap />
@@ -131,6 +139,7 @@ export default function RootLayout() {
             />
               </Stack>
             </AppErrorBoundary>
+            </TabBadgeRoot>
           </AuthProvider>
         </QueryProvider>
       </AppErrorBoundary>
