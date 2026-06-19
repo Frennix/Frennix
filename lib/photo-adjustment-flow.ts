@@ -1,8 +1,11 @@
 import { router } from "expo-router";
 
+export type PhotoAdjustmentMode = "feed" | "avatar";
+
 export type PhotoAdjustmentRequest = {
   uri: string;
   mimeType: string;
+  mode?: PhotoAdjustmentMode;
 };
 
 export type AdjustedPhotoResult = {
@@ -21,6 +24,7 @@ export function requestPhotoAdjustment(request: PhotoAdjustmentRequest): Promise
       params: {
         uri: request.uri,
         mimeType: request.mimeType,
+        mode: request.mode ?? "feed",
       },
     });
   });

@@ -1,6 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Redirect, router } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 import { Controller, useForm, type FieldErrors } from "react-hook-form";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -12,6 +11,7 @@ import { showAlert } from "@/lib/alerts";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { SubmitStatusBanner } from "@/components/SubmitStatusBanner";
 import { claimPendingReferral } from "@/lib/referral-storage";
+import { pickAdjustedAvatar } from "@/lib/pick-adjusted-avatar";
 import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 const SUCCESS_NAV_DELAY_MS = 2000;
@@ -43,6 +43,8 @@ export default function OnboardingScreen() {
   const { session, loading, passwordRecovery, refreshProfile, applySession } = useAuth();
   const [step, setStep] = useState(0);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarMimeType, setAvatarMimeType] = useState("image/jpeg");
+  const [avatarFile, setAvatarFile] = useState<File | undefined>(undefined);
   const [submitError, setSubmitError] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -85,13 +87,11 @@ export default function OnboardingScreen() {
   }
 
   async function pickAvatar() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled) setAvatarUri(result.assets[0].uri);
+    const adjusted = await pickAdjustedAvatar();
+    if (!adjusted) return;
+    setAvatarUri(adjusted.uri);
+    setAvatarMimeType(adjusted.mimeType);
+    setAvatarFile(adjusted.file);
   }
 
   function onInvalid(fieldErrors: FieldErrors<OnboardingForm>) {
@@ -135,7 +135,7 @@ export default function OnboardingScreen() {
       let avatarUrl: string | null = null;
       if (avatarUri) {
         setUploadingAvatar(true);
-        avatarUrl = await uploadAvatar(userId, avatarUri, "image/jpeg");
+        avatarUrl = await uploadAvatar(userId, avatarUri, avatarMimeType, avatarFile);
         setUploadingAvatar(false);
       }
       upsertPayload.avatar_url = avatarUrl;

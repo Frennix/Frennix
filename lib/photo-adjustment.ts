@@ -28,6 +28,12 @@ export function feedFrameSize(containerWidth: number, screenWidth: number) {
   return { frameWidth, frameHeight };
 }
 
+/** Square crop frame for profile avatars (displayed as a circle in the app). */
+export function avatarFrameSize(containerWidth: number) {
+  const size = Math.min(containerWidth, 320);
+  return { frameWidth: size, frameHeight: size };
+}
+
 export function getImageDimensions(uri: string): Promise<ImageDimensions> {
   return new Promise((resolve, reject) => {
     Image.getSize(
@@ -87,11 +93,12 @@ export async function exportAdjustedPhoto(
   imageHeight: number,
   frameWidth: number,
   frameHeight: number,
-  transform: CropTransform
+  transform: CropTransform,
+  options?: { maxEdge?: number }
 ): Promise<AdjustedPhotoExport> {
   const crop = computeCropRegion(imageWidth, imageHeight, frameWidth, frameHeight, transform);
 
-  const maxEdge = 1440;
+  const maxEdge = options?.maxEdge ?? 1440;
   const cropAspect = crop.width / crop.height;
   const resize =
     crop.width >= crop.height
@@ -110,7 +117,8 @@ export async function exportAdjustedPhoto(
   if (Platform.OS === "web") {
     const response = await fetch(result.uri);
     const blob = await response.blob();
-    file = new File([blob], `post-photo-${Date.now()}.jpg`, { type: mimeType });
+    const prefix = options?.maxEdge && options.maxEdge <= 512 ? "avatar" : "post-photo";
+    file = new File([blob], `${prefix}-${Date.now()}.jpg`, { type: mimeType });
   }
 
   const dimensions = await getImageDimensions(result.uri);

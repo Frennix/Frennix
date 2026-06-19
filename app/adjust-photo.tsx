@@ -5,6 +5,7 @@ import { StackBackButton } from "@/components/StackBackButton";
 import {
   cancelPhotoAdjustment,
   completePhotoAdjustment,
+  type PhotoAdjustmentMode,
 } from "@/lib/photo-adjustment-flow";
 import { colors } from "@frennix/ui";
 
@@ -14,9 +15,11 @@ function paramValue(value: string | string[] | undefined): string {
 }
 
 export default function AdjustPhotoScreen() {
-  const params = useLocalSearchParams<{ uri?: string; mimeType?: string }>();
+  const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mode?: string }>();
   const uri = paramValue(params.uri);
   const mimeType = paramValue(params.mimeType) || "image/jpeg";
+  const mode: PhotoAdjustmentMode = paramValue(params.mode) === "avatar" ? "avatar" : "feed";
+  const isAvatar = mode === "avatar";
 
   function handleCancel() {
     cancelPhotoAdjustment();
@@ -24,7 +27,7 @@ export default function AdjustPhotoScreen() {
   }
 
   const screenOptions = {
-    title: "Adjust photo",
+    title: isAvatar ? "Profile photo" : "Adjust photo",
     headerShown: true,
     headerBackVisible: false,
     presentation: "modal" as const,
@@ -52,7 +55,7 @@ export default function AdjustPhotoScreen() {
     <>
       <Stack.Screen options={screenOptions} />
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <PhotoAdjustEditor uri={uri} onDone={handleDone} onCancel={handleCancel} />
+        <PhotoAdjustEditor uri={uri} mode={mode} onDone={handleDone} onCancel={handleCancel} />
       </View>
     </>
   );

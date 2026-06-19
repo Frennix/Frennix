@@ -11,12 +11,14 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import {
+  avatarFrameSize,
   exportAdjustedPhoto,
   feedFrameSize,
   getImageDimensions,
   rotatePhoto,
   type CropTransform,
 } from "@/lib/photo-adjustment";
+import type { PhotoAdjustmentMode } from "@/lib/photo-adjustment-flow";
 import { colors, radius, spacing, typography } from "@frennix/ui";
 
 const MIN_SCALE = 1;
@@ -24,17 +26,21 @@ const MAX_SCALE = 4;
 
 type PhotoAdjustEditorProps = {
   uri: string;
+  mode?: PhotoAdjustmentMode;
   onDone: (result: { uri: string; mimeType: string; file?: File }) => void;
   onCancel: () => void;
 };
 
-export function PhotoAdjustEditor({ uri, onDone, onCancel }: PhotoAdjustEditorProps) {
+export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: PhotoAdjustEditorProps) {
+  const isAvatar = mode === "avatar";
   const { width: screenWidth } = useWindowDimensions();
   const horizontalPadding = spacing.md * 2;
-  const { frameWidth, frameHeight } = useMemo(
-    () => feedFrameSize(screenWidth - horizontalPadding, screenWidth),
-    [screenWidth]
-  );
+  const { frameWidth, frameHeight } = useMemo(() => {
+    const containerWidth = screenWidth - horizontalPadding;
+    return isAvatar
+      ? avatarFrameSize(containerWidth)
+      : feedFrameSize(containerWidth, screenWidth);
+  }, [screenWidth, isAvatar]);
 
   const [imageUri, setImageUri] = useState(uri);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
@@ -157,7 +163,8 @@ export function PhotoAdjustEditor({ uri, onDone, onCancel }: PhotoAdjustEditorPr
         imageSize.height,
         frameWidth,
         frameHeight,
-        transform
+        transform,
+        isAvatar ? { maxEdge: 512 } : undefined
       );
       onDone({ uri: exported.uri, mimeType: exported.mimeType, file: exported.file });
     } catch {
@@ -166,14 +173,23 @@ export function PhotoAdjustEditor({ uri, onDone, onCancel }: PhotoAdjustEditorPr
     }
   }
 
+  const frameRadius = isAvatar ? frameWidth / 2 : radius.md;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Adjust photo</Text>
+      <Text style={styles.title}>{isAvatar ? "Adjust profile photo" : "Adjust photo"}</Text>
       <Text style={styles.subtitle}>
-        Pinch to zoom, drag to reposition. Preview matches how photos appear in the feed.
+        {isAvatar
+          ? "Pinch to zoom and drag to reposition your face inside the circle."
+          : "Pinch to zoom, drag to reposition. Preview matches how photos appear in the feed."}
       </Text>
 
-      <View style={[styles.frameOuter, { width: frameWidth, height: frameHeight }]}>
+      <View
+        style={[
+          styles.frameOuter,
+          { width: frameWidth, height: frameHeight, borderRadius: frameRadius },
+        ]}
+      >
         {loading || !imageSize || !baseImageStyle ? (
           <View style={styles.frameLoading}>
             <ActivityIndicator color={colors.accent} />
@@ -189,9 +205,14 @@ export function PhotoAdjustEditor({ uri, onDone, onCancel }: PhotoAdjustEditorPr
             </View>
           </GestureDetector>
         )}
-        <View style={styles.frameBorder} pointerEvents="none" />
+        <View
+          style={[styles.frameBorder, { borderRadius: frameRadius }]}
+          pointerEvents="none"
+        />
         <View style={styles.feedBadge} pointerEvents="none">
-          <Text style={styles.feedBadgeText}>Feed preview</Text>
+          <Text style={styles.feedBadgeText}>
+            {isAvatar ? "Profile preview" : "Feed preview"}
+          </Text>
         </View>
       </View>
 
@@ -244,7 +265,6 @@ const styles = StyleSheet.create({
   frameOuter: {
     alignSelf: "center",
     position: "relative",
-    borderRadius: radius.md,
     overflow: "hidden",
     backgroundColor: colors.surfaceElevated,
   },
@@ -266,7 +286,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderWidth: 2,
     borderColor: colors.accent,
-    borderRadius: radius.md,
   },
   feedBadge: {
     position: "absolute",

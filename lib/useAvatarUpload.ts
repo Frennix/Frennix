@@ -1,9 +1,9 @@
-import * as ImagePicker from "expo-image-picker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getErrorMessage, updateProfile, uploadAvatar } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
+import { pickAdjustedAvatar } from "@/lib/pick-adjusted-avatar";
 
 export function useAvatarUpload() {
   const { session, refreshProfile } = useAuth();
@@ -23,33 +23,18 @@ export function useAvatarUpload() {
 
     setUploading(true);
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setUploading(false);
-      const message = "Photo library access is required to choose a profile picture";
-      setError(message);
-      showAlert("Profile photo", message);
-      return null;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (result.canceled) {
-      setUploading(false);
-      return null;
-    }
-
     try {
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType ?? "image/jpeg";
-      const file = "file" in asset ? asset.file : undefined;
+      const adjusted = await pickAdjustedAvatar();
+      if (!adjusted) {
+        return null;
+      }
 
-      const url = await uploadAvatar(session.user.id, asset.uri, mimeType, file);
+      const url = await uploadAvatar(
+        session.user.id,
+        adjusted.uri,
+        adjusted.mimeType,
+        adjusted.file
+      );
       const saved = await updateProfile(session.user.id, { avatar_url: url });
 
       if (!saved.avatar_url) {
