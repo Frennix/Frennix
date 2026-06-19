@@ -37,6 +37,56 @@ export function clampCropTransform(
   };
 }
 
+export function clampTranslation(
+  translateX: number,
+  translateY: number,
+  scale: number,
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number
+) {
+  const clamped = clampCropTransform(
+    { scale, translateX, translateY },
+    imageWidth,
+    imageHeight,
+    frameWidth,
+    frameHeight
+  );
+  return { x: clamped.translateX, y: clamped.translateY };
+}
+
+/** Focal-point pinch zoom used by native RNGH and web touch handlers. */
+export function computePinchTransform(
+  pinchStartScale: number,
+  pinchStartTranslateX: number,
+  pinchStartTranslateY: number,
+  pinchScaleMultiplier: number,
+  focalX: number,
+  focalY: number,
+  frameWidth: number,
+  frameHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+  minScale: number,
+  maxScale: number
+): CropTransform {
+  const nextScale = Math.min(maxScale, Math.max(minScale, pinchStartScale * pinchScaleMultiplier));
+  const scaleRatio = nextScale / pinchStartScale;
+  const focalOffsetX = focalX - frameWidth / 2;
+  const focalOffsetY = focalY - frameHeight / 2;
+  const nextX = focalOffsetX - scaleRatio * (focalOffsetX - pinchStartTranslateX);
+  const nextY = focalOffsetY - scaleRatio * (focalOffsetY - pinchStartTranslateY);
+
+  return clampCropTransform(
+    { scale: nextScale, translateX: nextX, translateY: nextY },
+    imageWidth,
+    imageHeight,
+    frameWidth,
+    frameHeight
+  );
+}
+
 export type CropRegion = {
   originX: number;
   originY: number;

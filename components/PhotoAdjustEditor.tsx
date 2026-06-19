@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -7,6 +7,7 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type View as RNView,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
@@ -20,10 +21,12 @@ import {
   type CropTransform,
 } from "@/lib/photo-adjustment";
 import type { PhotoAdjustmentMode } from "@/lib/photo-adjustment-flow";
+import { useWebCropGestures, resolveCropSurfaceElement } from "@/lib/useWebCropGestures";
 import { colors, radius, spacing, typography } from "@frennix/ui";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
+const IS_WEB = Platform.OS === "web";
 
 function clampTranslationWorklet(
   translateX: number,
@@ -72,6 +75,14 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
   const [exporting, setExporting] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [error, setError] = useState("");
+  const cropSurfaceRef = useRef<RNView>(null);
+  const [cropDomElement, setCropDomElement] = useState<HTMLElement | null>(null);
+
+  const bindCropSurfaceRef = useCallback((node: RNView | null) => {
+    cropSurfaceRef.current = node;
+    if (!IS_WEB) return;
+    setCropDomElement(node ? resolveCropSurfaceElement({ current: node }) : null);
+  }, []);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -126,6 +137,30 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
       cancelled = true;
     };
   }, [imageUri, imageWidthSv, imageHeightSv, resetTransform]);
+
+  useWebCropGestures({
+    enabled: IS_WEB && !loading && Boolean(imageSize),
+    domElement: cropDomElement,
+    frameWidth,
+    frameHeight,
+    imageWidth: imageSize?.width ?? 0,
+    imageHeight: imageSize?.height ?? 0,
+    scale,
+    savedScale,
+    translateX,
+    translateY,
+    savedTranslateX,
+    savedTranslateY,
+  });
+
+  // Re-resolve DOM node after the crop surface mounts (RN web ref timing).
+  useEffect(() => {
+    if (!IS_WEB || loading || !imageSize) return;
+    const resolved = resolveCropSurfaceElement(cropSurfaceRef);
+    if (resolved && resolved !== cropDomElement) {
+      setCropDomElement(resolved);
+    }
+  }, [loading, imageSize, cropDomElement]);
 
   const panGesture = Gesture.Pan()
     .minPointers(1)
@@ -314,7 +349,26 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
   }
 
   const frameRadius = isAvatar ? frameWidth / 2 : radius.md;
-  const gestureSurfaceStyle = Platform.OS === "web" ? styles.gestureSurfaceWeb : undefined;
+  const gestureSurfaceStyle = IS_WEB ? styles.gestureSurfaceWeb : undefined;
+
+  const cropImage = baseImageLayout ? (
+    <Animated.Image
+      source={{ uri: imageUri }}
+      style={[styles.image, IS_WEB && styles.imageWeb, baseImageLayout, imageAnimatedStyle]}
+      resizeMode="cover"
+    />
+  ) : null;
+
+  const cropSurface = (
+    <View
+      ref={bindCropSurfaceRef}
+      style={[styles.gestureSurface, gestureSurfaceStyle]}
+      collapsable={false}
+      pointerEvents={IS_WEB ? "auto" : "box-none"}
+    >
+      {cropImage}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -335,19 +389,10 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
           <View style={styles.frameLoading}>
             <ActivityIndicator color={colors.accent} />
           </View>
+        ) : IS_WEB ? (
+          cropSurface
         ) : (
-          <GestureDetector gesture={composedGesture}>
-            <Animated.View
-              style={[styles.gestureSurface, gestureSurfaceStyle]}
-              collapsable={false}
-            >
-              <Animated.Image
-                source={{ uri: imageUri }}
-                style={[styles.image, baseImageLayout, imageAnimatedStyle]}
-                resizeMode="cover"
-              />
-            </Animated.View>
-          </GestureDetector>
+          <GestureDetector gesture={composedGesture}>{cropSurface}</GestureDetector>
         )}
         <View
           style={[styles.frameBorder, { borderRadius: frameRadius }]}
@@ -419,6 +464,8 @@ const styles = StyleSheet.create({
   gestureSurfaceWeb: {
     touchAction: "none",
     userSelect: "none",
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
     cursor: "grab",
   } as object,
   frameLoading: {
@@ -429,6 +476,12 @@ const styles = StyleSheet.create({
   image: {
     position: "absolute",
   },
+  imageWeb: {
+    pointerEvents: "none",
+    userSelect: "none",
+    WebkitTouchCallout: "none",
+    WebkitUserDrag: "none",
+  } as object,
   frameBorder: {
     ...StyleSheet.absoluteFillObject,
     borderWidth: 2,
