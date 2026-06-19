@@ -15,6 +15,28 @@ export type CropTransform = {
   translateY: number;
 };
 
+/** Keep pan offsets inside the crop frame so the image always covers it. */
+export function clampCropTransform(
+  transform: CropTransform,
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number
+): CropTransform {
+  const coverScale = Math.max(frameWidth / imageWidth, frameHeight / imageHeight);
+  const totalScale = coverScale * transform.scale;
+  const displayWidth = imageWidth * totalScale;
+  const displayHeight = imageHeight * totalScale;
+  const maxX = Math.max(0, (displayWidth - frameWidth) / 2);
+  const maxY = Math.max(0, (displayHeight - frameHeight) / 2);
+
+  return {
+    scale: transform.scale,
+    translateX: Math.min(maxX, Math.max(-maxX, transform.translateX)),
+    translateY: Math.min(maxY, Math.max(-maxY, transform.translateY)),
+  };
+}
+
 export type CropRegion = {
   originX: number;
   originY: number;

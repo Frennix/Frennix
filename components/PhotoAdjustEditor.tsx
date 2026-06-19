@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import {
   avatarFrameSize,
+  clampCropTransform,
   exportAdjustedPhoto,
   feedFrameSize,
   getImageDimensions,
@@ -23,6 +24,29 @@ import { colors, radius, spacing, typography } from "@frennix/ui";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
+
+function clampTranslationWorklet(
+  translateX: number,
+  translateY: number,
+  scale: number,
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number
+) {
+  "worklet";
+  const coverScale = Math.max(frameWidth / imageWidth, frameHeight / imageHeight);
+  const totalScale = coverScale * scale;
+  const displayWidth = imageWidth * totalScale;
+  const displayHeight = imageHeight * totalScale;
+  const maxX = Math.max(0, (displayWidth - frameWidth) / 2);
+  const maxY = Math.max(0, (displayHeight - frameHeight) / 2);
+
+  return {
+    x: Math.min(maxX, Math.max(-maxX, translateX)),
+    y: Math.min(maxY, Math.max(-maxY, translateY)),
+  };
+}
 
 type PhotoAdjustEditorProps = {
   uri: string;
@@ -56,6 +80,20 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
+  const pinchStartScale = useSharedValue(1);
+  const pinchStartTranslateX = useSharedValue(0);
+  const pinchStartTranslateY = useSharedValue(0);
+
+  const imageWidthSv = useSharedValue(0);
+  const imageHeightSv = useSharedValue(0);
+  const frameWidthSv = useSharedValue(frameWidth);
+  const frameHeightSv = useSharedValue(frameHeight);
+
+  useEffect(() => {
+    frameWidthSv.value = frameWidth;
+    frameHeightSv.value = frameHeight;
+  }, [frameWidth, frameHeight, frameWidthSv, frameHeightSv]);
+
   const resetTransform = useCallback(() => {
     scale.value = 1;
     savedScale.value = 1;
@@ -72,6 +110,9 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
       .then((dimensions) => {
         if (!cancelled) {
           setImageSize(dimensions);
+          imageWidthSv.value = dimensions.width;
+          imageHeightSv.value = dimensions.height;
+          resetTransform();
           setLoading(false);
         }
       })
@@ -84,24 +125,90 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
     return () => {
       cancelled = true;
     };
-  }, [imageUri]);
+  }, [imageUri, imageWidthSv, imageHeightSv, resetTransform]);
 
   const panGesture = Gesture.Pan()
+    .minPointers(1)
+    .maxPointers(1)
     .onUpdate((event) => {
-      translateX.value = savedTranslateX.value + event.translationX;
-      translateY.value = savedTranslateY.value + event.translationY;
+      const nextX = savedTranslateX.value + event.translationX;
+      const nextY = savedTranslateY.value + event.translationY;
+      const clamped = clampTranslationWorklet(
+        nextX,
+        nextY,
+        scale.value,
+        imageWidthSv.value,
+        imageHeightSv.value,
+        frameWidthSv.value,
+        frameHeightSv.value
+      );
+      translateX.value = clamped.x;
+      translateY.value = clamped.y;
     })
     .onEnd(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
+      const clamped = clampTranslationWorklet(
+        translateX.value,
+        translateY.value,
+        scale.value,
+        imageWidthSv.value,
+        imageHeightSv.value,
+        frameWidthSv.value,
+        frameHeightSv.value
+      );
+      translateX.value = clamped.x;
+      translateY.value = clamped.y;
+      savedTranslateX.value = clamped.x;
+      savedTranslateY.value = clamped.y;
+      savedScale.value = scale.value;
     });
 
   const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      pinchStartScale.value = savedScale.value;
+      pinchStartTranslateX.value = savedTranslateX.value;
+      pinchStartTranslateY.value = savedTranslateY.value;
+    })
     .onUpdate((event) => {
-      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, savedScale.value * event.scale));
-      scale.value = next;
+      const nextScale = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, pinchStartScale.value * event.scale)
+      );
+      const scaleRatio = nextScale / pinchStartScale.value;
+
+      const focalOffsetX = event.focalX - frameWidthSv.value / 2;
+      const focalOffsetY = event.focalY - frameHeightSv.value / 2;
+
+      const nextX = focalOffsetX - scaleRatio * (focalOffsetX - pinchStartTranslateX.value);
+      const nextY = focalOffsetY - scaleRatio * (focalOffsetY - pinchStartTranslateY.value);
+
+      const clamped = clampTranslationWorklet(
+        nextX,
+        nextY,
+        nextScale,
+        imageWidthSv.value,
+        imageHeightSv.value,
+        frameWidthSv.value,
+        frameHeightSv.value
+      );
+
+      scale.value = nextScale;
+      translateX.value = clamped.x;
+      translateY.value = clamped.y;
     })
     .onEnd(() => {
+      const clamped = clampTranslationWorklet(
+        translateX.value,
+        translateY.value,
+        scale.value,
+        imageWidthSv.value,
+        imageHeightSv.value,
+        frameWidthSv.value,
+        frameHeightSv.value
+      );
+      translateX.value = clamped.x;
+      translateY.value = clamped.y;
+      savedTranslateX.value = clamped.x;
+      savedTranslateY.value = clamped.y;
       savedScale.value = scale.value;
     });
 
@@ -115,19 +222,46 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
     ],
   }));
 
-  const baseImageStyle = useMemo(() => {
+  const baseImageLayout = useMemo(() => {
     if (!imageSize) return null;
     const coverScale = Math.max(frameWidth / imageSize.width, frameHeight / imageSize.height);
+    const width = imageSize.width * coverScale;
+    const height = imageSize.height * coverScale;
     return {
-      width: imageSize.width * coverScale,
-      height: imageSize.height * coverScale,
+      width,
+      height,
+      left: (frameWidth - width) / 2,
+      top: (frameHeight - height) / 2,
     };
   }, [imageSize, frameWidth, frameHeight]);
 
+  function applyTransform(next: CropTransform) {
+    if (!imageSize) return;
+    const clamped = clampCropTransform(
+      {
+        scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, next.scale)),
+        translateX: next.translateX,
+        translateY: next.translateY,
+      },
+      imageSize.width,
+      imageSize.height,
+      frameWidth,
+      frameHeight
+    );
+    scale.value = clamped.scale;
+    savedScale.value = clamped.scale;
+    translateX.value = clamped.translateX;
+    translateY.value = clamped.translateY;
+    savedTranslateX.value = clamped.translateX;
+    savedTranslateY.value = clamped.translateY;
+  }
+
   function adjustZoom(delta: number) {
-    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, savedScale.value + delta));
-    scale.value = next;
-    savedScale.value = next;
+    applyTransform({
+      scale: savedScale.value + delta,
+      translateX: savedTranslateX.value,
+      translateY: savedTranslateY.value,
+    });
   }
 
   async function handleRotate() {
@@ -150,11 +284,17 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
     setExporting(true);
     setError("");
 
-    const transform: CropTransform = {
-      scale: savedScale.value,
-      translateX: savedTranslateX.value,
-      translateY: savedTranslateY.value,
-    };
+    const transform: CropTransform = clampCropTransform(
+      {
+        scale: savedScale.value,
+        translateX: savedTranslateX.value,
+        translateY: savedTranslateY.value,
+      },
+      imageSize.width,
+      imageSize.height,
+      frameWidth,
+      frameHeight
+    );
 
     try {
       const exported = await exportAdjustedPhoto(
@@ -174,13 +314,14 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
   }
 
   const frameRadius = isAvatar ? frameWidth / 2 : radius.md;
+  const gestureSurfaceStyle = Platform.OS === "web" ? styles.gestureSurfaceWeb : undefined;
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{isAvatar ? "Adjust profile photo" : "Adjust photo"}</Text>
       <Text style={styles.subtitle}>
         {isAvatar
-          ? "Pinch to zoom and drag to reposition your face inside the circle."
+          ? "Pinch with two fingers to zoom and drag to reposition inside the circle."
           : "Pinch to zoom, drag to reposition. Preview matches how photos appear in the feed."}
       </Text>
 
@@ -190,19 +331,22 @@ export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: Phot
           { width: frameWidth, height: frameHeight, borderRadius: frameRadius },
         ]}
       >
-        {loading || !imageSize || !baseImageStyle ? (
+        {loading || !imageSize || !baseImageLayout ? (
           <View style={styles.frameLoading}>
             <ActivityIndicator color={colors.accent} />
           </View>
         ) : (
           <GestureDetector gesture={composedGesture}>
-            <View style={styles.frame}>
+            <Animated.View
+              style={[styles.gestureSurface, gestureSurfaceStyle]}
+              collapsable={false}
+            >
               <Animated.Image
                 source={{ uri: imageUri }}
-                style={[styles.image, baseImageStyle, imageAnimatedStyle]}
+                style={[styles.image, baseImageLayout, imageAnimatedStyle]}
                 resizeMode="cover"
               />
-            </View>
+            </Animated.View>
           </GestureDetector>
         )}
         <View
@@ -268,12 +412,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.surfaceElevated,
   },
-  frame: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  gestureSurface: {
+    ...StyleSheet.absoluteFillObject,
     overflow: "hidden",
   },
+  gestureSurfaceWeb: {
+    touchAction: "none",
+    userSelect: "none",
+    cursor: "grab",
+  } as object,
   frameLoading: {
     flex: 1,
     alignItems: "center",
