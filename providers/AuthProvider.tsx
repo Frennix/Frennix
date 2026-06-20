@@ -17,7 +17,7 @@ import { isSupabaseConfigured } from "@/lib/config";
 import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
-import { stopPresenceTracking } from "@/lib/presence";
+import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 
 interface AuthContextValue {
   session: Session | null;
@@ -89,9 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (epoch !== authEpochRef.current) return;
       if (!passwordRecoveryRef.current) {
         registerForPushNotifications(nextSession.user.id).catch(() => undefined);
+        startPresenceTracking(nextSession.user.id);
       }
     } else {
       setProfile(null);
+      stopPresenceTracking(true);
     }
     if (epoch === authEpochRef.current) {
       setLoading(false);

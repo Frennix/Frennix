@@ -14,8 +14,10 @@ function clearHeartbeat() {
 async function sendPresence(isOnline: boolean) {
   try {
     await setPresence(isOnline);
-  } catch {
-    // Non-blocking: never interrupt auth or profile flows.
+  } catch (error) {
+    if (__DEV__) {
+      console.warn("[presence] setPresence failed", { isOnline, error });
+    }
   }
 }
 
