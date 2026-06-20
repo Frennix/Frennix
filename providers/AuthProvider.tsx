@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [passwordRecovery]);
 
   const clearPasswordRecovery = useCallback(() => {
+    passwordRecoveryRef.current = false;
     setPasswordRecovery(false);
   }, []);
 
@@ -89,7 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (epoch !== authEpochRef.current) return;
       if (!passwordRecoveryRef.current) {
         registerForPushNotifications(nextSession.user.id).catch(() => undefined);
-        startPresenceTracking(nextSession.user.id);
+        startPresenceTracking(nextSession.user.id, "auth-applySession");
+      } else {
+        console.log("[presence] applySession skipped — password recovery mode", {
+          userId: nextSession.user.id,
+        });
       }
     } else {
       setProfile(null);
@@ -145,12 +150,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = onAuthStateChange((event, s) => {
       if (event === "PASSWORD_RECOVERY") {
+        passwordRecoveryRef.current = true;
         setPasswordRecovery(true);
       } else if (event === "SIGNED_IN") {
+        passwordRecoveryRef.current = false;
         setPasswordRecovery(false);
         clearWebRecoveryHash();
       }
       if (event === "SIGNED_OUT") {
+        passwordRecoveryRef.current = false;
         setPasswordRecovery(false);
       }
       // Token refresh on tab resume only updates the JWT; skip profile refetch + push re-register.

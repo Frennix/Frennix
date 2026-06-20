@@ -10,6 +10,7 @@ import {
   signInWithEmail,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { startPresenceTracking } from "@/lib/presence";
 import { showAlert } from "@/lib/alerts";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -48,6 +49,7 @@ export default function LoginScreen() {
     try {
       console.info("[sign-in] applying session", { userId: session.user.id });
       await applySession(session);
+      startPresenceTracking(session.user.id, "login");
       router.replace("/");
     } catch (e) {
       console.error("[sign-in] post-auth applySession failed", e);
@@ -76,6 +78,9 @@ export default function LoginScreen() {
       if (error) throw error;
       const { data: sessionData } = await getSupabase().auth.getSession();
       await applySession(sessionData.session);
+      if (sessionData.session?.user.id) {
+        startPresenceTracking(sessionData.session.user.id, "login-apple");
+      }
       router.replace("/");
     } catch (e) {
       if ((e as { code?: string }).code !== "ERR_REQUEST_CANCELED") {

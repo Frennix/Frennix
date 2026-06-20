@@ -8,7 +8,15 @@ export function PresenceCoordinator() {
   const userId = session?.user.id;
 
   useEffect(() => {
-    if (!userId || passwordRecovery) return;
+    if (!userId) {
+      console.info("[presence] PresenceCoordinator idle — no userId");
+      return;
+    }
+    if (passwordRecovery) {
+      console.info("[presence] PresenceCoordinator skipped — password recovery", { userId });
+      return;
+    }
+    console.info("[presence] PresenceCoordinator attach", { userId });
     return attachPresenceLifecycle(userId);
   }, [userId, passwordRecovery]);
 
