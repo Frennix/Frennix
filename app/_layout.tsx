@@ -11,6 +11,7 @@ import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners } from "@/lib/notifications";
 import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
+import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StackBackButton } from "@/components/StackBackButton";
@@ -70,6 +71,7 @@ export default function RootLayout() {
             <AppErrorBoundary scope="navigation">
               <NotificationBootstrap />
               <PushRegistrationBootstrap />
+              <PresenceCoordinator />
               <AuthNavigationGuard />
               <StatusBar style="light" />
               <Stack screenOptions={stackDefaults}>

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { Stack, useLocalSearchParams } from "expo-router";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -20,20 +20,21 @@ import {
   subscribeToMessageReactions,
   subscribeToTyping,
 } from "@frennix/api";
-import type { Conversation, Message } from "@frennix/types";
+import type { Conversation, Message, Profile } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useMessageReaction } from "@/lib/useMessageReaction";
 import { ChatComposer, type ChatComposerHandle, type ChatSendPayload } from "@/components/ChatComposer";
 import { ChatMessageRow } from "@/components/ChatMessageRow";
 import { ImageLightbox } from "@/components/ImageLightbox";
-import { colors, spacing, typography } from "@frennix/ui";
+import { formatPresenceStatus, isProfileOnline, colors, spacing, typography } from "@frennix/ui";
 
 const TYPING_HIDE_MS = 3000;
+const PRESENCE_REFRESH_MS = 30_000;
 
 type ChatMessageListProps = {
   messages: Message[];
   userId: string;
-  participantProfiles: Record<string, { avatar_url?: string | null; display_name?: string }>;
+  participantProfiles: Record<string, Pick<Profile, "avatar_url" | "display_name" | "is_online" | "last_seen_at">>;
   otherTyping: boolean;
   onMediaPress: (uri: string) => void;
   onReaction: (messageId: string, emoji: string, currentEmoji?: string | null) => void;
@@ -108,7 +109,16 @@ export default function ChatScreen() {
     queryKey: ["conversation-profiles", conversationId],
     queryFn: () => getConversationProfiles(conversationId!),
     enabled: chatReady && isFocused,
+    refetchInterval: isFocused ? PRESENCE_REFRESH_MS : false,
   });
+
+  const otherProfile = useMemo(() => {
+    const otherId = Object.keys(participantProfiles).find((id) => id !== userId);
+    return otherId ? participantProfiles[otherId] : undefined;
+  }, [participantProfiles, userId]);
+
+  const headerPresence = otherProfile ? formatPresenceStatus(otherProfile) : null;
+  const headerOnline = otherProfile ? isProfileOnline(otherProfile) : false;
 
   const markRead = useCallback(() => {
     if (!conversationId || !userId) return;
@@ -205,6 +215,25 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerTitle: () => (
+            <View style={styles.headerTitle}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {otherProfile?.display_name ?? "Chat"}
+              </Text>
+              {headerPresence ? (
+                <Text
+                  style={[styles.headerPresence, headerOnline && styles.headerPresenceOnline]}
+                  numberOfLines={1}
+                >
+                  {headerPresence}
+                </Text>
+              ) : null}
+            </View>
+          ),
+        }}
+      />
       <ImageLightbox uri={previewUri} onClose={() => setPreviewUri(null)} />
       <View style={styles.listWrap}>
         <ChatMessageList
@@ -240,6 +269,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   container: { flex: 1, backgroundColor: colors.background },
+  headerTitle: { alignItems: "center", maxWidth: 220 },
+  headerName: { ...typography.body, fontWeight: "700", color: colors.text },
+  headerPresence: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  headerPresenceOnline: { color: colors.accent, fontWeight: "600" },
   listWrap: { flex: 1 },
   list: { padding: spacing.md, flexGrow: 1 },
   typing: {

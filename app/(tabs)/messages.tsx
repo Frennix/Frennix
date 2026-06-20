@@ -7,7 +7,7 @@ import { getConversations } from "@frennix/api";
 import type { Conversation } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { pushScreen, switchTab } from "@/lib/press-utils";
-import { Avatar, EmptyState, colors, spacing, typography } from "@frennix/ui";
+import { Avatar, EmptyState, colors, isProfileOnline, spacing, typography } from "@frennix/ui";
 
 function previewText(
   content: string | undefined,
@@ -32,6 +32,8 @@ const ConversationRow = memo(function ConversationRow({
         uri={item.other_participant?.avatar_url}
         name={item.other_participant?.display_name}
         size={52}
+        showOnline
+        isOnline={isProfileOnline(item.other_participant)}
       />
       <View style={styles.info}>
         <Text style={styles.name}>{item.other_participant?.display_name ?? "Chat"}</Text>

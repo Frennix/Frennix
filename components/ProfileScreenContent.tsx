@@ -25,6 +25,8 @@ import {
   ProfileContentTabs,
   WorkoutStreakBadge,
   colors,
+  formatPresenceStatus,
+  isProfileOnline,
   isVideoMedia,
   radius,
   spacing,
@@ -104,6 +106,8 @@ export function ProfileScreenContent({
   const coverUri = coverPreviewUri ?? storedCoverUri;
   const achievements = useMemo(() => computeProfileAchievements(stats), [stats]);
   const photoPosts = useMemo(() => posts.filter(isPhotoPost), [posts]);
+  const presenceOnline = !isOwn && isProfileOnline(profile);
+  const presenceLabel = !isOwn ? formatPresenceStatus(profile) : null;
 
   function handleCoverPress() {
     if (!onCoverPress || coverUploading) return;
@@ -164,6 +168,11 @@ export function ProfileScreenContent({
         <View style={styles.nameBlock}>
           <Text style={styles.name}>{profile.display_name}</Text>
           <Text style={styles.username}>@{profile.username}</Text>
+          {presenceLabel ? (
+            <Text style={[styles.presence, presenceOnline && styles.presenceOnline]}>
+              {presenceLabel}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.statsRow}>
@@ -384,6 +393,8 @@ const styles = StyleSheet.create({
   nameBlock: { marginTop: spacing.xs },
   name: { ...typography.title, fontSize: 24 },
   username: { ...typography.caption, color: colors.accent, marginTop: 2 },
+  presence: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
+  presenceOnline: { color: colors.accent, fontWeight: "600" },
   avatarError: {
     ...typography.bodySmall,
     color: colors.danger,

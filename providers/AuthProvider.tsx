@@ -17,6 +17,7 @@ import { isSupabaseConfigured } from "@/lib/config";
 import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
+import { stopPresenceTracking } from "@/lib/presence";
 
 interface AuthContextValue {
   session: Session | null;
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     authEpochRef.current += 1;
+    stopPresenceTracking(true);
     await supabaseSignOut();
     setSession(null);
     setProfile(null);
