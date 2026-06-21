@@ -2,9 +2,11 @@ import { AppState, Platform } from "react-native";
 import { getSupabase, PRESENCE_HEARTBEAT_MS, setPresence } from "@frennix/api";
 
 const PRESENCE_LOG = "[presence]";
+const PRESENCE_RPC_LOG = "[presence:rpc]";
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let trackingUserId: string | null = null;
+let presenceRpcSeq = 0;
 
 function clearHeartbeat() {
   if (heartbeatTimer) {
@@ -52,9 +54,16 @@ async function waitForAuthSession(
 }
 
 async function sendPresence(isOnline: boolean, reason?: string) {
-  console.info(PRESENCE_LOG, "sendPresence", {
+  const rpcId = ++presenceRpcSeq;
+  const reasonLabel = reason ?? "unspecified";
+  const enqueuedAt = new Date().toISOString();
+  const enqueuedAtMs = Date.now();
+
+  console.info(PRESENCE_RPC_LOG, "enqueue", {
+    rpcId,
+    reason: reasonLabel,
     isOnline,
-    reason: reason ?? "unspecified",
+    enqueuedAt,
     trackingUserId,
   });
 
@@ -64,26 +73,39 @@ async function sendPresence(isOnline: boolean, reason?: string) {
     } = await getSupabase().auth.getSession();
 
     if (!session?.user?.id) {
-      console.warn(PRESENCE_LOG, "sendPresence skipped — no auth session on Supabase client", {
+      console.warn(PRESENCE_RPC_LOG, "skipped", {
+        rpcId,
+        reason: reasonLabel,
         isOnline,
-        reason,
+        enqueuedAt,
+        note: "no auth session on Supabase client",
       });
       return;
     }
 
-    console.info(PRESENCE_LOG, "calling setPresence RPC", {
-      isOnline,
-      userId: session.user.id,
-      reason,
-    });
     await setPresence(isOnline);
-    console.info(PRESENCE_LOG, "setPresence OK", {
+
+    const completedAt = new Date().toISOString();
+    console.info(PRESENCE_RPC_LOG, "complete", {
+      rpcId,
+      reason: reasonLabel,
       isOnline,
+      enqueuedAt,
+      completedAt,
+      durationMs: Date.now() - enqueuedAtMs,
       userId: session.user.id,
-      reason,
     });
   } catch (error) {
-    console.warn(PRESENCE_LOG, "setPresence failed", { isOnline, reason, error });
+    const completedAt = new Date().toISOString();
+    console.warn(PRESENCE_RPC_LOG, "failed", {
+      rpcId,
+      reason: reasonLabel,
+      isOnline,
+      enqueuedAt,
+      completedAt,
+      durationMs: Date.now() - enqueuedAtMs,
+      error,
+    });
   }
 }
 
