@@ -3,10 +3,30 @@ import { getSupabase, PRESENCE_HEARTBEAT_MS, setPresence } from "@frennix/api";
 
 const PRESENCE_LOG = "[presence]";
 const PRESENCE_RPC_LOG = "[presence:rpc]";
+const PRESENCE_FALSE_LOG = "[presence:false]";
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let trackingUserId: string | null = null;
 let presenceRpcSeq = 0;
+
+function captureCallStack(): string {
+  return new Error("presence offline").stack?.split("\n").slice(1, 12).join("\n") ?? "";
+}
+
+/** Always-on log when the client is about to send set_presence(false). */
+function logSetPresenceFalse(
+  reason: string,
+  source: string,
+  extra?: Record<string, unknown>
+) {
+  console.warn(PRESENCE_FALSE_LOG, "setPresence(false)", {
+    reason,
+    source,
+    trackingUserId,
+    stack: captureCallStack(),
+    ...extra,
+  });
+}
 
 function clearHeartbeat() {
   if (heartbeatTimer) {
@@ -58,6 +78,10 @@ async function sendPresence(isOnline: boolean, reason?: string) {
   const reasonLabel = reason ?? "unspecified";
   const enqueuedAt = new Date().toISOString();
   const enqueuedAtMs = Date.now();
+
+  if (!isOnline) {
+    logSetPresenceFalse(reasonLabel, "sendPresence", { rpcId, enqueuedAt });
+  }
 
   console.info(PRESENCE_RPC_LOG, "enqueue", {
     rpcId,
@@ -152,7 +176,12 @@ export function startPresenceTracking(userId: string, reason?: string) {
     const previousUserId = trackingUserId;
     clearHeartbeat();
     trackingUserId = null;
-    void sendPresence(false, `switch-away-${previousUserId}`);
+    const switchReason = `switch-away-${previousUserId}`;
+    logSetPresenceFalse(switchReason, "startPresenceTracking.user-switch", {
+      previousUserId,
+      nextUserId: userId,
+    });
+    void sendPresence(false, switchReason);
   } else {
     clearHeartbeat();
   }
@@ -163,11 +192,18 @@ export function startPresenceTracking(userId: string, reason?: string) {
 }
 
 /** Stop heartbeats and mark offline (unless switching users). */
-export function stopPresenceTracking(markOffline = true) {
+export function stopPresenceTracking(markOffline = true, callerReason = "unspecified") {
   console.info(PRESENCE_LOG, "stopPresenceTracking", {
     markOffline,
+    callerReason,
     trackingUserId,
   });
+  if (markOffline) {
+    logSetPresenceFalse("stop", "stopPresenceTracking", {
+      callerReason,
+      willSendRpc: Boolean(trackingUserId),
+    });
+  }
   clearHeartbeat();
   if (markOffline && trackingUserId) {
     void sendPresence(false, "stop");
@@ -185,7 +221,8 @@ export function attachPresenceLifecycle(userId: string): () => void {
     startHeartbeat();
   };
 
-  const onBackground = () => {
+  const onBackground = (lifecycleSource: string) => {
+    logSetPresenceFalse("background", lifecycleSource, { userId });
     clearHeartbeat();
     void sendPresence(false, "background");
   };
@@ -197,13 +234,14 @@ export function attachPresenceLifecycle(userId: string): () => void {
         userId,
       });
       if (document.visibilityState === "visible") onForeground();
-      else onBackground();
+      else onBackground("attachPresenceLifecycle.visibilitychange");
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     const onPageHide = () => {
       console.info(PRESENCE_LOG, "pagehide", { userId });
+      logSetPresenceFalse("pagehide", "attachPresenceLifecycle.pagehide", { userId });
       void sendPresence(false, "pagehide");
     };
     window.addEventListener("pagehide", onPageHide);
@@ -219,7 +257,9 @@ export function attachPresenceLifecycle(userId: string): () => void {
   const subscription = AppState.addEventListener("change", (nextState) => {
     console.info(PRESENCE_LOG, "AppState change", { nextState, userId });
     if (nextState === "active") onForeground();
-    else if (nextState === "background" || nextState === "inactive") onBackground();
+    else if (nextState === "background" || nextState === "inactive") {
+      onBackground(`attachPresenceLifecycle.AppState.${nextState}`);
+    }
   });
 
   return () => {

@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     authEpochRef.current += 1;
-    stopPresenceTracking(true);
+    stopPresenceTracking(true, "auth-signOut");
     await supabaseSignOut();
     setSession(null);
     setProfile(null);
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else {
       setProfile(null);
-      stopPresenceTracking(true);
+      stopPresenceTracking(true, "auth-applySession-null");
     }
     if (epoch === authEpochRef.current) {
       setLoading(false);
