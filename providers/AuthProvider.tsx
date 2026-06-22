@@ -17,7 +17,7 @@ import { isSupabaseConfigured } from "@/lib/config";
 import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
-import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
+import { stopPresenceTracking } from "@/lib/presence";
 
 interface AuthContextValue {
   session: Session | null;
@@ -90,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (epoch !== authEpochRef.current) return;
       if (!passwordRecoveryRef.current) {
         registerForPushNotifications(nextSession.user.id).catch(() => undefined);
-        startPresenceTracking(nextSession.user.id, "auth-applySession");
       } else {
         console.log("[presence] applySession skipped — password recovery mode", {
           userId: nextSession.user.id,
@@ -98,7 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else {
       setProfile(null);
-      stopPresenceTracking(true, "auth-applySession-null");
     }
     if (epoch === authEpochRef.current) {
       setLoading(false);
@@ -160,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         passwordRecoveryRef.current = false;
         setPasswordRecovery(false);
+        stopPresenceTracking(true, "auth-signed-out");
       }
       // Token refresh on tab resume only updates the JWT; skip profile refetch + push re-register.
       if (event === "TOKEN_REFRESHED") {

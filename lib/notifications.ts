@@ -4,15 +4,19 @@ import { AppState, Platform } from "react-native";
 import { removePushTokens, savePushToken, type PushPlatform } from "@frennix/api";
 import { handlePushNotificationOpen } from "@/lib/notification-navigation";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+const isNative = Platform.OS !== "web";
+
+if (isNative) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 function getExpoProjectId(): string | undefined {
   return Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
@@ -25,6 +29,8 @@ function resolvePlatform(): PushPlatform | null {
 }
 
 export async function registerForPushNotifications(userId: string) {
+  if (!isNative) return null;
+
   const platform = resolvePlatform();
   if (!platform) return null;
 
@@ -72,13 +78,13 @@ export async function registerForPushNotifications(userId: string) {
 export async function unregisterPushNotifications(userId: string) {
   await removePushTokens(userId);
 
-  if (Platform.OS !== "web") {
+  if (isNative) {
     await Notifications.setBadgeCountAsync(0).catch(() => undefined);
   }
 }
 
 export async function syncNotificationBadgeCount(count: number) {
-  if (Platform.OS === "web") return;
+  if (!isNative) return;
   await Notifications.setBadgeCountAsync(Math.max(0, count)).catch(() => undefined);
 }
 
@@ -88,6 +94,10 @@ export function handleNotificationResponse(response: Notifications.NotificationR
 }
 
 export function setupNotificationListeners(onReceived?: () => void) {
+  if (!isNative) {
+    return () => undefined;
+  }
+
   const receivedSub = Notifications.addNotificationReceivedListener(() => {
     onReceived?.();
   });
@@ -105,6 +115,10 @@ export function setupNotificationListeners(onReceived?: () => void) {
 }
 
 export function setupPushRegistration(userId: string) {
+  if (!isNative) {
+    return () => undefined;
+  }
+
   void registerForPushNotifications(userId);
 
   const subscription = AppState.addEventListener("change", (nextState) => {
