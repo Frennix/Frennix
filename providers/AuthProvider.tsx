@@ -17,7 +17,10 @@ import { isSupabaseConfigured } from "@/lib/config";
 import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
-import { stopPresenceTracking } from "@/lib/presence";
+import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
+
+/** Grace period while Supabase refreshes the session after tab resume (ms). */
+const SESSION_RECOVERY_MS = 1500;
 
 interface AuthContextValue {
   session: Session | null;
@@ -40,6 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [passwordRecovery, setPasswordRecovery] = useState(() => isWebRecoveryHash());
   const passwordRecoveryRef = useRef(passwordRecovery);
   const authEpochRef = useRef(0);
+  const signOutInProgressRef = useRef(false);
+  const sessionRef = useRef<Session | null>(null);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     passwordRecoveryRef.current = passwordRecovery;
@@ -66,16 +75,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     authEpochRef.current += 1;
-    stopPresenceTracking(true, "auth-signOut");
-    await supabaseSignOut();
-    setSession(null);
-    setProfile(null);
-    setPasswordRecovery(false);
-    setLoading(false);
+    signOutInProgressRef.current = true;
+    const userId = sessionRef.current?.user?.id ?? null;
+    try {
+      await stopPresenceTracking(true, "auth-signOut", userId);
+      await supabaseSignOut();
+      setSession(null);
+      setProfile(null);
+      setPasswordRecovery(false);
+      setLoading(false);
+    } finally {
+      signOutInProgressRef.current = false;
+    }
   }, []);
 
   const applySession = useCallback(async (nextSession: Session | null) => {
     const epoch = authEpochRef.current;
+
+    if (!nextSession && sessionRef.current?.user?.id && !signOutInProgressRef.current) {
+      await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
+      if (epoch !== authEpochRef.current) return;
+      if (signOutInProgressRef.current) return;
+
+      try {
+        const recovered = await getSession();
+        if (recovered && !signOutInProgressRef.current) {
+          nextSession = recovered;
+        }
+      } catch {
+        // Fall through to signed-out handling.
+      }
+    }
+
+    if (epoch !== authEpochRef.current) return;
+
     setSession(nextSession);
     if (nextSession?.user.id) {
       try {
@@ -89,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (epoch !== authEpochRef.current) return;
       if (!passwordRecoveryRef.current) {
+        startPresenceTracking(nextSession.user.id, "auth-session");
         registerForPushNotifications(nextSession.user.id).catch(() => undefined);
       } else {
         console.log("[presence] applySession skipped — password recovery mode", {
@@ -158,7 +192,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         passwordRecoveryRef.current = false;
         setPasswordRecovery(false);
-        stopPresenceTracking(true, "auth-signed-out");
+
+        const signedOutUserId = sessionRef.current?.user?.id ?? null;
+
+        void (async () => {
+          await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
+          try {
+            const recovered = await getSession();
+            if (recovered) return;
+          } catch {
+            // Fall through to offline presence.
+          }
+          await stopPresenceTracking(true, "auth-signed-out", signedOutUserId);
+        })();
       }
       // Token refresh on tab resume only updates the JWT; skip profile refetch + push re-register.
       if (event === "TOKEN_REFRESHED") {

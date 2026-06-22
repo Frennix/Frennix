@@ -6,6 +6,8 @@ const PRESENCE_RPC_LOG = "[presence:rpc]";
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let trackingUserId: string | null = null;
+let signingOut = false;
+let presenceEpoch = 0;
 let presenceRpcSeq = 0;
 let presenceRpcChain: Promise<void> = Promise.resolve();
 
@@ -20,45 +22,20 @@ function enqueuePresenceRpc(run: () => Promise<void>) {
   presenceRpcChain = presenceRpcChain.then(run).catch(() => undefined);
 }
 
-async function waitForAuthSession(
-  expectedUserId: string,
-  maxAttempts = 10
-): Promise<string | null> {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const {
-      data: { session },
-      error,
-    } = await getSupabase().auth.getSession();
-
-    if (error) {
-      console.warn(PRESENCE_LOG, "getSession error while waiting for auth", {
-        attempt,
-        expectedUserId,
-        message: error.message,
-      });
-    } else if (session?.user?.id) {
-      if (session.user.id !== expectedUserId) {
-        console.warn(PRESENCE_LOG, "auth session user mismatch", {
-          expectedUserId,
-          actualUserId: session.user.id,
-        });
-      }
-      console.info(PRESENCE_LOG, "auth session ready", {
-        userId: session.user.id,
-        attempt,
-      });
-      return session.user.id;
-    }
-
-    if (attempt < maxAttempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    }
-  }
-
-  return null;
+function canSendOnlinePresence() {
+  return !signingOut && Boolean(trackingUserId);
 }
 
-async function sendPresence(isOnline: boolean, reason?: string) {
+async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: number) {
+  if (isOnline && !canSendOnlinePresence()) {
+    console.info(PRESENCE_RPC_LOG, "skipped online", {
+      reason: reason ?? "unspecified",
+      signingOut,
+      trackingUserId,
+    });
+    return;
+  }
+
   const rpcId = ++presenceRpcSeq;
   const reasonLabel = reason ?? "unspecified";
   const enqueuedAt = new Date().toISOString();
@@ -70,16 +47,37 @@ async function sendPresence(isOnline: boolean, reason?: string) {
     isOnline,
     enqueuedAt,
     trackingUserId,
+    signingOut,
+    offlineEpoch: offlineEpoch ?? null,
+    presenceEpoch,
   });
 
   await new Promise<void>((resolve) => {
     enqueuePresenceRpc(async () => {
       try {
+        if (isOnline && !canSendOnlinePresence()) {
+          console.info(PRESENCE_RPC_LOG, "skipped online at execution", {
+            rpcId,
+            reason: reasonLabel,
+            signingOut,
+            trackingUserId,
+          });
+          return;
+        }
+
         const {
           data: { session },
         } = await getSupabase().auth.getSession();
 
         if (!session?.user?.id) {
+          if (!isOnline) {
+            console.info(PRESENCE_RPC_LOG, "skipped offline — no session", {
+              rpcId,
+              reason: reasonLabel,
+            });
+            return;
+          }
+
           console.warn(PRESENCE_RPC_LOG, "skipped", {
             rpcId,
             reason: reasonLabel,
@@ -88,6 +86,19 @@ async function sendPresence(isOnline: boolean, reason?: string) {
             note: "no auth session on Supabase client",
           });
           return;
+        }
+
+        if (!isOnline) {
+          if (offlineEpoch !== undefined && offlineEpoch !== presenceEpoch) {
+            console.info(PRESENCE_RPC_LOG, "skipped stale offline", {
+              rpcId,
+              reason: reasonLabel,
+              offlineEpoch,
+              presenceEpoch,
+              userId: session.user.id,
+            });
+            return;
+          }
         }
 
         await setPresence(isOnline, isOnline ? undefined : reasonLabel);
@@ -121,6 +132,8 @@ async function sendPresence(isOnline: boolean, reason?: string) {
 }
 
 function startHeartbeat() {
+  if (!canSendOnlinePresence()) return;
+
   clearHeartbeat();
   heartbeatTimer = setInterval(() => {
     void sendPresence(true, "heartbeat");
@@ -129,11 +142,15 @@ function startHeartbeat() {
 
 /** Mark the signed-in user online with periodic heartbeats. Offline only via stopPresenceTracking (sign-out). */
 export function startPresenceTracking(userId: string, reason?: string) {
+  signingOut = false;
+  presenceEpoch += 1;
+
   console.info(PRESENCE_LOG, "startPresenceTracking", {
     userId,
     reason: reason ?? "unspecified",
     trackingUserId,
     hasHeartbeat: Boolean(heartbeatTimer),
+    presenceEpoch,
   });
 
   if (trackingUserId === userId && heartbeatTimer) {
@@ -143,9 +160,10 @@ export function startPresenceTracking(userId: string, reason?: string) {
 
   if (trackingUserId && trackingUserId !== userId) {
     const previousUserId = trackingUserId;
+    const switchEpoch = presenceEpoch;
     clearHeartbeat();
     trackingUserId = null;
-    void sendPresence(false, `switch-away-${previousUserId}`);
+    void sendPresence(false, `switch-away-${previousUserId}`, switchEpoch);
   } else {
     clearHeartbeat();
   }
@@ -155,45 +173,80 @@ export function startPresenceTracking(userId: string, reason?: string) {
   startHeartbeat();
 }
 
-/** Stop heartbeats and mark offline — sign-out only. */
-export function stopPresenceTracking(markOffline = true, callerReason = "unspecified") {
+/**
+ * Stop heartbeats and mark offline — sign-out only.
+ * Pass explicitUserId from AuthProvider session so offline still runs if module tracking state was lost.
+ */
+export async function stopPresenceTracking(
+  markOffline = true,
+  callerReason = "unspecified",
+  explicitUserId?: string | null
+) {
+  const userIdForOffline = explicitUserId ?? trackingUserId;
+
+  signingOut = true;
+  clearHeartbeat();
+  trackingUserId = null;
+  presenceEpoch += 1;
+
   console.info(PRESENCE_LOG, "stopPresenceTracking", {
     markOffline,
     callerReason,
-    trackingUserId,
+    userIdForOffline,
+    explicitUserId: explicitUserId ?? null,
+    presenceEpoch,
   });
-  clearHeartbeat();
-  if (markOffline && trackingUserId) {
-    void sendPresence(false, `stop:${callerReason}`);
+
+  try {
+    if (!markOffline || !userIdForOffline) {
+      if (markOffline) {
+        console.info(PRESENCE_LOG, "stopPresenceTracking skipped offline — no user id", {
+          callerReason,
+        });
+      }
+      return;
+    }
+
+    await presenceRpcChain;
+
+    const {
+      data: { session },
+    } = await getSupabase().auth.getSession();
+
+    if (!session?.user?.id) {
+      console.warn(PRESENCE_LOG, "stopPresenceTracking skipped offline — no auth session", {
+        callerReason,
+        userIdForOffline,
+      });
+      return;
+    }
+
+    console.info(PRESENCE_LOG, "stopPresenceTracking direct offline RPC", {
+      callerReason,
+      userId: session.user.id,
+    });
+    await setPresence(false, `stop:${callerReason}`);
+  } catch (error) {
+    console.warn(PRESENCE_LOG, "stopPresenceTracking offline RPC failed", {
+      callerReason,
+      userIdForOffline,
+      error,
+    });
+  } finally {
+    signingOut = false;
   }
-  trackingUserId = null;
 }
 
-/** App-wide foreground hooks: refresh online + heartbeat. Never mark offline on blur (sign-out only). */
+/** Foreground hooks only — refresh online + heartbeat. Cold start is owned by AuthProvider. */
 export function attachPresenceLifecycle(userId: string): () => void {
   let activeGeneration = 0;
   const generation = ++activeGeneration;
 
   console.info(PRESENCE_LOG, "attachPresenceLifecycle", { userId, generation });
 
-  void (async () => {
-    const authUserId = await waitForAuthSession(userId);
-    if (generation !== activeGeneration) {
-      console.info(PRESENCE_LOG, "attachPresenceLifecycle stale — skipped start", {
-        userId,
-        generation,
-      });
-      return;
-    }
-    if (!authUserId) {
-      console.warn(PRESENCE_LOG, "attachPresenceLifecycle aborted — no session", { userId });
-      return;
-    }
-    startPresenceTracking(authUserId, "lifecycle-attach");
-  })();
-
   const onForeground = () => {
     if (generation !== activeGeneration) return;
+    if (!canSendOnlinePresence()) return;
     void sendPresence(true, "foreground");
     startHeartbeat();
   };

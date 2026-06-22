@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { attachPresenceLifecycle } from "@/lib/presence";
 
-/** Mount once near the app root to sync online status with Supabase. */
+/**
+ * Mount once near the app root for foreground presence refresh (tab resume, AppState).
+ * Cold start (initial online + heartbeat) is handled by AuthProvider after session load.
+ */
 export function PresenceCoordinator() {
   const { session, passwordRecovery } = useAuth();
   const userId = session?.user.id;
