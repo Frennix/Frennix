@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
+import { FrennixLogo } from "@/components/FrennixLogo";
 import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, spacing, typography } from "@frennix/ui";
 import { openCreatePost, pushScreen, switchTab } from "@/lib/press-utils";
 
@@ -23,8 +24,8 @@ export function FeedHeader({
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
-        <View>
-          <Text style={styles.title}>Feed</Text>
+        <View style={styles.titleBlock}>
+          <FrennixLogo variant="full" height={30} />
           <Text style={styles.subtitle}>Workouts, progress, and wins from your network</Text>
         </View>
         <Pressable
@@ -82,8 +83,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  title: { ...typography.heading, fontSize: 24 },
-  subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  titleBlock: { flex: 1, gap: 4 },
+  subtitle: { ...typography.caption, color: colors.textMuted },
   createButton: {
     width: 40,
     height: 40,

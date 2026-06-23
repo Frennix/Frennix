@@ -7,6 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { config } from "@/lib/config";
 import { unregisterPushNotifications } from "@/lib/notifications";
 import { pushScreen } from "@/lib/press-utils";
+import { FrennixLogo } from "@/components/FrennixLogo";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
 function formatUsername(username: string | null | undefined) {
@@ -67,6 +68,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
+      <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
       <Text style={styles.section}>Account</Text>
       <Text style={styles.row}>{formatUsername(profile?.username)}</Text>
 
@@ -97,6 +99,16 @@ export default function SettingsScreen() {
               <Text style={styles.link}>Feedback dashboard</Text>
             </Pressable>
           </Link>
+          <Link href="/admin-trainer-review" asChild>
+            <Pressable>
+              <Text style={styles.link}>Trainer certification review</Text>
+            </Pressable>
+          </Link>
+          <Link href="/admin-analytics" asChild>
+            <Pressable>
+              <Text style={styles.link}>Product analytics</Text>
+            </Pressable>
+          </Link>
         </>
       ) : null}
 
@@ -104,13 +116,15 @@ export default function SettingsScreen() {
       <Link href="/beta-feedback" asChild>
         <Pressable>
           <Text style={styles.link}>Send feedback</Text>
+          <Text style={styles.linkHint}>Report bugs, suggest features, or share general feedback</Text>
         </Pressable>
       </Link>
 
       <Text style={styles.section}>Notifications</Text>
       <Link href="/notification-settings" asChild>
         <Pressable>
-          <Text style={styles.link}>Push notification settings</Text>
+          <Text style={styles.link}>Notification settings</Text>
+          <Text style={styles.linkHint}>Training matches, messages, and activity alerts</Text>
         </Pressable>
       </Link>
 
@@ -122,10 +136,42 @@ export default function SettingsScreen() {
         <Text style={styles.link}>Terms of Service</Text>
       </Pressable>
 
-      <Text style={styles.section}>Coming soon</Text>
-      <Pressable onPress={() => pushScreen("/matching")}>
-        <Text style={styles.link}>Partner matching</Text>
+      <Text style={styles.section}>Coaching</Text>
+      <Pressable onPress={() => pushScreen("/trainers")}>
+        <Text style={styles.link}>Find a trainer</Text>
+        <Text style={styles.linkHint}>Browse verified coaches — separate from Training Partners</Text>
       </Pressable>
+      <Pressable onPress={() => pushScreen("/trainers/connections")}>
+        <Text style={styles.link}>Trainer connections</Text>
+        <Text style={styles.linkHint}>Coaching requests and connected trainers</Text>
+      </Pressable>
+      {profile?.is_trainer ? (
+        <Pressable onPress={() => pushScreen("/trainer-profile/edit")}>
+          <Text style={styles.link}>Trainer profile</Text>
+          <Text style={styles.linkHint}>Bio, specialties, certifications, and portfolio</Text>
+        </Pressable>
+      ) : (
+        <Pressable onPress={() => pushScreen("/trainer-profile/setup")}>
+          <Text style={styles.link}>Become a trainer</Text>
+          <Text style={styles.linkHint}>Add a coaching profile alongside your athlete account</Text>
+        </Pressable>
+      )}
+
+      <Text style={styles.section}>Training partners</Text>
+      <Pressable onPress={() => pushScreen("/matching-settings")}>
+        <Text style={styles.link}>Training partner preferences</Text>
+        <Text style={styles.linkHint}>Discovery, private filters, and profile readiness</Text>
+      </Pressable>
+      <Pressable onPress={() => pushScreen("/matching")}>
+        <Text style={styles.link}>Find training partners</Text>
+        <Text style={styles.linkHint}>Browse athletes who share your goals</Text>
+      </Pressable>
+      <Pressable onPress={() => pushScreen("/matching/matches")}>
+        <Text style={styles.link}>Training matches</Text>
+        <Text style={styles.linkHint}>Open chat with athletes you connected with</Text>
+      </Pressable>
+
+      <Text style={styles.section}>Coming soon</Text>
       <Text style={styles.muted}>Marketplace · Premium · Live stream</Text>
 
       <View style={styles.footer}>
@@ -142,9 +188,11 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl },
+  brandMark: { marginBottom: spacing.sm },
   section: { ...typography.heading, fontSize: 16, marginTop: spacing.lg, marginBottom: spacing.sm },
   row: { ...typography.body },
   link: { ...typography.body, color: colors.accent, paddingVertical: spacing.xs },
+  linkHint: { ...typography.caption, color: colors.textMuted, marginTop: -2, marginBottom: spacing.xs },
   muted: { ...typography.bodySmall },
   footer: { marginTop: "auto", paddingBottom: spacing.xl },
 });

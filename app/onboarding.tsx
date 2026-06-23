@@ -5,10 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 import { getSession, getErrorMessage, upsertProfile, uploadAvatar, claimReferral } from "@frennix/api";
-import { ACTIVITIES, FITNESS_GOALS, type MatchPreference } from "@frennix/types";
+import { ACTIVITIES, FITNESS_GOALS } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
 import { formatActivity, formatGoal } from "@/lib/labels";
+import {
+  TRAINING_PARTNER_GENDERS,
+  TRAINING_PARTNER_PREFS,
+  formatTrainingPartnerGender,
+} from "@/lib/matching-preferences";
 import { SubmitStatusBanner } from "@/components/SubmitStatusBanner";
 import { claimPendingReferral } from "@/lib/referral-storage";
 import { pickAdjustedAvatar } from "@/lib/pick-adjusted-avatar";
@@ -16,12 +21,7 @@ import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui"
 
 const SUCCESS_NAV_DELAY_MS = 2000;
 
-const GENDERS = ["female", "male", "non_binary", "prefer_not_to_say"] as const;
-const MATCH_PREFS: { value: MatchPreference; label: string }[] = [
-  { value: "any", label: "Anyone" },
-  { value: "same", label: "Same gender" },
-  { value: "opposite", label: "Different gender" },
-];
+const GENDERS = TRAINING_PARTNER_GENDERS;
 
 const onboardingSchema = z.object({
   username: z
@@ -30,11 +30,11 @@ const onboardingSchema = z.object({
     .regex(/^[a-z0-9_]+$/, "Lowercase letters, numbers, underscores only"),
   displayName: z.string().min(1, "Display name is required"),
   bio: z.string().optional(),
-  city: z.string().optional(),
+  city: z.string().min(1, "City helps nearby athletes find you"),
   gender: z.enum(GENDERS, { required_error: "Select your gender" }),
   matchPreference: z.enum(["same", "opposite", "any"]),
   goals: z.array(z.string()).min(1, "Pick at least one goal"),
-  activities: z.array(z.string()).optional().default([]),
+  activities: z.array(z.string()).min(1, "Pick at least one workout style"),
 });
 
 type OnboardingForm = z.infer<typeof onboardingSchema>;
@@ -150,7 +150,7 @@ export default function OnboardingScreen() {
       await refreshProfile(saved);
       setSubmitSuccess(true);
       navigateTimeoutRef.current = setTimeout(() => {
-        router.replace("/(tabs)");
+        router.replace("/matching-settings?welcome=1");
         submittingRef.current = false;
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
@@ -169,7 +169,7 @@ export default function OnboardingScreen() {
 
   async function nextStep() {
     if (step === 0) {
-      const ok = await trigger(["username", "displayName"]);
+      const ok = await trigger(["username", "displayName", "city"]);
       if (ok) setStep(1);
     } else if (step === 1) {
       const ok = await trigger(["gender", "matchPreference"]);
@@ -249,14 +249,22 @@ export default function OnboardingScreen() {
             control={control}
             name="city"
             render={({ field: { onChange, value } }) => (
-              <Input label="City (optional)" value={value} onChangeText={onChange} />
+              <Input
+                label="City"
+                value={value}
+                onChangeText={onChange}
+                error={step === 0 ? errors.city?.message : undefined}
+              />
             )}
           />
       </View>
 
       {step === 1 ? (
         <View style={styles.stepPanel}>
-          <Text style={styles.sectionLabel}>Gender</Text>
+          <Text style={styles.sectionLabel}>Your gender</Text>
+          <Text style={styles.sectionHint}>
+            Used for private training partner filters — not shown on your public profile.
+          </Text>
           <View style={styles.chips}>
             {GENDERS.map((g) => (
               <Pressable
@@ -265,15 +273,16 @@ export default function OnboardingScreen() {
                 onPress={() => setValue("gender", g, { shouldValidate: true })}
               >
                 <Text style={[styles.chipText, gender === g && styles.chipTextActive]}>
-                  {g.replace(/_/g, " ")}
+                  {formatTrainingPartnerGender(g)}
                 </Text>
               </Pressable>
             ))}
           </View>
           {errors.gender ? <Text style={styles.error}>{errors.gender.message}</Text> : null}
-          <Text style={styles.sectionLabel}>Partner preference (for future matching)</Text>
+          <Text style={styles.sectionLabel}>Who you want to train with</Text>
+          <Text style={styles.sectionHint}>Private filter for the training partner discovery deck.</Text>
           <View style={styles.chips}>
-            {MATCH_PREFS.map(({ value, label }) => (
+            {TRAINING_PARTNER_PREFS.map(({ value, label }) => (
               <Pressable
                 key={value}
                 style={[styles.chip, matchPreference === value && styles.chipActive]}
@@ -292,6 +301,7 @@ export default function OnboardingScreen() {
 
       {step === 2 ? (
         <View style={styles.stepPanel}>
+          <Text style={styles.sectionHint}>Pick at least one goal so training partners know what you are working toward.</Text>
           <View style={styles.chips}>
             {FITNESS_GOALS.map((g) => (
               <Pressable
@@ -311,6 +321,7 @@ export default function OnboardingScreen() {
 
       {step === 3 ? (
         <View style={styles.stepPanel}>
+          <Text style={styles.sectionHint}>Pick at least one workout style so partners know how you train.</Text>
           <View style={styles.chips}>
             {ACTIVITIES.map((a) => (
               <Pressable
@@ -334,7 +345,7 @@ export default function OnboardingScreen() {
         isSubmitting={isSubmitting || uploadingAvatar}
         isSuccess={submitSuccess}
         submittingLabel={uploadingAvatar ? "Uploading photo…" : "Setting up your profile…"}
-        successLabel="Welcome to Frennix! Taking you to your feed…"
+        successLabel="Welcome to Frennix! Next, set up training partner discovery…"
       />
 
       <View style={styles.footer}>
@@ -370,6 +381,7 @@ const styles = StyleSheet.create({
   stepPanel: { gap: spacing.md },
   hiddenStep: { height: 0, overflow: "hidden", opacity: 0 },
   sectionLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  sectionHint: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   avatarWrap: { alignItems: "center", gap: spacing.sm },
   avatarHint: { ...typography.caption, color: colors.accent },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

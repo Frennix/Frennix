@@ -40,7 +40,7 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
-        icon: "./assets/icon.png",
+        icon: "./assets/brand/frennix-logo-icon.png",
         color: "#22C55E",
       },
     ],

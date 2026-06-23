@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { getErrorMessage, getWorkoutEvents } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { EmptyState, EventCard, colors, spacing, typography } from "@frennix/ui";
 
 export default function EventsTabScreen() {
@@ -77,6 +78,7 @@ export default function EventsTabScreen() {
             onAction={() => router.push("/create-event")}
           />
         }
+        ListFooterComponent={<ReportIssueLink area="events" from="/(tabs)/events" />}
         renderItem={({ item }) => (
           <EventCard event={item} onPress={() => router.push(`/event/${item.id}`)} />
         )}

@@ -193,16 +193,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         passwordRecoveryRef.current = false;
         setPasswordRecovery(false);
 
+        if (signOutInProgressRef.current) {
+          void applySession(s);
+          return;
+        }
+
         const signedOutUserId = sessionRef.current?.user?.id ?? null;
 
         void (async () => {
           await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
+          if (signOutInProgressRef.current) return;
+
           try {
             const recovered = await getSession();
             if (recovered) return;
           } catch {
             // Fall through to offline presence.
           }
+
           await stopPresenceTracking(true, "auth-signed-out", signedOutUserId);
         })();
       }

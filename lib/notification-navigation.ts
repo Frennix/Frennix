@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import type { Notification } from "@frennix/types";
-import { markNotificationRead, safeNotificationPayload } from "@frennix/api";
+import { getOrCreateConversation, markNotificationRead, safeNotificationPayload } from "@frennix/api";
 import { pushScreen } from "@/lib/press-utils";
 
 export type NotificationNavResult =
@@ -38,6 +38,50 @@ function postHref(payload: Record<string, unknown>): string | undefined {
   return `/post/${postId}`;
 }
 
+async function openTrainingMatchDestination(
+  notification: Notification,
+  userId: string
+): Promise<NotificationNavResult> {
+  const payload = safeNotificationPayload(notification.payload);
+  const partnerId =
+    asString(payload.matched_user_id) ?? notification.actor?.id ?? undefined;
+
+  if (partnerId) {
+    try {
+      const conversationId = await getOrCreateConversation(userId, partnerId);
+      return pushHref(`/chat/${conversationId}`);
+    } catch {
+      return pushHref("/matching/matches");
+    }
+  }
+
+  return pushHref("/matching/matches");
+}
+
+export async function openNotificationTargetAsync(
+  notification: Notification,
+  userId: string
+): Promise<NotificationNavResult> {
+  const { type } = notification;
+  const payload = safeNotificationPayload(notification.payload);
+
+  if (type === "match") {
+    return openTrainingMatchDestination(notification, userId);
+  }
+
+  if (type === "trainer_connection_request" || type === "trainer_connection_accepted") {
+    return pushHref("/trainers/connections");
+  }
+
+  if (type === "message") {
+    const conversationId = asString(payload.conversation_id);
+    if (conversationId) return pushHref(`/chat/${conversationId}`);
+    return { ok: false, message: "This message conversation is no longer available." };
+  }
+
+  return openNotificationTarget(notification);
+}
+
 export function openNotificationTarget(notification: Notification): NotificationNavResult {
   const { type } = notification;
   const payload = safeNotificationPayload(notification.payload);
@@ -73,7 +117,15 @@ export function openNotificationTarget(notification: Notification): Notification
     return { ok: false, message: "This post is no longer available." };
   }
 
-  if (type === "follow" || type === "match") {
+  if (type === "match") {
+    return pushHref("/matching/matches");
+  }
+
+  if (type === "trainer_connection_request" || type === "trainer_connection_accepted") {
+    return pushHref("/trainers/connections");
+  }
+
+  if (type === "follow") {
     const profileHref = actorProfileHref(notification);
     if (profileHref) return pushHref(profileHref);
     return { ok: false, message: "This profile is no longer available." };
@@ -104,6 +156,39 @@ export function openNotificationTarget(notification: Notification): Notification
   if (fallbackProfile) return pushHref(fallbackProfile);
 
   return { ok: false, message: "This notification is no longer available." };
+}
+
+export async function openNotificationFromPushDataAsync(
+  data: Record<string, unknown>,
+  userId: string
+): Promise<NotificationNavResult> {
+  const type = asString(data.type);
+  const payload = safeNotificationPayload(data);
+
+  if (type === "match") {
+    const partnerId = asString(data.matched_user_id) ?? asString(payload.matched_user_id);
+    if (partnerId) {
+      try {
+        const conversationId = await getOrCreateConversation(userId, partnerId);
+        return pushHref(`/chat/${conversationId}`);
+      } catch {
+        return pushHref("/matching/matches");
+      }
+    }
+    return pushHref("/matching/matches");
+  }
+
+  if (type === "trainer_connection_request" || type === "trainer_connection_accepted") {
+    return pushHref("/trainers/connections");
+  }
+
+  if (type === "message") {
+    const conversationId = asString(data.conversation_id) ?? asString(payload.conversation_id);
+    if (conversationId) return pushHref(`/chat/${conversationId}`);
+    return { ok: false, message: "This message conversation is no longer available." };
+  }
+
+  return openNotificationFromPushData(data);
 }
 
 export function openNotificationFromPushData(data: Record<string, unknown>): NotificationNavResult {
@@ -159,14 +244,25 @@ export function openNotificationFromPushData(data: Record<string, unknown>): Not
     return { ok: false, message: "This group is no longer available." };
   }
 
-  if ((type === "follow" || type === "match") && actorUsername) {
+  if (type === "match") {
+    return pushHref("/matching/matches");
+  }
+
+  if (type === "trainer_connection_request" || type === "trainer_connection_accepted") {
+    return pushHref("/trainers/connections");
+  }
+
+  if (type === "follow" && actorUsername) {
     return pushHref(`/user/${actorUsername}`);
   }
 
   return { ok: false, message: "This notification is no longer available." };
 }
 
-export async function handlePushNotificationOpen(data: Record<string, unknown>) {
+export async function handlePushNotificationOpen(
+  data: Record<string, unknown>,
+  userId: string
+) {
   const notificationId = asString(data.notification_id);
   if (notificationId) {
     try {
@@ -176,7 +272,7 @@ export async function handlePushNotificationOpen(data: Record<string, unknown>) 
     }
   }
 
-  const result = openNotificationFromPushData(data);
+  const result = await openNotificationFromPushDataAsync(data, userId);
   if (!result.ok) {
     router.push("/notifications");
   }

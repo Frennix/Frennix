@@ -1,10 +1,16 @@
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
-import { AppState, Platform } from "react-native";
-import { removePushTokens, savePushToken, type PushPlatform } from "@frennix/api";
+import { AppState, Linking, Platform } from "react-native";
+import type { QueryClient } from "@tanstack/react-query";
+import { getUnreadNotificationCount, removePushTokens, savePushToken, type PushPlatform } from "@frennix/api";
 import { handlePushNotificationOpen } from "@/lib/notification-navigation";
+import { logMatchmakingError } from "@/lib/matchmaking-observability";
 
 const isNative = Platform.OS !== "web";
+
+export type PushPermissionStatus = "granted" | "denied" | "undetermined" | "unavailable";
+
+export type PushReceivedHandler = (data: Record<string, unknown>) => void;
 
 if (isNative) {
   Notifications.setNotificationHandler({
@@ -26,6 +32,86 @@ function resolvePlatform(): PushPlatform | null {
   if (Platform.OS === "ios") return "ios";
   if (Platform.OS === "android") return "android";
   return null;
+}
+
+function asPushType(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function getPushNotificationData(
+  notification: Notifications.Notification
+): Record<string, unknown> {
+  return (notification.request.content.data ?? {}) as Record<string, unknown>;
+}
+
+export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
+  if (!isNative) return "unavailable";
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status === "granted") return "granted";
+  if (status === "denied") return "denied";
+  return "undetermined";
+}
+
+export async function requestPushPermission(): Promise<PushPermissionStatus> {
+  if (!isNative) return "unavailable";
+
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === "granted") return "granted";
+  if (existing === "denied") return "denied";
+
+  const { status } = await Notifications.requestPermissionsAsync({
+    ios: {
+      allowAlert: true,
+      allowBadge: true,
+      allowSound: true,
+    },
+  });
+
+  if (status === "granted") return "granted";
+  if (status === "denied") return "denied";
+  return "undetermined";
+}
+
+export async function openSystemNotificationSettings(): Promise<boolean> {
+  if (!isNative) return false;
+
+  try {
+    await Linking.openSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function invalidateQueriesForPushNotification(
+  queryClient: QueryClient,
+  userId: string,
+  data: Record<string, unknown>
+) {
+  if (!userId) return;
+
+  const type = asPushType(data.type);
+
+  queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+  queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+
+  if (type === "match") {
+    queryClient.invalidateQueries({ queryKey: ["training-matches", userId] });
+  }
+
+  if (type === "trainer_connection_request" || type === "trainer_connection_accepted") {
+    queryClient.invalidateQueries({ queryKey: ["trainer-connections", userId] });
+  }
+
+  if (type === "message") {
+    queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+    queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
+  }
+
+  void getUnreadNotificationCount(userId)
+    .then((count) => syncNotificationBadgeCount(count))
+    .catch(() => undefined);
 }
 
 export async function registerForPushNotifications(userId: string) {
@@ -68,6 +154,7 @@ export async function registerForPushNotifications(userId: string) {
     token = tokenData.data;
   } catch (error) {
     console.warn("[push] Failed to get Expo push token", error);
+    logMatchmakingError("push_registration", error, { userId, platform });
     return null;
   }
 
@@ -88,24 +175,29 @@ export async function syncNotificationBadgeCount(count: number) {
   await Notifications.setBadgeCountAsync(Math.max(0, count)).catch(() => undefined);
 }
 
-export function handleNotificationResponse(response: Notifications.NotificationResponse) {
-  const data = response.notification.request.content.data as Record<string, unknown>;
-  void handlePushNotificationOpen(data);
+export function handleNotificationResponse(
+  response: Notifications.NotificationResponse,
+  userId: string
+) {
+  const data = getPushNotificationData(response.notification);
+  void handlePushNotificationOpen(data, userId);
 }
 
-export function setupNotificationListeners(onReceived?: () => void) {
+export function setupNotificationListeners(userId: string, onReceived?: PushReceivedHandler) {
   if (!isNative) {
     return () => undefined;
   }
 
-  const receivedSub = Notifications.addNotificationReceivedListener(() => {
-    onReceived?.();
+  const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+    onReceived?.(getPushNotificationData(notification));
   });
 
-  const responseSub = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+  const responseSub = Notifications.addNotificationResponseReceivedListener((response) =>
+    handleNotificationResponse(response, userId)
+  );
 
   void Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (response) handleNotificationResponse(response);
+    if (response) handleNotificationResponse(response, userId);
   });
 
   return () => {

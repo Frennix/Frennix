@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState, useCallback } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
 import type { SuggestedAthlete } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { formatActivity } from "@/lib/labels";
+import { pushScreen } from "@/lib/press-utils";
 import {
   ChallengeCard,
   DiscoverProfileCard,
@@ -105,6 +107,19 @@ export default function DiscoverScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Find your training community</Text>
+
+      <Pressable style={styles.trainerCard} onPress={() => pushScreen("/trainers")}>
+        <View style={styles.trainerCardIcon}>
+          <Ionicons name="fitness-outline" size={24} color={colors.accent} />
+        </View>
+        <View style={styles.trainerCardCopy}>
+          <Text style={styles.trainerCardTitle}>Find a trainer</Text>
+          <Text style={styles.trainerCardBody}>
+            Connect with professional coaches for online or in-person training — separate from Training Partners.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Pressable>
 
       {tab === "people" ? (
         <View style={styles.searchBlock}>
@@ -252,6 +267,28 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
   header: { ...typography.heading, marginBottom: spacing.sm },
+  trainerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  trainerCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.accentMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trainerCardCopy: { flex: 1, gap: 4 },
+  trainerCardTitle: { ...typography.body, fontWeight: "700" },
+  trainerCardBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   searchBlock: { gap: spacing.xs, marginBottom: spacing.xs },
   searchHint: { ...typography.caption, color: colors.textMuted },
   tabRow: { flexDirection: "row", gap: spacing.sm, marginVertical: spacing.md },

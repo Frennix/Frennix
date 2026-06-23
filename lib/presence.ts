@@ -1,12 +1,16 @@
 import { AppState, Platform } from "react-native";
 import { getSupabase, PRESENCE_HEARTBEAT_MS, setPresence } from "@frennix/api";
+import { logMatchmakingError } from "@/lib/matchmaking-observability";
 
 const PRESENCE_LOG = "[presence]";
 const PRESENCE_RPC_LOG = "[presence:rpc]";
+const OFFLINE_DEBOUNCE_MS = 2000;
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let offlineTimer: ReturnType<typeof setTimeout> | null = null;
 let trackingUserId: string | null = null;
 let signingOut = false;
+let appInForeground = true;
 let presenceEpoch = 0;
 let presenceRpcSeq = 0;
 let presenceRpcChain: Promise<void> = Promise.resolve();
@@ -18,12 +22,19 @@ function clearHeartbeat() {
   }
 }
 
+function cancelScheduledOffline() {
+  if (offlineTimer) {
+    clearTimeout(offlineTimer);
+    offlineTimer = null;
+  }
+}
+
 function enqueuePresenceRpc(run: () => Promise<void>) {
   presenceRpcChain = presenceRpcChain.then(run).catch(() => undefined);
 }
 
 function canSendOnlinePresence() {
-  return !signingOut && Boolean(trackingUserId);
+  return !signingOut && Boolean(trackingUserId) && appInForeground;
 }
 
 async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: number) {
@@ -32,6 +43,7 @@ async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: n
       reason: reason ?? "unspecified",
       signingOut,
       trackingUserId,
+      appInForeground,
     });
     return;
   }
@@ -48,6 +60,7 @@ async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: n
     enqueuedAt,
     trackingUserId,
     signingOut,
+    appInForeground,
     offlineEpoch: offlineEpoch ?? null,
     presenceEpoch,
   });
@@ -59,8 +72,6 @@ async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: n
           console.info(PRESENCE_RPC_LOG, "skipped online at execution", {
             rpcId,
             reason: reasonLabel,
-            signingOut,
-            trackingUserId,
           });
           return;
         }
@@ -78,12 +89,9 @@ async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: n
             return;
           }
 
-          console.warn(PRESENCE_RPC_LOG, "skipped", {
+          console.warn(PRESENCE_RPC_LOG, "skipped online — no session", {
             rpcId,
             reason: reasonLabel,
-            isOnline,
-            enqueuedAt,
-            note: "no auth session on Supabase client",
           });
           return;
         }
@@ -95,7 +103,14 @@ async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: n
               reason: reasonLabel,
               offlineEpoch,
               presenceEpoch,
-              userId: session.user.id,
+            });
+            return;
+          }
+
+          if (reasonLabel.startsWith("background") && appInForeground) {
+            console.info(PRESENCE_RPC_LOG, "skipped offline — back in foreground", {
+              rpcId,
+              reason: reasonLabel,
             });
             return;
           }
@@ -103,27 +118,22 @@ async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: n
 
         await setPresence(isOnline, isOnline ? undefined : reasonLabel);
 
-        const completedAt = new Date().toISOString();
         console.info(PRESENCE_RPC_LOG, "complete", {
           rpcId,
           reason: reasonLabel,
           isOnline,
-          enqueuedAt,
-          completedAt,
           durationMs: Date.now() - enqueuedAtMs,
           userId: session.user.id,
         });
       } catch (error) {
-        const completedAt = new Date().toISOString();
         console.warn(PRESENCE_RPC_LOG, "failed", {
           rpcId,
           reason: reasonLabel,
           isOnline,
-          enqueuedAt,
-          completedAt,
           durationMs: Date.now() - enqueuedAtMs,
           error,
         });
+        logMatchmakingError("presence", error, { reason: reasonLabel, isOnline });
       } finally {
         resolve();
       }
@@ -140,16 +150,45 @@ function startHeartbeat() {
   }, PRESENCE_HEARTBEAT_MS);
 }
 
-/** Mark the signed-in user online with periodic heartbeats. Offline only via stopPresenceTracking (sign-out). */
+function scheduleOffline(reason: string) {
+  cancelScheduledOffline();
+  const offlineEpoch = presenceEpoch;
+
+  offlineTimer = setTimeout(() => {
+    offlineTimer = null;
+    if (appInForeground) return;
+    if (!trackingUserId) return;
+    void sendPresence(false, reason, offlineEpoch);
+  }, OFFLINE_DEBOUNCE_MS);
+}
+
+function markForeground(reason: string) {
+  appInForeground = true;
+  presenceEpoch += 1;
+  cancelScheduledOffline();
+
+  if (!trackingUserId) return;
+
+  void sendPresence(true, reason);
+  startHeartbeat();
+}
+
+function markBackground(reason: string) {
+  appInForeground = false;
+  clearHeartbeat();
+  scheduleOffline(reason);
+}
+
+/** Mark the signed-in user online with periodic heartbeats while foregrounded. */
 export function startPresenceTracking(userId: string, reason?: string) {
   signingOut = false;
+  appInForeground = true;
   presenceEpoch += 1;
+  cancelScheduledOffline();
 
   console.info(PRESENCE_LOG, "startPresenceTracking", {
     userId,
     reason: reason ?? "unspecified",
-    trackingUserId,
-    hasHeartbeat: Boolean(heartbeatTimer),
     presenceEpoch,
   });
 
@@ -173,10 +212,7 @@ export function startPresenceTracking(userId: string, reason?: string) {
   startHeartbeat();
 }
 
-/**
- * Stop heartbeats and mark offline — sign-out only.
- * Pass explicitUserId from AuthProvider session so offline still runs if module tracking state was lost.
- */
+/** Stop heartbeats and mark offline — sign-out or background (after debounce). */
 export async function stopPresenceTracking(
   markOffline = true,
   callerReason = "unspecified",
@@ -186,94 +222,77 @@ export async function stopPresenceTracking(
 
   signingOut = true;
   clearHeartbeat();
+  cancelScheduledOffline();
   trackingUserId = null;
-  presenceEpoch += 1;
+  const offlineEpoch = ++presenceEpoch;
 
   console.info(PRESENCE_LOG, "stopPresenceTracking", {
     markOffline,
     callerReason,
     userIdForOffline,
-    explicitUserId: explicitUserId ?? null,
-    presenceEpoch,
+    offlineEpoch,
   });
 
   try {
-    if (!markOffline || !userIdForOffline) {
-      if (markOffline) {
-        console.info(PRESENCE_LOG, "stopPresenceTracking skipped offline — no user id", {
-          callerReason,
-        });
-      }
-      return;
-    }
+    if (!markOffline || !userIdForOffline) return;
 
-    await presenceRpcChain;
-
-    const {
-      data: { session },
-    } = await getSupabase().auth.getSession();
-
-    if (!session?.user?.id) {
-      console.warn(PRESENCE_LOG, "stopPresenceTracking skipped offline — no auth session", {
-        callerReason,
-        userIdForOffline,
-      });
-      return;
-    }
-
-    console.info(PRESENCE_LOG, "stopPresenceTracking direct offline RPC", {
-      callerReason,
-      userId: session.user.id,
-    });
-    await setPresence(false, `stop:${callerReason}`);
-  } catch (error) {
-    console.warn(PRESENCE_LOG, "stopPresenceTracking offline RPC failed", {
-      callerReason,
-      userIdForOffline,
-      error,
-    });
+    await sendPresence(false, `stop:${callerReason}`, offlineEpoch);
   } finally {
     signingOut = false;
   }
 }
 
-/** Foreground hooks only — refresh online + heartbeat. Cold start is owned by AuthProvider. */
+/** Foreground / background lifecycle — complements AuthProvider cold start. */
 export function attachPresenceLifecycle(userId: string): () => void {
-  let activeGeneration = 0;
-  const generation = ++activeGeneration;
+  let detached = false;
 
-  console.info(PRESENCE_LOG, "attachPresenceLifecycle", { userId, generation });
-
-  const onForeground = () => {
-    if (generation !== activeGeneration) return;
-    if (!canSendOnlinePresence()) return;
-    void sendPresence(true, "foreground");
-    startHeartbeat();
-  };
+  console.info(PRESENCE_LOG, "attachPresenceLifecycle", { userId });
 
   if (Platform.OS === "web" && typeof document !== "undefined") {
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") onForeground();
+      if (detached) return;
+      if (document.visibilityState === "visible") {
+        markForeground("foreground-web");
+      } else {
+        markBackground("background-web-hidden");
+      }
+    };
+
+    const onPageHide = () => {
+      if (detached) return;
+      markBackground("background-web-pagehide");
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
 
     return () => {
-      activeGeneration += 1;
-      console.info(PRESENCE_LOG, "detachPresenceLifecycle (web)", { userId, generation });
+      detached = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
       clearHeartbeat();
+      cancelScheduledOffline();
     };
   }
 
   const subscription = AppState.addEventListener("change", (nextState) => {
-    if (nextState === "active") onForeground();
+    if (detached) return;
+
+    if (nextState === "active") {
+      markForeground("foreground-native");
+      return;
+    }
+
+    // iOS "inactive" (control center, app switcher) — stay online.
+    if (nextState === "background") {
+      markBackground("background-native");
+    }
   });
 
   return () => {
-    activeGeneration += 1;
-    console.info(PRESENCE_LOG, "detachPresenceLifecycle (native)", { userId, generation });
+    detached = true;
     subscription.remove();
     clearHeartbeat();
+    cancelScheduledOffline();
   };
 }

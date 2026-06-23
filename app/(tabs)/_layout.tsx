@@ -7,6 +7,7 @@ import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
+import { FrennixLogo } from "@/components/FrennixLogo";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 
@@ -42,6 +43,9 @@ const TabsShell = memo(function TabsShell() {
   const messagesBadge =
     unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
 
+  const renderFeedHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={26} />, []);
+  const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={26} />, []);
+  const renderProfileHeaderTitle = useCallback(() => <FrennixLogo variant="icon" height={24} />, []);
   const renderHeaderBell = useCallback(() => <HeaderBell />, []);
   const renderProfileHeader = useCallback(
     () => (
@@ -70,7 +74,7 @@ const TabsShell = memo(function TabsShell() {
         name="index"
         options={{
           title: "Feed",
-          headerTitle: "Feed",
+          headerTitle: renderFeedHeaderTitle,
           tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
           headerRight: renderHeaderBell,
@@ -90,6 +94,7 @@ const TabsShell = memo(function TabsShell() {
         name="events"
         options={{
           title: "Events",
+          headerTitle: renderEventsHeaderTitle,
           tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/events" />,
@@ -124,6 +129,7 @@ const TabsShell = memo(function TabsShell() {
         name="profile"
         options={{
           title: "Profile",
+          headerTitle: renderProfileHeaderTitle,
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
           headerRight: renderProfileHeader,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/profile" />,

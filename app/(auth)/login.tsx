@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
+import { FrennixLogo } from "@/components/FrennixLogo";
 import { isSupabaseConfigured } from "@/lib/config";
 
 export default function LoginScreen() {
@@ -89,6 +90,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <FrennixLogo variant="full" height={44} style={styles.logo} />
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.subtitle}>Train together. Grow together.</Text>
 
@@ -121,6 +123,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, gap: spacing.md, justifyContent: "center" },
+  logo: { alignSelf: "center", marginBottom: spacing.sm },
   title: { ...typography.title },
   subtitle: { ...typography.bodySmall, marginBottom: spacing.md },
   error: { color: colors.danger, fontSize: 14 },

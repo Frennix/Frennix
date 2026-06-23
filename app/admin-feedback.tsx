@@ -2,19 +2,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getAdminFeedback, getErrorMessage, reopenFeedback, resolveFeedback } from "@frennix/api";
-import type { BetaFeedback, FeedbackStatus, FeedbackType } from "@frennix/types";
+import type { BetaFeedback, FeedbackFeatureArea, FeedbackStatus, FeedbackType } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert, showSuccess } from "@/lib/alerts";
 import { Button, EmptyState, colors, radius, spacing, typography } from "@frennix/ui";
 
 type TypeFilter = FeedbackType | "all";
 type StatusFilter = FeedbackStatus | "all";
+type AreaFilter = FeedbackFeatureArea | "all";
 
 const TYPE_FILTERS: { id: TypeFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "bug", label: "Bugs" },
   { id: "feature", label: "Features" },
+  { id: "general", label: "General" },
   { id: "rating", label: "Ratings" },
+];
+
+const AREA_FILTERS: { id: AreaFilter; label: string }[] = [
+  { id: "all", label: "All areas" },
+  { id: "training_partners", label: "Training Partners" },
+  { id: "trainer_matching", label: "Trainer Matching" },
+  { id: "messages", label: "Messages" },
+  { id: "events", label: "Events" },
+  { id: "notifications", label: "Notifications" },
+  { id: "general", label: "General" },
 ];
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
@@ -29,6 +41,8 @@ function typeLabel(type: FeedbackType) {
       return "Bug report";
     case "feature":
       return "Feature request";
+    case "general":
+      return "General feedback";
     case "rating":
       return "Experience rating";
   }
@@ -63,6 +77,17 @@ function FeedbackCard({
 
       {item.message ? <Text style={styles.message}>{item.message}</Text> : null}
 
+      {item.feature_area ? (
+        <Text style={styles.meta}>Area: {item.feature_area.replace(/_/g, " ")}</Text>
+      ) : null}
+      {item.screen_path ? <Text style={styles.meta}>Screen: {item.screen_path}</Text> : null}
+      {item.platform ? (
+        <Text style={styles.meta}>
+          {item.platform}
+          {item.app_version ? ` · v${item.app_version}` : ""}
+        </Text>
+      ) : null}
+
       <Text style={styles.meta}>
         {author} · {new Date(item.created_at).toLocaleString()}
       </Text>
@@ -82,10 +107,11 @@ export default function AdminFeedbackScreen() {
   const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
+  const [areaFilter, setAreaFilter] = useState<AreaFilter>("all");
 
   const { data: feedback = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ["admin-feedback", typeFilter, statusFilter],
-    queryFn: () => getAdminFeedback(typeFilter, statusFilter),
+    queryKey: ["admin-feedback", typeFilter, statusFilter, areaFilter],
+    queryFn: () => getAdminFeedback(typeFilter, statusFilter, areaFilter),
     enabled: !!profile?.is_admin,
   });
 
@@ -142,6 +168,21 @@ export default function AdminFeedbackScreen() {
               onPress={() => setStatusFilter(filter.id)}
             >
               <Text style={[styles.chipText, statusFilter === filter.id && styles.chipTextActive]}>
+                {filter.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.filterLabel}>Feature area</Text>
+        <View style={styles.filterRow}>
+          {AREA_FILTERS.map((filter) => (
+            <Pressable
+              key={filter.id}
+              style={[styles.chip, areaFilter === filter.id && styles.chipActive]}
+              onPress={() => setAreaFilter(filter.id)}
+            >
+              <Text style={[styles.chipText, areaFilter === filter.id && styles.chipTextActive]}>
                 {filter.label}
               </Text>
             </Pressable>

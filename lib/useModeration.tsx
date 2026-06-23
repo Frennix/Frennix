@@ -35,6 +35,8 @@ export function useModeration(userId: string) {
     queryClient.invalidateQueries({ queryKey: ["blocked-users", userId] });
     queryClient.invalidateQueries({ queryKey: ["is-following"] });
     queryClient.invalidateQueries({ queryKey: ["discover-profiles"] });
+    queryClient.invalidateQueries({ queryKey: ["training-matches", userId] });
+    queryClient.invalidateQueries({ queryKey: ["training-partner-candidates", userId] });
   }, [queryClient, userId]);
 
   const reportMutation = useMutation({

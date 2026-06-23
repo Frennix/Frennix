@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes } from "@frennix/api";
 import type { FeedStory, Post } from "@frennix/types";
@@ -16,6 +16,7 @@ import { useModeration } from "@/lib/useModeration";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { useFeedLike } from "@/lib/useFeedLike";
+import { trackFeedLoad } from "@/lib/product-analytics";
 import { EmptyState, FeedPostCardSkeleton, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
@@ -29,6 +30,8 @@ export default function HomeScreen() {
   const { moderationSheets, openPostModeration } = useModeration(userId);
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
   const { toggleLikePost } = useFeedLike(userId);
+  const feedLoadStartedRef = useRef<number | null>(null);
+  const feedPerfTrackedRef = useRef(false);
 
   const {
     data,
@@ -73,6 +76,19 @@ export default function HomeScreen() {
   });
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+
+  useEffect(() => {
+    if (userId) {
+      feedLoadStartedRef.current = performance.now();
+      feedPerfTrackedRef.current = false;
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!isFeedReady || feedPerfTrackedRef.current || feedLoadStartedRef.current == null) return;
+    trackFeedLoad(performance.now() - feedLoadStartedRef.current, posts.length);
+    feedPerfTrackedRef.current = true;
+  }, [isFeedReady, posts.length]);
 
   async function handleRefresh() {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);

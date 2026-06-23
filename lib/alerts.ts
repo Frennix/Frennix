@@ -65,7 +65,8 @@ export function showSuccess(message: string) {
 
 export function confirmBlockUser(onConfirm: () => void) {
   const title = "Block this user?";
-  const message = "You will no longer see their posts, comments, or messages.";
+  const message =
+    "You will no longer see their posts, comments, or messages. Any active training match will be removed.";
 
   if (Platform.OS === "web") {
     if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
@@ -77,5 +78,22 @@ export function confirmBlockUser(onConfirm: () => void) {
   Alert.alert(title, message, [
     { text: "Cancel", style: "cancel" },
     { text: "Block", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+export function confirmRemoveTrainingMatch(partnerName: string, onConfirm: () => void) {
+  const title = "Remove training match?";
+  const message = `You and ${partnerName} will no longer appear in each other's training matches. Your chat history stays available in Messages.`;
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Remove", style: "destructive", onPress: onConfirm },
   ]);
 }

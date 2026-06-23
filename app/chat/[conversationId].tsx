@@ -14,22 +14,25 @@ import {
 import {
   getConversationProfiles,
   getMessages,
+  getTrainerVerificationForUser,
   markMessagesAsRead,
   sendMessage,
   subscribeToMessages,
   subscribeToMessageReactions,
   subscribeToTyping,
 } from "@frennix/api";
-import type { Conversation, Message, Profile } from "@frennix/types";
+import type { Conversation, Message, Profile, TrainerVerificationLevel } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useMessageReaction } from "@/lib/useMessageReaction";
+import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { ChatComposer, type ChatComposerHandle, type ChatSendPayload } from "@/components/ChatComposer";
 import { ChatMessageRow } from "@/components/ChatMessageRow";
 import { ImageLightbox } from "@/components/ImageLightbox";
+import { TrainerBadge } from "@/components/TrainerBadge";
+import { trackMessagingLoad } from "@/lib/product-analytics";
 import { formatPresenceStatus, isProfileOnline, colors, spacing, typography } from "@frennix/ui";
 
 const TYPING_HIDE_MS = 3000;
-const PRESENCE_REFRESH_MS = 30_000;
 
 type ChatMessageListProps = {
   messages: Message[];
@@ -98,6 +101,15 @@ export default function ChatScreen() {
   const messageReactionRef = useRef(messageReaction);
   messageReactionRef.current = messageReaction;
   const isFocused = useIsFocused();
+  const messagingPerfTrackedRef = useRef(false);
+  const messagingLoadStartedRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (chatReady && conversationId) {
+      messagingLoadStartedRef.current = performance.now();
+      messagingPerfTrackedRef.current = false;
+    }
+  }, [chatReady, conversationId]);
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", conversationId],
@@ -109,13 +121,40 @@ export default function ChatScreen() {
     queryKey: ["conversation-profiles", conversationId],
     queryFn: () => getConversationProfiles(conversationId!),
     enabled: chatReady && isFocused,
-    refetchInterval: isFocused ? PRESENCE_REFRESH_MS : false,
   });
 
   const otherProfile = useMemo(() => {
     const otherId = Object.keys(participantProfiles).find((id) => id !== userId);
     return otherId ? participantProfiles[otherId] : undefined;
   }, [participantProfiles, userId]);
+
+  const otherUserId = useMemo(() => {
+    return Object.keys(participantProfiles).find((id) => id !== userId);
+  }, [participantProfiles, userId]);
+
+  const { data: otherTrainerLevel } = useQuery({
+    queryKey: ["trainer-verification", otherUserId],
+    queryFn: () => getTrainerVerificationForUser(otherUserId!),
+    enabled: !!otherUserId,
+  });
+
+  useProfilesPresence(userId, otherProfile?.id ? [otherProfile.id] : []);
+
+  useEffect(() => {
+    if (
+      !messagesLoading &&
+      conversationId &&
+      !messagingPerfTrackedRef.current &&
+      messagingLoadStartedRef.current != null
+    ) {
+      trackMessagingLoad(
+        performance.now() - messagingLoadStartedRef.current,
+        conversationId,
+        messages.length
+      );
+      messagingPerfTrackedRef.current = true;
+    }
+  }, [messagesLoading, conversationId, messages.length]);
 
   const headerPresence = otherProfile ? formatPresenceStatus(otherProfile) : null;
   const headerOnline = otherProfile ? isProfileOnline(otherProfile) : false;
@@ -222,6 +261,9 @@ export default function ChatScreen() {
               <Text style={styles.headerName} numberOfLines={1}>
                 {otherProfile?.display_name ?? "Chat"}
               </Text>
+              {otherTrainerLevel && otherTrainerLevel !== "trainer" ? (
+                <TrainerBadge level={otherTrainerLevel as TrainerVerificationLevel} compact />
+              ) : null}
               {headerPresence ? (
                 <Text
                   style={[styles.headerPresence, headerOnline && styles.headerPresenceOnline]}

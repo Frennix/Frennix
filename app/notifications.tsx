@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,37 +10,25 @@ import {
   View,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  buildNotificationRowText,
-  getErrorMessage,
-  getNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from "@frennix/api";
+import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead } from "@frennix/api";
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
-import { openNotificationTarget } from "@/lib/notification-navigation";
+import { openNotificationTargetAsync } from "@/lib/notification-navigation";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { showAlert } from "@/lib/alerts";
-import { EmptyState, NotificationRow, colors, spacing, typography } from "@frennix/ui";
+import { EmptyState, colors, spacing, typography } from "@frennix/ui";
+import { FrennixLogo } from "@/components/FrennixLogo";
+import { FrennixNotificationRow } from "@/components/FrennixNotificationRow";
 
 const SafeNotificationRow = memo(function SafeNotificationRow({
   notification,
-  text,
   onPress,
 }: {
   notification: Notification;
-  text: string;
   onPress: (id: string) => void;
 }) {
-  return (
-    <NotificationRow
-      notification={notification}
-      text={text}
-      onPress={() => onPress(notification.id)}
-    />
-  );
+  return <FrennixNotificationRow notification={notification} onPress={() => onPress(notification.id)} />;
 });
 
 export default function NotificationsScreen() {
@@ -110,48 +98,28 @@ export default function NotificationsScreen() {
     },
   });
 
-  const notificationsById = useMemo(() => {
-    const map = new Map<string, Notification>();
-    for (const item of notifications) {
-      map.set(item.id, item);
-    }
-    return map;
-  }, [notifications]);
-
-  const rowTextById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of notifications) {
-      map.set(item.id, buildNotificationRowText(item));
-    }
-    return map;
-  }, [notifications]);
-
   const handlePressById = useCallback(
-    (notificationId: string) => {
-      const notification = notificationsById.get(notificationId);
+    async (notificationId: string) => {
+      const notification = notifications.find((item) => item.id === notificationId);
       if (!notification) return;
 
       if (!notification.read_at) {
         readMutation.mutate(notification.id);
       }
 
-      const result = openNotificationTarget(notification);
+      const result = await openNotificationTargetAsync(notification, userId);
       if (!result.ok) {
         showAlert("Unavailable", result.message);
       }
     },
-    [notificationsById, readMutation]
+    [notifications, readMutation, userId]
   );
 
   const renderItem = useCallback(
     ({ item }: { item: Notification }) => (
-      <SafeNotificationRow
-        notification={item}
-        text={rowTextById.get(item.id) ?? "New activity on Frennix"}
-        onPress={handlePressById}
-      />
+      <SafeNotificationRow notification={item} onPress={handlePressById} />
     ),
-    [handlePressById, rowTextById]
+    [handlePressById]
   );
 
   if (authLoading) {
@@ -194,10 +162,12 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
+      <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
       <View style={styles.summary}>
-        <Text style={styles.summaryTitle}>Stay on top of your fitness community</Text>
+        <Text style={styles.summaryTitle}>Stay on top of your training network</Text>
         <Text style={styles.summaryBody}>
-          Follows, likes, reactions, comments, replies, and messages appear here in real time.
+          Training matches, partner messages, follows, likes, comments, and event updates appear
+          here in real time.
         </Text>
       </View>
 
@@ -227,7 +197,7 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           <EmptyState
             title="All caught up"
-            description="When someone follows you, likes or reacts to a post, comments, replies, or sends a message, you'll see it here instantly."
+            description="When you connect with a training partner, receive a message, or get activity on your posts, you'll see it here instantly."
           />
         }
         renderItem={renderItem}
@@ -246,7 +216,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  loadingText: { ...typography.bodySmall, color: colors.textMuted, marginTop: spacing.sm },
   errorTitle: { ...typography.heading, textAlign: "center" },
   errorText: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center" },
   retryButton: {
@@ -270,6 +239,7 @@ const styles = StyleSheet.create({
   },
   summaryTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   summaryBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
+  brandMark: { marginLeft: spacing.md, marginTop: spacing.sm, marginBottom: spacing.xs },
   header: {
     flexDirection: "row",
     alignItems: "center",

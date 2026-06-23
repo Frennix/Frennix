@@ -5,6 +5,7 @@ import { signUpWithEmail } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { storePendingReferralCode } from "@/lib/referral-storage";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
+import { FrennixLogo } from "@/components/FrennixLogo";
 
 export default function SignupScreen() {
   const { ref } = useLocalSearchParams<{ ref?: string }>();
@@ -45,6 +46,7 @@ export default function SignupScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <FrennixLogo variant="full" height={44} style={styles.logo} />
       <Text style={styles.title}>Join Frennix</Text>
       <Text style={styles.subtitle}>Build your fitness community</Text>
 
@@ -63,6 +65,7 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, gap: spacing.md, justifyContent: "center" },
+  logo: { alignSelf: "center", marginBottom: spacing.sm },
   title: { ...typography.title },
   subtitle: { ...typography.bodySmall, marginBottom: spacing.md },
   error: { color: colors.danger, fontSize: 14 },

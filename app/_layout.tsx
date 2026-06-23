@@ -8,10 +8,11 @@ import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { TabBadgeProvider } from "@/providers/TabBadgeProvider";
 import { initSentry } from "@/lib/sentry";
-import { setupNotificationListeners } from "@/lib/notifications";
+import { setupNotificationListeners, invalidateQueriesForPushNotification } from "@/lib/notifications";
 import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
 import { PresenceCoordinator } from "@/components/PresenceCoordinator";
+import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StackBackButton } from "@/components/StackBackButton";
@@ -50,10 +51,9 @@ function NotificationBootstrap() {
   useNotificationSubscription(userId);
 
   useEffect(() => {
-    return setupNotificationListeners(() => {
+    return setupNotificationListeners(userId, (data) => {
       if (!userId) return;
-      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+      invalidateQueriesForPushNotification(queryClient, userId, data);
     });
   }, [queryClient, userId]);
 
@@ -71,6 +71,7 @@ export default function RootLayout() {
             <AppErrorBoundary scope="navigation">
               <NotificationBootstrap />
               <PushRegistrationBootstrap />
+              <ProductAnalyticsBootstrap />
               <PresenceCoordinator />
               <AuthNavigationGuard />
               <StatusBar style="light" />
@@ -127,6 +128,14 @@ export default function RootLayout() {
               options={backScreen("Edit profile", { presentation: "modal" })}
             />
             <Stack.Screen name="settings" options={backScreen("Settings")} />
+            <Stack.Screen
+              name="matching-settings"
+              options={{
+                ...backScreen("Training partner preferences"),
+                animation: "fade",
+                animationDuration: 150,
+              }}
+            />
             <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />
             <Stack.Screen name="saved-posts" options={backScreen("Saved Posts")} />
             <Stack.Screen name="invite-friends" options={backScreen("Invite Friends")} />
@@ -135,14 +144,12 @@ export default function RootLayout() {
             <Stack.Screen name="admin-moderation" options={backScreen("Moderation")} />
             <Stack.Screen name="beta-feedback" options={backScreen("Beta Feedback")} />
             <Stack.Screen name="admin-feedback" options={backScreen("Feedback Dashboard")} />
-            <Stack.Screen
-              name="matching"
-              options={{
-                ...backScreen("Partner matching"),
-                animation: "fade",
-                animationDuration: 150,
-              }}
-            />
+            <Stack.Screen name="matching" options={{ headerShown: false }} />
+            <Stack.Screen name="trainers" options={{ headerShown: false }} />
+            <Stack.Screen name="trainer/[username]" options={backScreen("Trainer")} />
+            <Stack.Screen name="trainer-profile" options={{ headerShown: false }} />
+            <Stack.Screen name="admin-trainer-review" options={backScreen("Trainer review")} />
+            <Stack.Screen name="admin-analytics" options={backScreen("Analytics")} />
               </Stack>
             </AppErrorBoundary>
             </TabBadgeRoot>

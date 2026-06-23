@@ -1,11 +1,12 @@
 import { Link } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
+import { FrennixLogo } from "@/components/FrennixLogo";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
 export default function WelcomeScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Frennix</Text>
+      <FrennixLogo variant="mark" height={120} style={styles.logo} />
       <Text style={styles.tagline}>
         Connect through shared fitness goals, accountability, and real-world training partners.
       </Text>
@@ -32,7 +33,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.lg,
   },
-  logo: { ...typography.title, fontSize: 42, color: colors.accent },
+  logo: { alignSelf: "center", marginBottom: spacing.md },
   tagline: { ...typography.body, color: colors.textSecondary, lineHeight: 26 },
   actions: { gap: spacing.md, marginTop: spacing.lg },
   hint: { ...typography.caption, textAlign: "center", marginTop: spacing.xl },

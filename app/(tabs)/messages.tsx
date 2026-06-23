@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { usePathname } from "expo-router";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getConversations } from "@frennix/api";
 import type { Conversation } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen, switchTab } from "@/lib/press-utils";
+import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { Avatar, EmptyState, colors, isProfileOnline, spacing, typography } from "@frennix/ui";
 
 function previewText(
@@ -75,6 +77,16 @@ export default function MessagesScreen() {
     refetchIntervalInBackground: false,
   });
 
+  const partnerIds = useMemo(
+    () =>
+      conversations
+        .map((conversation) => conversation.other_participant?.id)
+        .filter((id): id is string => Boolean(id)),
+    [conversations]
+  );
+
+  useProfilesPresence(userId, partnerIds);
+
   const handlePress = useCallback((id: string) => {
     pushScreen(`/chat/${id}`);
   }, []);
@@ -106,6 +118,7 @@ export default function MessagesScreen() {
             />
           ) : null
         }
+        ListFooterComponent={<ReportIssueLink area="messages" from="/(tabs)/messages" />}
         renderItem={renderItem}
       />
     </View>
