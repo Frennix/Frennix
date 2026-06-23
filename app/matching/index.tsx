@@ -11,7 +11,12 @@ import {
   View,
 } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMatchCandidates, getOrCreateConversation, recordMatchSwipe } from "@frennix/api";
+import {
+  getErrorMessage,
+  getMatchCandidates,
+  getOrCreateConversation,
+  recordMatchSwipe,
+} from "@frennix/api";
 import type { Profile } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import {
@@ -70,13 +75,13 @@ export default function TrainingPartnerDiscoveryScreen() {
   });
 
   const syncDeck = useCallback((incoming: Profile[]) => {
-    setDeck(incoming);
+    setDeck(Array.isArray(incoming) ? incoming : []);
     setDeckInitialized(true);
   }, []);
 
   useEffect(() => {
     if (!discoveryEnabled || isLoading || deckInitialized) return;
-    syncDeck(candidates);
+    syncDeck(Array.isArray(candidates) ? candidates : []);
   }, [candidates, deckInitialized, discoveryEnabled, isLoading, syncDeck]);
 
   useEffect(() => {
@@ -219,7 +224,7 @@ export default function TrainingPartnerDiscoveryScreen() {
           <FrennixLogo variant="full" height={32} style={styles.logo} />
           <EmptyState
             title="Could not load partners"
-            description={error instanceof Error ? error.message : "Something went wrong"}
+            description={getErrorMessage(error)}
             actionLabel="Try again"
             onAction={() => void handleRefresh()}
           />

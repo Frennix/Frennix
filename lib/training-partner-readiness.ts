@@ -1,4 +1,5 @@
 import type { Profile } from "@frennix/types";
+import { coerceStringArray } from "@/lib/training-partner-utils";
 
 export type TrainingPartnerReadinessKey = "gender" | "goals" | "activities" | "city";
 
@@ -36,8 +37,8 @@ export function getTrainingPartnerReadinessItems(
 ): TrainingPartnerReadinessItem[] {
   const checks: Record<TrainingPartnerReadinessKey, boolean> = {
     gender: Boolean(profile.gender),
-    goals: (profile.fitness_goals ?? []).length > 0,
-    activities: (profile.activities ?? []).length > 0,
+    goals: coerceStringArray(profile.fitness_goals).length > 0,
+    activities: coerceStringArray(profile.activities).length > 0,
     city: Boolean(profile.city?.trim()),
   };
 
