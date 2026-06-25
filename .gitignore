@@ -4,11 +4,29 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# Environment & secrets
 .env
 .env.local
-*.env 
-.vercel
+*.env
+
+# Dependencies & package manager caches
 node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# Expo / React Native
+.expo/
+
+# Tooling & hosting
+.vercel
+
+# Local artifacts
 screenshots/
+.DS_Store
+*.log
+coverage/
+
+# Supabase local state
 supabase/.temp/
 supabase/.branches/

@@ -110,6 +110,7 @@ apps/mobile/                    ← GIT ROOT
 ├── dist/                       Pre-built web export (committed for Vercel)
 ├── assets/                     Brand images, icons
 ├── pnpm-workspace.yaml         Workspace: `.` + `packages/*`
+├── .gitignore                  Ignores `node_modules/`, `.pnpm-store/`, `.expo/`, secrets
 └── HANDOFF.md                  This document
 ```
 
@@ -684,6 +685,7 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 - Delete: confirmation ("Delete Workout?"), DB + storage cleanup, instant feed removal
 - API: `updatePost` extended for media fields; `removePostsStorageFiles` helper
 - Cache: optimistic updates across feed, profile, group, challenge, event, saved-posts
+- `.gitignore` updated to exclude `.pnpm-store/` and other local caches from version control
 
 ---
 
