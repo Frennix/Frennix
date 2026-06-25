@@ -13,6 +13,7 @@ import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { useModeration } from "@/lib/useModeration";
+import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
@@ -27,7 +28,12 @@ export default function ChallengeDetailScreen() {
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, openPostModeration } = useModeration(userId);
+  const { moderationSheets, startPostReport } = useModeration(userId);
+  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+    userId,
+    onShare: (post) => openShare(post.shared_post ?? post),
+    onReport: startPostReport,
+  });
 
   const { data: challenge, isLoading: challengeLoading } = useQuery({
     queryKey: ["challenge", id],
@@ -83,6 +89,7 @@ export default function ChallengeDetailScreen() {
   return (
     <View style={styles.container}>
       <PostActionSheet {...actionSheetProps} />
+      {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
       <FlatList
@@ -132,7 +139,7 @@ export default function ChallengeDetailScreen() {
             onOwnerActionsPress={() => openPostActions(item)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onModerationPress={() => openPostModeration(item.id, item.author_id)}
+            onModerationPress={() => openViewerActions(item)}
           />
         )}
         ListEmptyComponent={

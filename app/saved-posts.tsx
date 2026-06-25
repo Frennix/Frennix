@@ -6,6 +6,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSavePost } from "@/lib/useSavePost";
 import { useModeration } from "@/lib/useModeration";
+import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { EmptyState, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
@@ -16,7 +17,12 @@ export default function SavedPostsScreen() {
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, openPostModeration } = useModeration(userId);
+  const { moderationSheets, startPostReport } = useModeration(userId);
+  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+    userId,
+    onShare: (post) => openShare(post.shared_post ?? post),
+    onReport: startPostReport,
+  });
 
   const {
     data,
@@ -39,6 +45,7 @@ export default function SavedPostsScreen() {
   return (
     <View style={styles.container}>
       <PostActionSheet {...actionSheetProps} />
+      {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
       <FlatList
@@ -79,7 +86,7 @@ export default function SavedPostsScreen() {
             onComment={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onModerationPress={() => openPostModeration(item.id, item.author_id)}
+            onModerationPress={() => openViewerActions(item)}
           />
         )}
       />

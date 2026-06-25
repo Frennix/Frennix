@@ -16,6 +16,7 @@ import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { useModeration } from "@/lib/useModeration";
+import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
 import { showAlert, showSuccess, confirmCancelEvent } from "@/lib/alerts";
@@ -42,7 +43,12 @@ export default function EventDetailScreen() {
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, openPostModeration } = useModeration(userId);
+  const { moderationSheets, startPostReport } = useModeration(userId);
+  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+    userId,
+    onShare: (post) => openShare(post.shared_post ?? post),
+    onReport: startPostReport,
+  });
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: event, isLoading: eventLoading } = useQuery({
@@ -145,6 +151,7 @@ export default function EventDetailScreen() {
       }
     >
       <PostActionSheet {...actionSheetProps} />
+      {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
       {isCancelled ? (
@@ -250,7 +257,7 @@ export default function EventDetailScreen() {
               onOwnerActionsPress={() => openPostActions(post)}
               onShare={() => openShare(post.shared_post ?? post)}
               onSave={() => toggleSavePost(post.id, !!post.saved_by_me)}
-              onModerationPress={() => openPostModeration(post.id, post.author_id)}
+              onModerationPress={() => openViewerActions(post)}
             />
           ))
         ) : (

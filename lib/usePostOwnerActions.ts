@@ -1,9 +1,10 @@
 import { router } from "expo-router";
-import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { deletePost, getErrorMessage } from "@frennix/api";
-import type { FeedPage, Post } from "@frennix/types";
+import type { Post } from "@frennix/types";
 import { confirmDeletePost, showAlert, showSuccess } from "@/lib/alerts";
+import { invalidatePostQueries, removePostFromAllCaches } from "@/lib/post-cache";
 
 interface UsePostOwnerActionsOptions {
   userId: string;
@@ -25,52 +26,24 @@ export function usePostOwnerActions({ userId, onDeleted }: UsePostOwnerActionsOp
     setActivePost(null);
   }, []);
 
-  const removeFromFeedCache = useCallback(
-    (postId: string) => {
-      queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            posts: page.posts.filter((p) => p.id !== postId),
-          })),
-        };
-      });
-
-      queryClient.setQueriesData<FeedPage>({ queryKey: ["user-posts"] }, (old) => {
-        if (!old) return old;
-        return { ...old, posts: old.posts.filter((p) => p.id !== postId) };
-      });
-
-      queryClient.setQueriesData<Post[]>({ queryKey: ["group-posts"] }, (old) => {
-        if (!old) return old;
-        return old.filter((p) => p.id !== postId);
-      });
-    },
-    [queryClient, userId]
-  );
-
   const deleteMutation = useMutation({
     mutationFn: (postId: string) => deletePost(postId, userId),
     onMutate: async (postId) => {
       await queryClient.cancelQueries({ queryKey: ["feed", userId] });
-      const previous = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-      removeFromFeedCache(postId);
+      const previous = queryClient.getQueryData(["feed", userId]);
+      removePostFromAllCaches(queryClient, userId, postId);
       return { previous };
     },
     onError: (error, _postId, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["feed", userId], context.previous);
       }
-      showAlert("Delete failed", getErrorMessage(error));
+      showAlert("Something went wrong", getErrorMessage(error) || "Please try again.");
     },
-    onSuccess: (_data, postId) => {
-      queryClient.invalidateQueries({ queryKey: ["feed", userId] });
-      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["group-posts"] });
+    onSuccess: async (_data, postId) => {
       queryClient.removeQueries({ queryKey: ["post", postId] });
-      showSuccess("Post deleted");
+      await invalidatePostQueries(queryClient, userId, postId);
+      showSuccess("Workout deleted.");
       onDeleted?.(postId);
     },
   });

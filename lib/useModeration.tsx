@@ -74,6 +74,12 @@ export function useModeration(userId: string) {
     setSheetVisible(true);
   }, [userId]);
 
+  const startPostReport = useCallback((postId: string, authorId: string) => {
+    if (!userId || authorId === userId) return;
+    setTarget({ type: "post", postId, authorId });
+    setReportVisible(true);
+  }, [userId]);
+
   const openCommentModeration = useCallback((commentId: string, authorId: string) => {
     if (!userId || authorId === userId) return;
     setTarget({ type: "comment", commentId, authorId });
@@ -135,6 +141,7 @@ export function useModeration(userId: string) {
   return {
     moderationSheets,
     openPostModeration,
+    startPostReport,
     openCommentModeration,
     openUserModeration,
     blockMutation,

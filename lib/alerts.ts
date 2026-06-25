@@ -9,7 +9,7 @@ export function showAlert(title: string, message: string) {
 }
 
 export function confirmDeletePost(onConfirm: () => void) {
-  const title = "Delete this post?";
+  const title = "Delete Workout?";
   const message = "This action cannot be undone.";
 
   if (Platform.OS === "web") {

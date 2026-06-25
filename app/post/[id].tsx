@@ -16,6 +16,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
+import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
 import { useState } from "react";
@@ -47,7 +48,12 @@ export default function PostDetailScreen() {
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
-  const { moderationSheets, openPostModeration, openCommentModeration } = useModeration(userId);
+  const { moderationSheets, startPostReport, openCommentModeration } = useModeration(userId);
+  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+    userId,
+    onShare: (selected) => openShare(selected.shared_post ?? selected),
+    onReport: startPostReport,
+  });
   const { openImage, lightbox } = useImageLightbox();
 
   const { data: post, isLoading: postLoading } = useQuery({
@@ -133,6 +139,7 @@ export default function PostDetailScreen() {
       keyboardVerticalOffset={80}
     >
       <PostActionSheet {...actionSheetProps} />
+      {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
       {lightbox}
@@ -157,7 +164,7 @@ export default function PostDetailScreen() {
               currentEmoji: post.my_reaction,
             })
           }
-          onModerationPress={() => openPostModeration(post.id, post.author_id)}
+          onModerationPress={() => openViewerActions(post)}
         />
 
         <Text style={styles.section}>

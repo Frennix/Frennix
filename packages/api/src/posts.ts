@@ -404,11 +404,38 @@ export function extractPostsStoragePath(publicUrl: string): string | null {
   return null;
 }
 
+export type UpdatePostPatch = {
+  content?: string | null;
+  workout_type?: string | null;
+  media_urls?: string[];
+  thumbnail_url?: string | null;
+  post_type?: Post["post_type"];
+};
+
+export async function removePostsStorageFiles(urls: string[]) {
+  const paths = urls
+    .map(extractPostsStoragePath)
+    .filter((path): path is string => Boolean(path));
+
+  if (!paths.length) return;
+
+  const { error } = await getSupabase().storage.from("posts").remove(paths);
+  if (error) throw formatSupabaseError(error, "Failed to delete post media");
+}
+
 export async function updatePost(
   postId: string,
   userId: string,
-  patch: { content?: string | null; workout_type?: string | null }
+  patch: UpdatePostPatch,
+  options?: { removedMediaUrls?: string[]; removedThumbnailUrl?: string | null }
 ) {
+  const storageUrls = [...(options?.removedMediaUrls ?? [])];
+  if (options?.removedThumbnailUrl) storageUrls.push(options.removedThumbnailUrl);
+
+  if (storageUrls.length) {
+    await removePostsStorageFiles(storageUrls);
+  }
+
   const { data, error } = await getSupabase()
     .from("posts")
     .update(patch)

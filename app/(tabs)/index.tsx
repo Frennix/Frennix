@@ -13,6 +13,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
+import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { PostActionSheet } from "@/components/PostActionSheet";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { useFeedLike } from "@/lib/useFeedLike";
@@ -28,7 +29,12 @@ export default function HomeScreen() {
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
-  const { moderationSheets, openPostModeration } = useModeration(userId);
+  const { moderationSheets, startPostReport } = useModeration(userId);
+  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+    userId,
+    onShare: (post) => openShare(post.shared_post ?? post),
+    onReport: startPostReport,
+  });
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
   const { toggleLikePost } = useFeedLike(userId);
   const { openImage, lightbox } = useImageLightbox();
@@ -140,7 +146,7 @@ export default function HomeScreen() {
       });
     },
     onModerationPress: (post: Post) => {
-      openPostModeration(post.id, post.author_id);
+      openViewerActions(post);
     },
     onOwnerActionsPress: (post: Post) => {
       openPostActions(post);
@@ -200,6 +206,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <PostActionSheet {...actionSheetProps} />
+      {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
       {lightbox}

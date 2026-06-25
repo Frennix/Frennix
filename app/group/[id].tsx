@@ -7,6 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useModeration } from "@/lib/useModeration";
+import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { useSavePost } from "@/lib/useSavePost";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { PostActionSheet } from "@/components/PostActionSheet";
@@ -22,7 +23,12 @@ export default function GroupDetailScreen() {
   const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, openPostModeration } = useModeration(userId);
+  const { moderationSheets, startPostReport } = useModeration(userId);
+  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+    userId,
+    onShare: (post) => openShare(post.shared_post ?? post),
+    onReport: startPostReport,
+  });
 
   const { data: group, isLoading: groupLoading } = useQuery({
     queryKey: ["group", id],
@@ -92,6 +98,7 @@ export default function GroupDetailScreen() {
   return (
     <View style={styles.container}>
       <PostActionSheet {...actionSheetProps} />
+      {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
       <FlatList
@@ -142,7 +149,7 @@ export default function GroupDetailScreen() {
             onOwnerActionsPress={() => openPostActions(item)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onModerationPress={() => openPostModeration(item.id, item.author_id)}
+            onModerationPress={() => openViewerActions(item)}
           />
         )}
         ListEmptyComponent={

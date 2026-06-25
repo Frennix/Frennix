@@ -1,6 +1,6 @@
 # Frennix — Comprehensive Agent Handoff
 
-**Last updated:** June 20, 2026  
+**Last updated:** June 25, 2026  
 **Production web:** https://frennix.vercel.app  
 **Supabase project:** `wkrwncovmpsveatlrqel`  
 **Git remote:** https://github.com/Frennix/Frennix.git (root = `apps/mobile`)
@@ -9,10 +9,13 @@
 
 ## Executive summary
 
-Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, workout events, training-partner matching, and trainer discovery. Phases **4–14A** and **15 tooling** are implemented and deployed to web. **Phase 15 exit criteria** (real-user validation) are **not yet met** — no new major features until then. **Phase 14B** (Trainer Leads Dashboard) is blocked.
+Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, workout events, training-partner matching, and trainer discovery. Phases **4–14A** and **15 tooling** are implemented and deployed to web.
 
-Recent session work (deployed to production):
+**Current roadmap priority (June 2026):** Premium post management, media experience, and feed performance — core social functionality users expect before Phase 15 exit validation resumes.
 
+Recent session work:
+
+- **Post management (Priority 1)** — owner/non-owner three-dot menus, full edit (caption, workout type, media add/remove/replace/reorder), delete with storage cleanup, instant feed cache updates, copy-link support
 - **Logo clipping fix** — padded PNG + web-native `<img>` in `FrennixLogo.tsx`
 - **Feed photo lightbox** — pinch/pan zoom, full-screen viewer on feed + post detail
 - **Instagram-style feed media** — full-width, aspect-preserving photos/videos, large play button
@@ -42,7 +45,8 @@ Recent session work (deployed to production):
 18. [Known issues](#18-known-issues)
 19. [Technical debt](#19-technical-debt)
 20. [Recommended next priorities](#20-recommended-next-priorities)
-21. [Quick reference](#21-quick-reference)
+21. [Post management roadmap](#21-post-management-roadmap)
+22. [Quick reference](#22-quick-reference)
 
 ---
 
@@ -369,7 +373,23 @@ Feed is a **client-side graph query**, not a single server RPC. RLS on `posts` c
 
 ### Interactions
 
-Hooks: `useFeedLike`, `usePostReaction`, `useSavePost`, `useSharePost`.
+Hooks: `useFeedLike`, `usePostReaction`, `useSavePost`, `useSharePost`, `usePostOwnerActions`, `usePostViewerActions`.
+
+**Post management (Priority 1 — live):**
+
+| Surface | Owner menu | Non-owner menu |
+|---------|------------|----------------|
+| Three-dot (⋯) | Edit Post, Delete Post, Cancel | Share, Copy Link, Report, Cancel |
+
+| Action | Implementation |
+|--------|----------------|
+| Edit | `app/edit-post/[id].tsx` — caption, workout type, media add/remove/replace/reorder (up to 10 photos or 1 video) |
+| Delete | `usePostOwnerActions` → `deletePost()` — DB row + storage cleanup + optimistic cache removal |
+| Copy link | `lib/post-link.ts` → `{APP_URL}/post/{id}` |
+| Share (non-owner ⋯) | Opens in-app `SharePostSheet` (message/group/challenge) |
+| Report | `useModeration.startPostReport` → `ReportReasonSheet` |
+
+Cache helpers: `lib/post-cache.ts` — `removePostFromAllCaches`, `updatePostInAllCaches`, `invalidatePostQueries`.
 
 Perf tracking: `trackFeedLoad` → `perf_feed_load` in `product_events`.
 
@@ -634,16 +654,40 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 
 ## 20. Recommended next priorities
 
-1. **Complete Phase 15 validation** — recruit beta cohort, run RUT checklists, record perf baselines, triage feedback.
-2. **Human QA sign-off** — training partners on real iOS devices; document in `features/validation/SIGN-OFF-TEMPLATE.md`.
-3. **Fix messaging perf** — batch conversation metadata query or RPC before scaling users.
-4. **Elevate git root** — single repo for `apps/mobile`, `packages/*`, `supabase/`, root configs.
-5. **Product gate** — after Phase 15 exit, decide Phase 14B vs other roadmap items.
-6. **CI web builds** — stop relying solely on committed `dist/`; build in Vercel from source.
+1. **Priority 2 — Media experience** — pre-post crop/zoom/rotate polish, full-screen viewer enhancements, video thumbnail + playback UX.
+2. **Priority 3 — Feed performance** — lazy loading, image/thumbnail caching, infinite scroll optimization, eliminate unnecessary re-renders, instant cache updates on all interactions.
+3. **Priority 4 — Security verification** — confirm owner-only edit/delete, RLS policies, API guards.
+4. **Priority 5 — Error handling** — friendly messages, no stuck loading states.
+5. **Priority 6 — Testing** — full mobile + web QA checklist before marking complete.
+6. **Phase 15 validation** — resume beta cohort recruitment after post-management milestones ship.
+7. **Fix messaging perf** — batch conversation metadata query or RPC before scaling users.
+8. **CI web builds** — stop relying solely on committed `dist/`; build in Vercel from source.
 
 ---
 
-## 21. Quick reference
+## 21. Post management roadmap
+
+| Priority | Feature | Status |
+|----------|---------|--------|
+| 1 | Complete post management (menus, edit, delete, storage cleanup, cache updates) | **Done** |
+| 2 | Media experience (crop, zoom, full-screen, video playback) | Pending |
+| 3 | Feed performance (lazy load, caching, infinite scroll, instant updates) | Pending |
+| 4 | Security verification (RLS, owner-only guards) | Pending |
+| 5 | Error handling polish | Pending |
+| 6 | Full mobile + web QA | Pending |
+
+### Priority 1 deliverables (completed)
+
+- Owner ⋯ menu: Edit Post, Delete Post, Cancel (`PostActionSheet`)
+- Non-owner ⋯ menu: Share, Copy Link, Report, Cancel (`PostViewerActionSheet`)
+- Edit: caption, workout type, photos/videos with add/remove/replace/reorder
+- Delete: confirmation ("Delete Workout?"), DB + storage cleanup, instant feed removal
+- API: `updatePost` extended for media fields; `removePostsStorageFiles` helper
+- Cache: optimistic updates across feed, profile, group, challenge, event, saved-posts
+
+---
+
+## 22. Quick reference
 
 ### `packages/api/src/` modules
 
@@ -651,7 +695,7 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 |--------|--------|
 | `supabase`, `auth` | Client init, email/Apple auth |
 | `profiles`, `profile-utils` | CRUD, avatar/cover, search |
-| `posts`, `comments`, `reactions`, `saved-posts`, `share` | Feed |
+| `posts`, `comments`, `reactions`, `saved-posts`, `share` | Feed + post management |
 | `follows`, `suggestions`, `groups`, `challenges` | Social graph |
 | `messaging`, `presence` | DMs, typing, presence |
 | `notifications`, `notification-preferences`, `push-tokens` | Notifications |

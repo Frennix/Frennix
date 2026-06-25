@@ -64,7 +64,7 @@ export function PostCard({
           style={styles.menuButton}
           onPress={onModerationPress}
           hitSlop={8}
-          accessibilityLabel="Report or block"
+            accessibilityLabel="Post options"
         >
           <Text style={styles.menuIcon}>⋯</Text>
         </Pressable>
