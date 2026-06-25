@@ -10,3 +10,5 @@ expo-env.d.ts
 .vercel
 node_modules/
 screenshots/
+supabase/.temp/
+supabase/.branches/
