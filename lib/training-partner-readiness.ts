@@ -33,8 +33,18 @@ export const TRAINING_PARTNER_READINESS_COPY: Record<
 };
 
 export function getTrainingPartnerReadinessItems(
-  profile: Profile
+  profile: Profile | null | undefined
 ): TrainingPartnerReadinessItem[] {
+  if (!profile) {
+    return (Object.keys(TRAINING_PARTNER_READINESS_COPY) as TrainingPartnerReadinessKey[]).map(
+      (key) => ({
+        key,
+        ...TRAINING_PARTNER_READINESS_COPY[key],
+        complete: false,
+      })
+    );
+  }
+
   const checks: Record<TrainingPartnerReadinessKey, boolean> = {
     gender: Boolean(profile.gender),
     goals: coerceStringArray(profile.fitness_goals).length > 0,
@@ -51,11 +61,19 @@ export function getTrainingPartnerReadinessItems(
   );
 }
 
-export function isTrainingPartnerDiscoveryReady(profile: Profile): boolean {
+export function isTrainingPartnerDiscoveryReady(
+  profile: Profile | null | undefined
+): boolean {
   return getTrainingPartnerReadinessItems(profile).every((item) => item.complete);
 }
 
-export function getTrainingPartnerReadinessSummary(profile: Profile): string {
+export function getTrainingPartnerReadinessSummary(
+  profile: Profile | null | undefined
+): string {
+  if (!profile) {
+    return "Complete your training profile before turning on discovery.";
+  }
+
   const missing = getTrainingPartnerReadinessItems(profile)
     .filter((item) => !item.complete)
     .map((item) => item.label.toLowerCase());

@@ -46,7 +46,7 @@ export default function SignupScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <FrennixLogo variant="full" height={44} style={styles.logo} />
+      <FrennixLogo variant="full" height={56} style={styles.logo} />
       <Text style={styles.title}>Join Frennix</Text>
       <Text style={styles.subtitle}>Build your fitness community</Text>
 

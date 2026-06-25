@@ -1,6 +1,15 @@
 import { Link } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useState } from "react";
 import { redirectToLogin } from "@/lib/auth-navigation";
 import { useAuth } from "@/providers/AuthProvider";
@@ -67,10 +76,43 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
       <Text style={styles.section}>Account</Text>
       <Text style={styles.row}>{formatUsername(profile?.username)}</Text>
+
+      <Text style={styles.section}>Matching</Text>
+      <Pressable onPress={() => pushScreen("/matching")}>
+        <Text style={styles.link}>Find training partners</Text>
+        <Text style={styles.linkHint}>Browse athletes who share your goals and workout style</Text>
+      </Pressable>
+      <Pressable onPress={() => pushScreen("/matching/matches")}>
+        <Text style={styles.link}>Training matches</Text>
+        <Text style={styles.linkHint}>Open chat with athletes you connected with</Text>
+      </Pressable>
+      <Pressable onPress={() => pushScreen("/matching-settings")}>
+        <Text style={styles.link}>Training partner preferences</Text>
+        <Text style={styles.linkHint}>Discovery, private filters, and profile readiness</Text>
+      </Pressable>
+      <Pressable onPress={() => pushScreen("/trainers")}>
+        <Text style={styles.link}>Find a trainer</Text>
+        <Text style={styles.linkHint}>Browse verified coaches — separate from Training Partners</Text>
+      </Pressable>
+      <Pressable onPress={() => pushScreen("/trainers/connections")}>
+        <Text style={styles.link}>Trainer connections</Text>
+        <Text style={styles.linkHint}>Coaching requests and connected trainers</Text>
+      </Pressable>
+      {profile?.is_trainer ? (
+        <Pressable onPress={() => pushScreen("/trainer-profile/edit")}>
+          <Text style={styles.link}>Trainer profile</Text>
+          <Text style={styles.linkHint}>Bio, specialties, certifications, and portfolio</Text>
+        </Pressable>
+      ) : (
+        <Pressable onPress={() => pushScreen("/trainer-profile/setup")}>
+          <Text style={styles.link}>Become a trainer</Text>
+          <Text style={styles.linkHint}>Add a coaching profile alongside your athlete account</Text>
+        </Pressable>
+      )}
 
       <Text style={styles.section}>Invite</Text>
       <Link href="/invite-friends" asChild>
@@ -136,41 +178,6 @@ export default function SettingsScreen() {
         <Text style={styles.link}>Terms of Service</Text>
       </Pressable>
 
-      <Text style={styles.section}>Coaching</Text>
-      <Pressable onPress={() => pushScreen("/trainers")}>
-        <Text style={styles.link}>Find a trainer</Text>
-        <Text style={styles.linkHint}>Browse verified coaches — separate from Training Partners</Text>
-      </Pressable>
-      <Pressable onPress={() => pushScreen("/trainers/connections")}>
-        <Text style={styles.link}>Trainer connections</Text>
-        <Text style={styles.linkHint}>Coaching requests and connected trainers</Text>
-      </Pressable>
-      {profile?.is_trainer ? (
-        <Pressable onPress={() => pushScreen("/trainer-profile/edit")}>
-          <Text style={styles.link}>Trainer profile</Text>
-          <Text style={styles.linkHint}>Bio, specialties, certifications, and portfolio</Text>
-        </Pressable>
-      ) : (
-        <Pressable onPress={() => pushScreen("/trainer-profile/setup")}>
-          <Text style={styles.link}>Become a trainer</Text>
-          <Text style={styles.linkHint}>Add a coaching profile alongside your athlete account</Text>
-        </Pressable>
-      )}
-
-      <Text style={styles.section}>Training partners</Text>
-      <Pressable onPress={() => pushScreen("/matching-settings")}>
-        <Text style={styles.link}>Training partner preferences</Text>
-        <Text style={styles.linkHint}>Discovery, private filters, and profile readiness</Text>
-      </Pressable>
-      <Pressable onPress={() => pushScreen("/matching")}>
-        <Text style={styles.link}>Find training partners</Text>
-        <Text style={styles.linkHint}>Browse athletes who share your goals</Text>
-      </Pressable>
-      <Pressable onPress={() => pushScreen("/matching/matches")}>
-        <Text style={styles.link}>Training matches</Text>
-        <Text style={styles.linkHint}>Open chat with athletes you connected with</Text>
-      </Pressable>
-
       <Text style={styles.section}>Coming soon</Text>
       <Text style={styles.muted}>Marketplace · Premium · Live stream</Text>
 
@@ -182,17 +189,22 @@ export default function SettingsScreen() {
           loading={signingOut}
         />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: {
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl * 2,
+    flexGrow: 1,
+  },
   brandMark: { marginBottom: spacing.sm },
   section: { ...typography.heading, fontSize: 16, marginTop: spacing.lg, marginBottom: spacing.sm },
   row: { ...typography.body },
   link: { ...typography.body, color: colors.accent, paddingVertical: spacing.xs },
   linkHint: { ...typography.caption, color: colors.textMuted, marginTop: -2, marginBottom: spacing.xs },
   muted: { ...typography.bodySmall },
-  footer: { marginTop: "auto", paddingBottom: spacing.xl },
+  footer: { marginTop: spacing.xl },
 });

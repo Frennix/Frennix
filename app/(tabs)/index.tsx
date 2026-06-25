@@ -17,6 +17,7 @@ import { PostActionSheet } from "@/components/PostActionSheet";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { useFeedLike } from "@/lib/useFeedLike";
 import { trackFeedLoad } from "@/lib/product-analytics";
+import { useImageLightbox } from "@/lib/useImageLightbox";
 import { EmptyState, FeedPostCardSkeleton, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const { moderationSheets, openPostModeration } = useModeration(userId);
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
   const { toggleLikePost } = useFeedLike(userId);
+  const { openImage, lightbox } = useImageLightbox();
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
 
@@ -105,6 +107,7 @@ export default function HomeScreen() {
     onReaction: () => undefined,
     onModerationPress: () => undefined,
     onOwnerActionsPress: () => undefined,
+    onMediaPress: () => undefined,
   });
 
   feedActionsRef.current = {
@@ -142,6 +145,9 @@ export default function HomeScreen() {
     onOwnerActionsPress: (post: Post) => {
       openPostActions(post);
     },
+    onMediaPress: (_post: Post, uri: string) => {
+      openImage(uri);
+    },
   };
 
   const feedActions = useMemo<FeedListItemActions>(
@@ -156,6 +162,7 @@ export default function HomeScreen() {
       onReaction: (post, emoji) => feedActionsRef.current.onReaction(post, emoji),
       onModerationPress: (post) => feedActionsRef.current.onModerationPress(post),
       onOwnerActionsPress: (post) => feedActionsRef.current.onOwnerActionsPress(post),
+      onMediaPress: (post, uri) => feedActionsRef.current.onMediaPress(post, uri),
     }),
     []
   );
@@ -195,6 +202,7 @@ export default function HomeScreen() {
       <PostActionSheet {...actionSheetProps} />
       {shareSheet}
       {moderationSheets}
+      {lightbox}
       <FeedStoryViewer
         story={activeStory}
         visible={Boolean(activeStory)}

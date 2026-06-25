@@ -43,8 +43,8 @@ const TabsShell = memo(function TabsShell() {
   const messagesBadge =
     unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
 
-  const renderFeedHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={26} />, []);
-  const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={26} />, []);
+  const renderFeedHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
+  const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
   const renderProfileHeaderTitle = useCallback(() => <FrennixLogo variant="icon" height={24} />, []);
   const renderHeaderBell = useCallback(() => <HeaderBell />, []);
   const renderProfileHeader = useCallback(
@@ -68,6 +68,7 @@ const TabsShell = memo(function TabsShell() {
         tabBarItemStyle: { minWidth: 56 },
         lazy: true,
         freezeOnBlur: true,
+        headerTitleContainerStyle: { overflow: "visible" },
       }}
     >
       <Tabs.Screen

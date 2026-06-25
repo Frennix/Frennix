@@ -13,6 +13,7 @@ export type FeedListItemActions = {
   onReaction: (post: Post, emoji: string) => void;
   onModerationPress: (post: Post) => void;
   onOwnerActionsPress: (post: Post) => void;
+  onMediaPress: (post: Post, uri: string) => void;
 };
 
 type FeedListItemProps = {
@@ -58,6 +59,7 @@ export const FeedListItem = memo(function FeedListItem({
       onReaction: (emoji: string) => actions.onReaction(post, emoji),
       onModerationPress: () => actions.onModerationPress(post),
       onOwnerActionsPress: () => actions.onOwnerActionsPress(post),
+      onMediaPress: (uri: string) => actions.onMediaPress(post, uri),
     }),
     [actions, post]
   );
@@ -76,6 +78,7 @@ export const FeedListItem = memo(function FeedListItem({
       onReaction={handlers.onReaction}
       onModerationPress={handlers.onModerationPress}
       onOwnerActionsPress={handlers.onOwnerActionsPress}
+      onMediaPress={handlers.onMediaPress}
     />
   );
 }, feedItemPropsEqual);

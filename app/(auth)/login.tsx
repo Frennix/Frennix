@@ -90,7 +90,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <FrennixLogo variant="full" height={44} style={styles.logo} />
+      <FrennixLogo variant="full" height={56} style={styles.logo} />
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.subtitle}>Train together. Grow together.</Text>
 

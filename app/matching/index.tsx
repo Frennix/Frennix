@@ -46,7 +46,7 @@ function MatchingHeaderActions() {
 }
 
 export default function TrainingPartnerDiscoveryScreen() {
-  const { profile, session } = useAuth();
+  const { profile, session, loading: authLoading, refreshProfile } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
 
@@ -59,7 +59,7 @@ export default function TrainingPartnerDiscoveryScreen() {
   const [openingMessage, setOpeningMessage] = useState(false);
 
   const discoveryEnabled = profile?.matching_enabled ?? false;
-  const profileReady = isTrainingPartnerDiscoveryReady(profile);
+  const profileReady = profile ? isTrainingPartnerDiscoveryReady(profile) : false;
 
   const {
     data: candidates = [],
@@ -161,11 +161,23 @@ export default function TrainingPartnerDiscoveryScreen() {
     setMatchPartner(null);
   }
 
-  if (!profile) {
+  if (authLoading || !profile) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
+      <>
+        <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
+        <View style={styles.centered}>
+          {authLoading || session ? (
+            <ActivityIndicator color={colors.accent} size="large" />
+          ) : (
+            <EmptyState
+              title="Could not load your profile"
+              description="We could not load your training profile. Try again before browsing partners."
+              actionLabel="Try again"
+              onAction={() => void refreshProfile()}
+            />
+          )}
+        </View>
+      </>
     );
   }
 
@@ -174,7 +186,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <View style={styles.gated}>
-          <FrennixLogo variant="full" height={32} style={styles.logo} />
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
             title="Training partner discovery is off"
             description="Turn on discovery in your training partner preferences to browse athletes who share your goals and workout style."
@@ -191,7 +203,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <ScrollView contentContainerStyle={styles.gated}>
-          <FrennixLogo variant="full" height={32} style={styles.logo} />
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
             title="Complete your training profile"
             description="Add your goals, workout styles, city, and gender before browsing training partners."
@@ -221,7 +233,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <View style={styles.gated}>
-          <FrennixLogo variant="full" height={32} style={styles.logo} />
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
             title="Could not load partners"
             description={getErrorMessage(error)}
@@ -247,7 +259,7 @@ export default function TrainingPartnerDiscoveryScreen() {
             />
           }
         >
-          <FrennixLogo variant="full" height={32} style={styles.logo} />
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
             title="No training partners right now"
             description="Check back later as more athletes enable discovery, or update your training partner filters."
@@ -276,7 +288,7 @@ export default function TrainingPartnerDiscoveryScreen() {
 
       <View style={styles.screen}>
         <View style={styles.header}>
-          <FrennixLogo variant="full" height={26} />
+          <FrennixLogo variant="full" height={34} />
           <Text style={styles.headerHint}>
             {remainingCount > 0
               ? `${remainingCount + 1} athletes in your deck`

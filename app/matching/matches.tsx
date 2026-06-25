@@ -163,7 +163,7 @@ export default function TrainingMatchesScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <DiscoveryHeaderButton /> }} />
         <View style={styles.centered}>
-          <FrennixLogo variant="full" height={28} style={styles.logo} />
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
           <ActivityIndicator color={colors.accent} size="large" />
           <Text style={styles.loadingText}>Loading training matches…</Text>
         </View>
@@ -176,7 +176,7 @@ export default function TrainingMatchesScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <DiscoveryHeaderButton /> }} />
         <View style={styles.emptyWrap}>
-          <FrennixLogo variant="full" height={28} style={styles.logo} />
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
             title="Could not load training matches"
             description={
@@ -196,7 +196,7 @@ export default function TrainingMatchesScreen() {
 
       <View style={styles.container}>
         <View style={styles.brandHeader}>
-          <FrennixLogo variant="full" height={26} />
+          <FrennixLogo variant="full" height={34} />
           {totalUnread > 0 ? (
             <Text style={styles.unreadSummary}>
               {totalUnread} unread message{totalUnread === 1 ? "" : "s"}

@@ -108,18 +108,34 @@ export default function DiscoverScreen() {
     <View style={styles.container}>
       <Text style={styles.header}>Find your training community</Text>
 
-      <Pressable style={styles.trainerCard} onPress={() => pushScreen("/trainers")}>
-        <View style={styles.trainerCardIcon}>
-          <Ionicons name="fitness-outline" size={24} color={colors.accent} />
-        </View>
-        <View style={styles.trainerCardCopy}>
-          <Text style={styles.trainerCardTitle}>Find a trainer</Text>
-          <Text style={styles.trainerCardBody}>
-            Connect with professional coaches for online or in-person training — separate from Training Partners.
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-      </Pressable>
+      <Text style={styles.matchingSectionTitle}>Matching</Text>
+      <View style={styles.matchingCards}>
+        <Pressable style={styles.matchingCard} onPress={() => pushScreen("/matching")}>
+          <View style={styles.matchingCardIcon}>
+            <Ionicons name="people-outline" size={24} color={colors.accent} />
+          </View>
+          <View style={styles.matchingCardCopy}>
+            <Text style={styles.matchingCardTitle}>Find training partners</Text>
+            <Text style={styles.matchingCardBody}>
+              Browse athletes who share your goals and workout style — connect to train together.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable style={styles.matchingCard} onPress={() => pushScreen("/trainers")}>
+          <View style={styles.matchingCardIcon}>
+            <Ionicons name="fitness-outline" size={24} color={colors.accent} />
+          </View>
+          <View style={styles.matchingCardCopy}>
+            <Text style={styles.matchingCardTitle}>Find a trainer</Text>
+            <Text style={styles.matchingCardBody}>
+              Connect with professional coaches for online or in-person training.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
+      </View>
 
       {tab === "people" ? (
         <View style={styles.searchBlock}>
@@ -267,7 +283,16 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
   header: { ...typography.heading, marginBottom: spacing.sm },
-  trainerCard: {
+  matchingSectionTitle: {
+    ...typography.bodySmall,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: spacing.sm,
+  },
+  matchingCards: { gap: spacing.sm, marginBottom: spacing.md },
+  matchingCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
@@ -276,9 +301,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    marginBottom: spacing.md,
   },
-  trainerCardIcon: {
+  matchingCardIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
@@ -286,9 +310,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  trainerCardCopy: { flex: 1, gap: 4 },
-  trainerCardTitle: { ...typography.body, fontWeight: "700" },
-  trainerCardBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
+  matchingCardCopy: { flex: 1, gap: 4 },
+  matchingCardTitle: { ...typography.body, fontWeight: "700" },
+  matchingCardBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   searchBlock: { gap: spacing.xs, marginBottom: spacing.xs },
   searchHint: { ...typography.caption, color: colors.textMuted },
   tabRow: { flexDirection: "row", gap: spacing.sm, marginVertical: spacing.md },

@@ -20,6 +20,7 @@ import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
 import { useState } from "react";
 import { confirmDeleteComment } from "@/lib/alerts";
+import { useImageLightbox } from "@/lib/useImageLightbox";
 import {
   PostCard,
   Input,
@@ -47,6 +48,7 @@ export default function PostDetailScreen() {
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
   const { moderationSheets, openPostModeration, openCommentModeration } = useModeration(userId);
+  const { openImage, lightbox } = useImageLightbox();
 
   const { data: post, isLoading: postLoading } = useQuery({
     queryKey: ["post", id, userId],
@@ -133,11 +135,13 @@ export default function PostDetailScreen() {
       <PostActionSheet {...actionSheetProps} />
       {shareSheet}
       {moderationSheets}
+      {lightbox}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <PostCard
           post={post}
           isOwn={post.author_id === userId}
           onOwnerActionsPress={() => openPostActions(post)}
+          onMediaPress={openImage}
           onPress={() => {
             const targetId = getSharedPostTargetId(post);
             if (targetId !== post.id) router.push(`/post/${targetId}`);

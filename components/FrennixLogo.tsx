@@ -1,4 +1,14 @@
-import { Image, StyleSheet, type ImageStyle, type StyleProp } from "react-native";
+import resolveAssetSource from "expo-asset/build/resolveAssetSource";
+import { createElement } from "react";
+import {
+  Image,
+  Platform,
+  StyleSheet,
+  View,
+  type ImageStyle,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 /**
  * Official Frennix logo — always loads from `assets/brand/frennix-logo.png` (master)
@@ -17,7 +27,7 @@ const SOURCES: Record<FrennixLogoVariant, number> = {
 
 /** Width / height for each variant (from official master exports). */
 const ASPECT_RATIO: Record<FrennixLogoVariant, number> = {
-  full: 688 / 508,
+  full: 688 / 597,
   icon: 1,
   mark: 698 / 623,
 };
@@ -28,12 +38,34 @@ const DEFAULT_HEIGHT: Record<FrennixLogoVariant, number> = {
   mark: 48,
 };
 
+/** Keep wordmark text legible — the full export stacks icon + text vertically. */
+const MIN_HEIGHT: Record<FrennixLogoVariant, number> = {
+  full: 32,
+  icon: 20,
+  mark: 40,
+};
+
+/** Extra layout space so mobile web does not clip the wordmark baseline. */
+const WORDMARK_BOTTOM_PAD: Record<FrennixLogoVariant, number> = {
+  full: 8,
+  icon: 0,
+  mark: 4,
+};
+
 type FrennixLogoProps = {
   variant?: FrennixLogoVariant;
   height?: number;
-  style?: StyleProp<ImageStyle>;
+  style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 };
+
+function getAspectRatio(variant: FrennixLogoVariant): number {
+  const asset = resolveAssetSource(SOURCES[variant]);
+  if (asset?.width && asset?.height) {
+    return asset.width / asset.height;
+  }
+  return ASPECT_RATIO[variant];
+}
 
 export function FrennixLogo({
   variant = "full",
@@ -41,18 +73,59 @@ export function FrennixLogo({
   style,
   accessibilityLabel = "Frennix",
 }: FrennixLogoProps) {
-  const width = height * ASPECT_RATIO[variant];
+  const resolvedHeight = Math.max(height, MIN_HEIGHT[variant]);
+  const aspectRatio = getAspectRatio(variant);
+  const width = resolvedHeight * aspectRatio;
+  const bottomPad = WORDMARK_BOTTOM_PAD[variant];
+  const imageStyle: ImageStyle = {
+    height: resolvedHeight,
+    width,
+    minHeight: resolvedHeight,
+  };
+
+  const wrapperStyle: ViewStyle = {
+    overflow: "visible",
+    paddingBottom: bottomPad,
+    alignSelf: "center",
+  };
+
+  if (Platform.OS === "web") {
+    const asset = resolveAssetSource(SOURCES[variant]);
+    const uri = asset?.uri;
+    if (uri) {
+      return (
+        <View style={[wrapperStyle, style]}>
+          {createElement("img", {
+            src: uri,
+            alt: accessibilityLabel,
+            style: {
+              display: "block",
+              height: resolvedHeight,
+              width,
+              minHeight: resolvedHeight,
+              objectFit: "contain",
+              overflow: "visible",
+            },
+          })}
+        </View>
+      );
+    }
+  }
 
   return (
-    <Image
-      source={SOURCES[variant]}
-      style={[styles.image, { height, width }, style]}
-      resizeMode="contain"
-      accessibilityLabel={accessibilityLabel}
-    />
+    <View style={[wrapperStyle, style]}>
+      <Image
+        source={SOURCES[variant]}
+        style={[styles.image, imageStyle]}
+        resizeMode="contain"
+        accessibilityLabel={accessibilityLabel}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  image: {},
+  image: {
+    flexShrink: 0,
+  },
 });

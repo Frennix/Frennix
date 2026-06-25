@@ -25,7 +25,7 @@ export function FeedHeader({
     <View style={styles.container}>
       <View style={styles.topRow}>
         <View style={styles.titleBlock}>
-          <FrennixLogo variant="full" height={30} />
+          <FrennixLogo variant="full" height={34} />
           <Text style={styles.subtitle}>Workouts, progress, and wins from your network</Text>
         </View>
         <Pressable

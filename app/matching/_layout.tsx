@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { MatchingRouteErrorBoundary } from "@/components/MatchingRouteErrorBoundary";
 import { StackBackButton } from "@/components/StackBackButton";
 import { colors } from "@frennix/ui";
 
@@ -15,6 +16,7 @@ function backScreen(title: string) {
 
 export default function MatchingLayout() {
   return (
+    <MatchingRouteErrorBoundary>
     <Stack
       screenOptions={{
         contentStyle: { backgroundColor: colors.background },
@@ -25,5 +27,6 @@ export default function MatchingLayout() {
       <Stack.Screen name="index" options={backScreen("Training partners")} />
       <Stack.Screen name="matches" options={backScreen("Training matches")} />
     </Stack>
+    </MatchingRouteErrorBoundary>
   );
 }

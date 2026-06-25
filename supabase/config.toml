@@ -1,0 +1,27 @@
+# Frennix Supabase local config
+# See https://supabase.com/docs/guides/cli/config
+
+project_id = "frennix"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "frennix://"
+additional_redirect_urls = ["frennix://**", "exp://**"]
+
+[auth.email]
+enable_signup = true
+
+[storage]
+enabled = true
