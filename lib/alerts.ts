@@ -8,6 +8,23 @@ export function showAlert(title: string, message: string) {
   Alert.alert(title, message);
 }
 
+export function confirmDeleteChallenge(onConfirm: () => void) {
+  const title = "Delete Challenge?";
+  const message = "This action cannot be undone.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 export function confirmDeletePost(onConfirm: () => void) {
   const title = "Delete Workout?";
   const message = "This action cannot be undone.";

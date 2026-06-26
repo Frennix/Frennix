@@ -15,6 +15,7 @@ Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, wo
 
 Recent session work:
 
+- **Challenge management** — creator ⋯ menu (Edit/Delete), edit screen (title, description, rules, dates, cover), hard delete with participant CASCADE, RLS update/delete policies
 - **Post management (Priority 1)** — owner/non-owner three-dot menus, full edit (caption, workout type, media add/remove/replace/reorder), delete with storage cleanup, instant feed cache updates, copy-link support
 - **Logo clipping fix** — padded PNG + web-native `<img>` in `FrennixLogo.tsx`
 - **Feed photo lightbox** — pinch/pan zoom, full-screen viewer on feed + post detail
@@ -214,7 +215,7 @@ Migrations live in `supabase/migrations/` (41 files, May–Jun 2025 timestamps).
 |-------|---------|
 | `groups` | name, sport_tags[], cover, owner, is_public |
 | `group_members` | role: owner/admin/member |
-| `challenges` | time-bound challenges, optional group |
+| `challenges` | time-bound challenges, optional group; fields: title, description, **rules**, **cover_image_url**, start/end dates, created_by |
 | `challenge_participants` | status: active/completed/left |
 
 ### Messaging
@@ -686,6 +687,20 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 - API: `updatePost` extended for media fields; `removePostsStorageFiles` helper
 - Cache: optimistic updates across feed, profile, group, challenge, event, saved-posts
 - `.gitignore` updated to exclude `.pnpm-store/` and other local caches from version control
+
+### Challenge management (QA fix — live)
+
+- Creator ⋯ on `/challenge/[id]`: Edit Challenge, Delete Challenge, Cancel (`ChallengeActionSheet`)
+- Edit: title, description, rules, start/end dates, cover image (`app/edit-challenge/[id].tsx`)
+- Delete: "Delete Challenge?" confirmation, DB hard delete, participant rows CASCADE, posts keep `challenge_id` SET NULL, cover removed from storage
+- RLS: `"Update own challenges"`, `"Delete own challenges"` — migration `20250630000001_challenge_management.sql`
+- Non-creators: no ⋯ menu on challenge detail
+
+**Apply migration:** `supabase db push` from repo root.
+
+### Priority 1 QA checklist (in progress)
+
+See agent session notes — test post create/edit/delete, menus, permissions, feed updates, storage cleanup on **web + mobile** before Priority 2.
 
 ---
 

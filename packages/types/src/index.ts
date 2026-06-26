@@ -254,6 +254,8 @@ export interface Challenge {
   id: string;
   title: string;
   description: string | null;
+  rules: string | null;
+  cover_image_url: string | null;
   start_date: string;
   end_date: string;
   created_by: string;

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
   getChallenge,
   getChallengePosts,
@@ -10,14 +10,16 @@ import {
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { useChallengeOwnerActions } from "@/lib/useChallengeOwnerActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { useModeration } from "@/lib/useModeration";
 import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { PostActionSheet } from "@/components/PostActionSheet";
+import { ChallengeActionSheet } from "@/components/ChallengeActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
-import { Button, EmptyState, PostCard, getSharedPostTargetId, colors, spacing, typography } from "@frennix/ui";
+import { Button, EmptyState, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
 
 export default function ChallengeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +36,12 @@ export default function ChallengeDetailScreen() {
     onShare: (post) => openShare(post.shared_post ?? post),
     onReport: startPostReport,
   });
+  const { openChallengeActions, actionSheetProps: challengeActionSheetProps } =
+    useChallengeOwnerActions({
+      userId,
+      challengeId: id ?? "",
+      onDeleted: () => router.replace("/(tabs)/discover"),
+    });
 
   const { data: challenge, isLoading: challengeLoading } = useQuery({
     queryKey: ["challenge", id],
@@ -86,9 +94,12 @@ export default function ChallengeDetailScreen() {
     );
   }
 
+  const isCreator = challenge.created_by === userId;
+
   return (
     <View style={styles.container}>
       <PostActionSheet {...actionSheetProps} />
+      <ChallengeActionSheet {...challengeActionSheetProps} />
       {viewerActionSheet}
       {shareSheet}
       {moderationSheets}
@@ -101,8 +112,35 @@ export default function ChallengeDetailScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>{challenge.title}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{challenge.title}</Text>
+              {isCreator ? (
+                <Pressable
+                  style={styles.menuButton}
+                  onPress={openChallengeActions}
+                  hitSlop={8}
+                  accessibilityLabel="Challenge options"
+                >
+                  <Text style={styles.menuIcon}>⋯</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {challenge.cover_image_url ? (
+              <Image
+                source={{ uri: challenge.cover_image_url }}
+                style={styles.cover}
+                resizeMode="cover"
+              />
+            ) : null}
+
             {challenge.description ? <Text style={styles.desc}>{challenge.description}</Text> : null}
+            {challenge.rules ? (
+              <View style={styles.rulesBlock}>
+                <Text style={styles.rulesLabel}>Rules</Text>
+                <Text style={styles.rulesText}>{challenge.rules}</Text>
+              </View>
+            ) : null}
             <Text style={styles.dates}>
               {new Date(challenge.start_date).toLocaleDateString()} –{" "}
               {new Date(challenge.end_date).toLocaleDateString()}
@@ -167,8 +205,34 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.md, flexGrow: 1 },
   header: { gap: spacing.sm, marginBottom: spacing.sm },
-  title: { ...typography.title },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  title: { ...typography.title, flex: 1 },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
+  cover: {
+    width: "100%",
+    height: 180,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceElevated,
+  },
   desc: { ...typography.body, lineHeight: 24 },
+  rulesBlock: { gap: spacing.xs },
+  rulesLabel: { ...typography.bodySmall, fontWeight: "600", color: colors.textSecondary },
+  rulesText: { ...typography.body, lineHeight: 22 },
   dates: { color: colors.accent, fontWeight: "600" },
   participants: { ...typography.caption },
   joined: { ...typography.body, color: colors.accent },

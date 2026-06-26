@@ -11,6 +11,7 @@ export default function CreateChallengeScreen() {
   const { session } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [rules, setRules] = useState("");
   const [days, setDays] = useState("7");
   const [error, setError] = useState("");
   const { isLocked, isSubmitting, isSuccess, submitWithSuccess } = useSuccessSubmit();
@@ -33,6 +34,7 @@ export default function CreateChallengeScreen() {
           createChallenge({
             title: title.trim(),
             description: description.trim(),
+            rules: rules.trim() || null,
             start_date: start.toISOString(),
             end_date: end.toISOString(),
             created_by: session.user.id,
@@ -59,6 +61,14 @@ export default function CreateChallengeScreen() {
         onChangeText={setDescription}
         multiline
         editable={!isLocked}
+      />
+      <Input
+        label="Rules (optional)"
+        value={rules}
+        onChangeText={setRules}
+        multiline
+        editable={!isLocked}
+        placeholder="How scoring, check-ins, or participation works…"
       />
       <Input
         label="Duration (days)"

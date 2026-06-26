@@ -124,6 +124,10 @@ export default function RootLayout() {
               options={backScreen("Create challenge", { presentation: "modal" })}
             />
             <Stack.Screen
+              name="edit-challenge/[id]"
+              options={backScreen("Edit challenge", { presentation: "modal" })}
+            />
+            <Stack.Screen
               name="edit-profile"
               options={backScreen("Edit profile", { presentation: "modal" })}
             />
