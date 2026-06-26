@@ -40,18 +40,24 @@ export default function ProfileTabScreen() {
     queryKey: ["profile-stats", userId],
     queryFn: () => getProfileStats(userId),
     enabled: !!userId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: followingIds = [], refetch: refetchFollowingIds } = useQuery({
     queryKey: ["following-ids", userId],
     queryFn: () => getFollowingIds(userId),
     enabled: !!userId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: postsPage, refetch: refetchPosts } = useQuery({
     queryKey: ["user-posts", userId, userId],
     queryFn: () => getPostsByUser(userId, userId),
     enabled: !!userId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const refreshProfile = useCallback(async () => {

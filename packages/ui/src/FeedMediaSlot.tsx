@@ -14,6 +14,8 @@ interface FeedMediaSlotProps {
   thumbnailUrl?: string | null;
   style?: ViewStyle;
   onMediaPress?: (uri: string) => void;
+  /** When false, show a skeleton until the row is near the viewport. Once active, stays mounted. */
+  visible?: boolean;
 }
 
 function FeedMediaSkeleton({ style }: { style?: ViewStyle }) {
@@ -31,12 +33,17 @@ export function FeedMediaSlot({
   thumbnailUrl,
   style,
   onMediaPress,
+  visible = true,
 }: FeedMediaSlotProps) {
   const containerRef = useRef<View>(null);
-  const [active, setActive] = useState(Platform.OS !== "web");
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || active || typeof document === "undefined") return;
+    if (visible) setActive(true);
+  }, [visible]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || active || !visible || typeof document === "undefined") return;
 
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node || typeof IntersectionObserver === "undefined") {
@@ -56,7 +63,7 @@ export function FeedMediaSlot({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [active, mediaUrls]);
+  }, [active, mediaUrls, visible]);
 
   if (!active) {
     return (

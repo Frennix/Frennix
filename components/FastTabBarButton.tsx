@@ -1,6 +1,7 @@
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { router, type Href } from "expo-router";
+import { trackTabSwitch } from "@/lib/product-analytics";
 import { scrollTabToTop, type TabScrollKey } from "@/lib/tab-scroll-registry";
 import { switchTab } from "@/lib/press-utils";
 
@@ -45,7 +46,11 @@ export function FastTabBarButton({
           return;
         }
 
+        const started = performance.now();
         switchTab(href);
+        requestAnimationFrame(() => {
+          trackTabSwitch(tabKey, performance.now() - started);
+        });
       }}
     />
   );

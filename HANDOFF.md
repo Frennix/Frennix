@@ -406,7 +406,19 @@ Hooks: `useFeedLike`, `usePostReaction`, `useSavePost`, `useSharePost`, `usePost
 
 Cache helpers: `lib/post-cache.ts` — `removePostFromAllCaches`, `updatePostInAllCaches`, `invalidatePostQueries`.
 
-Perf tracking: `trackFeedLoad` → `perf_feed_load` in `product_events`.
+Perf tracking: `trackFeedLoad` → `perf_feed_load`, `trackTabSwitch` → `perf_tab_switch`, `trackScreenLoad` → `perf_screen_load` in `product_events`.
+
+### Feed performance (June 2026)
+
+**Top bottlenecks addressed:**
+
+1. **Full-list re-renders** — removed `extraData={dataUpdatedAt}` from Feed `FlatList`; `FeedListItem` memo + immutable cache patches handle per-post updates.
+2. **Cold tab switches** — `lazy: false` + `freezeOnBlur: true` keeps tabs mounted; `TabPrefetchCoordinator` warms Discover/Events/Messages/Profile caches after Feed settles.
+3. **Eager media mounts** — `FeedMediaSlot` defers images/videos until row is viewable (native via FlatList viewability + web IntersectionObserver); once loaded, stays mounted.
+
+**Also:** tuned FlatList window (`initialNumToRender: 5`, `windowSize: 7`), memoized `FeedHeader`, query `staleTime`/`placeholderData` on tab screens, Messages poll interval 60s.
+
+**Files:** `lib/tab-prefetch.ts`, `components/TabPrefetchCoordinator.tsx`, `components/FeedListItem.tsx`, `packages/ui/src/FeedMediaSlot.tsx`.
 
 ### Recent feed media behavior
 
@@ -685,7 +697,7 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 ## 20. Recommended next priorities
 
 1. **Priority 2 — Media experience** — pre-post crop/zoom/rotate polish, full-screen viewer enhancements, video thumbnail + playback UX.
-2. **Priority 3 — Feed performance** — lazy loading, image/thumbnail caching, infinite scroll optimization, eliminate unnecessary re-renders, instant cache updates on all interactions.
+2. **Priority 3 — Feed performance** — lazy media, tab prefetch, list memoization, cache-first tab data (June 2026 pass).
 3. **Priority 4 — Security verification** — confirm owner-only edit/delete, RLS policies, API guards.
 4. **Priority 5 — Error handling** — friendly messages, no stuck loading states.
 5. **Priority 6 — Testing** — full mobile + web QA checklist before marking complete.
@@ -701,7 +713,7 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 |----------|---------|--------|
 | 1 | Complete post management (menus, edit, delete, storage cleanup, cache updates) | **Done** |
 | 2 | Media experience (crop, zoom, full-screen, video playback) | Pending |
-| 3 | Feed performance (lazy load, caching, infinite scroll, instant updates) | Pending |
+| 3 | Feed performance (lazy load, caching, infinite scroll, instant updates) | **Done** (June 2026 perf pass) |
 | 4 | Security verification (RLS, owner-only guards) | Pending |
 | 5 | Error handling polish | Pending |
 | 6 | Full mobile + web QA | Pending |

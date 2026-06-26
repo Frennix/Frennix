@@ -75,8 +75,9 @@ export default function MessagesScreen() {
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(userId),
     enabled: !!userId && isListActive,
-    staleTime: 30_000,
-    refetchInterval: isListActive ? 30_000 : false,
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
+    refetchInterval: isListActive ? 60_000 : false,
     refetchIntervalInBackground: false,
   });
 

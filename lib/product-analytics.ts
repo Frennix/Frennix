@@ -31,6 +31,26 @@ export function trackFeedLoad(durationMs: number, postCount: number): void {
   });
 }
 
+export function trackTabSwitch(tab: string, durationMs: number): void {
+  trackAnalyticsEvent("perf_tab_switch", {
+    tab,
+    duration_ms: Math.round(durationMs),
+  });
+}
+
+export function trackImageLoad(uri: string, durationMs: number): void {
+  trackAnalyticsEvent("perf_image_load", {
+    duration_ms: Math.round(durationMs),
+    uri_host: (() => {
+      try {
+        return new URL(uri).host;
+      } catch {
+        return "unknown";
+      }
+    })(),
+  });
+}
+
 export function trackMessagingLoad(durationMs: number, conversationId: string, messageCount: number): void {
   trackAnalyticsEvent("perf_messaging_load", {
     duration_ms: Math.round(durationMs),

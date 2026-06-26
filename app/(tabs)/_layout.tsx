@@ -5,6 +5,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { FastTabBarButton } from "@/components/FastTabBarButton";
+import { TabPrefetchCoordinator } from "@/components/TabPrefetchCoordinator";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
@@ -57,7 +58,9 @@ const TabsShell = memo(function TabsShell() {
   );
 
   return (
-    <Tabs
+    <>
+      <TabPrefetchCoordinator />
+      <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
@@ -66,7 +69,7 @@ const TabsShell = memo(function TabsShell() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarItemStyle: { minWidth: 56 },
-        lazy: true,
+        lazy: false,
         freezeOnBlur: true,
         headerTitleContainerStyle: { overflow: "visible" },
       }}
@@ -145,6 +148,7 @@ const TabsShell = memo(function TabsShell() {
         }}
       />
     </Tabs>
+    </>
   );
 });
 

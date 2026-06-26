@@ -54,6 +54,8 @@ export default function DiscoverScreen() {
     queryKey: ["discover-people", debouncedPeopleSearch],
     queryFn: () => searchProfiles(debouncedPeopleSearch, 30, userId),
     enabled: tab === "people" && isSearchingPeople,
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const {
@@ -65,18 +67,24 @@ export default function DiscoverScreen() {
     queryKey: ["discover-suggestions", userId],
     queryFn: () => getSuggestedAthletes(userId, 20),
     enabled: tab === "people" && !isSearchingPeople && !!userId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: groups = [], refetch: refetchGroups, isRefetching: groupsRefetching } = useQuery({
     queryKey: ["discover-groups", groupQuery],
     queryFn: () => getGroups({ query: groupQuery || undefined }),
     enabled: tab === "groups",
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: challenges = [], refetch: refetchChallenges, isRefetching: challengesRefetching } = useQuery({
     queryKey: ["discover-challenges"],
     queryFn: getChallenges,
     enabled: tab === "challenges",
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   const tabs: { key: Tab; label: string }[] = [

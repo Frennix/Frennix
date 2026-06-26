@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, Platform, RefreshControl, StyleSheet, View, type ViewToken } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes } from "@frennix/api";
 import type { FeedStory, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -38,10 +38,29 @@ export default function HomeScreen() {
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
   const listRef = useRef<FlatList<Post>>(null);
+  const [visiblePostIds, setVisiblePostIds] = useState<Set<string>>(() => new Set());
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 15,
+    minimumViewTime: 100,
+  }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken<Post>[] }) => {
+      const next = new Set(
+        viewableItems
+          .filter((entry) => entry.isViewable && entry.item?.id)
+          .map((entry) => entry.item.id)
+      );
+      setVisiblePostIds((prev) => {
+        if (prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
+        return next;
+      });
+    }
+  ).current;
 
   const {
     data,
-    dataUpdatedAt,
     isLoading,
     isSuccess: isFeedReady,
     refetch,
@@ -189,9 +208,14 @@ export default function HomeScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: Post }) => (
-      <FeedListItem post={item} userId={userId} actions={feedActions} />
+      <FeedListItem
+        post={item}
+        userId={userId}
+        actions={feedActions}
+        mediaActive={visiblePostIds.has(item.id)}
+      />
     ),
-    [feedActions, userId]
+    [feedActions, userId, visiblePostIds]
   );
 
   const listHeader = useMemo(
@@ -242,14 +266,15 @@ export default function HomeScreen() {
       <FlatList
         ref={listRef}
         data={posts}
-        extraData={dataUpdatedAt}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        initialNumToRender={8}
-        maxToRenderPerBatch={6}
-        windowSize={11}
-        updateCellsBatchingPeriod={32}
+        initialNumToRender={5}
+        maxToRenderPerBatch={4}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
         removeClippedSubviews={Platform.OS !== "web"}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         onScroll={onScroll}
         onScrollEndDrag={onScrollEnd}
         onMomentumScrollEnd={onScrollEnd}

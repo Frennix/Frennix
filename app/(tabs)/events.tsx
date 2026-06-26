@@ -29,6 +29,8 @@ export default function EventsTabScreen() {
     queryKey: ["workout-events", userId],
     queryFn: () => getWorkoutEvents(userId),
     enabled: !!userId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
   });
 
   useTabScrollRegistration(

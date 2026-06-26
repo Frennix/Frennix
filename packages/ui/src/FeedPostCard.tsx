@@ -29,6 +29,8 @@ interface FeedPostCardProps {
   isOwn?: boolean;
   onOwnerActionsPress?: () => void;
   onMediaPress?: (uri: string) => void;
+  /** Defer heavy media until the row is near the viewport. */
+  mediaActive?: boolean;
 }
 
 export const FeedPostCard = memo(function FeedPostCard({
@@ -45,6 +47,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   isOwn,
   onOwnerActionsPress,
   onMediaPress,
+  mediaActive = true,
 }: FeedPostCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const author = post.author;
@@ -101,6 +104,7 @@ export const FeedPostCard = memo(function FeedPostCard({
           thumbnailUrl={displayPost.thumbnail_url}
           style={styles.media}
           onMediaPress={onMediaPress}
+          visible={mediaActive}
         />
       ) : !showCaption && post.content ? (
         <Pressable

@@ -20,10 +20,13 @@ type FeedListItemProps = {
   post: Post;
   userId: string;
   actions: FeedListItemActions;
+  /** When true, mount feed media (images/videos). Deferred until row is near viewport. */
+  mediaActive?: boolean;
 };
 
 function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
   if (prev.userId !== next.userId) return false;
+  if (prev.mediaActive !== next.mediaActive) return false;
   if (prev.post.id !== next.post.id) return false;
 
   const a = prev.post;
@@ -37,8 +40,8 @@ function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
     a.my_reaction === b.my_reaction &&
     a.content === b.content &&
     a.updated_at === b.updated_at &&
-    JSON.stringify(a.reactions) === JSON.stringify(b.reactions) &&
-    JSON.stringify(a.preview_comments) === JSON.stringify(b.preview_comments)
+    a.reactions === b.reactions &&
+    a.preview_comments === b.preview_comments
   );
 }
 
@@ -46,6 +49,7 @@ export const FeedListItem = memo(function FeedListItem({
   post,
   userId,
   actions,
+  mediaActive = true,
 }: FeedListItemProps) {
   const handlers = useMemo(
     () => ({
@@ -79,6 +83,7 @@ export const FeedListItem = memo(function FeedListItem({
       onModerationPress={handlers.onModerationPress}
       onOwnerActionsPress={handlers.onOwnerActionsPress}
       onMediaPress={handlers.onMediaPress}
+      mediaActive={mediaActive}
     />
   );
 }, feedItemPropsEqual);

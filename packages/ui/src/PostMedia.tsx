@@ -62,7 +62,7 @@ function VideoPlayer({
       src: uri,
       controls: true,
       playsInline: true,
-      preload: "metadata",
+      preload: layout === "feed" ? "none" : "metadata",
       poster: posterUri ?? undefined,
       style: {
         width: "100%",

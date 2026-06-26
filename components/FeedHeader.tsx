@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
@@ -13,7 +14,7 @@ interface FeedHeaderProps {
   onFollowPress?: (profileId: string, isFollowing: boolean) => void;
 }
 
-export function FeedHeader({
+export const FeedHeader = memo(function FeedHeader({
   stories = [],
   suggestions = [],
   followingIds = [],
@@ -65,7 +66,7 @@ export function FeedHeader({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
