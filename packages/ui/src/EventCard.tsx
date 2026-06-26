@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import type { WorkoutEvent } from "@frennix/types";
+import { ScalePressable } from "./ScalePressable";
 import { formatWorkoutTypeLabel, workoutTypeEmoji } from "./formatRelativeTime";
 import { colors, radius, spacing, typography } from "./theme";
 
@@ -27,7 +28,7 @@ export function EventCard({ event, onPress }: EventCardProps) {
     event.max_attendees != null ? `${attendeeCount}/${event.max_attendees}` : `${attendeeCount}`;
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <ScalePressable style={styles.card} onPress={onPress} disabled={!onPress}>
       <View style={styles.header}>
         <Text style={styles.emoji}>{emoji}</Text>
         <View style={styles.headerText}>
@@ -56,7 +57,7 @@ export function EventCard({ event, onPress }: EventCardProps) {
         </Text>
         {event.is_full ? <Text style={styles.full}>Full</Text> : null}
       </View>
-    </Pressable>
+    </ScalePressable>
   );
 }
 

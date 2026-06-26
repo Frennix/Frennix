@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
+import { CachedImage } from "./CachedImage";
 import { ReactionBar } from "./ReactionBar";
 import { ReactionPicker } from "./ReactionPicker";
 import { SharedPostPreview } from "./SharedPostPreview";
@@ -62,7 +63,7 @@ export function MessageBubble({
                 accessibilityLabel="View image full screen"
                 style={({ pressed }) => [pressed && onMediaPress ? styles.mediaPressed : null]}
               >
-                <Image source={{ uri: mediaUrl }} style={styles.media} resizeMode="cover" />
+                <CachedImage uri={mediaUrl} style={styles.media} contentFit="cover" recyclingKey={`msg-${mediaUrl}`} />
               </Pressable>
             ) : null}
             {showText ? (

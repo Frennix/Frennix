@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import type { Group } from "@frennix/types";
+import { ScalePressable } from "./ScalePressable";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface GroupCardProps {
@@ -9,7 +10,7 @@ interface GroupCardProps {
 
 export function GroupCard({ group, onPress }: GroupCardProps) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <ScalePressable style={styles.card} onPress={onPress} disabled={!onPress}>
       <Text style={styles.name}>{group.name}</Text>
       {group.description ? (
         <Text style={styles.description} numberOfLines={2}>{group.description}</Text>
@@ -18,7 +19,7 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
         <Text style={styles.tags}>{group.sport_tags.slice(0, 3).join(" · ")}</Text>
         <Text style={styles.members}>{group.member_count ?? 0} members</Text>
       </View>
-    </Pressable>
+    </ScalePressable>
   );
 }
 

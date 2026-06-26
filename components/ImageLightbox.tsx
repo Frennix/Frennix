@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import { CachedImage } from "@frennix/ui";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -73,12 +73,9 @@ function NativeLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWid
   return (
     <View style={[styles.imageFrame, { width: maxWidth, height: maxHeight }]}>
       <GestureDetector gesture={Gesture.Simultaneous(pinch, pan)}>
-        <Animated.Image
-          source={{ uri }}
-          style={[styles.image, animatedStyle]}
-          resizeMode="contain"
-          accessibilityLabel="Full size image"
-        />
+        <Animated.View style={[styles.image, animatedStyle]}>
+          <CachedImage uri={uri} style={styles.imageFill} contentFit="contain" recyclingKey={`lightbox-${uri}`} />
+        </Animated.View>
       </GestureDetector>
     </View>
   );
@@ -165,15 +162,17 @@ function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth:
         pinchStart.current = null;
       }}
     >
-      <Image
-        source={{ uri }}
+      <CachedImage
+        uri={uri}
         style={[
           styles.image,
+          styles.imageFill,
           {
             transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale }],
           },
         ]}
-        resizeMode="contain"
+        contentFit="contain"
+        recyclingKey={`lightbox-web-${uri}`}
         accessibilityLabel="Full size image"
       />
     </View>
@@ -267,6 +266,10 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   image: {
+    width: "100%",
+    height: "100%",
+  },
+  imageFill: {
     width: "100%",
     height: "100%",
   },

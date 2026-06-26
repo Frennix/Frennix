@@ -26,6 +26,13 @@ const stackDefaults = {
   headerTintColor: colors.text,
   contentStyle: { backgroundColor: colors.background },
   headerShadowVisible: false,
+  animation: "fade" as const,
+  animationDuration: 200,
+} as const;
+
+const fadeScreen = {
+  animation: "fade" as const,
+  animationDuration: 200,
 } as const;
 
 function backScreen(title: string, extra?: object) {
@@ -101,19 +108,17 @@ export default function RootLayout() {
               name="edit-event/[id]"
               options={backScreen("Edit event", { presentation: "modal" })}
             />
-            <Stack.Screen name="event/[id]" options={backScreen("Event")} />
-            <Stack.Screen name="event/[id]/invite" options={backScreen("Invite athletes")} />
-            <Stack.Screen name="post/[id]" options={backScreen("Post")} />
-            <Stack.Screen name="user/[username]" options={backScreen("Profile")} />
-            <Stack.Screen name="group/[id]" options={backScreen("Group")} />
-            <Stack.Screen name="challenge/[id]" options={backScreen("Challenge")} />
-            <Stack.Screen name="chat/[conversationId]" options={backScreen("Chat")} />
+            <Stack.Screen name="event/[id]" options={backScreen("Event", fadeScreen)} />
+            <Stack.Screen name="event/[id]/invite" options={backScreen("Invite athletes", fadeScreen)} />
+            <Stack.Screen name="post/[id]" options={backScreen("Post", fadeScreen)} />
+            <Stack.Screen name="user/[username]" options={backScreen("Profile", fadeScreen)} />
+            <Stack.Screen name="group/[id]" options={backScreen("Group", fadeScreen)} />
+            <Stack.Screen name="challenge/[id]" options={backScreen("Challenge", fadeScreen)} />
+            <Stack.Screen name="chat/[conversationId]" options={backScreen("Chat", fadeScreen)} />
             <Stack.Screen name="followers/[userId]" options={backScreen("Followers")} />
             <Stack.Screen name="following/[userId]" options={backScreen("Following")} />
             <Stack.Screen name="notifications" options={{
-              ...backScreen("Notifications Center"),
-              animation: "fade",
-              animationDuration: 150,
+              ...backScreen("Notifications Center", fadeScreen),
             }} />
             <Stack.Screen
               name="create-group"
@@ -135,9 +140,7 @@ export default function RootLayout() {
             <Stack.Screen
               name="matching-settings"
               options={{
-                ...backScreen("Training partner preferences"),
-                animation: "fade",
-                animationDuration: 150,
+                ...backScreen("Training partner preferences", fadeScreen),
               }}
             />
             <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />

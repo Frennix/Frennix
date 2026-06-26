@@ -5,7 +5,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,7 +36,7 @@ import {
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { invalidatePostQueries, updatePostInAllCaches } from "@/lib/post-cache";
-import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, CachedImage, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const CAPTION_MAX = 500;
 const MAX_PHOTOS = 10;
@@ -350,7 +349,7 @@ export default function EditPostScreen() {
                         isLooping={false}
                       />
                     ) : (
-                      <Image source={{ uri: item.uri }} style={styles.preview} resizeMode="cover" />
+                      <CachedImage uri={item.uri} style={styles.preview} contentFit="cover" recyclingKey={`edit-${item.uri}`} />
                     )}
 
                     <Pressable

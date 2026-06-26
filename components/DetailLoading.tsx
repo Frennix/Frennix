@@ -1,19 +1,5 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { colors } from "@frennix/ui";
+import { PostDetailSkeleton } from "@/components/PostDetailSkeleton";
 
 export function DetailLoading() {
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator color={colors.accent} size="large" />
-    </View>
-  );
+  return <PostDetailSkeleton />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-});

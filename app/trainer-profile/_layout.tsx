@@ -15,7 +15,13 @@ function backScreen(title: string) {
 
 export default function TrainerProfileLayout() {
   return (
-    <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background } }}>
+    <Stack
+      screenOptions={{
+        contentStyle: { backgroundColor: colors.background },
+        animation: "fade",
+        animationDuration: 200,
+      }}
+    >
       <Stack.Screen name="setup" options={backScreen("Become a trainer")} />
       <Stack.Screen name="edit" options={backScreen("Trainer profile")} />
     </Stack>

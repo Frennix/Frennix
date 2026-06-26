@@ -6,15 +6,16 @@ import {
   getComments,
   getPost,
   toggleCommentLike,
-  toggleLike,
 } from "@frennix/api";
-import type { Comment } from "@frennix/types";
+import type { Comment, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePostActions } from "@/lib/usePostActions";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
+import { useFeedLike } from "@/lib/useFeedLike";
+import { hapticLight } from "@/lib/haptics";
 import { DetailLoading } from "@/components/DetailLoading";
 import { useCallback, useRef, useState } from "react";
 import { useImageLightbox } from "@/lib/useImageLightbox";
@@ -33,7 +34,7 @@ import {
 export default function PostDetailScreen() {
   const { id, comment: commentParam } = useLocalSearchParams<{ id: string; comment?: string }>();
   const highlightCommentId = Array.isArray(commentParam) ? commentParam[0] : commentParam;
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const userId = session?.user.id ?? "";
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
@@ -69,7 +70,7 @@ export default function PostDetailScreen() {
     postId: id!,
     onDeleted: invalidatePostComments,
   });
-  const { openImage, lightbox } = useImageLightbox();
+  const { toggleLikePost } = useFeedLike(userId);
 
   const { data: post, isLoading: postLoading } = useQuery({
     queryKey: ["post", id, userId],
@@ -83,19 +84,78 @@ export default function PostDetailScreen() {
     enabled: !!id && !!userId,
   });
 
-  const likeMutation = useMutation({
-    mutationFn: () => toggleLike(id!, userId, !!post?.liked_by_me),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["post", id] });
-      queryClient.invalidateQueries({ queryKey: ["feed"] });
-    },
-  });
+  const { openImage, lightbox } = useImageLightbox();
+
+  type CommentMutationVars = {
+    text: string;
+    parentId: string | null;
+    replyToComment: Comment | null;
+  };
+
+  function appendOptimisticComment(
+    comments: Comment[],
+    optimistic: Comment,
+    parentId: string | null
+  ): Comment[] {
+    if (!parentId) return [...comments, optimistic];
+    return comments.map((comment) =>
+      comment.id === parentId
+        ? { ...comment, replies: [...(comment.replies ?? []), optimistic] }
+        : comment
+    );
+  }
 
   const commentMutation = useMutation({
-    mutationFn: () => addComment(id!, userId, commentText.trim(), replyTo?.id ?? null),
-    onSuccess: () => {
+    mutationFn: ({ text, parentId }: CommentMutationVars) =>
+      addComment(id!, userId, text, parentId),
+    onMutate: async ({ text, parentId, replyToComment }) => {
+      hapticLight();
+      const optimistic: Comment = {
+        id: `optimistic-${Date.now()}`,
+        post_id: id!,
+        author_id: userId,
+        parent_id: parentId,
+        content: text,
+        created_at: new Date().toISOString(),
+        author: profile ?? undefined,
+        like_count: 0,
+        liked_by_me: false,
+        replies: [],
+      };
+
+      await queryClient.cancelQueries({ queryKey: ["comments", id, userId] });
+      await queryClient.cancelQueries({ queryKey: ["post", id, userId] });
+
+      const previousComments = queryClient.getQueryData<Comment[]>(["comments", id, userId]);
+      const previousPost = queryClient.getQueryData<Post>(["post", id, userId]);
+
+      queryClient.setQueryData<Comment[]>(["comments", id, userId], (old = []) =>
+        appendOptimisticComment(old, optimistic, parentId)
+      );
+
+      if (previousPost) {
+        queryClient.setQueryData<Post>(["post", id, userId], {
+          ...previousPost,
+          comment_count: (previousPost.comment_count ?? 0) + 1,
+        });
+      }
+
       setCommentText("");
       setReplyTo(null);
+
+      return { previousComments, previousPost, replyToComment };
+    },
+    onError: (_error, { text, replyToComment }, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(["comments", id, userId], context.previousComments);
+      }
+      if (context?.previousPost) {
+        queryClient.setQueryData(["post", id, userId], context.previousPost);
+      }
+      setCommentText(text);
+      if (replyToComment) setReplyTo(replyToComment);
+    },
+    onSettled: () => {
       invalidatePostComments();
     },
   });
@@ -156,7 +216,7 @@ export default function PostDetailScreen() {
             const targetId = getSharedPostTargetId(post);
             if (targetId !== post.id) router.push(`/post/${targetId}`);
           }}
-          onLike={() => likeMutation.mutate()}
+          onLike={() => toggleLikePost(post.id)}
           onComment={() => undefined}
           onShare={() => openShare(post.shared_post ?? post)}
           onSave={() => toggleSavePost(post.id, !!post.saved_by_me)}
@@ -199,7 +259,15 @@ export default function PostDetailScreen() {
         <Input value={commentText} onChangeText={setCommentText} placeholder={commentPlaceholder} />
         <Button
           title={replyTo ? "Reply" : "Post comment"}
-          onPress={() => commentMutation.mutate()}
+          onPress={() => {
+            const text = commentText.trim();
+            if (!text) return;
+            commentMutation.mutate({
+              text,
+              parentId: replyTo?.id ?? null,
+              replyToComment: replyTo,
+            });
+          }}
           loading={commentMutation.isPending}
           disabled={!commentText.trim()}
         />

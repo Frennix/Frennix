@@ -15,6 +15,7 @@ Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, wo
 
 Recent session work:
 
+- **Premium social feel (June 2026)** — haptics, Reanimated post enter animations, skeleton placeholders, optimistic comments, 30min query cache, `ScalePressable` press feedback, global 200ms fade navigation, `ProgressiveImage` blur/thumbnail placeholders via expo-image, `QueryErrorState` retry UI, exponential query retry
 - **Auth/profile resume fix (June 2026)** — Safari return no longer routes completed users to Set up Profile; `authReady` gate + profile cache + resume refresh
 - **Online status privacy (June 2026)** — Show Online Status toggle; backend masking via `profiles_reader` + `set_presence` guard
 - **Lucide SVG icons (June 2026)** — all UI icons migrated off font-based Ionicons for iOS Safari reliability
@@ -418,7 +419,7 @@ Perf tracking: `trackFeedLoad` → `perf_feed_load`, `trackTabSwitch` → `perf_
 
 **Also:** tuned FlatList window (`initialNumToRender: 5`, `windowSize: 7`), memoized `FeedHeader`, query `staleTime`/`placeholderData` on tab screens, Messages poll interval 60s.
 
-**Fast-scroll pass (June 2026):** `useFeedInfiniteScroll` prefetches next page ~3 viewport-heights early, auto-loads page 2 on startup, appends in-list skeleton rows while fetching, expands media lookahead (`MEDIA_LOOKAHEAD_ITEMS: 8`), `windowSize: 21`, `removeClippedSubviews: false`, image prefetch via `prefetch-post-images.ts`.
+**Fast-scroll pass (June 2026):** `useFeedInfiniteScroll` prefetches next page ~3 viewport-heights early, auto-loads page 2 on startup, appends in-list skeleton rows while fetching, expands media lookahead (`MEDIA_LOOKAHEAD_ITEMS: 12`), `windowSize: 21`, `removeClippedSubviews: false`, image prefetch via `prefetch-post-images.ts`.
 
 **Pull-to-refresh + new posts banner (June 2026):**
 - `useGuardedRefresh` — deduped pull-to-refresh with friendly errors on Feed, Discover, Events, Messages, Notifications.

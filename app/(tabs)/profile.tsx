@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef } from "react";
-import { ActivityIndicator, ScrollView, View, StyleSheet } from "react-native";
+import { ScrollView } from "react-native";
+import { ProfileTabSkeleton } from "@/components/ProfileTabSkeleton";
 import { getFollowingIds, getPostsByUser, getProfileStats } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
@@ -12,7 +13,6 @@ import { useProfileActions } from "@/lib/useProfileActions";
 import { scrollScrollViewToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
-import { colors } from "@frennix/ui";
 
 const EMPTY_STATS = {
   posts: 0,
@@ -90,11 +90,7 @@ export default function ProfileTabScreen() {
   );
 
   if (!authReady || !profile) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+    return <ProfileTabSkeleton />;
   }
 
   const baseStats = stats ?? EMPTY_STATS;
@@ -127,11 +123,3 @@ export default function ProfileTabScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-});

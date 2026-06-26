@@ -1,10 +1,13 @@
 import { useCallback, useRef } from "react";
 import { getErrorMessage } from "@frennix/api";
 import { showAlert } from "@/lib/alerts";
+import { hapticRefresh } from "@/lib/haptics";
 
 type GuardedRefreshOptions = {
   onError?: (error: unknown) => void;
   errorTitle?: string;
+  /** Trigger light haptic when pull-to-refresh starts. */
+  haptic?: boolean;
 };
 
 /** Wraps pull-to-refresh so duplicate gestures are ignored and failures show a friendly alert. */
@@ -20,6 +23,7 @@ export function useGuardedRefresh(
     if (inFlightRef.current) return;
 
     inFlightRef.current = true;
+    if (options.haptic) hapticRefresh();
     try {
       await refreshFnRef.current();
     } catch (error) {
@@ -31,7 +35,7 @@ export function useGuardedRefresh(
     } finally {
       inFlightRef.current = false;
     }
-  }, [options.errorTitle, options.onError]);
+  }, [options.errorTitle, options.haptic, options.onError]);
 
   return onRefresh;
 }

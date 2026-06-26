@@ -38,4 +38,8 @@ export * from "./ProfileAchievementBadges";
 export * from "./ProfileContentTabs";
 export * from "./SharedPostPreview";
 export * from "./ReactionBar";
+export * from "./CachedImage";
+export * from "./ScalePressable";
+export * from "./ProgressiveImage";
+export * from "./QueryErrorState";
 export * from "./ReactionPicker";

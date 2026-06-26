@@ -1,4 +1,4 @@
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { TrainerProfileBundle } from "@frennix/types";
 import { TrainerBadge } from "@/components/TrainerBadge";
 import {
@@ -9,7 +9,7 @@ import {
   formatTrainerSpecialty,
 } from "@/lib/trainer-labels";
 import { displaySocialHandle, formatTrainerBudgetRange, formatYearsExperience } from "@/lib/trainer-utils";
-import { Avatar, Chip, colors, radius, spacing, typography } from "@frennix/ui";
+import { Avatar, CachedImage, Chip, colors, radius, spacing, typography } from "@frennix/ui";
 
 type TrainerProfileViewProps = {
   bundle: TrainerProfileBundle;
@@ -125,7 +125,7 @@ export function TrainerProfileView({ bundle, showSocialLinks = true }: TrainerPr
           <View style={styles.portfolioGrid}>
             {portfolio.map((photo) => (
               <View key={photo.id} style={styles.portfolioItem}>
-                <Image source={{ uri: photo.image_url }} style={styles.portfolioImage} />
+                <CachedImage uri={photo.image_url} style={styles.portfolioImage} contentFit="cover" recyclingKey={`portfolio-${photo.id}`} />
                 <Text style={styles.portfolioCaption}>
                   {photo.caption ?? formatPortfolioCategory(photo.category)}
                 </Text>

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-
 import { getErrorMessage, toggleLike } from "@frennix/api";
 import type { FeedPage, Post } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
+import { hapticLike } from "@/lib/haptics";
 
 function findPostInFeed(feed: InfiniteData<FeedPage> | undefined, postId: string): Post | undefined {
   if (!feed) return undefined;
@@ -46,6 +47,8 @@ export function useFeedLike(userId: string) {
   const likeMutation = useMutation({
     mutationFn: ({ postId, liked }: LikeVars) => toggleLike(postId, userId, liked),
     onMutate: ({ postId, liked }) => {
+      if (!liked) hapticLike();
+
       const previousFeed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
       const previousPost = queryClient.getQueryData<Post>(["post", postId, userId]);
 

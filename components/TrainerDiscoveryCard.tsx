@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { TrainerSearchResult } from "@frennix/types";
 import { TrainerBadge } from "@/components/TrainerBadge";
 import {
@@ -9,7 +9,7 @@ import {
 } from "@/lib/trainer-labels";
 import { formatTrainerBudgetRange, formatYearsExperience } from "@/lib/trainer-utils";
 import { pushScreen } from "@/lib/press-utils";
-import { Avatar, Chip, colors, radius, spacing, typography } from "@frennix/ui";
+import { Avatar, CachedImage, Chip, colors, radius, spacing, typography } from "@frennix/ui";
 
 type TrainerDiscoveryCardProps = {
   result: TrainerSearchResult;
@@ -70,7 +70,7 @@ export function TrainerDiscoveryCard({ result, onPress }: TrainerDiscoveryCardPr
       {preview.length ? (
         <View style={styles.previewRow}>
           {preview.slice(0, 3).map((photo) => (
-            <Image key={photo.id} source={{ uri: photo.image_url }} style={styles.previewThumb} />
+            <CachedImage key={photo.id} uri={photo.image_url} style={styles.previewThumb} contentFit="cover" recyclingKey={`trainer-${photo.id}`} />
           ))}
         </View>
       ) : null}

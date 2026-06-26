@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useRef } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -18,7 +17,8 @@ import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
-import { EmptyState, EventCard, colors, spacing, typography } from "@frennix/ui";
+import { EventListSkeleton } from "@/components/EventListSkeleton";
+import { EmptyState, EventCard, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
 
 export default function EventsTabScreen() {
   const { session } = useAuth();
@@ -36,7 +36,7 @@ export default function EventsTabScreen() {
 
   const onRefresh = useGuardedRefresh(
     useCallback(() => refetch(), [refetch]),
-    { errorTitle: "Could not refresh events" }
+    { errorTitle: "Could not refresh events", haptic: true }
   );
 
   useTabScrollRegistration(
@@ -62,25 +62,18 @@ export default function EventsTabScreen() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+  if (isLoading && events.length === 0) {
+    return <EventListSkeleton />;
   }
 
-  if (isError) {
-    const message = getErrorMessage(error);
+  if (isError && events.length === 0) {
     console.error("[events] failed to load workout events", error);
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorTitle}>Could not load events</Text>
-        <Text style={styles.errorText}>{message}</Text>
-        <Pressable onPress={() => refetch()} style={styles.retryButton}>
-          <Text style={styles.retryText}>Try again</Text>
-        </Pressable>
-      </View>
+      <QueryErrorState
+        title="Could not load events"
+        message={getErrorMessage(error)}
+        onRetry={() => void refetch()}
+      />
     );
   }
 

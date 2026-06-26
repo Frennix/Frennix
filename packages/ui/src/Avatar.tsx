@@ -1,5 +1,6 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useEffect, useState } from "react";
+import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
 
 interface AvatarProps {
@@ -44,12 +45,13 @@ export function Avatar({ uri, name, size = 40, showOnline = false, isOnline = fa
   if (uri && !failed) {
     return (
       <View style={{ width: size, height: size }}>
-        <Image
-          key={uri}
-          source={{ uri }}
-          style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
-          resizeMode="cover"
+        <ProgressiveImage
+          uri={uri}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          contentFit="cover"
+          accessibilityLabel={name ? `${name} avatar` : "User avatar"}
           onError={() => setFailed(true)}
+          recyclingKey={`avatar-${uri}`}
         />
         {onlineDot}
       </View>
@@ -67,7 +69,6 @@ export function Avatar({ uri, name, size = 40, showOnline = false, isOnline = fa
 }
 
 const styles = StyleSheet.create({
-  image: { backgroundColor: colors.surfaceElevated },
   placeholder: {
     backgroundColor: colors.accentMuted,
     alignItems: "center",

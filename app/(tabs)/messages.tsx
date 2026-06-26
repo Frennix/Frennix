@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { usePathname } from "expo-router";
 import { memo, useCallback, useMemo, useRef } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { getConversations } from "@frennix/api";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { getConversations, getErrorMessage } from "@frennix/api";
 import type { Conversation } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
@@ -13,7 +13,8 @@ import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
-import { Avatar, EmptyState, colors, isProfileOnline, spacing, typography } from "@frennix/ui";
+import { MessagesListSkeleton } from "@/components/MessagesListSkeleton";
+import { Avatar, EmptyState, QueryErrorState, ScalePressable, colors, isProfileOnline, spacing, typography } from "@frennix/ui";
 
 function previewText(
   content: string | undefined,
@@ -33,7 +34,7 @@ const ConversationRow = memo(function ConversationRow({
   onPress: (id: string) => void;
 }) {
   return (
-    <Pressable style={styles.row} onPress={() => onPress(item.id)}>
+    <ScalePressable containerStyle={styles.row} onPress={() => onPress(item.id)}>
       <Avatar
         uri={item.other_participant?.avatar_url}
         name={item.other_participant?.display_name}
@@ -61,7 +62,7 @@ const ConversationRow = memo(function ConversationRow({
           </Text>
         </View>
       ) : null}
-    </Pressable>
+    </ScalePressable>
   );
 });
 
@@ -72,7 +73,7 @@ export default function MessagesScreen() {
   const pathname = usePathname();
   const isListActive = isFocused && !pathname.startsWith("/chat/");
 
-  const { data: conversations = [], refetch, isRefetching, isLoading } = useQuery({
+  const { data: conversations = [], refetch, isRefetching, isLoading, isError, error } = useQuery({
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(userId),
     enabled: !!userId && isListActive,
@@ -103,7 +104,7 @@ export default function MessagesScreen() {
 
   const onRefresh = useGuardedRefresh(
     useCallback(() => refetch(), [refetch]),
-    { errorTitle: "Could not refresh messages" }
+    { errorTitle: "Could not refresh messages", haptic: true }
   );
 
   const listRef = useRef<FlatList<Conversation>>(null);
@@ -123,6 +124,18 @@ export default function MessagesScreen() {
       [isAtTop, onRefresh]
     )
   );
+
+  if (isError && conversations.length === 0) {
+    return (
+      <View style={styles.container}>
+        <QueryErrorState
+          title="Could not load messages"
+          message={getErrorMessage(error)}
+          onRetry={() => void refetch()}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -144,14 +157,16 @@ export default function MessagesScreen() {
           />
         }
         ListEmptyComponent={
-          !isLoading ? (
+          isLoading ? (
+            <MessagesListSkeleton />
+          ) : (
             <EmptyState
               title="No messages yet"
               description="Message someone from their profile to find a workout partner or training buddy."
               actionLabel="Discover people"
               onAction={() => switchTab("/(tabs)/discover")}
             />
-          ) : null
+          )
         }
         ListFooterComponent={<ReportIssueLink area="messages" from="/(tabs)/messages" />}
         renderItem={renderItem}

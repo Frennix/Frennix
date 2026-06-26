@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
   getChallenge,
   getChallengePosts,
@@ -15,7 +15,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { DetailLoading } from "@/components/DetailLoading";
-import { Button, EmptyState, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, CachedImage, EmptyState, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
 
 import { isChallengeClosed } from "@/lib/challenge-actions";
 
@@ -127,10 +127,11 @@ export default function ChallengeDetailScreen() {
             ) : null}
 
             {challenge.cover_image_url ? (
-              <Image
-                source={{ uri: challenge.cover_image_url }}
+              <CachedImage
+                uri={challenge.cover_image_url}
                 style={styles.cover}
-                resizeMode="cover"
+                contentFit="cover"
+                recyclingKey={`challenge-cover-${challenge.id}`}
               />
             ) : null}
 

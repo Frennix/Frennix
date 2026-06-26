@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { AppIcon } from "@/components/AppIcon";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
@@ -99,7 +100,7 @@ export default function DiscoverScreen() {
       if (isSearchingPeople) await refetchSearch();
       else await refetchSuggestions();
     }, [isSearchingPeople, refetchSearch, refetchSuggestions]),
-    { errorTitle: "Could not refresh people" }
+    { errorTitle: "Could not refresh people", haptic: true }
   );
 
   const onRefreshGroups = useGuardedRefresh(
@@ -238,12 +239,12 @@ export default function DiscoverScreen() {
                   Based on shared sports, workout interests, location, mutual connections, and activity.
                 </Text>
               </View>
-            ) : peopleLoading ? (
-              <ActivityIndicator color={colors.accent} style={styles.loader} />
             ) : null
           }
           ListEmptyComponent={
-            !peopleLoading ? (
+            peopleLoading ? (
+              <DiscoverPeopleSkeleton />
+            ) : (
               <EmptyState
                 title={isSearchingPeople ? "No people found" : "No suggestions yet"}
                 description={
@@ -252,7 +253,7 @@ export default function DiscoverScreen() {
                     : "Complete your profile with activities and city to get better athlete recommendations."
                 }
               />
-            ) : null
+            )
           }
           renderItem={({ item }) => {
             const profile = item.profile;

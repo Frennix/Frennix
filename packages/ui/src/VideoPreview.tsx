@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
   type ViewStyle,
 } from "react-native";
+import { CachedImage } from "./CachedImage";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { FEED_VIDEO_FALLBACK_RATIO, type MediaLayout } from "./mediaLayout";
 import { colors, radius } from "./theme";
@@ -55,10 +55,12 @@ export function VideoPreview({
   const previewBody = (
     <>
       {showStoredPoster ? (
-        <Image
-          source={{ uri: posterUri! }}
+        <CachedImage
+          uri={posterUri!}
+          placeholderUri={thumbnailUrl}
           style={styles.poster}
-          resizeMode={posterFit}
+          contentFit={posterFit}
+          recyclingKey={`poster-${posterUri}`}
           onError={() => setPosterImageFailed(true)}
         />
       ) : showVideoFrame ? (

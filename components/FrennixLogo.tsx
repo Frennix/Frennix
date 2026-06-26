@@ -1,7 +1,6 @@
 import resolveAssetSource from "expo-asset/build/resolveAssetSource";
 import { createElement } from "react";
 import {
-  Image,
   Platform,
   StyleSheet,
   View,
@@ -9,6 +8,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { CachedAssetImage } from "@frennix/ui";
 
 /**
  * Official Frennix logo — always loads from `assets/brand/frennix-logo.png` (master)
@@ -114,10 +114,10 @@ export function FrennixLogo({
 
   return (
     <View style={[wrapperStyle, style]}>
-      <Image
+      <CachedAssetImage
         source={SOURCES[variant]}
         style={[styles.image, imageStyle]}
-        resizeMode="contain"
+        contentFit="contain"
         accessibilityLabel={accessibilityLabel}
       />
     </View>

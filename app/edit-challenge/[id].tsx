@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   getChallenge,
   getErrorMessage,
@@ -14,7 +14,7 @@ import { showAlert, showSuccess } from "@/lib/alerts";
 import { updateChallengeInLists } from "@/lib/entity-list-cache";
 import { ownershipMessages } from "@/lib/ownership/messages";
 import { stackBackOptions } from "@/lib/stack-navigation";
-import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, CachedImage, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 function toDateInput(iso: string) {
   return iso.slice(0, 10);
@@ -214,7 +214,7 @@ export default function EditChallengeScreen() {
         <View style={styles.coverSection}>
           <Text style={styles.sectionLabel}>Cover image</Text>
           {previewCover ? (
-            <Image source={{ uri: previewCover }} style={styles.coverPreview} resizeMode="cover" />
+            <CachedImage uri={previewCover} style={styles.coverPreview} contentFit="cover" recyclingKey={`edit-challenge-${previewCover}`} />
           ) : (
             <View style={styles.coverPlaceholder}>
               <Text style={styles.coverPlaceholderText}>No cover image</Text>

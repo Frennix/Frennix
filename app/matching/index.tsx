@@ -28,6 +28,7 @@ import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadin
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen } from "@/lib/press-utils";
 import { logMatchmakingError } from "@/lib/matchmaking-observability";
+import { hapticMatch } from "@/lib/haptics";
 import { isTrainingPartnerDiscoveryReady } from "@/lib/training-partner-readiness";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button, EmptyState, colors, spacing, typography } from "@frennix/ui";
@@ -117,6 +118,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       const result = await recordMatchSwipe(currentCandidate.id, direction);
 
       if (direction === "right" && result.is_mutual && result.match) {
+        hapticMatch();
         setMatchPartner(currentCandidate);
         setMatchModalVisible(true);
         await Promise.all([

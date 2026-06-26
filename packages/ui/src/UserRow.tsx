@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import type { Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { Button } from "./Button";
+import { ScalePressable } from "./ScalePressable";
 import { formatPresenceStatus, isProfileOnline } from "./presence";
 import { colors, spacing, typography } from "./theme";
 
@@ -29,7 +30,7 @@ export function UserRow({
   const line3 = presenceLabel ?? subtitle;
 
   return (
-    <Pressable style={styles.row} onPress={onPress}>
+    <ScalePressable style={styles.row} onPress={onPress} disabled={!onPress}>
       <Avatar
         uri={profile.avatar_url}
         name={profile.display_name}
@@ -58,7 +59,7 @@ export function UserRow({
           style={styles.action}
         />
       ) : null}
-    </Pressable>
+    </ScalePressable>
   );
 }
 

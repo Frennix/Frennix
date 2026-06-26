@@ -7,7 +7,7 @@ import { prefetchPostImages } from "@/lib/prefetch-post-images";
 /** Start fetching the next page this many viewport-heights before the list end. */
 const PREFETCH_VIEWPORT_MULTIPLIER = 3;
 /** Activate media for rows this many indices ahead of the last visible post. */
-const MEDIA_LOOKAHEAD_ITEMS = 8;
+const MEDIA_LOOKAHEAD_ITEMS = 12;
 const MEDIA_LOOKBEHIND_ITEMS = 2;
 
 type UseFeedInfiniteScrollOptions = {
@@ -123,7 +123,7 @@ export function useFeedInfiniteScroll({
         .map((entry) => (entry.item as Extract<FeedListRow, { kind: "post" }>).post);
 
       if (visiblePosts.length) {
-        prefetchPostImages(visiblePosts, 6);
+        prefetchPostImages(visiblePosts, 10);
       }
     }
   ).current;

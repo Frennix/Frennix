@@ -1,6 +1,5 @@
 import { createElement, useState } from "react";
 import {
-  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
 } from "react-native";
 import type { PostType } from "@frennix/types";
 import { MediaAspectFrame } from "./MediaAspectFrame";
+import { ProgressiveImage } from "./ProgressiveImage";
 import { VideoPreview } from "./VideoPreview";
 import { VideoPosterFallback } from "./VideoPosterFallback";
 import { useVideoPoster } from "./useVideoPoster";
@@ -149,6 +149,7 @@ export function PostMedia({
   return (
     <FeedImage
       uri={uri}
+      thumbnailUrl={thumbnailUrl}
       style={style}
       layout={layout}
       onImagePress={onImagePress}
@@ -159,18 +160,19 @@ export function PostMedia({
 
 function FeedImage({
   uri,
+  thumbnailUrl,
   style,
   layout,
   onImagePress,
   maxHeight,
 }: {
   uri: string;
+  thumbnailUrl?: string | null;
   style: StyleProp<ViewStyle>;
   layout: MediaLayout;
   onImagePress?: () => void;
   maxHeight?: number;
 }) {
-  const [loaded, setLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
 
   const content = (
@@ -185,12 +187,12 @@ function FeedImage({
           {imageFailed ? (
             <VideoPosterFallback label="Photo unavailable" style={styles.imageFallback} />
           ) : (
-            <Image
-              source={{ uri }}
-              style={[styles.image, !loaded && styles.imageHidden]}
-              resizeMode="contain"
+            <ProgressiveImage
+              uri={uri}
+              placeholderUri={thumbnailUrl}
+              style={styles.image}
+              contentFit="contain"
               accessibilityLabel="Post photo"
-              onLoad={() => setLoaded(true)}
               onError={() => setImageFailed(true)}
             />
           )}
@@ -218,9 +220,6 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-  },
-  imageHidden: {
-    opacity: 0,
   },
   imageFallback: {
     ...StyleSheet.absoluteFillObject,

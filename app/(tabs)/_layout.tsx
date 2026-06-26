@@ -69,6 +69,7 @@ const TabsShell = memo(function TabsShell() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarItemStyle: { minWidth: 56 },
+        sceneContainerStyle: { backgroundColor: colors.background },
         lazy: false,
         freezeOnBlur: true,
         headerTitleContainerStyle: { overflow: "visible" },

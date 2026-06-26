@@ -1,5 +1,7 @@
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 import type { Post } from "@frennix/types";
+import { ProgressiveImage } from "./ProgressiveImage";
+import { ScalePressable } from "./ScalePressable";
 import { isVideoMedia } from "./PostMedia";
 import { VideoPreview } from "./VideoPreview";
 import { colors, radius, spacing, typography } from "./theme";
@@ -42,9 +44,9 @@ export function PostGrid({
         const hasMedia = Boolean(post.media_urls?.[0]);
 
         return (
-        <Pressable
+        <ScalePressable
           key={post.id}
-          style={[styles.cell, { width: cellSize, height: cellSize }]}
+          containerStyle={[styles.cell, { width: cellSize, height: cellSize }]}
           onPress={() => onPressPost(post.id)}
           onLongPress={
             isOwn && onOwnerActionsPress ? () => onOwnerActionsPress(post) : undefined
@@ -60,7 +62,13 @@ export function PostGrid({
                   compact
                 />
               ) : (
-                <Image source={{ uri: post.media_urls[0] }} style={styles.image} resizeMode="cover" />
+                <ProgressiveImage
+                  uri={post.media_urls[0]}
+                  placeholderUri={post.thumbnail_url}
+                  style={styles.image}
+                  contentFit="cover"
+                  recyclingKey={`grid-${post.id}`}
+                />
               )}
             </>
           ) : (
@@ -70,7 +78,7 @@ export function PostGrid({
               </Text>
             </View>
           )}
-        </Pressable>
+        </ScalePressable>
         );
       })}
     </View>

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { followUser, getErrorMessage, unfollowUser } from "@frennix/api";
 import type { ProfileStats } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
+import { hapticFollow } from "@/lib/haptics";
 
 type FollowMutationVars = {
   targetUserId: string;
@@ -38,6 +39,7 @@ export function useFollowUser(currentUserId: string) {
     },
     onMutate: async ({ targetUserId, isFollowing }) => {
       const nextFollowing = !isFollowing;
+      if (nextFollowing) hapticFollow();
 
       await Promise.all([
         queryClient.cancelQueries({ queryKey: ["is-following", currentUserId, targetUserId] }),

@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { getFeed, getFeedStories, getSuggestedAthletes } from "@frennix/api";
+import { getFeed, getFeedStories, getSuggestedAthletes, getErrorMessage } from "@frennix/api";
 import type { FeedStory, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
+import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { usePostActions } from "@/lib/usePostActions";
@@ -24,7 +25,7 @@ import type { FeedListRow } from "@/lib/feed-list-rows";
 import { trackFeedLoad } from "@/lib/product-analytics";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import { NewPostsBanner } from "@/components/NewPostsBanner";
-import { EmptyState, FeedPostCardSkeleton, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
   const { session } = useAuth();
@@ -47,6 +48,8 @@ export default function HomeScreen() {
   const {
     data,
     isLoading,
+    isError,
+    error,
     isSuccess: isFeedReady,
     refetch,
     isRefetching,
@@ -119,7 +122,10 @@ export default function HomeScreen() {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
   }, [refetch, refetchStories, refetchSuggestions]);
 
-  const handleRefresh = useGuardedRefresh(refreshFeedData, { errorTitle: "Could not refresh feed" });
+  const handleRefresh = useGuardedRefresh(refreshFeedData, {
+    errorTitle: "Could not refresh feed",
+    haptic: true,
+  });
 
   const { newPostCount, showBanner, clearBanner } = useFeedNewPostsBanner({
     userId,
@@ -243,7 +249,7 @@ export default function HomeScreen() {
       }
 
       return (
-        <FeedListItem
+        <AnimatedFeedListItem
           post={item.post}
           userId={userId}
           actions={feedActions}
@@ -283,6 +289,18 @@ export default function HomeScreen() {
     },
     [onScrollEnd]
   );
+
+  if (isError && posts.length === 0) {
+    return (
+      <View style={styles.container}>
+        <QueryErrorState
+          title="Could not load feed"
+          message={getErrorMessage(error)}
+          onRetry={() => void refetch()}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

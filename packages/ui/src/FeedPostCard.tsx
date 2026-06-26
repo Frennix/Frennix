@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
+import { ScalePressable } from "./ScalePressable";
 import { FeedCommentPreview } from "./FeedCommentPreview";
 import {
   formatEngagementSummary,
@@ -63,16 +64,14 @@ export const FeedPostCard = memo(function FeedPostCard({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Pressable style={styles.header} onPress={onAuthorPress}>
+        <ScalePressable containerStyle={styles.header} onPress={onAuthorPress} disabled={!onAuthorPress}>
           <Avatar uri={author?.avatar_url} name={author?.display_name} size={44} />
           <View style={styles.headerText}>
             <Text style={styles.name}>{author?.display_name ?? "Unknown"}</Text>
             {author?.username ? <Text style={styles.username}>@{author.username}</Text> : null}
             <Text style={styles.meta}>{meta}</Text>
           </View>
-        </Pressable>
-
-        {isOwn ? (
+        </ScalePressable>
           <Pressable
             style={styles.menuButton}
             onPress={onOwnerActionsPress}

@@ -38,6 +38,14 @@ export function trackTabSwitch(tab: string, durationMs: number): void {
   });
 }
 
+export function trackInteraction(name: string, durationMs: number, extra: Record<string, unknown> = {}): void {
+  trackAnalyticsEvent("perf_interaction", {
+    interaction: name,
+    duration_ms: Math.round(durationMs),
+    ...extra,
+  });
+}
+
 export function trackImageLoad(uri: string, durationMs: number): void {
   trackAnalyticsEvent("perf_image_load", {
     duration_ms: Math.round(durationMs),

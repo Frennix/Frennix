@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
+const MAX_QUERY_RETRIES = 3;
+
 export function QueryProvider({ children }: { children: ReactNode }) {
   const [client] = useState(
     () =>
@@ -8,11 +10,16 @@ export function QueryProvider({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 30_000,
-            retry: 2,
+            gcTime: 30 * 60 * 1000,
+            retry: (failureCount) => failureCount < MAX_QUERY_RETRIES,
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8_000),
             // Avoid refetch storms when the browser tab regains focus (root cause of blank hangs).
             refetchOnWindowFocus: false,
-            refetchOnReconnect: false,
+            refetchOnReconnect: true,
             refetchIntervalInBackground: false,
+          },
+          mutations: {
+            retry: 1,
           },
         },
       })

@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { ReactNode, useMemo, useState, type RefObject } from "react";
 import {
   ActivityIndicator,
-  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +18,7 @@ import { splitProfileActivities } from "@/lib/profile-interests";
 import { avatarDisplayUri } from "@/lib/avatar";
 import {
   Button,
+  CachedImage,
   Chip,
   EditableAvatar,
   PostGrid,
@@ -135,9 +135,10 @@ export function ProfileScreenContent({
 
       <View style={styles.coverWrap}>
         {coverUri ? (
-          <ImageBackground source={{ uri: coverUri }} style={styles.cover} resizeMode="cover">
+          <View style={styles.cover}>
+            <CachedImage uri={coverUri} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={`cover-${coverUri}`} />
             <View style={styles.coverOverlay} pointerEvents="none" />
-          </ImageBackground>
+          </View>
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <View style={styles.coverFallback} pointerEvents="none">
