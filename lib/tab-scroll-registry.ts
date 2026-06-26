@@ -36,10 +36,26 @@ export function handleTabRetap(options: {
   options.scrollToTop();
 }
 
-export function scrollFlatListToTop(
-  listRef: { scrollToOffset?: (options: { offset: number; animated?: boolean }) => void } | null
-) {
-  listRef?.scrollToOffset?.({ offset: 0, animated: true });
+type FlatListScrollRef = {
+  scrollToOffset?: (options: { offset: number; animated?: boolean }) => void;
+  scrollToLocation?: (options: {
+    itemIndex: number;
+    sectionIndex?: number;
+    animated?: boolean;
+    viewOffset?: number;
+    viewPosition?: number;
+  }) => void;
+  getScrollRef?: () => { scrollTo?: (options: { y: number; animated?: boolean }) => void } | null;
+  getNativeScrollRef?: () => { scrollTo?: (options: { y: number; animated?: boolean }) => void } | null;
+};
+
+export function scrollFlatListToTop(listRef: FlatListScrollRef | null) {
+  if (!listRef) return;
+
+  listRef.scrollToOffset?.({ offset: 0, animated: true });
+
+  const nativeScrollRef = listRef.getNativeScrollRef?.() ?? listRef.getScrollRef?.();
+  nativeScrollRef?.scrollTo?.({ y: 0, animated: true });
 }
 
 export function scrollScrollViewToTop(
