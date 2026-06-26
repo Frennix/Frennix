@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -63,7 +63,7 @@ export default function TrainerDiscoveryScreen() {
           />
         </View>
         <Pressable style={styles.filterButton} onPress={openFilters} accessibilityLabel="Filter trainers">
-          <Ionicons name="options-outline" size={22} color={colors.accent} />
+          <AppIcon name="sliders" color={colors.accent} size={22} />
           {activeFilterCount > 0 ? (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { Stack, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -36,10 +36,10 @@ function MatchingHeaderActions() {
   return (
     <View style={styles.headerActions}>
       <Pressable onPress={() => pushScreen("/matching/matches")} hitSlop={8}>
-        <Ionicons name="people-outline" size={22} color={colors.text} />
+        <AppIcon name="users" color={colors.text} size={22} />
       </Pressable>
       <Pressable onPress={() => pushScreen("/matching-settings")} hitSlop={8}>
-        <Ionicons name="options-outline" size={22} color={colors.text} />
+        <AppIcon name="sliders" color={colors.text} size={22} />
       </Pressable>
     </View>
   );

@@ -7,7 +7,7 @@ import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { FrennixLogo } from "@/components/FrennixLogo";
-import { TabBarIcon } from "@/components/TabBarIcon";
+import { AppIcon } from "@/components/AppIcon";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 
@@ -32,7 +32,7 @@ const ProfileHeaderActions = memo(function ProfileHeaderActions() {
     <View style={styles.profileHeader}>
       <NotificationBellButton userId={userId} unreadCount={unreadNotifications} />
       <Pressable onPress={() => pushScreen("/settings")} hitSlop={8}>
-        <TabBarIcon name="settings" color={colors.text} size={24} />
+        <AppIcon name="settings" color={colors.text} size={24} />
       </Pressable>
     </View>
   );
@@ -77,7 +77,7 @@ const TabsShell = memo(function TabsShell() {
           title: "Feed",
           headerTitle: renderFeedHeaderTitle,
           tabBarLabel: "Feed",
-          tabBarIcon: ({ color, size }) => <TabBarIcon name="feed" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="feed" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)" />,
         }}
@@ -86,7 +86,7 @@ const TabsShell = memo(function TabsShell() {
         name="discover"
         options={{
           title: "Discover",
-          tabBarIcon: ({ color, size }) => <TabBarIcon name="discover" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="discover" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/discover" />,
         }}
@@ -96,7 +96,7 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Events",
           headerTitle: renderEventsHeaderTitle,
-          tabBarIcon: ({ color, size }) => <TabBarIcon name="events" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="events" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/events" />,
         }}
@@ -106,7 +106,7 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Post",
           tabBarLabel: "Post",
-          tabBarIcon: ({ color, size }) => <TabBarIcon name="post" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="post" color={color} size={size} />,
           tabBarButton: (props) => <CreateTabBarButton {...props} />,
         }}
         listeners={{
@@ -120,7 +120,7 @@ const TabsShell = memo(function TabsShell() {
         name="messages"
         options={{
           title: "Messages",
-          tabBarIcon: ({ color, size }) => <TabBarIcon name="messages" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="messages" color={color} size={size} />,
           tabBarBadge: messagesBadge,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/messages" />,
@@ -131,7 +131,7 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Profile",
           headerTitle: renderProfileHeaderTitle,
-          tabBarIcon: ({ color, size }) => <TabBarIcon name="profile" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="profile" color={color} size={size} />,
           headerRight: renderProfileHeader,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/profile" />,
         }}

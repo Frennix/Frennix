@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState, useCallback } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
 import type { SuggestedAthlete } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -112,7 +112,7 @@ export default function DiscoverScreen() {
       <View style={styles.matchingCards}>
         <Pressable style={styles.matchingCard} onPress={() => pushScreen("/matching")}>
           <View style={styles.matchingCardIcon}>
-            <Ionicons name="people-outline" size={24} color={colors.accent} />
+            <AppIcon name="users" color={colors.accent} size={24} />
           </View>
           <View style={styles.matchingCardCopy}>
             <Text style={styles.matchingCardTitle}>Find training partners</Text>
@@ -120,12 +120,12 @@ export default function DiscoverScreen() {
               Browse athletes who share your goals and workout style — connect to train together.
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <AppIcon name="chevron-right" color={colors.textMuted} size={20} />
         </Pressable>
 
         <Pressable style={styles.matchingCard} onPress={() => pushScreen("/trainers")}>
           <View style={styles.matchingCardIcon}>
-            <Ionicons name="fitness-outline" size={24} color={colors.accent} />
+            <AppIcon name="dumbbell" color={colors.accent} size={24} />
           </View>
           <View style={styles.matchingCardCopy}>
             <Text style={styles.matchingCardTitle}>Find a trainer</Text>
@@ -133,7 +133,7 @@ export default function DiscoverScreen() {
               Connect with professional coaches for online or in-person training.
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <AppIcon name="chevron-right" color={colors.textMuted} size={20} />
         </Pressable>
       </View>
 

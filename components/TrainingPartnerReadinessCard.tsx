@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
 import type { Profile } from "@frennix/types";
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import {
   getTrainingPartnerReadinessItems,
   isTrainingPartnerDiscoveryReady,
@@ -38,8 +38,8 @@ export function TrainingPartnerReadinessCard({
       <View style={styles.list}>
         {items.map((item) => (
           <View key={item.key} style={styles.row}>
-            <Ionicons
-              name={item.complete ? "checkmark-circle" : "ellipse-outline"}
+            <AppIcon
+              name={item.complete ? "check-circle" : "circle"}
               size={18}
               color={item.complete ? colors.accent : colors.textMuted}
             />

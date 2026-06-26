@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { router, type Href } from "expo-router";
 import { Pressable, StyleSheet } from "react-native";
 import { colors, spacing } from "@frennix/ui";
@@ -32,7 +32,7 @@ export function StackBackButton({ fallbackHref = "/(tabs)", onBack }: StackBackB
       accessibilityRole="button"
       accessibilityLabel="Go back"
     >
-      <Ionicons name="chevron-back" size={28} color={colors.text} />
+      <AppIcon name="chevron-left" color={colors.text} size={28} />
     </Pressable>
   );
 }

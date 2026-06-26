@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { Stack, router } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -31,7 +31,7 @@ import { Button, EmptyState, colors, spacing, typography } from "@frennix/ui";
 function DiscoveryHeaderButton() {
   return (
     <Pressable onPress={() => pushScreen("/matching")} hitSlop={8} style={styles.headerButton}>
-      <Ionicons name="compass-outline" size={22} color={colors.text} />
+      <AppIcon name="compass" color={colors.text} size={22} />
     </Pressable>
   );
 }

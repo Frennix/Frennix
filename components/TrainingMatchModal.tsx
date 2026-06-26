@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Profile } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
@@ -73,7 +73,7 @@ export function TrainingPartnerDeckActions({
         disabled={disabled || loading}
         accessibilityLabel="Skip training partner"
       >
-        <Ionicons name="close" size={28} color={colors.textSecondary} />
+        <AppIcon name="close" color={colors.textSecondary} size={28} />
         <Text style={styles.skipLabel}>Skip</Text>
       </Pressable>
 
@@ -83,7 +83,7 @@ export function TrainingPartnerDeckActions({
         disabled={disabled || loading}
         accessibilityLabel="Connect with training partner"
       >
-        <Ionicons name="people" size={28} color={colors.background} />
+        <AppIcon name="users" color={colors.background} size={28} />
         <Text style={styles.connectLabel}>Connect</Text>
       </Pressable>
     </View>

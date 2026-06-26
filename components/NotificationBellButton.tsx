@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/components/AppIcon";
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -37,7 +37,7 @@ export function NotificationBellButton({ userId, unreadCount }: NotificationBell
           : "Notifications"
       }
     >
-      <Ionicons name="notifications-outline" size={24} color={colors.text} />
+      <AppIcon name="bell" color={colors.text} size={24} />
       {unreadCount > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
