@@ -18,6 +18,27 @@ export function removeChallengeFromLists(
   });
 }
 
+/** Patch a challenge in discover/detail caches immediately after edit. */
+export function updateChallengeInLists(
+  queryClient: QueryClient,
+  updated: Challenge,
+  userId: string
+) {
+  queryClient.setQueriesData<Challenge[]>({ queryKey: ["discover-challenges"] }, (old) => {
+    if (!old) return old;
+    return old.map((challenge) => (challenge.id === updated.id ? { ...challenge, ...updated } : challenge));
+  });
+
+  queryClient.setQueriesData<Challenge[]>({ queryKey: ["my-challenges", userId] }, (old) => {
+    if (!old) return old;
+    return old.map((challenge) => (challenge.id === updated.id ? { ...challenge, ...updated } : challenge));
+  });
+
+  queryClient.setQueriesData<Challenge | null>({ queryKey: ["challenge", updated.id] }, (old) =>
+    old ? { ...old, ...updated } : updated
+  );
+}
+
 /** Remove a group from discover lists immediately after delete. */
 export function removeGroupFromLists(queryClient: QueryClient, groupId: string) {
   queryClient.setQueriesData<Group[]>({ queryKey: ["discover-groups"] }, (old) => {

@@ -23,7 +23,7 @@ import {
   showAlert,
   showSuccess,
 } from "@/lib/alerts";
-import { removeChallengeFromLists } from "@/lib/entity-list-cache";
+import { removeChallengeFromLists, updateChallengeInLists } from "@/lib/entity-list-cache";
 import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
 
@@ -75,11 +75,14 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["discover-challenges"] });
       await queryClient.cancelQueries({ queryKey: ["my-challenges", userId] });
+      const previousDiscover = queryClient.getQueryData<Challenge[]>(["discover-challenges"]);
+      const previousMine = queryClient.getQueryData<Challenge[]>(["my-challenges", userId]);
       removeChallengeFromLists(queryClient, challengeId, userId);
       queryClient.removeQueries({ queryKey: ["challenge", challengeId] });
       queryClient.removeQueries({ queryKey: ["challenge-posts", challengeId] });
       queryClient.removeQueries({ queryKey: ["challenge-joined", challengeId] });
       queryClient.removeQueries({ queryKey: ["challenge-participants", challengeId] });
+      return { previousDiscover, previousMine };
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["discover-challenges"] });
@@ -87,8 +90,13 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
       showSuccess(ownershipMessages.deleted("Challenge"));
       onDeleted?.();
     },
-    onError: (error) => {
-      void invalidateChallengeLists();
+    onError: (error, _vars, context) => {
+      if (context?.previousDiscover) {
+        queryClient.setQueryData(["discover-challenges"], context.previousDiscover);
+      }
+      if (context?.previousMine) {
+        queryClient.setQueryData(["my-challenges", userId], context.previousMine);
+      }
       showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
   });
@@ -151,7 +159,7 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
       switch (actionId) {
         case "edit":
           closeMenu();
-          router.push({ pathname: "/edit-challenge/[id]", params: { id: challenge.id } });
+          router.push(`/edit-challenge/${challenge.id}`);
           return;
         case "delete":
           closeMenu();

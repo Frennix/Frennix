@@ -757,7 +757,7 @@ pnpm build:web        # web bundle compiles with ownership framework
 
 Last run (June 25, 2026): **all checks passed**; web export succeeded.
 
-**Code audit QA (agent, post-push):** Two bugs fixed in follow-up commit — saved-posts optimistic delete cache shape; comment deep links (`?comment=`) now highlight and scroll on post detail. Remaining checklist items require signed-in manual testing on web + native.
+**Code audit QA (agent, post-push):** Two bugs fixed in `7f4e2b2` — saved-posts optimistic delete cache shape; comment deep links (`?comment=`) highlight and scroll on post detail. Challenge ownership hardened in follow-up — creator auto-join, discover ⋯ menu, immediate edit cache patch, delete rollback, resilient cover cleanup. **Requires `supabase db push`** for challenge UPDATE/DELETE RLS (`20250630000001`).
 
 #### Phase A QA checklist (web + mobile — manual sign-off)
 

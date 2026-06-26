@@ -20,7 +20,8 @@ import { Button, EmptyState, PostCard, getSharedPostTargetId, colors, radius, sp
 import { isChallengeClosed } from "@/lib/challenge-actions";
 
 export default function ChallengeDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();

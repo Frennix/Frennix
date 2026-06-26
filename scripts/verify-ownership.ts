@@ -210,6 +210,7 @@ function verifyListCacheHelpers() {
   const source = readFileSync(join(ROOT, "lib/entity-list-cache.ts"), "utf8");
   for (const fn of [
     "removeChallengeFromLists",
+    "updateChallengeInLists",
     "removeGroupFromLists",
     "removeEventFromLists",
   ]) {

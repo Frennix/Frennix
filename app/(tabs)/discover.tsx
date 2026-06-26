@@ -6,11 +6,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
 import type { SuggestedAthlete } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { DiscoverChallengeRow } from "@/components/DiscoverChallengeRow";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
 import {
-  ChallengeCard,
   DiscoverProfileCard,
   EmptyState,
   GroupCard,
@@ -271,9 +271,7 @@ export default function DiscoverScreen() {
               onAction={() => router.push("/create-challenge")}
             />
           }
-          renderItem={({ item }) => (
-            <ChallengeCard challenge={item} onPress={() => router.push(`/challenge/${item.id}`)} />
-          )}
+          renderItem={({ item }) => <DiscoverChallengeRow challenge={item} userId={userId} />}
         />
       ) : null}
     </View>

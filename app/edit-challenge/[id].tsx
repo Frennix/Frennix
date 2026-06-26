@@ -11,6 +11,8 @@ import {
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert, showSuccess } from "@/lib/alerts";
+import { updateChallengeInLists } from "@/lib/entity-list-cache";
+import { ownershipMessages } from "@/lib/ownership/messages";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
@@ -24,7 +26,8 @@ function combineDateInput(date: string, endOfDay = false) {
 }
 
 export default function EditChallengeScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
@@ -129,7 +132,7 @@ export default function EditChallengeScreen() {
         coverUrl = null;
       }
 
-      await updateChallenge(
+      const updated = await updateChallenge(
         id,
         userId,
         {
@@ -143,9 +146,8 @@ export default function EditChallengeScreen() {
         { removedCoverUrl }
       );
 
-      await queryClient.invalidateQueries({ queryKey: ["challenge", id] });
-      await queryClient.invalidateQueries({ queryKey: ["discover-challenges"] });
-      showSuccess("Challenge updated successfully.");
+      updateChallengeInLists(queryClient, updated, userId);
+      showSuccess(ownershipMessages.updated("Challenge"));
       router.back();
     } catch (e) {
       const message = getErrorMessage(e) || "Something went wrong. Please try again.";

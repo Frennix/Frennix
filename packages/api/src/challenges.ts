@@ -62,6 +62,17 @@ export async function createChallenge(input: {
 }) {
   const { data, error } = await getSupabase().from("challenges").insert(input).select().single();
   if (error) throw formatSupabaseError(error, "Failed to create challenge");
+  if (!data) throw new Error("Challenge created but no data returned");
+
+  const { error: joinError } = await getSupabase().from("challenge_participants").insert({
+    challenge_id: data.id,
+    user_id: input.created_by,
+    status: "active",
+  });
+  if (joinError && joinError.code !== "23505") {
+    throw formatSupabaseError(joinError, "Failed to join challenge as creator");
+  }
+
   return data as Challenge;
 }
 
@@ -89,7 +100,7 @@ export async function updateChallenge(
 
   if (error) throw formatSupabaseError(error, "Failed to update challenge");
   if (!data) throw new Error("Challenge update did not return a row");
-  return data as Challenge;
+  return enrichChallengeParticipantCount(data as Challenge);
 }
 
 export async function deleteChallenge(challengeId: string, userId: string) {
@@ -106,7 +117,11 @@ export async function deleteChallenge(challengeId: string, userId: string) {
   if (challenge.cover_image_url) {
     const path = extractAvatarsStoragePath(challenge.cover_image_url as string);
     if (path) {
-      await getSupabase().storage.from("avatars").remove([path]);
+      try {
+        await getSupabase().storage.from("avatars").remove([path]);
+      } catch {
+        // Best-effort storage cleanup — do not block challenge deletion.
+      }
     }
   }
 
