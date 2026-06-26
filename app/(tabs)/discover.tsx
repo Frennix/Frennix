@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { AppIcon } from "@/components/AppIcon";
+import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
+import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
 import type { SuggestedAthlete } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -104,6 +107,32 @@ export default function DiscoverScreen() {
   const peopleLoading = isSearchingPeople ? searchLoading : suggestionsLoading;
   const peopleRefetching = isSearchingPeople ? searchRefetching : suggestionsRefetching;
 
+  const peopleListRef = useRef<FlatList<SuggestedAthlete>>(null);
+  const groupsListRef = useRef<FlatList<(typeof groups)[number]>>(null);
+  const challengesListRef = useRef<FlatList<(typeof challenges)[number]>>(null);
+  const { onScroll, isAtTop, resetAtTop } = useScrollAtTop();
+
+  useEffect(() => {
+    resetAtTop();
+  }, [resetAtTop, tab]);
+
+  useTabScrollRegistration(
+    "discover",
+    useCallback(() => {
+      const activeRef =
+        tab === "people" ? peopleListRef : tab === "groups" ? groupsListRef : challengesListRef;
+      handleTabRetap({
+        isAtTop,
+        scrollToTop: () => scrollFlatListToTop(activeRef.current),
+        refresh: () => {
+          if (tab === "people") void onRefreshPeople();
+          else if (tab === "groups") void onRefreshGroups();
+          else void onRefreshChallenges();
+        },
+      });
+    }, [isAtTop, onRefreshChallenges, onRefreshGroups, onRefreshPeople, tab])
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Find your training community</Text>
@@ -168,7 +197,10 @@ export default function DiscoverScreen() {
 
       {tab === "people" ? (
         <FlatList
+          ref={peopleListRef}
           data={peopleData}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           keyExtractor={(item) => item.profile.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
@@ -221,7 +253,10 @@ export default function DiscoverScreen() {
 
       {tab === "groups" ? (
         <FlatList
+          ref={groupsListRef}
           data={groups}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           keyExtractor={(g) => g.id}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -248,7 +283,10 @@ export default function DiscoverScreen() {
 
       {tab === "challenges" ? (
         <FlatList
+          ref={challengesListRef}
           data={challenges}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
           refreshControl={

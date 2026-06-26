@@ -79,7 +79,7 @@ const TabsShell = memo(function TabsShell() {
           tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <AppIcon name="feed" color={color} size={size} />,
           headerRight: renderHeaderBell,
-          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)" />,
+          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)" tabKey="feed" />,
         }}
       />
       <Tabs.Screen
@@ -88,7 +88,9 @@ const TabsShell = memo(function TabsShell() {
           title: "Discover",
           tabBarIcon: ({ color, size }) => <AppIcon name="discover" color={color} size={size} />,
           headerRight: renderHeaderBell,
-          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/discover" />,
+          tabBarButton: (props) => (
+            <FastTabBarButton {...props} href="/(tabs)/discover" tabKey="discover" />
+          ),
         }}
       />
       <Tabs.Screen
@@ -98,7 +100,9 @@ const TabsShell = memo(function TabsShell() {
           headerTitle: renderEventsHeaderTitle,
           tabBarIcon: ({ color, size }) => <AppIcon name="events" color={color} size={size} />,
           headerRight: renderHeaderBell,
-          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/events" />,
+          tabBarButton: (props) => (
+            <FastTabBarButton {...props} href="/(tabs)/events" tabKey="events" />
+          ),
         }}
       />
       <Tabs.Screen
@@ -123,7 +127,9 @@ const TabsShell = memo(function TabsShell() {
           tabBarIcon: ({ color, size }) => <AppIcon name="messages" color={color} size={size} />,
           tabBarBadge: messagesBadge,
           headerRight: renderHeaderBell,
-          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/messages" />,
+          tabBarButton: (props) => (
+            <FastTabBarButton {...props} href="/(tabs)/messages" tabKey="messages" />
+          ),
         }}
       />
       <Tabs.Screen
@@ -133,7 +139,9 @@ const TabsShell = memo(function TabsShell() {
           headerTitle: renderProfileHeaderTitle,
           tabBarIcon: ({ color, size }) => <AppIcon name="profile" color={color} size={size} />,
           headerRight: renderProfileHeader,
-          tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)/profile" />,
+          tabBarButton: (props) => (
+            <FastTabBarButton {...props} href="/(tabs)/profile" tabKey="profile" />
+          ),
         }}
       />
     </Tabs>

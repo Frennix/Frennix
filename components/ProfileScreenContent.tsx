@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useMemo, useState, type RefObject } from "react";
 import {
   ActivityIndicator,
   ImageBackground,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import type { Post, Profile, ProfileStats } from "@frennix/types";
 import { computeProfileAchievements } from "@frennix/api";
@@ -55,6 +57,8 @@ interface ProfileScreenContentProps {
   onOwnerActionsPress?: (post: Post) => void;
   postActionSheet?: ReactNode;
   profileActionSheet?: ReactNode;
+  scrollViewRef?: RefObject<ScrollView>;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }
 
 const COVER_HEIGHT = 200;
@@ -99,6 +103,8 @@ export function ProfileScreenContent({
   onOwnerActionsPress,
   postActionSheet,
   profileActionSheet,
+  scrollViewRef,
+  onScroll,
 }: ProfileScreenContentProps) {
   const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
@@ -117,7 +123,13 @@ export function ProfileScreenContent({
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      ref={scrollViewRef}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
       {postActionSheet}
       {profileActionSheet}
 

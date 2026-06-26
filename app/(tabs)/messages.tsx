@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { usePathname } from "expo-router";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getConversations } from "@frennix/api";
 import type { Conversation } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen, switchTab } from "@/lib/press-utils";
+import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
+import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { Avatar, EmptyState, colors, isProfileOnline, spacing, typography } from "@frennix/ui";
 
@@ -96,10 +99,31 @@ export default function MessagesScreen() {
     [handlePress]
   );
 
+  const listRef = useRef<FlatList<Conversation>>(null);
+  const { onScroll, isAtTop } = useScrollAtTop();
+
+  useTabScrollRegistration(
+    "messages",
+    useCallback(
+      () =>
+        handleTabRetap({
+          isAtTop,
+          scrollToTop: () => scrollFlatListToTop(listRef.current),
+          refresh: () => {
+            void refetch();
+          },
+        }),
+      [isAtTop, refetch]
+    )
+  );
+
   return (
     <View style={styles.container}>
       <FlatList
+        ref={listRef}
         data={conversations}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
         initialNumToRender={12}

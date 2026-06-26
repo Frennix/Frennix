@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,19 +11,40 @@ import {
   View,
 } from "react-native";
 import { getErrorMessage, getWorkoutEvents } from "@frennix/api";
+import type { WorkoutEvent } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
+import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
+import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { EmptyState, EventCard, colors, spacing, typography } from "@frennix/ui";
 
 export default function EventsTabScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+  const listRef = useRef<FlatList<WorkoutEvent>>(null);
+  const { onScroll, isAtTop } = useScrollAtTop();
 
   const { data: events = [], isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ["workout-events", userId],
     queryFn: () => getWorkoutEvents(userId),
     enabled: !!userId,
   });
+
+  useTabScrollRegistration(
+    "events",
+    useCallback(
+      () =>
+        handleTabRetap({
+          isAtTop,
+          scrollToTop: () => scrollFlatListToTop(listRef.current),
+          refresh: () => {
+            void refetch();
+          },
+        }),
+      [isAtTop, refetch]
+    )
+  );
 
   if (!userId) {
     return (
@@ -64,7 +86,10 @@ export default function EventsTabScreen() {
       </View>
 
       <FlatList
+        ref={listRef}
         data={events}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         keyExtractor={(event) => event.id}
         contentContainerStyle={styles.list}
         refreshControl={

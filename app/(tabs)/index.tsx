@@ -13,6 +13,9 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
+import { handleTabRetap, scrollFlatListToTop } from "@/lib/tab-scroll-registry";
+import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useFeedLike } from "@/lib/useFeedLike";
 import { trackFeedLoad } from "@/lib/product-analytics";
 import { useImageLightbox } from "@/lib/useImageLightbox";
@@ -34,6 +37,7 @@ export default function HomeScreen() {
   const { openImage, lightbox } = useImageLightbox();
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
+  const listRef = useRef<FlatList<Post>>(null);
 
   const {
     data,
@@ -78,6 +82,26 @@ export default function HomeScreen() {
   });
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+  const { onScroll, isAtTop } = useScrollAtTop();
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
+  }, [refetch, refetchStories, refetchSuggestions]);
+
+  useTabScrollRegistration(
+    "feed",
+    useCallback(
+      () =>
+        handleTabRetap({
+          isAtTop,
+          scrollToTop: () => scrollFlatListToTop(listRef.current),
+          refresh: () => {
+            void handleRefresh();
+          },
+        }),
+      [handleRefresh, isAtTop]
+    )
+  );
 
   useEffect(() => {
     if (userId) {
@@ -91,10 +115,6 @@ export default function HomeScreen() {
     trackFeedLoad(performance.now() - feedLoadStartedRef.current, posts.length);
     feedPerfTrackedRef.current = true;
   }, [isFeedReady, posts.length]);
-
-  async function handleRefresh() {
-    await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
-  }
 
   const feedActionsRef = useRef<FeedListItemActions>({
     onPress: () => undefined,
@@ -220,6 +240,7 @@ export default function HomeScreen() {
         }}
       />
       <FlatList
+        ref={listRef}
         data={posts}
         extraData={dataUpdatedAt}
         keyExtractor={(item) => item.id}
@@ -229,6 +250,8 @@ export default function HomeScreen() {
         windowSize={11}
         updateCellsBatchingPeriod={32}
         removeClippedSubviews={Platform.OS !== "web"}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching || isStoriesRefetching || isSuggestionsRefetching}

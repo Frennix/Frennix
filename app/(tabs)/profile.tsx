@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
-import { ActivityIndicator, View, StyleSheet } from "react-native";
+import { useCallback, useRef } from "react";
+import { ActivityIndicator, ScrollView, View, StyleSheet } from "react-native";
 import { getFollowingIds, getPostsByUser, getProfileStats } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
@@ -9,6 +9,9 @@ import { useAvatarUpload } from "@/lib/useAvatarUpload";
 import { useCoverUpload } from "@/lib/useCoverUpload";
 import { usePostActions } from "@/lib/usePostActions";
 import { useProfileActions } from "@/lib/useProfileActions";
+import { scrollScrollViewToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
+import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { colors } from "@frennix/ui";
 
 const EMPTY_STATS = {
@@ -30,18 +33,45 @@ export default function ProfileTabScreen() {
     userId,
     profile,
   });
+  const scrollRef = useRef<ScrollView>(null);
+  const { onScroll, isAtTop } = useScrollAtTop();
 
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ["profile-stats", userId],
     queryFn: () => getProfileStats(userId),
     enabled: !!userId,
   });
 
-  const { data: followingIds = [] } = useQuery({
+  const { data: followingIds = [], refetch: refetchFollowingIds } = useQuery({
     queryKey: ["following-ids", userId],
     queryFn: () => getFollowingIds(userId),
     enabled: !!userId,
   });
+
+  const { data: postsPage, refetch: refetchPosts } = useQuery({
+    queryKey: ["user-posts", userId, userId],
+    queryFn: () => getPostsByUser(userId, userId),
+    enabled: !!userId,
+  });
+
+  const refreshProfile = useCallback(async () => {
+    await Promise.all([refetchStats(), refetchFollowingIds(), refetchPosts()]);
+  }, [refetchFollowingIds, refetchPosts, refetchStats]);
+
+  useTabScrollRegistration(
+    "profile",
+    useCallback(
+      () =>
+        handleTabRetap({
+          isAtTop,
+          scrollToTop: () => scrollScrollViewToTop(scrollRef.current),
+          refresh: () => {
+            void refreshProfile();
+          },
+        }),
+      [isAtTop, refreshProfile]
+    )
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -52,12 +82,6 @@ export default function ProfileTabScreen() {
       }
     }, [queryClient, userId])
   );
-
-  const { data: postsPage } = useQuery({
-    queryKey: ["user-posts", userId, userId],
-    queryFn: () => getPostsByUser(userId, userId),
-    enabled: !!userId,
-  });
 
   if (!authReady || !profile) {
     return (
@@ -91,6 +115,8 @@ export default function ProfileTabScreen() {
       onProfileMenuPress={openProfileActions}
       postActionSheet={postActionSheets}
       profileActionSheet={profileActionSheets}
+      scrollViewRef={scrollRef}
+      onScroll={onScroll}
     />
   );
 }
