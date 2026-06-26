@@ -1,4 +1,4 @@
-import type { Challenge, Post } from "@frennix/types";
+import type { Challenge, ChallengeParticipant, Post, Profile } from "@frennix/types";
 import { enrichPostsWithInteractions } from "./posts";
 import { formatSupabaseError, normalizeImageExt, readImageBytes } from "./profile-utils";
 import { getSupabase } from "./supabase";
@@ -172,4 +172,39 @@ export async function getChallengePosts(challengeId: string, viewerId?: string) 
   const posts = (data ?? []) as Post[];
   if (viewerId) return enrichPostsWithInteractions(posts, viewerId);
   return posts;
+}
+
+export async function getChallengeParticipants(
+  challengeId: string
+): Promise<ChallengeParticipant[]> {
+  const { data, error } = await getSupabase()
+    .from("challenge_participants")
+    .select(`*, profile:profiles!challenge_participants_user_id_fkey(*)`)
+    .eq("challenge_id", challengeId)
+    .eq("status", "active")
+    .order("joined_at", { ascending: true });
+
+  if (error) throw formatSupabaseError(error, "Failed to load participants");
+
+  return (data ?? []).map((row) => {
+    const entry = row as ChallengeParticipant & { profile: Profile | Profile[] | null };
+    const profile = Array.isArray(entry.profile) ? entry.profile[0] : entry.profile;
+    return { ...entry, profile: profile ?? undefined };
+  });
+}
+
+export async function closeChallengeEarly(challengeId: string, userId: string) {
+  const now = new Date().toISOString();
+  const { data, error } = await getSupabase()
+    .from("challenges")
+    .update({ end_date: now })
+    .eq("id", challengeId)
+    .eq("created_by", userId)
+    .gt("end_date", now)
+    .select()
+    .single();
+
+  if (error) throw formatSupabaseError(error, "Failed to close challenge");
+  if (!data) throw new Error("Challenge is already closed or you are not the creator");
+  return data as Challenge;
 }

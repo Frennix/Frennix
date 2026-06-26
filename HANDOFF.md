@@ -15,8 +15,9 @@ Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, wo
 
 Recent session work:
 
-- **Challenge management** — creator ⋯ menu (Edit/Delete), edit screen (title, description, rules, dates, cover), hard delete with participant CASCADE, RLS update/delete policies
-- **Post management (Priority 1)** — owner/non-owner three-dot menus, full edit (caption, workout type, media add/remove/replace/reorder), delete with storage cleanup, instant feed cache updates, copy-link support
+- **Phase A — Shared ownership framework** — `EntityActionSheet`, `entity-actions`, unified post/challenge/event menus (Edit, Delete, Share, Copy Link, Report, Block); events get ⋯ menu + share/report
+- **Challenge management** — creator/viewer ⋯ menus on shared framework
+- **Post management (Priority 1)** — unified `usePostActions`, owner gets Share + Copy Link, viewer gets Block
 - **Logo clipping fix** — padded PNG + web-native `<img>` in `FrennixLogo.tsx`
 - **Feed photo lightbox** — pinch/pan zoom, full-screen viewer on feed + post detail
 - **Instagram-style feed media** — full-width, aspect-preserving photos/videos, large play button
@@ -678,29 +679,86 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 | 5 | Error handling polish | Pending |
 | 6 | Full mobile + web QA | Pending |
 
+### Phase A — Shared ownership framework (completed)
+
+All owner-managed content uses the same three-layer pattern:
+
+| Layer | File | Role |
+|-------|------|------|
+| Core types | `lib/entity-actions.ts` | `EntityActionId`, `EntityActionDefinition`, standard owner/viewer presets |
+| Shared UI | `components/EntityActionSheet.tsx` | Configurable ⋯ menu + Cancel |
+| Shared UI | `components/EntityListSheet.tsx` | Participants / attendees modal |
+| Link helpers | `lib/entity-link.ts` | `copyEntityLink`, `shareEntityLink` (used by `*-link.ts` per entity) |
+
+**Per-entity wiring** (add a row for each new content type):
+
+| Entity | Registry | Hook | Link helper |
+|--------|----------|------|-------------|
+| Post | `lib/post-actions.ts` | `lib/usePostActions.tsx` | `lib/post-link.ts` |
+| Challenge | `lib/challenge-actions.ts` | `lib/useChallengeActions.tsx` | `lib/challenge-link.ts` |
+| Event | `lib/event-actions.ts` | `lib/useEventActions.tsx` | `lib/event-link.ts` |
+
+**Standard owner menu:** Edit, Delete, Share, Copy Link (+ entity extras: View Participants, Invite, Close Early, etc.)
+
+**Standard viewer menu:** Share, Copy Link, Report, Block
+
+**Removed (replaced by framework):** `PostActionSheet`, `PostViewerActionSheet`, `ChallengeActionSheet`, `usePostOwnerActions`, `usePostViewerActions`
+
 ### Priority 1 deliverables (completed)
 
-- Owner ⋯ menu: Edit Post, Delete Post, Cancel (`PostActionSheet`)
-- Non-owner ⋯ menu: Share, Copy Link, Report, Cancel (`PostViewerActionSheet`)
+- Unified `usePostActions` on `EntityActionSheet` — owner: Edit, Delete, Share, Copy Link; viewer: Share, Copy Link, Report, Block
 - Edit: caption, workout type, photos/videos with add/remove/replace/reorder
-- Delete: confirmation ("Delete Workout?"), DB + storage cleanup, instant feed removal
+- Delete: confirmation, DB + storage cleanup, instant feed removal
+- Profile grid: long-press opens owner menu for **all** own posts (not media-only)
 - API: `updatePost` extended for media fields; `removePostsStorageFiles` helper
 - Cache: optimistic updates across feed, profile, group, challenge, event, saved-posts
-- `.gitignore` updated to exclude `.pnpm-store/` and other local caches from version control
 
-### Challenge management (QA fix — live)
+### Challenge management
 
-- Creator ⋯ on `/challenge/[id]`: Edit Challenge, Delete Challenge, Cancel (`ChallengeActionSheet`)
-- Edit: title, description, rules, start/end dates, cover image (`app/edit-challenge/[id].tsx`)
-- Delete: "Delete Challenge?" confirmation, DB hard delete, participant rows CASCADE, posts keep `challenge_id` SET NULL, cover removed from storage
-- RLS: `"Update own challenges"`, `"Delete own challenges"` — migration `20250630000001_challenge_management.sql`
-- Non-creators: no ⋯ menu on challenge detail
+| Layer | File |
+|-------|------|
+| Registry | `lib/challenge-actions.ts` |
+| Hook | `lib/useChallengeActions.tsx` |
+| Links | `lib/challenge-link.ts` |
 
-**Apply migration:** `supabase db push` from repo root.
+**Owner ⋯:** Edit, Delete, Share, Copy Link, Duplicate (placeholder), View Participants, Close Early (hidden when ended)
 
-### Priority 1 QA checklist (in progress)
+**Viewer ⋯:** Share, Copy Link, Report, Block
 
-See agent session notes — test post create/edit/delete, menus, permissions, feed updates, storage cleanup on **web + mobile** before Priority 2.
+- Migrations: `20250630000001_challenge_management.sql`, `20250630000002_challenge_reports.sql`
+
+### Event management (Phase A)
+
+| Layer | File |
+|-------|------|
+| Registry | `lib/event-actions.ts` |
+| Hook | `lib/useEventActions.tsx` |
+| Links | `lib/event-link.ts` |
+
+**Owner ⋯:** Edit, Cancel, Share, Copy Link, View Attendees, Invite Athletes (hidden when cancelled)
+
+**Viewer ⋯:** Share, Copy Link, Report, Block
+
+- Report: `reportEvent` → `reports.reported_event_id` (migration `20250630000003_event_reports.sql`)
+- Event detail: header ⋯ replaces inline creator buttons; Join/Leave remains a primary CTA
+
+**Apply migrations:** `supabase db push` (`20250630000001`, `20250630000002`, `20250630000003`).
+
+### Phase A QA checklist
+
+Test on **web + mobile** before Priority 2 (Media Experience):
+
+- [ ] Post owner ⋯: Edit, Delete, Share (in-app sheet), Copy Link
+- [ ] Post viewer ⋯: Share, Copy Link, Report, Block
+- [ ] Profile grid long-press on text-only own post → owner menu
+- [ ] Challenge owner/viewer menus match standard + View Participants / Close Early
+- [ ] Event ⋯ menu: creator vs non-creator actions; Cancel event; View Attendees sheet
+- [ ] Event share/copy link opens correct `/event/{id}` URL
+- [ ] Block removes author content from feed after refresh
+
+**Do not start Priority 2 until user approves after QA passes.**
+
+### Priority 1 QA checklist (superseded by Phase A above)
 
 ---
 

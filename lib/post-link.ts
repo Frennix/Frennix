@@ -1,6 +1,5 @@
-import { Platform, Share } from "react-native";
 import { config } from "@/lib/config";
-import { showAlert, showSuccess } from "@/lib/alerts";
+import { copyEntityLink, shareEntityLink } from "@/lib/entity-link";
 
 export function buildPostLink(postId: string) {
   const base = config.appUrl.replace(/\/$/, "");
@@ -8,19 +7,7 @@ export function buildPostLink(postId: string) {
 }
 
 export async function copyPostLink(postId: string) {
-  const link = buildPostLink(postId);
-
-  if (Platform.OS === "web") {
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(link);
-      showSuccess("Link copied to clipboard");
-      return;
-    }
-    showAlert("Copy link", link);
-    return;
-  }
-
-  await Share.share({ message: link });
+  await copyEntityLink(buildPostLink(postId));
 }
 
 export async function sharePostLink(postId: string, caption?: string | null) {
@@ -28,23 +15,9 @@ export async function sharePostLink(postId: string, caption?: string | null) {
   const message = caption?.trim()
     ? `${caption.trim()}\n\n${link}`
     : `Check out this workout on Frennix\n\n${link}`;
-
-  if (Platform.OS === "web") {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: "Frennix workout", text: message, url: link });
-        return;
-      } catch {
-        // fall through to copy
-      }
-    }
-    await copyPostLink(postId);
-    return;
-  }
-
-  await Share.share({
+  await shareEntityLink({
+    link,
+    headline: "Frennix workout",
     message,
-    url: Platform.OS === "ios" ? link : undefined,
-    title: "Frennix workout",
   });
 }

@@ -11,13 +11,11 @@ import {
 } from "@frennix/api";
 import type { Comment } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useModeration } from "@/lib/useModeration";
-import { usePostViewerActions } from "@/lib/usePostViewerActions";
-import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
 import { useState } from "react";
 import { confirmDeleteComment } from "@/lib/alerts";
@@ -41,19 +39,15 @@ export default function PostDetailScreen() {
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const queryClient = useQueryClient();
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({
+  const { openShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, postActionSheets } = usePostActions({
     userId,
     onDeleted: () => router.back(),
+    onShareInApp: (selected) => openShare(selected.shared_post ?? selected),
   });
-  const { openShare, shareSheet } = useSharePost(userId);
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
-  const { moderationSheets, startPostReport, openCommentModeration } = useModeration(userId);
-  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
-    userId,
-    onShare: (selected) => openShare(selected.shared_post ?? selected),
-    onReport: startPostReport,
-  });
+  const { moderationSheets, openCommentModeration } = useModeration(userId);
   const { openImage, lightbox } = useImageLightbox();
 
   const { data: post, isLoading: postLoading } = useQuery({
@@ -138,8 +132,7 @@ export default function PostDetailScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={80}
     >
-      <PostActionSheet {...actionSheetProps} />
-      {viewerActionSheet}
+      {postActionSheets}
       {shareSheet}
       {moderationSheets}
       {lightbox}
@@ -164,7 +157,7 @@ export default function PostDetailScreen() {
               currentEmoji: post.my_reaction,
             })
           }
-          onModerationPress={() => openViewerActions(post)}
+          onModerationPress={() => openPostActions(post)}
         />
 
         <Text style={styles.section}>

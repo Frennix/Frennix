@@ -59,6 +59,8 @@ export async function reportContent(input: {
   reported_user_id?: string;
   reported_post_id?: string;
   reported_comment_id?: string;
+  reported_challenge_id?: string;
+  reported_event_id?: string;
   reason: string;
 }) {
   const { error } = await getSupabase().from("reports").insert({
@@ -95,6 +97,34 @@ export async function reportUser(reporterId: string, reportedUserId: string, rea
   await reportContent({
     reporter_id: reporterId,
     reported_user_id: reportedUserId,
+    reason,
+  });
+}
+
+export async function reportChallenge(
+  reporterId: string,
+  challengeId: string,
+  creatorId: string,
+  reason: string
+) {
+  await reportContent({
+    reporter_id: reporterId,
+    reported_challenge_id: challengeId,
+    reported_user_id: creatorId,
+    reason,
+  });
+}
+
+export async function reportEvent(
+  reporterId: string,
+  eventId: string,
+  creatorId: string,
+  reason: string
+) {
+  await reportContent({
+    reporter_id: reporterId,
+    reported_event_id: eventId,
+    reported_user_id: creatorId,
     reason,
   });
 }

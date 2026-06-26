@@ -1,35 +1,45 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import type { EntityActionDefinition, EntityActionId } from "@/lib/entity-actions";
 import { colors, radius, spacing, typography } from "@frennix/ui";
 
-interface PostViewerActionSheetProps {
+interface EntityActionSheetProps {
   visible: boolean;
+  title?: string;
+  actions: EntityActionDefinition[];
+  onSelect: (actionId: EntityActionId) => void;
   onClose: () => void;
-  onShare: () => void;
-  onCopyLink: () => void;
-  onReport: () => void;
 }
 
-export function PostViewerActionSheet({
+function labelStyle(tone: EntityActionDefinition["tone"]) {
+  if (tone === "danger") return styles.dangerText;
+  if (tone === "muted") return styles.mutedText;
+  return styles.optionText;
+}
+
+export function EntityActionSheet({
   visible,
+  title = "Options",
+  actions,
+  onSelect,
   onClose,
-  onShare,
-  onCopyLink,
-  onReport,
-}: PostViewerActionSheetProps) {
+}: EntityActionSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Post options</Text>
-          <Pressable style={styles.option} onPress={onShare}>
-            <Text style={styles.optionText}>Share</Text>
-          </Pressable>
-          <Pressable style={styles.option} onPress={onCopyLink}>
-            <Text style={styles.optionText}>Copy Link</Text>
-          </Pressable>
-          <Pressable style={styles.option} onPress={onReport}>
-            <Text style={styles.optionText}>Report</Text>
-          </Pressable>
+          <Text style={styles.title}>{title}</Text>
+          {actions.map((action) => (
+            <Pressable
+              key={action.id}
+              style={styles.option}
+              onPress={() => onSelect(action.id)}
+            >
+              <Text style={labelStyle(action.tone)}>
+                {action.label}
+                {action.placeholder ? " (coming soon)" : ""}
+              </Text>
+            </Pressable>
+          ))}
           <Pressable style={[styles.option, styles.cancelOption]} onPress={onClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
@@ -68,6 +78,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   optionText: { ...typography.body, fontWeight: "600", color: colors.text },
+  dangerText: { ...typography.body, fontWeight: "600", color: colors.danger },
+  mutedText: { ...typography.body, fontWeight: "600", color: colors.textMuted },
   cancelOption: { backgroundColor: colors.surfaceElevated },
   cancelText: { ...typography.body, fontWeight: "600", color: colors.textSecondary },
 });

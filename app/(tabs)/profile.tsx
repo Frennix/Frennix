@@ -5,10 +5,9 @@ import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { getFollowingIds, getPostsByUser, getProfileStats } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
-import { PostActionSheet } from "@/components/PostActionSheet";
 import { useAvatarUpload } from "@/lib/useAvatarUpload";
 import { useCoverUpload } from "@/lib/useCoverUpload";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
 import { colors } from "@frennix/ui";
 
 const EMPTY_STATS = {
@@ -25,7 +24,7 @@ export default function ProfileTabScreen() {
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
   const { pickAndUploadCover, uploading: coverUploading, error: coverError, previewUri: coverPreviewUri } = useCoverUpload();
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
+  const { openPostActions, postActionSheets } = usePostActions({ userId });
 
   const { data: stats } = useQuery({
     queryKey: ["profile-stats", userId],
@@ -84,7 +83,7 @@ export default function ProfileTabScreen() {
       coverPreviewUri={coverPreviewUri}
       currentUserId={userId}
       onOwnerActionsPress={openPostActions}
-      postActionSheet={<PostActionSheet {...actionSheetProps} />}
+      postActionSheet={postActionSheets}
     />
   );
 }

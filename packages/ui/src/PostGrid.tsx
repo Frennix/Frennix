@@ -47,7 +47,7 @@ export function PostGrid({
           style={[styles.cell, { width: cellSize, height: cellSize }]}
           onPress={() => onPressPost(post.id)}
           onLongPress={
-            isOwn && hasMedia && onOwnerActionsPress ? () => onOwnerActionsPress(post) : undefined
+            isOwn && onOwnerActionsPress ? () => onOwnerActionsPress(post) : undefined
           }
           delayLongPress={400}
         >

@@ -9,17 +9,15 @@ import {
   isChallengeParticipant,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
-import { useChallengeOwnerActions } from "@/lib/useChallengeOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
+import { useChallengeActions } from "@/lib/useChallengeActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
-import { useModeration } from "@/lib/useModeration";
-import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
-import { PostActionSheet } from "@/components/PostActionSheet";
-import { ChallengeActionSheet } from "@/components/ChallengeActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
 import { Button, EmptyState, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
+
+import { isChallengeClosed } from "@/lib/challenge-actions";
 
 export default function ChallengeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,26 +25,23 @@ export default function ChallengeDetailScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
-  const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, startPostReport } = useModeration(userId);
-  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+  const { openPostActions, postActionSheets } = usePostActions({
     userId,
-    onShare: (post) => openShare(post.shared_post ?? post),
-    onReport: startPostReport,
+    onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
-  const { openChallengeActions, actionSheetProps: challengeActionSheetProps } =
-    useChallengeOwnerActions({
-      userId,
-      challengeId: id ?? "",
-      onDeleted: () => router.replace("/(tabs)/discover"),
-    });
+  const { toggleSavePost } = useSavePost(userId);
 
   const { data: challenge, isLoading: challengeLoading } = useQuery({
     queryKey: ["challenge", id],
     queryFn: () => getChallenge(id!),
     enabled: !!id,
+  });
+
+  const { openChallengeActions, challengeActionSheets } = useChallengeActions({
+    userId,
+    challenge,
+    onDeleted: () => router.replace("/(tabs)/discover"),
   });
 
   const { data: joined } = useQuery({
@@ -94,15 +89,13 @@ export default function ChallengeDetailScreen() {
     );
   }
 
-  const isCreator = challenge.created_by === userId;
+  const closed = isChallengeClosed(challenge);
 
   return (
     <View style={styles.container}>
-      <PostActionSheet {...actionSheetProps} />
-      <ChallengeActionSheet {...challengeActionSheetProps} />
-      {viewerActionSheet}
+      {postActionSheets}
+      {challengeActionSheets}
       {shareSheet}
-      {moderationSheets}
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
@@ -114,7 +107,7 @@ export default function ChallengeDetailScreen() {
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{challenge.title}</Text>
-              {isCreator ? (
+              {userId ? (
                 <Pressable
                   style={styles.menuButton}
                   onPress={openChallengeActions}
@@ -125,6 +118,12 @@ export default function ChallengeDetailScreen() {
                 </Pressable>
               ) : null}
             </View>
+
+            {closed ? (
+              <View style={styles.closedBanner}>
+                <Text style={styles.closedText}>This challenge has ended</Text>
+              </View>
+            ) : null}
 
             {challenge.cover_image_url ? (
               <Image
@@ -147,13 +146,14 @@ export default function ChallengeDetailScreen() {
             </Text>
             <Text style={styles.participants}>{challenge.participant_count} participants</Text>
 
-            {!joined ? (
+            {!closed && !joined ? (
               <Button
                 title="Join challenge"
                 onPress={() => joinMutation.mutate()}
                 loading={joinMutation.isPending}
               />
-            ) : (
+            ) : null}
+            {!closed && joined ? (
               <>
                 <Text style={styles.joined}>You're in! Stay accountable and check in daily.</Text>
                 <Button
@@ -164,7 +164,7 @@ export default function ChallengeDetailScreen() {
                   }
                 />
               </>
-            )}
+            ) : null}
 
             <Text style={styles.section}>Challenge feed</Text>
           </View>
@@ -177,7 +177,7 @@ export default function ChallengeDetailScreen() {
             onOwnerActionsPress={() => openPostActions(item)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onModerationPress={() => openViewerActions(item)}
+            onModerationPress={() => openPostActions(item)}
           />
         )}
         ListEmptyComponent={
@@ -186,13 +186,19 @@ export default function ChallengeDetailScreen() {
             description={
               joined
                 ? "Share your first check-in to stay accountable with the group."
-                : "Join this challenge to see posts and share your progress."
+                : closed
+                  ? "This challenge has ended."
+                  : "Join this challenge to see posts and share your progress."
             }
-            actionLabel={joined ? "Share post" : "Join challenge"}
+            actionLabel={
+              !closed && joined ? "Share post" : !closed && !joined ? "Join challenge" : undefined
+            }
             onAction={
-              joined
+              !closed && joined
                 ? () => router.push({ pathname: "/create-post", params: { challengeId: id! } })
-                : () => joinMutation.mutate()
+                : !closed && !joined
+                  ? () => joinMutation.mutate()
+                  : undefined
             }
           />
         }
@@ -223,6 +229,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
+  closedBanner: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  closedText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center" },
   cover: {
     width: "100%",
     height: 180,

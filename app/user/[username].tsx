@@ -12,8 +12,7 @@ import {
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
-import { PostActionSheet } from "@/components/PostActionSheet";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
 import { useModeration } from "@/lib/useModeration";
 import { useFollowUser } from "@/lib/useFollowUser";
 import { DetailLoading } from "@/components/DetailLoading";
@@ -25,7 +24,7 @@ export default function UserProfileScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const [messaging, setMessaging] = useState(false);
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
+  const { openPostActions, postActionSheets } = usePostActions({ userId });
   const { moderationSheets, openUserModeration } = useModeration(userId);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -119,7 +118,7 @@ export default function UserProfileScreen() {
         messageLoading={messaging}
         currentUserId={isOwn ? userId : undefined}
         onOwnerActionsPress={isOwn ? openPostActions : undefined}
-        postActionSheet={isOwn ? <PostActionSheet {...actionSheetProps} /> : undefined}
+        postActionSheet={isOwn ? postActionSheets : undefined}
       />
     </>
   );

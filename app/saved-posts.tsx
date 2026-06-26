@@ -3,26 +3,20 @@ import { router } from "expo-router";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { getSavedPosts } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
 import { useSavePost } from "@/lib/useSavePost";
-import { useModeration } from "@/lib/useModeration";
-import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { useSharePost } from "@/lib/useSharePost";
-import { PostActionSheet } from "@/components/PostActionSheet";
 import { EmptyState, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function SavedPostsScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
-  const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, startPostReport } = useModeration(userId);
-  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+  const { openPostActions, postActionSheets } = usePostActions({
     userId,
-    onShare: (post) => openShare(post.shared_post ?? post),
-    onReport: startPostReport,
+    onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
+  const { toggleSavePost } = useSavePost(userId);
 
   const {
     data,
@@ -44,10 +38,8 @@ export default function SavedPostsScreen() {
 
   return (
     <View style={styles.container}>
-      <PostActionSheet {...actionSheetProps} />
-      {viewerActionSheet}
+      {postActionSheets}
       {shareSheet}
-      {moderationSheets}
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -86,7 +78,7 @@ export default function SavedPostsScreen() {
             onComment={() => router.push(`/post/${getSharedPostTargetId(item)}`)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onModerationPress={() => openViewerActions(item)}
+            onModerationPress={() => openPostActions(item)}
           />
         )}
       />

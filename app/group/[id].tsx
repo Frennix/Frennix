@@ -4,13 +4,10 @@ import { useCallback, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getGroup, getGroupMembers, getGroupPosts, joinGroup, leaveGroup, isGroupMember } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
 import { useSharePost } from "@/lib/useSharePost";
-import { useModeration } from "@/lib/useModeration";
-import { usePostViewerActions } from "@/lib/usePostViewerActions";
 import { useSavePost } from "@/lib/useSavePost";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
-import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
 import { Button, EmptyState, PostCard, getSharedPostTargetId, UserRow, colors, spacing, typography } from "@frennix/ui";
 
@@ -20,15 +17,12 @@ export default function GroupDetailScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
-  const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, startPostReport } = useModeration(userId);
-  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
+  const { openPostActions, postActionSheets } = usePostActions({
     userId,
-    onShare: (post) => openShare(post.shared_post ?? post),
-    onReport: startPostReport,
+    onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
+  const { toggleSavePost } = useSavePost(userId);
 
   const { data: group, isLoading: groupLoading } = useQuery({
     queryKey: ["group", id],
@@ -97,10 +91,8 @@ export default function GroupDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <PostActionSheet {...actionSheetProps} />
-      {viewerActionSheet}
+      {postActionSheets}
       {shareSheet}
-      {moderationSheets}
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
@@ -149,7 +141,7 @@ export default function GroupDetailScreen() {
             onOwnerActionsPress={() => openPostActions(item)}
             onShare={() => openShare(item.shared_post ?? item)}
             onSave={() => toggleSavePost(item.id, !!item.saved_by_me)}
-            onModerationPress={() => openViewerActions(item)}
+            onModerationPress={() => openPostActions(item)}
           />
         )}
         ListEmptyComponent={

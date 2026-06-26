@@ -8,6 +8,24 @@ export function showAlert(title: string, message: string) {
   Alert.alert(title, message);
 }
 
+export function confirmCloseChallengeEarly(onConfirm: () => void) {
+  const title = "Close challenge early?";
+  const message =
+    "The challenge will end immediately. New athletes will not be able to join.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Close challenge", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 export function confirmDeleteChallenge(onConfirm: () => void) {
   const title = "Delete Challenge?";
   const message = "This action cannot be undone.";

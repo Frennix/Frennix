@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
-  cancelWorkoutEvent,
   getErrorMessage,
   getEventAttendees,
   getEventPosts,
@@ -12,17 +11,26 @@ import {
   leaveWorkoutEvent,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
+import { useEventActions } from "@/lib/useEventActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
-import { useModeration } from "@/lib/useModeration";
-import { usePostViewerActions } from "@/lib/usePostViewerActions";
-import { PostActionSheet } from "@/components/PostActionSheet";
 import { DetailLoading } from "@/components/DetailLoading";
-import { showAlert, showSuccess, confirmCancelEvent } from "@/lib/alerts";
+import { showAlert, showSuccess } from "@/lib/alerts";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { formatActivity } from "@/lib/labels";
-import { Avatar, Button, EmptyState, PostCard, getSharedPostTargetId, UserRow, colors, radius, spacing, typography } from "@frennix/ui";
+import {
+  Avatar,
+  Button,
+  EmptyState,
+  PostCard,
+  getSharedPostTargetId,
+  UserRow,
+  colors,
+  radius,
+  spacing,
+  typography,
+} from "@frennix/ui";
 import { formatWorkoutTypeLabel, workoutTypeEmoji } from "@frennix/ui";
 
 function formatEventDateTime(iso: string) {
@@ -40,21 +48,25 @@ export default function EventDetailScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
-  const { openShare, shareSheet } = useSharePost(userId);
-  const { toggleSavePost } = useSavePost(userId);
-  const { moderationSheets, startPostReport } = useModeration(userId);
-  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
-    userId,
-    onShare: (post) => openShare(post.shared_post ?? post),
-    onReport: startPostReport,
-  });
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: event, isLoading: eventLoading } = useQuery({
     queryKey: ["workout-event", id, userId],
     queryFn: () => getWorkoutEvent(id!, userId),
     enabled: !!id && !!userId,
+  });
+
+  const { openShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, postActionSheets } = usePostActions({
+    userId,
+    onShareInApp: (post) => openShare(post.shared_post ?? post),
+  });
+  const { toggleSavePost } = useSavePost(userId);
+
+  const { openEventActions, eventActionSheets } = useEventActions({
+    userId,
+    event,
+    onCancelled: () => router.back(),
   });
 
   const { data: attendees = [] } = useQuery({
@@ -91,20 +103,6 @@ export default function EventDetailScreen() {
     },
     onError: (e) => showAlert("Could not leave", getErrorMessage(e)),
   });
-
-  const cancelMutation = useMutation({
-    mutationFn: () => cancelWorkoutEvent(id!, userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workout-events"] });
-      showSuccess("Event cancelled");
-      router.back();
-    },
-    onError: (e) => showAlert("Cancel failed", getErrorMessage(e)),
-  });
-
-  function handleCancel() {
-    confirmCancelEvent(() => cancelMutation.mutate());
-  }
 
   const onRefresh = useCallback(async () => {
     if (!id) return;
@@ -150,10 +148,10 @@ export default function EventDetailScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
       }
     >
-      <PostActionSheet {...actionSheetProps} />
-      {viewerActionSheet}
+      {postActionSheets}
+      {eventActionSheets}
       {shareSheet}
-      {moderationSheets}
+
       {isCancelled ? (
         <View style={styles.cancelledBanner}>
           <Text style={styles.cancelledText}>This event was cancelled</Text>
@@ -161,10 +159,24 @@ export default function EventDetailScreen() {
       ) : null}
 
       <View style={styles.hero}>
-        <Text style={styles.emoji}>
-          {event.workout_type ? workoutTypeEmoji(event.workout_type) : "🏅"}
-        </Text>
-        <Text style={styles.title}>{event.title}</Text>
+        <View style={styles.titleRow}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.emoji}>
+              {event.workout_type ? workoutTypeEmoji(event.workout_type) : "🏅"}
+            </Text>
+            <Text style={styles.title}>{event.title}</Text>
+          </View>
+          {userId ? (
+            <Pressable
+              style={styles.menuButton}
+              onPress={openEventActions}
+              hitSlop={8}
+              accessibilityLabel="Event options"
+            >
+              <Text style={styles.menuIcon}>⋯</Text>
+            </Pressable>
+          ) : null}
+        </View>
         {event.workout_type ? (
           <Text style={styles.workoutType}>{formatWorkoutTypeLabel(event.workout_type)}</Text>
         ) : null}
@@ -215,26 +227,6 @@ export default function EventDetailScreen() {
         />
       ) : null}
 
-      {isCreator && !isCancelled ? (
-        <View style={styles.creatorActions}>
-          <Button
-            title="Invite athletes"
-            onPress={() => router.push(`/event/${event.id}/invite`)}
-          />
-          <Button
-            title="Edit event"
-            variant="secondary"
-            onPress={() => router.push({ pathname: "/edit-event/[id]", params: { id: event.id } })}
-          />
-          <Button
-            title="Cancel event"
-            variant="danger"
-            onPress={handleCancel}
-            loading={cancelMutation.isPending}
-          />
-        </View>
-      ) : null}
-
       {!isCancelled && (event.joined_by_me || isCreator) ? (
         <Button
           title="Share post"
@@ -257,7 +249,7 @@ export default function EventDetailScreen() {
               onOwnerActionsPress={() => openPostActions(post)}
               onShare={() => openShare(post.shared_post ?? post)}
               onSave={() => toggleSavePost(post.id, !!post.saved_by_me)}
-              onModerationPress={() => openViewerActions(post)}
+              onModerationPress={() => openPostActions(post)}
             />
           ))
         ) : (
@@ -320,8 +312,27 @@ const styles = StyleSheet.create({
   },
   cancelledText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   hero: { alignItems: "center", gap: spacing.xs, paddingVertical: spacing.sm },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: spacing.sm,
+  },
+  titleBlock: { flex: 1, alignItems: "center", gap: spacing.xs },
   emoji: { fontSize: 40 },
   title: { ...typography.title, fontSize: 26, textAlign: "center", color: colors.text },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
   workoutType: { ...typography.body, color: colors.accent, fontWeight: "600" },
   metaCard: {
     backgroundColor: colors.surface,
@@ -346,6 +357,5 @@ const styles = StyleSheet.create({
   hostRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   hostName: { ...typography.body, fontWeight: "600", color: colors.text },
   hostUsername: { ...typography.caption, color: colors.textMuted },
-  creatorActions: { gap: spacing.sm },
   notFound: { flex: 1, backgroundColor: colors.background, justifyContent: "center" },
 });

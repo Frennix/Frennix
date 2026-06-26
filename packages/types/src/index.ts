@@ -269,6 +269,7 @@ export interface ChallengeParticipant {
   user_id: string;
   status: ChallengeParticipantStatus;
   joined_at: string;
+  profile?: Profile;
 }
 
 export type EventStatus = "active" | "cancelled";
@@ -392,6 +393,8 @@ export interface Report {
   reported_user_id: string | null;
   reported_post_id: string | null;
   reported_comment_id?: string | null;
+  reported_challenge_id?: string | null;
+  reported_event_id?: string | null;
   reason: string;
   status?: ReportStatus;
   reviewed_at?: string | null;

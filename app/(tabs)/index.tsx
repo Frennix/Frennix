@@ -8,13 +8,10 @@ import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
-import { usePostOwnerActions } from "@/lib/usePostOwnerActions";
+import { usePostActions } from "@/lib/usePostActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
-import { useModeration } from "@/lib/useModeration";
-import { usePostViewerActions } from "@/lib/usePostViewerActions";
-import { PostActionSheet } from "@/components/PostActionSheet";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { useFeedLike } from "@/lib/useFeedLike";
 import { trackFeedLoad } from "@/lib/product-analytics";
@@ -25,16 +22,13 @@ export default function HomeScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const [activeStory, setActiveStory] = useState<FeedStory | null>(null);
-  const { openPostActions, actionSheetProps } = usePostOwnerActions({ userId });
   const { openShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, postActionSheets } = usePostActions({
+    userId,
+    onShareInApp: (post) => openShare(post.shared_post ?? post),
+  });
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
-  const { moderationSheets, startPostReport } = useModeration(userId);
-  const { openViewerActions, viewerActionSheet } = usePostViewerActions({
-    userId,
-    onShare: (post) => openShare(post.shared_post ?? post),
-    onReport: startPostReport,
-  });
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
   const { toggleLikePost } = useFeedLike(userId);
   const { openImage, lightbox } = useImageLightbox();
@@ -146,7 +140,7 @@ export default function HomeScreen() {
       });
     },
     onModerationPress: (post: Post) => {
-      openViewerActions(post);
+      openPostActions(post);
     },
     onOwnerActionsPress: (post: Post) => {
       openPostActions(post);
@@ -205,10 +199,8 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <PostActionSheet {...actionSheetProps} />
-      {viewerActionSheet}
+      {postActionSheets}
       {shareSheet}
-      {moderationSheets}
       {lightbox}
       <FeedStoryViewer
         story={activeStory}
