@@ -3,7 +3,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import {
   addComment,
-  deleteComment,
   getComments,
   getPost,
   toggleCommentLike,
@@ -12,13 +11,12 @@ import {
 import type { Comment } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePostActions } from "@/lib/usePostActions";
+import { useCommentActions } from "@/lib/useCommentActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
-import { useModeration } from "@/lib/useModeration";
 import { DetailLoading } from "@/components/DetailLoading";
-import { useState } from "react";
-import { confirmDeleteComment } from "@/lib/alerts";
+import { useCallback, useState } from "react";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import {
   PostCard,
@@ -39,6 +37,13 @@ export default function PostDetailScreen() {
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const queryClient = useQueryClient();
+
+  const invalidatePostComments = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["comments", id] });
+    queryClient.invalidateQueries({ queryKey: ["post", id] });
+    queryClient.invalidateQueries({ queryKey: ["feed"] });
+  }, [id, queryClient]);
+
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
@@ -47,7 +52,11 @@ export default function PostDetailScreen() {
   });
   const { toggleSavePost } = useSavePost(userId);
   const postReaction = usePostReaction(userId);
-  const { moderationSheets, openCommentModeration } = useModeration(userId);
+  const { openCommentActions, commentActionSheets } = useCommentActions({
+    userId,
+    postId: id!,
+    onDeleted: invalidatePostComments,
+  });
   const { openImage, lightbox } = useImageLightbox();
 
   const { data: post, isLoading: postLoading } = useQuery({
@@ -61,12 +70,6 @@ export default function PostDetailScreen() {
     queryFn: () => getComments(id!, userId),
     enabled: !!id && !!userId,
   });
-
-  function invalidatePostComments() {
-    queryClient.invalidateQueries({ queryKey: ["comments", id] });
-    queryClient.invalidateQueries({ queryKey: ["post", id] });
-    queryClient.invalidateQueries({ queryKey: ["feed"] });
-  }
 
   const likeMutation = useMutation({
     mutationFn: () => toggleLike(id!, userId, !!post?.liked_by_me),
@@ -85,11 +88,6 @@ export default function PostDetailScreen() {
     },
   });
 
-  const deleteCommentMutation = useMutation({
-    mutationFn: (commentId: string) => deleteComment(commentId, userId),
-    onSuccess: () => invalidatePostComments(),
-  });
-
   const commentLikeMutation = useMutation({
     mutationFn: ({ commentId, liked }: { commentId: string; liked: boolean }) =>
       toggleCommentLike(commentId, userId, liked),
@@ -98,10 +96,6 @@ export default function PostDetailScreen() {
 
   function handleReply(comment: Comment) {
     setReplyTo(comment);
-  }
-
-  function handleDelete(comment: Comment) {
-    confirmDeleteComment(() => deleteCommentMutation.mutate(comment.id));
   }
 
   function handleLike(comment: Comment) {
@@ -133,8 +127,8 @@ export default function PostDetailScreen() {
       keyboardVerticalOffset={80}
     >
       {postActionSheets}
+      {commentActionSheets}
       {shareSheet}
-      {moderationSheets}
       {lightbox}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <PostCard
@@ -169,8 +163,7 @@ export default function PostDetailScreen() {
           currentUserId={userId}
           onReply={handleReply}
           onLike={handleLike}
-          onDelete={handleDelete}
-          onReport={(comment) => openCommentModeration(comment.id, comment.author_id)}
+          onMenuPress={openCommentActions}
         />
       </ScrollView>
 

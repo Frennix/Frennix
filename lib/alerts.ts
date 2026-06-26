@@ -26,8 +26,9 @@ export function confirmCloseChallengeEarly(onConfirm: () => void) {
   ]);
 }
 
-export function confirmDeleteChallenge(onConfirm: () => void) {
-  const title = "Delete Challenge?";
+/** Shared delete confirmation for all owner-managed content types. */
+export function confirmDelete(entityLabel: string, onConfirm: () => void) {
+  const title = `Delete ${entityLabel}?`;
   const message = "This action cannot be undone.";
 
   if (Platform.OS === "web") {
@@ -43,21 +44,20 @@ export function confirmDeleteChallenge(onConfirm: () => void) {
   ]);
 }
 
+export function confirmDeleteChallenge(onConfirm: () => void) {
+  confirmDelete("Challenge", onConfirm);
+}
+
 export function confirmDeletePost(onConfirm: () => void) {
-  const title = "Delete Workout?";
-  const message = "This action cannot be undone.";
+  confirmDelete("Post", onConfirm);
+}
 
-  if (Platform.OS === "web") {
-    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
+export function confirmDeleteGroup(onConfirm: () => void) {
+  confirmDelete("Group", onConfirm);
+}
 
-  Alert.alert(title, message, [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: onConfirm },
-  ]);
+export function confirmDeleteComment(onConfirm: () => void) {
+  confirmDelete("Comment", onConfirm);
 }
 
 export function confirmCancelEvent(onConfirm: () => void) {
@@ -74,23 +74,6 @@ export function confirmCancelEvent(onConfirm: () => void) {
   Alert.alert(title, message, [
     { text: "Keep event", style: "cancel" },
     { text: "Cancel event", style: "destructive", onPress: onConfirm },
-  ]);
-}
-
-export function confirmDeleteComment(onConfirm: () => void) {
-  const title = "Delete this comment?";
-  const message = "This action cannot be undone.";
-
-  if (Platform.OS === "web") {
-    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-
-  Alert.alert(title, message, [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: onConfirm },
   ]);
 }
 

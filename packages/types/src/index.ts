@@ -395,6 +395,7 @@ export interface Report {
   reported_comment_id?: string | null;
   reported_challenge_id?: string | null;
   reported_event_id?: string | null;
+  reported_group_id?: string | null;
   reason: string;
   status?: ReportStatus;
   reviewed_at?: string | null;

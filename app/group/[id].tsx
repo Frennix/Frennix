@@ -1,15 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { getGroup, getGroupMembers, getGroupPosts, joinGroup, leaveGroup, isGroupMember } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePostActions } from "@/lib/usePostActions";
+import { useGroupActions } from "@/lib/useGroupActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { DetailLoading } from "@/components/DetailLoading";
-import { Button, EmptyState, PostCard, getSharedPostTargetId, UserRow, colors, spacing, typography } from "@frennix/ui";
+import { Button, EmptyState, PostCard, getSharedPostTargetId, UserRow, colors, radius, spacing, typography } from "@frennix/ui";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +29,12 @@ export default function GroupDetailScreen() {
     queryKey: ["group", id],
     queryFn: () => getGroup(id!),
     enabled: !!id,
+  });
+
+  const { openGroupActions, groupActionSheets } = useGroupActions({
+    userId,
+    group,
+    onDeleted: () => router.replace("/(tabs)/discover"),
   });
 
   const { data: isMember } = useQuery({
@@ -92,6 +99,7 @@ export default function GroupDetailScreen() {
   return (
     <View style={styles.container}>
       {postActionSheets}
+      {groupActionSheets}
       {shareSheet}
       <FlatList
         data={posts}
@@ -102,7 +110,19 @@ export default function GroupDetailScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>{group.name}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{group.name}</Text>
+              {userId ? (
+                <Pressable
+                  style={styles.menuButton}
+                  onPress={openGroupActions}
+                  hitSlop={8}
+                  accessibilityLabel="Group options"
+                >
+                  <Text style={styles.menuIcon}>⋯</Text>
+                </Pressable>
+              ) : null}
+            </View>
             {group.description ? <Text style={styles.desc}>{group.description}</Text> : null}
             <Text style={styles.meta}>
               {group.member_count} members · {group.sport_tags.join(", ")}
@@ -169,7 +189,24 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.md, flexGrow: 1 },
   header: { gap: spacing.sm, marginBottom: spacing.sm },
-  title: { ...typography.title, fontSize: 24 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  title: { ...typography.title, fontSize: 24, flex: 1 },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
   desc: { ...typography.bodySmall },
   meta: { ...typography.caption, marginBottom: spacing.sm },
   section: { ...typography.heading, fontSize: 18, marginTop: spacing.lg, marginBottom: spacing.sm },

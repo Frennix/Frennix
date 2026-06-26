@@ -121,6 +121,10 @@ export function useEventActions({ userId, event, onCancelled }: UseEventActionsO
           closeMenu();
           setAttendeesVisible(true);
           return;
+        case "view_analytics":
+          closeMenu();
+          showAlert("Coming soon", "View Analytics will be available in a future update.");
+          return;
         case "invite":
           closeMenu();
           router.push(`/event/${event.id}/invite`);

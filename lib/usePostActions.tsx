@@ -9,6 +9,7 @@ import { type EntityActionId, isPlaceholderAction } from "@/lib/entity-actions";
 import { copyPostLink, sharePostLink } from "@/lib/post-link";
 import { postActionsForRole } from "@/lib/post-actions";
 import { confirmBlockUser, confirmDeletePost, showAlert, showSuccess } from "@/lib/alerts";
+import { ownershipMessages } from "@/lib/ownership/messages";
 import { invalidatePostQueries, removePostFromAllCaches } from "@/lib/post-cache";
 import { getSharedPostTargetId } from "@frennix/ui";
 
@@ -63,7 +64,7 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     onSuccess: async (_data, postId) => {
       queryClient.removeQueries({ queryKey: ["post", postId] });
       await invalidatePostQueries(queryClient, userId, postId);
-      showSuccess("Post deleted.");
+      showSuccess(ownershipMessages.deleted("Post"));
       onDeleted?.(postId);
     },
   });
@@ -76,7 +77,7 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     onSuccess: () => {
       setReportVisible(false);
       closeMenu();
-      showSuccess("Report submitted. Our team will review it.");
+      showSuccess(ownershipMessages.reportSubmitted);
     },
     onError: (error) => showAlert("Report failed", getErrorMessage(error)),
   });
@@ -87,7 +88,7 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
       closeMenu();
       await queryClient.invalidateQueries({ queryKey: ["feed", userId] });
       await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
-      showSuccess("User blocked");
+      showSuccess(ownershipMessages.userBlocked);
     },
     onError: (error) => showAlert("Block failed", getErrorMessage(error)),
   });

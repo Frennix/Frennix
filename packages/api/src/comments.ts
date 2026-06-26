@@ -91,6 +91,23 @@ export async function deleteComment(commentId: string, userId: string) {
   if (error) throw formatSupabaseError(error, "Failed to delete comment");
 }
 
+export async function updateComment(commentId: string, userId: string, content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error("Comment cannot be empty");
+
+  const { data, error } = await getSupabase()
+    .from("comments")
+    .update({ content: trimmed })
+    .eq("id", commentId)
+    .eq("author_id", userId)
+    .select(`*, author:profiles!comments_author_id_fkey(*)`)
+    .single();
+
+  if (error) throw formatSupabaseError(error, "Failed to update comment");
+  if (!data) throw new Error("Comment update did not return a row");
+  return data as Comment;
+}
+
 export async function toggleCommentLike(commentId: string, userId: string, liked: boolean) {
   if (liked) {
     const { error } = await getSupabase()

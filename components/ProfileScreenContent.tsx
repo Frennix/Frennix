@@ -48,12 +48,13 @@ interface ProfileScreenContentProps {
   following?: boolean;
   onFollow?: () => void;
   onMessage?: () => void;
-  onModeration?: () => void;
+  onProfileMenuPress?: () => void;
   followLoading?: boolean;
   messageLoading?: boolean;
   currentUserId?: string;
   onOwnerActionsPress?: (post: Post) => void;
   postActionSheet?: ReactNode;
+  profileActionSheet?: ReactNode;
 }
 
 const COVER_HEIGHT = 200;
@@ -91,12 +92,13 @@ export function ProfileScreenContent({
   following,
   onFollow,
   onMessage,
-  onModeration,
+  onProfileMenuPress,
   followLoading,
   messageLoading,
   currentUserId,
   onOwnerActionsPress,
   postActionSheet,
+  profileActionSheet,
 }: ProfileScreenContentProps) {
   const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
@@ -117,6 +119,7 @@ export function ProfileScreenContent({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {postActionSheet}
+      {profileActionSheet}
 
       <View style={styles.coverWrap}>
         {coverUri ? (
@@ -166,8 +169,22 @@ export function ProfileScreenContent({
         {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
 
         <View style={styles.nameBlock}>
-          <Text style={styles.name}>{profile.display_name}</Text>
-          <Text style={styles.username}>@{profile.username}</Text>
+          <View style={styles.nameRow}>
+            <View style={styles.nameTextBlock}>
+              <Text style={styles.name}>{profile.display_name}</Text>
+              <Text style={styles.username}>@{profile.username}</Text>
+            </View>
+            {onProfileMenuPress ? (
+              <Pressable
+                style={styles.menuButton}
+                onPress={onProfileMenuPress}
+                hitSlop={8}
+                accessibilityLabel="Profile options"
+              >
+                <Text style={styles.menuIcon}>⋯</Text>
+              </Pressable>
+            ) : null}
+          </View>
           {presenceLabel ? (
             <Text style={[styles.presence, presenceOnline && styles.presenceOnline]}>
               {presenceLabel}
@@ -232,9 +249,7 @@ export function ProfileScreenContent({
           )}
         </View>
 
-        {!isOwn ? (
-          <Button title="Report / Block" variant="ghost" onPress={onModeration} />
-        ) : (
+        {!isOwn ? null : (
           <Button
             title="Invite Friends"
             variant="ghost"
@@ -390,7 +405,20 @@ const styles = StyleSheet.create({
     borderColor: colors.background,
     overflow: "hidden",
   },
-  nameBlock: { marginTop: spacing.xs },
+  nameBlock: { marginTop: spacing.xs, gap: spacing.xs },
+  nameRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
+  nameTextBlock: { flex: 1 },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
   name: { ...typography.title, fontSize: 24 },
   username: { ...typography.caption, color: colors.accent, marginTop: 2 },
   presence: { ...typography.caption, color: colors.textMuted, marginTop: 4 },

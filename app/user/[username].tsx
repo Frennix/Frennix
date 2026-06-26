@@ -13,7 +13,7 @@ import {
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
 import { usePostActions } from "@/lib/usePostActions";
-import { useModeration } from "@/lib/useModeration";
+import { useProfileActions } from "@/lib/useProfileActions";
 import { useFollowUser } from "@/lib/useFollowUser";
 import { DetailLoading } from "@/components/DetailLoading";
 import { showAlert } from "@/lib/alerts";
@@ -25,12 +25,16 @@ export default function UserProfileScreen() {
   const userId = session?.user.id ?? "";
   const [messaging, setMessaging] = useState(false);
   const { openPostActions, postActionSheets } = usePostActions({ userId });
-  const { moderationSheets, openUserModeration } = useModeration(userId);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", username],
     queryFn: () => getProfileByUsername(username!),
     enabled: !!username,
+  });
+
+  const { openProfileActions, profileActionSheets } = useProfileActions({
+    userId,
+    profile,
   });
 
   const { data: following } = useQuery({
@@ -53,14 +57,10 @@ export default function UserProfileScreen() {
 
   const followMutation = useFollowUser(userId);
 
-  function showModerationAlert(title: string, message: string) {
-    showAlert(title, message);
-  }
-
   async function messageUser() {
     if (!profile) return;
     if (!userId) {
-      showModerationAlert("Sign in required", "Sign in to send messages.");
+      showAlert("Sign in required", "Sign in to send messages.");
       return;
     }
 
@@ -69,15 +69,10 @@ export default function UserProfileScreen() {
       const convId = await getOrCreateConversation(userId, profile.id);
       router.push(`/chat/${convId}`);
     } catch (e) {
-      showModerationAlert("Could not open chat", getErrorMessage(e));
+      showAlert("Could not open chat", getErrorMessage(e));
     } finally {
       setMessaging(false);
     }
-  }
-
-  function showModeration() {
-    if (!profile) return;
-    openUserModeration(profile.id);
   }
 
   if (profileLoading) return <DetailLoading />;
@@ -97,30 +92,28 @@ export default function UserProfileScreen() {
   const isOwn = profile.id === userId;
 
   return (
-    <>
-      {moderationSheets}
-      <ProfileScreenContent
-        profile={profile}
-        stats={stats ?? { posts: 0, followers: 0, following: 0, eventsJoined: 0, workoutStreak: 0 }}
-        posts={postsPage?.posts ?? []}
-        isOwn={isOwn}
-        following={following}
-        onFollow={() => {
-          if (!userId) {
-            showModerationAlert("Sign in required", "Sign in to follow people.");
-            return;
-          }
-          followMutation.mutate({ targetUserId: profile.id, isFollowing: !!following });
-        }}
-        onMessage={messageUser}
-        onModeration={showModeration}
-        followLoading={followMutation.isPending}
-        messageLoading={messaging}
-        currentUserId={isOwn ? userId : undefined}
-        onOwnerActionsPress={isOwn ? openPostActions : undefined}
-        postActionSheet={isOwn ? postActionSheets : undefined}
-      />
-    </>
+    <ProfileScreenContent
+      profile={profile}
+      stats={stats ?? { posts: 0, followers: 0, following: 0, eventsJoined: 0, workoutStreak: 0 }}
+      posts={postsPage?.posts ?? []}
+      isOwn={isOwn}
+      following={following}
+      onFollow={() => {
+        if (!userId) {
+          showAlert("Sign in required", "Sign in to follow people.");
+          return;
+        }
+        followMutation.mutate({ targetUserId: profile.id, isFollowing: !!following });
+      }}
+      onMessage={messageUser}
+      onProfileMenuPress={userId ? openProfileActions : undefined}
+      followLoading={followMutation.isPending}
+      messageLoading={messaging}
+      currentUserId={isOwn ? userId : undefined}
+      onOwnerActionsPress={isOwn ? openPostActions : undefined}
+      postActionSheet={isOwn ? postActionSheets : undefined}
+      profileActionSheet={profileActionSheets}
+    />
   );
 }
 

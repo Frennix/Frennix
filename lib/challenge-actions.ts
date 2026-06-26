@@ -11,6 +11,7 @@ export const CHALLENGE_OWNER_ACTIONS: EntityActionDefinition[] = [
   entityAction("copy_link", "Copy Link"),
   entityAction("duplicate", "Duplicate Challenge", { placeholder: true }),
   entityAction("view_participants", "View Participants"),
+  entityAction("view_analytics", "View Analytics", { placeholder: true }),
   entityAction("close_early", "Close Challenge Early"),
 ];
 

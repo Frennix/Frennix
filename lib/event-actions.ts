@@ -10,6 +10,7 @@ export const EVENT_OWNER_ACTIONS: EntityActionDefinition[] = [
   entityAction("share", "Share Event"),
   entityAction("copy_link", "Copy Link"),
   entityAction("view_participants", "View Attendees"),
+  entityAction("view_analytics", "View Analytics", { placeholder: true }),
   entityAction("invite", "Invite Athletes"),
 ];
 

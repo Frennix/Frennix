@@ -1,6 +1,14 @@
 import type { Group, GroupMember, Post } from "@frennix/types";
 import { enrichPostsWithInteractions } from "./posts";
+import { formatSupabaseError } from "./profile-utils";
 import { getSupabase } from "./supabase";
+
+export type UpdateGroupPatch = {
+  name?: string;
+  description?: string | null;
+  sport_tags?: string[];
+  is_public?: boolean;
+};
 
 export async function getGroups(filters?: { sport?: string; query?: string }): Promise<Group[]> {
   let q = getSupabase()
@@ -109,4 +117,38 @@ export async function isGroupMember(groupId: string, userId: string) {
     .eq("user_id", userId)
     .maybeSingle();
   return !!data;
+}
+
+export async function updateGroup(groupId: string, userId: string, patch: UpdateGroupPatch) {
+  const { data, error } = await getSupabase()
+    .from("groups")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", groupId)
+    .eq("owner_id", userId)
+    .select()
+    .single();
+
+  if (error) throw formatSupabaseError(error, "Failed to update group");
+  if (!data) throw new Error("Group update did not return a row");
+  return data as Group;
+}
+
+export async function deleteGroup(groupId: string, userId: string) {
+  const { data: group, error: fetchError } = await getSupabase()
+    .from("groups")
+    .select("id, owner_id")
+    .eq("id", groupId)
+    .single();
+
+  if (fetchError) throw formatSupabaseError(fetchError, "Failed to load group");
+  if (!group) throw new Error("Group not found");
+  if (group.owner_id !== userId) throw new Error("You can only delete your own groups");
+
+  const { error: deleteError } = await getSupabase()
+    .from("groups")
+    .delete()
+    .eq("id", groupId)
+    .eq("owner_id", userId);
+
+  if (deleteError) throw formatSupabaseError(deleteError, "Failed to delete group");
 }

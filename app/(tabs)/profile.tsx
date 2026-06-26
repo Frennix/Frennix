@@ -8,6 +8,7 @@ import { ProfileScreenContent } from "@/components/ProfileScreenContent";
 import { useAvatarUpload } from "@/lib/useAvatarUpload";
 import { useCoverUpload } from "@/lib/useCoverUpload";
 import { usePostActions } from "@/lib/usePostActions";
+import { useProfileActions } from "@/lib/useProfileActions";
 import { colors } from "@frennix/ui";
 
 const EMPTY_STATS = {
@@ -25,6 +26,10 @@ export default function ProfileTabScreen() {
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
   const { pickAndUploadCover, uploading: coverUploading, error: coverError, previewUri: coverPreviewUri } = useCoverUpload();
   const { openPostActions, postActionSheets } = usePostActions({ userId });
+  const { openProfileActions, profileActionSheets } = useProfileActions({
+    userId,
+    profile,
+  });
 
   const { data: stats } = useQuery({
     queryKey: ["profile-stats", userId],
@@ -83,7 +88,9 @@ export default function ProfileTabScreen() {
       coverPreviewUri={coverPreviewUri}
       currentUserId={userId}
       onOwnerActionsPress={openPostActions}
+      onProfileMenuPress={openProfileActions}
       postActionSheet={postActionSheets}
+      profileActionSheet={profileActionSheets}
     />
   );
 }

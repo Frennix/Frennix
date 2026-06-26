@@ -10,8 +10,7 @@ interface CommentRowProps {
   depth?: number;
   onReply: (comment: Comment) => void;
   onLike: (comment: Comment) => void;
-  onDelete: (comment: Comment) => void;
-  onReport?: (comment: Comment) => void;
+  onMenuPress?: (comment: Comment) => void;
 }
 
 export function CommentRow({
@@ -20,20 +19,31 @@ export function CommentRow({
   depth = 0,
   onReply,
   onLike,
-  onDelete,
-  onReport,
+  onMenuPress,
 }: CommentRowProps) {
-  const isOwn = Boolean(currentUserId && comment.author_id === currentUserId);
   const likeCount = comment.like_count ?? 0;
+  const showMenu = Boolean(currentUserId && onMenuPress);
 
   return (
     <View style={[styles.wrapper, depth > 0 && styles.replyWrapper]}>
       <View style={styles.row}>
         <Avatar uri={comment.author?.avatar_url} name={comment.author?.display_name} size={depth > 0 ? 28 : 36} />
         <View style={styles.body}>
-          <View style={styles.meta}>
-            <Text style={styles.author}>{comment.author?.display_name ?? "Unknown"}</Text>
-            <Text style={styles.time}>{formatRelativeTime(comment.created_at)}</Text>
+          <View style={styles.metaRow}>
+            <View style={styles.meta}>
+              <Text style={styles.author}>{comment.author?.display_name ?? "Unknown"}</Text>
+              <Text style={styles.time}>{formatRelativeTime(comment.created_at)}</Text>
+            </View>
+            {showMenu ? (
+              <Pressable
+                style={styles.menuButton}
+                onPress={() => onMenuPress?.(comment)}
+                hitSlop={8}
+                accessibilityLabel="Comment options"
+              >
+                <Text style={styles.menuIcon}>⋯</Text>
+              </Pressable>
+            ) : null}
           </View>
           <Text style={styles.content}>{comment.content}</Text>
           <View style={styles.actions}>
@@ -45,15 +55,6 @@ export function CommentRow({
             <Pressable onPress={() => onReply(comment)} hitSlop={8} style={styles.actionButton}>
               <Text style={styles.actionText}>Reply</Text>
             </Pressable>
-            {isOwn ? (
-              <Pressable onPress={() => onDelete(comment)} hitSlop={8} style={styles.actionButton}>
-                <Text style={styles.deleteText}>Delete</Text>
-              </Pressable>
-            ) : onReport ? (
-              <Pressable onPress={() => onReport(comment)} hitSlop={8} style={styles.actionButton}>
-                <Text style={styles.reportText}>Report</Text>
-              </Pressable>
-            ) : null}
           </View>
         </View>
       </View>
@@ -68,8 +69,7 @@ export function CommentRow({
               depth={depth + 1}
               onReply={onReply}
               onLike={onLike}
-              onDelete={onDelete}
-              onReport={onReport}
+              onMenuPress={onMenuPress}
             />
           ))}
         </View>
@@ -83,7 +83,16 @@ const styles = StyleSheet.create({
   replyWrapper: { marginLeft: spacing.lg },
   row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" },
   body: { flex: 1, gap: spacing.xs },
-  meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  metaRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
+  meta: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  menuButton: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuIcon: { fontSize: 18, lineHeight: 20, color: colors.textSecondary, fontWeight: "700" },
   author: { ...typography.bodySmall, fontWeight: "600", color: colors.text },
   time: { ...typography.caption, color: colors.textMuted },
   content: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },
@@ -91,8 +100,6 @@ const styles = StyleSheet.create({
   actionButton: { paddingVertical: 2 },
   actionText: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
   likedText: { color: colors.accent },
-  deleteText: { ...typography.caption, color: colors.danger, fontWeight: "600" },
-  reportText: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
   replies: {
     marginTop: spacing.sm,
     paddingLeft: spacing.sm,
@@ -106,11 +113,10 @@ interface CommentThreadProps {
   currentUserId?: string;
   onReply: (comment: Comment) => void;
   onLike: (comment: Comment) => void;
-  onDelete: (comment: Comment) => void;
-  onReport?: (comment: Comment) => void;
+  onMenuPress?: (comment: Comment) => void;
 }
 
-export function CommentThread({ comments, currentUserId, onReply, onLike, onDelete, onReport }: CommentThreadProps) {
+export function CommentThread({ comments, currentUserId, onReply, onLike, onMenuPress }: CommentThreadProps) {
   if (!comments.length) {
     return (
       <View style={threadStyles.empty}>
@@ -128,8 +134,7 @@ export function CommentThread({ comments, currentUserId, onReply, onLike, onDele
           currentUserId={currentUserId}
           onReply={onReply}
           onLike={onLike}
-          onDelete={onDelete}
-          onReport={onReport}
+          onMenuPress={onMenuPress}
         />
       ))}
     </View>

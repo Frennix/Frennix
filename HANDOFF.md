@@ -15,7 +15,7 @@ Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, wo
 
 Recent session work:
 
-- **Phase A — Shared ownership framework** — `EntityActionSheet`, `entity-actions`, unified post/challenge/event menus (Edit, Delete, Share, Copy Link, Report, Block); events get ⋯ menu + share/report
+- **Phase A — Platform ownership standard** — groups, comments, profiles on EntityActionSheet; content-type registry; consistent menus/messages/RLS
 - **Challenge management** — creator/viewer ⋯ menus on shared framework
 - **Post management (Priority 1)** — unified `usePostActions`, owner gets Share + Copy Link, viewer gets Block
 - **Logo clipping fix** — padded PNG + web-native `<img>` in `FrennixLogo.tsx`
@@ -679,86 +679,80 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 | 5 | Error handling polish | Pending |
 | 6 | Full mobile + web QA | Pending |
 
-### Phase A — Shared ownership framework (completed)
+### Phase A — Platform ownership standard (completed)
 
-All owner-managed content uses the same three-layer pattern:
+**Every user-created content type** must use the same framework. Full registry: `lib/ownership/content-types.ts`.
+
+#### Architecture (required for all new features)
 
 | Layer | File | Role |
 |-------|------|------|
-| Core types | `lib/entity-actions.ts` | `EntityActionId`, `EntityActionDefinition`, standard owner/viewer presets |
-| Shared UI | `components/EntityActionSheet.tsx` | Configurable ⋯ menu + Cancel |
-| Shared UI | `components/EntityListSheet.tsx` | Participants / attendees modal |
-| Link helpers | `lib/entity-link.ts` | `copyEntityLink`, `shareEntityLink` (used by `*-link.ts` per entity) |
+| Core types | `lib/entity-actions.ts` | `EntityActionId`, `EntityActionDefinition` |
+| Shared UI | `components/EntityActionSheet.tsx` | ⋯ menu + Cancel (consistent everywhere) |
+| Shared UI | `components/EntityListSheet.tsx` | Participants / members / attendees |
+| Link helpers | `lib/entity-link.ts` | Clipboard + native share |
+| Messages | `lib/ownership/messages.ts` | Consistent success/error copy |
+| Confirmations | `lib/alerts.ts` | `confirmDelete(label)`, `confirmBlockUser`, entity-specific wrappers |
 
-**Per-entity wiring** (add a row for each new content type):
+**Per entity:** `lib/{entity}-actions.ts` + `lib/use{Entity}Actions.tsx` + `lib/{entity}-link.ts` + edit route with owner guard + API `.eq(owner_field)` + Supabase RLS.
 
-| Entity | Registry | Hook | Link helper |
-|--------|----------|------|-------------|
-| Post | `lib/post-actions.ts` | `lib/usePostActions.tsx` | `lib/post-link.ts` |
-| Challenge | `lib/challenge-actions.ts` | `lib/useChallengeActions.tsx` | `lib/challenge-link.ts` |
-| Event | `lib/event-actions.ts` | `lib/useEventActions.tsx` | `lib/event-link.ts` |
+#### Standard menus
 
-**Standard owner menu:** Edit, Delete, Share, Copy Link (+ entity extras: View Participants, Invite, Close Early, etc.)
+| Role | Actions |
+|------|---------|
+| **Owner** | Edit, Delete, Share, Copy Link, View Participants/Attendees (where applicable), View Analytics (placeholder where applicable) |
+| **Viewer** | Share, Copy Link, Report, Block |
 
-**Standard viewer menu:** Share, Copy Link, Report, Block
+Profiles exclude Delete (account deletion not in-app). Events use Cancel instead of Delete.
 
-**Removed (replaced by framework):** `PostActionSheet`, `PostViewerActionSheet`, `ChallengeActionSheet`, `usePostOwnerActions`, `usePostViewerActions`
+#### Live content types
 
-### Priority 1 deliverables (completed)
+| Entity | Owner field | Registry / Hook |
+|--------|-------------|-----------------|
+| Post / workout log / run club post | `author_id` | `post-actions` / `usePostActions` |
+| Challenge | `created_by` | `challenge-actions` / `useChallengeActions` |
+| Event | `created_by` | `event-actions` / `useEventActions` |
+| Group | `owner_id` | `group-actions` / `useGroupActions` |
+| Comment | `author_id` | `comment-actions` / `useCommentActions` |
+| Profile | `id` | `profile-actions` / `useProfileActions` |
 
-- Unified `usePostActions` on `EntityActionSheet` — owner: Edit, Delete, Share, Copy Link; viewer: Share, Copy Link, Report, Block
-- Edit: caption, workout type, photos/videos with add/remove/replace/reorder
-- Delete: confirmation, DB + storage cleanup, instant feed removal
-- Profile grid: long-press opens owner menu for **all** own posts (not media-only)
-- API: `updatePost` extended for media fields; `removePostsStorageFiles` helper
-- Cache: optimistic updates across feed, profile, group, challenge, event, saved-posts
+Run club posts = posts with `group_id`. Workout logs = posts with `post_type: workout_update`.
 
-### Challenge management
+#### Deferred (use same pattern when built)
 
-| Layer | File |
-|-------|------|
-| Registry | `lib/challenge-actions.ts` |
-| Hook | `lib/useChallengeActions.tsx` |
-| Links | `lib/challenge-link.ts` |
+| Entity | Notes |
+|--------|-------|
+| Recipes | Not in codebase yet — registry stub in `content-types.ts` |
+| Marketplace listings | `features/marketplace/README.md` — seller ownership TBD |
 
-**Owner ⋯:** Edit, Delete, Share, Copy Link, Duplicate (placeholder), View Participants, Close Early (hidden when ended)
+#### Security & UX rules
 
-**Viewer ⋯:** Share, Copy Link, Report, Block
+1. Edit/Delete only in **owner** menus; viewer menus never expose owner actions
+2. Delete removes item from lists **immediately** (optimistic cache or `onMutate` patch)
+3. Share links use `lib/{entity}-link.ts` → `{APP_URL}/{entity}/{id}`
+4. Route guards on all edit screens redirect non-owners
+5. API + RLS enforce owner field on update/delete
 
-- Migrations: `20250630000001_challenge_management.sql`, `20250630000002_challenge_reports.sql`
+#### Migrations (`supabase db push`)
 
-### Event management (Phase A)
+| Migration | Purpose |
+|-----------|---------|
+| `20250630000001` | Challenge edit/delete RLS |
+| `20250630000002` | Challenge reports |
+| `20250630000003` | Event reports |
+| `20250630000004` | Group delete RLS + group reports |
+| `20250630000005` | Comment edit RLS |
 
-| Layer | File |
-|-------|------|
-| Registry | `lib/event-actions.ts` |
-| Hook | `lib/useEventActions.tsx` |
-| Links | `lib/event-link.ts` |
+#### Phase A QA checklist (web + mobile)
 
-**Owner ⋯:** Edit, Cancel, Share, Copy Link, View Attendees, Invite Athletes (hidden when cancelled)
-
-**Viewer ⋯:** Share, Copy Link, Report, Block
-
-- Report: `reportEvent` → `reports.reported_event_id` (migration `20250630000003_event_reports.sql`)
-- Event detail: header ⋯ replaces inline creator buttons; Join/Leave remains a primary CTA
-
-**Apply migrations:** `supabase db push` (`20250630000001`, `20250630000002`, `20250630000003`).
-
-### Phase A QA checklist
-
-Test on **web + mobile** before Priority 2 (Media Experience):
-
-- [ ] Post owner ⋯: Edit, Delete, Share (in-app sheet), Copy Link
-- [ ] Post viewer ⋯: Share, Copy Link, Report, Block
-- [ ] Profile grid long-press on text-only own post → owner menu
-- [ ] Challenge owner/viewer menus match standard + View Participants / Close Early
-- [ ] Event ⋯ menu: creator vs non-creator actions; Cancel event; View Attendees sheet
-- [ ] Event share/copy link opens correct `/event/{id}` URL
-- [ ] Block removes author content from feed after refresh
+- [ ] Posts: owner/viewer ⋯ menus; delete instant on feed; block/report
+- [ ] Comments: ⋯ menu; edit/delete owner; share/copy link; optimistic delete
+- [ ] Groups: ⋯ menu; edit/delete owner; view members; share `/group/{id}`
+- [ ] Challenges / Events: standard menus + participants/attendees
+- [ ] Profiles: ⋯ menu; share/copy `/user/{username}`; report/block on others
+- [ ] Profile grid long-press on any own post → owner menu
 
 **Do not start Priority 2 until user approves after QA passes.**
-
-### Priority 1 QA checklist (superseded by Phase A above)
 
 ---
 

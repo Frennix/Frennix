@@ -159,6 +159,10 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
           closeMenu();
           setParticipantsVisible(true);
           return;
+        case "view_analytics":
+          closeMenu();
+          showAlert("Coming soon", "View Analytics will be available in a future update.");
+          return;
         case "close_early":
           closeMenu();
           confirmCloseChallengeEarly(() => closeEarlyMutation.mutate());
