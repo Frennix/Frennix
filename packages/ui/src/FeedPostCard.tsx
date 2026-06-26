@@ -72,6 +72,8 @@ export const FeedPostCard = memo(function FeedPostCard({
             <Text style={styles.meta}>{meta}</Text>
           </View>
         </ScalePressable>
+
+        {isOwn ? (
           <Pressable
             style={styles.menuButton}
             onPress={onOwnerActionsPress}
