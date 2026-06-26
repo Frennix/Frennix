@@ -14,7 +14,7 @@ import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotifi
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTargetAsync } from "@/lib/notification-navigation";
-import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { showAlert } from "@/lib/alerts";
 import { EmptyState, colors, spacing, typography } from "@frennix/ui";
@@ -51,6 +51,11 @@ export default function NotificationsScreen() {
     enabled: notificationsReady,
     staleTime: 30_000,
   });
+
+  const onRefresh = useGuardedRefresh(
+    useCallback(() => refetch(), [refetch]),
+    { errorTitle: "Could not refresh notifications" }
+  );
 
   const readMutation = useMutation({
     mutationFn: markNotificationRead,
@@ -192,7 +197,11 @@ export default function NotificationsScreen() {
         windowSize={9}
         removeClippedSubviews={Platform.OS !== "web"}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void onRefresh()}
+            tintColor={colors.accent}
+          />
         }
         ListEmptyComponent={
           <EmptyState

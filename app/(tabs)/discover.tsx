@@ -13,6 +13,7 @@ import { DiscoverChallengeRow } from "@/components/DiscoverChallengeRow";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
+import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import {
   DiscoverProfileCard,
   EmptyState,
@@ -93,13 +94,23 @@ export default function DiscoverScreen() {
     { key: "challenges", label: "Challenges" },
   ];
 
-  const onRefreshPeople = useCallback(async () => {
-    if (isSearchingPeople) await refetchSearch();
-    else await refetchSuggestions();
-  }, [isSearchingPeople, refetchSearch, refetchSuggestions]);
+  const onRefreshPeople = useGuardedRefresh(
+    useCallback(async () => {
+      if (isSearchingPeople) await refetchSearch();
+      else await refetchSuggestions();
+    }, [isSearchingPeople, refetchSearch, refetchSuggestions]),
+    { errorTitle: "Could not refresh people" }
+  );
 
-  const onRefreshGroups = useCallback(() => refetchGroups(), [refetchGroups]);
-  const onRefreshChallenges = useCallback(() => refetchChallenges(), [refetchChallenges]);
+  const onRefreshGroups = useGuardedRefresh(
+    useCallback(() => refetchGroups(), [refetchGroups]),
+    { errorTitle: "Could not refresh groups" }
+  );
+
+  const onRefreshChallenges = useGuardedRefresh(
+    useCallback(() => refetchChallenges(), [refetchChallenges]),
+    { errorTitle: "Could not refresh challenges" }
+  );
 
   const peopleData: SuggestedAthlete[] = isSearchingPeople
     ? searchResults.map((profile) => ({
@@ -213,7 +224,11 @@ export default function DiscoverScreen() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           refreshControl={
-            <RefreshControl refreshing={peopleRefetching} onRefresh={onRefreshPeople} tintColor={colors.accent} />
+            <RefreshControl
+              refreshing={peopleRefetching}
+              onRefresh={() => void onRefreshPeople()}
+              tintColor={colors.accent}
+            />
           }
           ListHeaderComponent={
             !isSearchingPeople ? (
@@ -268,7 +283,11 @@ export default function DiscoverScreen() {
           keyExtractor={(g) => g.id}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={groupsRefetching} onRefresh={onRefreshGroups} tintColor={colors.accent} />
+            <RefreshControl
+              refreshing={groupsRefetching}
+              onRefresh={() => void onRefreshGroups()}
+              tintColor={colors.accent}
+            />
           }
           ListHeaderComponent={
             <Pressable onPress={() => router.push("/create-group")}>
@@ -300,7 +319,7 @@ export default function DiscoverScreen() {
           refreshControl={
             <RefreshControl
               refreshing={challengesRefetching}
-              onRefresh={onRefreshChallenges}
+              onRefresh={() => void onRefreshChallenges()}
               tintColor={colors.accent}
             />
           }

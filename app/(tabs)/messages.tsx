@@ -10,6 +10,7 @@ import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen, switchTab } from "@/lib/press-utils";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { Avatar, EmptyState, colors, isProfileOnline, spacing, typography } from "@frennix/ui";
@@ -100,6 +101,11 @@ export default function MessagesScreen() {
     [handlePress]
   );
 
+  const onRefresh = useGuardedRefresh(
+    useCallback(() => refetch(), [refetch]),
+    { errorTitle: "Could not refresh messages" }
+  );
+
   const listRef = useRef<FlatList<Conversation>>(null);
   const { onScroll, isAtTop } = useScrollAtTop();
 
@@ -111,10 +117,10 @@ export default function MessagesScreen() {
           isAtTop,
           scrollToTop: () => scrollFlatListToTop(listRef.current),
           refresh: () => {
-            void refetch();
+            void onRefresh();
           },
         }),
-      [isAtTop, refetch]
+      [isAtTop, onRefresh]
     )
   );
 
@@ -131,7 +137,11 @@ export default function MessagesScreen() {
         maxToRenderPerBatch={8}
         windowSize={7}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void onRefresh()}
+            tintColor={colors.accent}
+          />
         }
         ListEmptyComponent={
           !isLoading ? (

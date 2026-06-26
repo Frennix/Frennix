@@ -420,6 +420,11 @@ Perf tracking: `trackFeedLoad` → `perf_feed_load`, `trackTabSwitch` → `perf_
 
 **Fast-scroll pass (June 2026):** `useFeedInfiniteScroll` prefetches next page ~3 viewport-heights early, auto-loads page 2 on startup, appends in-list skeleton rows while fetching, expands media lookahead (`MEDIA_LOOKAHEAD_ITEMS: 8`), `windowSize: 21`, `removeClippedSubviews: false`, image prefetch via `prefetch-post-images.ts`.
 
+**Pull-to-refresh + new posts banner (June 2026):**
+- `useGuardedRefresh` — deduped pull-to-refresh with friendly errors on Feed, Discover, Events, Messages, Notifications.
+- `NewPostsBanner` + `useFeedNewPostsBanner` — peeks feed head every 45s when scrolled down; shows “N new posts”; tap refreshes + scrolls to top. At top, soft auto-refresh every 90s when new posts exist.
+- Feed tab re-tap: at top → refresh; scrolled → scroll to top (unchanged).
+
 **Files:** `lib/tab-prefetch.ts`, `components/TabPrefetchCoordinator.tsx`, `components/FeedListItem.tsx`, `packages/ui/src/FeedMediaSlot.tsx`.
 
 ### Recent feed media behavior

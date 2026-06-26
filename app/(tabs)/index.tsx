@@ -18,9 +18,12 @@ import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useFeedLike } from "@/lib/useFeedLike";
 import { useFeedInfiniteScroll } from "@/lib/useFeedInfiniteScroll";
+import { useFeedNewPostsBanner } from "@/lib/useFeedNewPostsBanner";
+import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import type { FeedListRow } from "@/lib/feed-list-rows";
 import { trackFeedLoad } from "@/lib/product-analytics";
 import { useImageLightbox } from "@/lib/useImageLightbox";
+import { NewPostsBanner } from "@/components/NewPostsBanner";
 import { EmptyState, FeedPostCardSkeleton, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function HomeScreen() {
@@ -85,10 +88,11 @@ export default function HomeScreen() {
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
   const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
+  const [feedAtTop, setFeedAtTop] = useState(true);
 
   const {
     listRows,
-    handleScroll,
+    handleScroll: handleFeedScroll,
     onViewableItemsChanged,
     viewabilityConfig,
     visiblePostIds,
@@ -102,9 +106,36 @@ export default function HomeScreen() {
     onScrollBase: onScroll,
   });
 
-  const handleRefresh = useCallback(async () => {
+  const handleScroll = useCallback(
+    (event: Parameters<typeof handleFeedScroll>[0]) => {
+      handleFeedScroll(event);
+      const atTop = event.nativeEvent.contentOffset.y <= 8;
+      setFeedAtTop((prev) => (prev === atTop ? prev : atTop));
+    },
+    [handleFeedScroll]
+  );
+
+  const refreshFeedData = useCallback(async () => {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
   }, [refetch, refetchStories, refetchSuggestions]);
+
+  const handleRefresh = useGuardedRefresh(refreshFeedData, { errorTitle: "Could not refresh feed" });
+
+  const { newPostCount, showBanner, clearBanner } = useFeedNewPostsBanner({
+    userId,
+    posts,
+    atTop: feedAtTop,
+    enabled: isFeedReady,
+    onNewPostsWhileAtTop: () => {
+      void handleRefresh();
+    },
+  });
+
+  const handleNewPostsBannerPress = useCallback(async () => {
+    clearBanner();
+    await handleRefresh();
+    scrollFlatListToTop(listRef.current);
+  }, [clearBanner, handleRefresh]);
 
   useTabScrollRegistration(
     "feed",
@@ -275,6 +306,9 @@ export default function HomeScreen() {
           openCreatePost();
         }}
       />
+      {showBanner ? (
+        <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
+      ) : null}
       <FlatList
         ref={listRef}
         data={listRows}
@@ -293,9 +327,13 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching || isStoriesRefetching || isSuggestionsRefetching}
-            onRefresh={handleRefresh}
+            refreshing={
+              isRefetching || isStoriesRefetching || isSuggestionsRefetching
+            }
+            onRefresh={() => void handleRefresh()}
             tintColor={colors.accent}
+            colors={[colors.accent]}
+            progressBackgroundColor={colors.surface}
           />
         }
         onEndReachedThreshold={2}

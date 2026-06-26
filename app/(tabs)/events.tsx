@@ -16,6 +16,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
+import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { EmptyState, EventCard, colors, spacing, typography } from "@frennix/ui";
 
@@ -33,6 +34,11 @@ export default function EventsTabScreen() {
     placeholderData: (previousData) => previousData,
   });
 
+  const onRefresh = useGuardedRefresh(
+    useCallback(() => refetch(), [refetch]),
+    { errorTitle: "Could not refresh events" }
+  );
+
   useTabScrollRegistration(
     "events",
     useCallback(
@@ -41,10 +47,10 @@ export default function EventsTabScreen() {
           isAtTop,
           scrollToTop: () => scrollFlatListToTop(listRef.current),
           refresh: () => {
-            void refetch();
+            void onRefresh();
           },
         }),
-      [isAtTop, refetch]
+      [isAtTop, onRefresh]
     )
   );
 
@@ -95,7 +101,11 @@ export default function EventsTabScreen() {
         keyExtractor={(event) => event.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void onRefresh()}
+            tintColor={colors.accent}
+          />
         }
         ListEmptyComponent={
           <EmptyState
