@@ -16,7 +16,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { DetailLoading } from "@/components/DetailLoading";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import {
   PostCard,
@@ -31,12 +31,24 @@ import {
 } from "@frennix/ui";
 
 export default function PostDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, comment: commentParam } = useLocalSearchParams<{ id: string; comment?: string }>();
+  const highlightCommentId = Array.isArray(commentParam) ? commentParam[0] : commentParam;
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const queryClient = useQueryClient();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledToCommentRef = useRef(false);
+
+  const handleHighlightLayout = useCallback(
+    (y: number) => {
+      if (!highlightCommentId || scrolledToCommentRef.current) return;
+      scrolledToCommentRef.current = true;
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true });
+    },
+    [highlightCommentId]
+  );
 
   const invalidatePostComments = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["comments", id] });
@@ -130,7 +142,11 @@ export default function PostDetailScreen() {
       {commentActionSheets}
       {shareSheet}
       {lightbox}
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <PostCard
           post={post}
           isOwn={post.author_id === userId}
@@ -161,6 +177,8 @@ export default function PostDetailScreen() {
         <CommentThread
           comments={comments}
           currentUserId={userId}
+          highlightCommentId={highlightCommentId}
+          onHighlightLayout={handleHighlightLayout}
           onReply={handleReply}
           onLike={handleLike}
           onMenuPress={openCommentActions}

@@ -8,6 +8,8 @@ interface CommentRowProps {
   comment: Comment;
   currentUserId?: string;
   depth?: number;
+  highlightCommentId?: string;
+  onHighlightLayout?: (y: number) => void;
   onReply: (comment: Comment) => void;
   onLike: (comment: Comment) => void;
   onMenuPress?: (comment: Comment) => void;
@@ -17,15 +19,25 @@ export function CommentRow({
   comment,
   currentUserId,
   depth = 0,
+  highlightCommentId,
+  onHighlightLayout,
   onReply,
   onLike,
   onMenuPress,
 }: CommentRowProps) {
   const likeCount = comment.like_count ?? 0;
   const showMenu = Boolean(currentUserId && onMenuPress);
+  const highlighted = highlightCommentId === comment.id;
 
   return (
-    <View style={[styles.wrapper, depth > 0 && styles.replyWrapper]}>
+    <View
+      style={[styles.wrapper, depth > 0 && styles.replyWrapper, highlighted && styles.highlighted]}
+      onLayout={
+        highlighted && onHighlightLayout
+          ? (event) => onHighlightLayout(event.nativeEvent.layout.y)
+          : undefined
+      }
+    >
       <View style={styles.row}>
         <Avatar uri={comment.author?.avatar_url} name={comment.author?.display_name} size={depth > 0 ? 28 : 36} />
         <View style={styles.body}>
@@ -67,6 +79,8 @@ export function CommentRow({
               comment={reply}
               currentUserId={currentUserId}
               depth={depth + 1}
+              highlightCommentId={highlightCommentId}
+              onHighlightLayout={onHighlightLayout}
               onReply={onReply}
               onLike={onLike}
               onMenuPress={onMenuPress}
@@ -81,6 +95,12 @@ export function CommentRow({
 const styles = StyleSheet.create({
   wrapper: { marginBottom: spacing.md },
   replyWrapper: { marginLeft: spacing.lg },
+  highlighted: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginHorizontal: -spacing.sm,
+  },
   row: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" },
   body: { flex: 1, gap: spacing.xs },
   metaRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
@@ -111,12 +131,22 @@ const styles = StyleSheet.create({
 interface CommentThreadProps {
   comments: Comment[];
   currentUserId?: string;
+  highlightCommentId?: string;
+  onHighlightLayout?: (y: number) => void;
   onReply: (comment: Comment) => void;
   onLike: (comment: Comment) => void;
   onMenuPress?: (comment: Comment) => void;
 }
 
-export function CommentThread({ comments, currentUserId, onReply, onLike, onMenuPress }: CommentThreadProps) {
+export function CommentThread({
+  comments,
+  currentUserId,
+  highlightCommentId,
+  onHighlightLayout,
+  onReply,
+  onLike,
+  onMenuPress,
+}: CommentThreadProps) {
   if (!comments.length) {
     return (
       <View style={threadStyles.empty}>
@@ -132,6 +162,8 @@ export function CommentThread({ comments, currentUserId, onReply, onLike, onMenu
           key={comment.id}
           comment={comment}
           currentUserId={currentUserId}
+          highlightCommentId={highlightCommentId}
+          onHighlightLayout={onHighlightLayout}
           onReply={onReply}
           onLike={onLike}
           onMenuPress={onMenuPress}

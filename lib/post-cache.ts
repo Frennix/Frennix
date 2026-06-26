@@ -1,10 +1,17 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import type { FeedPage, Post } from "@frennix/types";
 
-function patchPostInFeedPages(pages: FeedPage[], postId: string, patch: Partial<Post>): FeedPage[] {
+function removePostFromFeedPages(pages: FeedPage[], postId: string): FeedPage[] {
   return pages.map((page) => ({
     ...page,
-    posts: page.posts.map((post) => (post.id === postId ? { ...post, ...patch } : post)),
+    posts: page.posts.filter((post) => post.id !== postId),
+  }));
+}
+
+function updatePostInFeedPages(pages: FeedPage[], updated: Post): FeedPage[] {
+  return pages.map((page) => ({
+    ...page,
+    posts: page.posts.map((post) => (post.id === updated.id ? { ...post, ...updated } : post)),
   }));
 }
 
@@ -13,10 +20,7 @@ export function removePostFromAllCaches(queryClient: QueryClient, userId: string
     if (!old) return old;
     return {
       ...old,
-      pages: old.pages.map((page) => ({
-        ...page,
-        posts: page.posts.filter((post) => post.id !== postId),
-      })),
+      pages: removePostFromFeedPages(old.pages, postId),
     };
   });
 
@@ -40,9 +44,12 @@ export function removePostFromAllCaches(queryClient: QueryClient, userId: string
     return old.filter((post) => post.id !== postId);
   });
 
-  queryClient.setQueriesData<Post[]>({ queryKey: ["saved-posts", userId] }, (old) => {
+  queryClient.setQueryData<InfiniteData<FeedPage>>(["saved-posts", userId], (old) => {
     if (!old) return old;
-    return old.filter((post) => post.id !== postId);
+    return {
+      ...old,
+      pages: removePostFromFeedPages(old.pages, postId),
+    };
   });
 }
 
@@ -53,7 +60,7 @@ export function updatePostInAllCaches(queryClient: QueryClient, userId: string, 
 
   queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
     if (!old) return old;
-    return { ...old, pages: patchPostInFeedPages(old.pages, updated.id, updated) };
+    return { ...old, pages: updatePostInFeedPages(old.pages, updated) };
   });
 
   queryClient.setQueriesData<FeedPage>({ queryKey: ["user-posts"] }, (old) => {
@@ -79,9 +86,9 @@ export function updatePostInAllCaches(queryClient: QueryClient, userId: string, 
     return old.map((post) => (post.id === updated.id ? { ...post, ...updated } : post));
   });
 
-  queryClient.setQueriesData<Post[]>({ queryKey: ["saved-posts", userId] }, (old) => {
+  queryClient.setQueryData<InfiniteData<FeedPage>>(["saved-posts", userId], (old) => {
     if (!old) return old;
-    return old.map((post) => (post.id === updated.id ? { ...post, ...updated } : post));
+    return { ...old, pages: updatePostInFeedPages(old.pages, updated) };
   });
 }
 

@@ -757,6 +757,8 @@ pnpm build:web        # web bundle compiles with ownership framework
 
 Last run (June 25, 2026): **all checks passed**; web export succeeded.
 
+**Code audit QA (agent, post-push):** Two bugs fixed in follow-up commit — saved-posts optimistic delete cache shape; comment deep links (`?comment=`) now highlight and scroll on post detail. Remaining checklist items require signed-in manual testing on web + native.
+
 #### Phase A QA checklist (web + mobile — manual sign-off)
 
 Run each on **web** (https://frennix.vercel.app or local `expo export -p web`) and **native** (Expo Go / dev build):
