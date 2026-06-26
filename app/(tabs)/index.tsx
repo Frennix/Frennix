@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Platform, RefreshControl, StyleSheet, View, type ViewToken } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes } from "@frennix/api";
 import type { FeedStory, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -17,6 +17,8 @@ import { handleTabRetap, scrollFlatListToTop } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useFeedLike } from "@/lib/useFeedLike";
+import { useFeedInfiniteScroll } from "@/lib/useFeedInfiniteScroll";
+import type { FeedListRow } from "@/lib/feed-list-rows";
 import { trackFeedLoad } from "@/lib/product-analytics";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import { EmptyState, FeedPostCardSkeleton, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
@@ -37,27 +39,7 @@ export default function HomeScreen() {
   const { openImage, lightbox } = useImageLightbox();
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
-  const listRef = useRef<FlatList<Post>>(null);
-  const [visiblePostIds, setVisiblePostIds] = useState<Set<string>>(() => new Set());
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 15,
-    minimumViewTime: 100,
-  }).current;
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken<Post>[] }) => {
-      const next = new Set(
-        viewableItems
-          .filter((entry) => entry.isViewable && entry.item?.id)
-          .map((entry) => entry.item.id)
-      );
-      setVisiblePostIds((prev) => {
-        if (prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
-        return next;
-      });
-    }
-  ).current;
+  const listRef = useRef<FlatList<FeedListRow>>(null);
 
   const {
     data,
@@ -101,7 +83,24 @@ export default function HomeScreen() {
   });
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+  const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
+
+  const {
+    listRows,
+    handleScroll,
+    onViewableItemsChanged,
+    viewabilityConfig,
+    visiblePostIds,
+  } = useFeedInfiniteScroll({
+    posts,
+    pageCount,
+    isFeedReady,
+    hasNextPage: !!hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    onScrollBase: onScroll,
+  });
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
@@ -207,14 +206,20 @@ export default function HomeScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Post }) => (
-      <FeedListItem
-        post={item}
-        userId={userId}
-        actions={feedActions}
-        mediaActive={visiblePostIds.has(item.id)}
-      />
-    ),
+    ({ item }: { item: FeedListRow }) => {
+      if (item.kind === "skeleton") {
+        return <FeedPostCardSkeleton />;
+      }
+
+      return (
+        <FeedListItem
+          post={item.post}
+          userId={userId}
+          actions={feedActions}
+          mediaActive={visiblePostIds.has(item.post.id)}
+        />
+      );
+    },
     [feedActions, userId, visiblePostIds]
   );
 
@@ -241,6 +246,13 @@ export default function HomeScreen() {
     ]
   );
 
+  const handleScrollEnd = useCallback(
+    (event: Parameters<typeof onScrollEnd>[0]) => {
+      onScrollEnd(event);
+    },
+    [onScrollEnd]
+  );
+
   return (
     <View style={styles.container}>
       {postActionSheets}
@@ -265,19 +277,19 @@ export default function HomeScreen() {
       />
       <FlatList
         ref={listRef}
-        data={posts}
+        data={listRows}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        initialNumToRender={5}
-        maxToRenderPerBatch={4}
-        windowSize={7}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={Platform.OS !== "web"}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={21}
+        updateCellsBatchingPeriod={16}
+        removeClippedSubviews={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        onScroll={onScroll}
-        onScrollEndDrag={onScrollEnd}
-        onMomentumScrollEnd={onScrollEnd}
+        onScroll={handleScroll}
+        onScrollEndDrag={handleScrollEnd}
+        onMomentumScrollEnd={handleScrollEnd}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
@@ -286,19 +298,11 @@ export default function HomeScreen() {
             tintColor={colors.accent}
           />
         }
+        onEndReachedThreshold={2}
         onEndReached={() => {
-          if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
         }}
-        onEndReachedThreshold={0.65}
         ListHeaderComponent={listHeader}
-        ListFooterComponent={
-          isFetchingNextPage ? (
-            <View style={styles.footerSkeletons}>
-              <FeedPostCardSkeleton />
-              <FeedPostCardSkeleton />
-            </View>
-          ) : null
-        }
         ListEmptyComponent={
           isLoading ? (
             <View style={styles.initialSkeletons}>
@@ -327,7 +331,5 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { flexGrow: 1, paddingBottom: spacing.xl },
   emptyWrap: { padding: spacing.lg },
-  footer: { paddingVertical: spacing.lg },
   initialSkeletons: { gap: 0 },
-  footerSkeletons: { gap: 0 },
 });

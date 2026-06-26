@@ -418,6 +418,8 @@ Perf tracking: `trackFeedLoad` → `perf_feed_load`, `trackTabSwitch` → `perf_
 
 **Also:** tuned FlatList window (`initialNumToRender: 5`, `windowSize: 7`), memoized `FeedHeader`, query `staleTime`/`placeholderData` on tab screens, Messages poll interval 60s.
 
+**Fast-scroll pass (June 2026):** `useFeedInfiniteScroll` prefetches next page ~3 viewport-heights early, auto-loads page 2 on startup, appends in-list skeleton rows while fetching, expands media lookahead (`MEDIA_LOOKAHEAD_ITEMS: 8`), `windowSize: 21`, `removeClippedSubviews: false`, image prefetch via `prefetch-post-images.ts`.
+
 **Files:** `lib/tab-prefetch.ts`, `components/TabPrefetchCoordinator.tsx`, `components/FeedListItem.tsx`, `packages/ui/src/FeedMediaSlot.tsx`.
 
 ### Recent feed media behavior
