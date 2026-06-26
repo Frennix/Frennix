@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "verify:supabase": "npx tsx scripts/verify-supabase-init.ts",
     "verify:ownership": "npx tsx scripts/verify-ownership.ts",
+    "verify:auth-resume": "npx tsx scripts/verify-auth-resume.ts",
     "build:web": "expo export -p web"
   },
   "dependencies": {

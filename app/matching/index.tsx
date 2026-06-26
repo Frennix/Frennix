@@ -46,7 +46,7 @@ function MatchingHeaderActions() {
 }
 
 export default function TrainingPartnerDiscoveryScreen() {
-  const { profile, session, loading: authLoading, refreshProfile } = useAuth();
+  const { profile, session, authReady, refreshProfile } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
 
@@ -161,7 +161,7 @@ export default function TrainingPartnerDiscoveryScreen() {
     setMatchPartner(null);
   }
 
-  if (authLoading || !profile) {
+  if (!authReady || !profile) {
     return (
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />

@@ -20,7 +20,7 @@ const EMPTY_STATS = {
 } as const;
 
 export default function ProfileTabScreen() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, authReady } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
@@ -59,7 +59,7 @@ export default function ProfileTabScreen() {
     enabled: !!userId,
   });
 
-  if (loading || !profile) {
+  if (!authReady || !profile) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.accent} size="large" />

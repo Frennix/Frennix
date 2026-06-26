@@ -40,7 +40,7 @@ const onboardingSchema = z.object({
 type OnboardingForm = z.infer<typeof onboardingSchema>;
 
 export default function OnboardingScreen() {
-  const { session, loading, passwordRecovery, refreshProfile, applySession } = useAuth();
+  const { session, authReady, passwordRecovery, profile, refreshProfile, applySession } = useAuth();
   const [step, setStep] = useState(0);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarMimeType, setAvatarMimeType] = useState("image/jpeg");
@@ -100,7 +100,7 @@ export default function OnboardingScreen() {
   }
 
   async function onSubmit(data: OnboardingForm) {
-    if (loading || submittingRef.current || submitSuccess) return;
+    if (!authReady || submittingRef.current || submitSuccess) return;
 
     let userId = session?.user.id;
     if (!userId) {
@@ -188,7 +188,7 @@ export default function OnboardingScreen() {
     };
   }, []);
 
-  if (loading) {
+  if (!authReady) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.accent} size="large" />
@@ -202,6 +202,10 @@ export default function OnboardingScreen() {
 
   if (!session) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (profile?.onboarding_complete) {
+    return <Redirect href="/(tabs)" />;
   }
 
   return (

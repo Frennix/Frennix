@@ -5,13 +5,13 @@ import { colors } from "@frennix/ui";
 import { isSupabaseConfigured } from "@/lib/config";
 
 export default function Index() {
-  const { session, profile, loading, passwordRecovery } = useAuth();
+  const { session, profile, authReady, passwordRecovery } = useAuth();
 
   if (!isSupabaseConfigured()) {
     return <Redirect href="/(auth)/welcome" />;
   }
 
-  if (loading || (passwordRecovery && !session)) {
+  if (!authReady || (passwordRecovery && !session)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />

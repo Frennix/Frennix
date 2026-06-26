@@ -4,6 +4,7 @@ import { getSession } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 
 const LOGIN_HREF = "/(auth)/login" as Href;
+const TABS_HREF = "/(tabs)" as Href;
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
 const SESSION_RECOVERY_MS = 1500;
@@ -26,7 +27,7 @@ function isPasswordRecoveryRoute(root: string | undefined) {
 
 /** Redirect signed-out users away from protected screens without a full page refresh. */
 export function AuthNavigationGuard() {
-  const { session, loading, passwordRecovery } = useAuth();
+  const { session, authReady, profile, passwordRecovery } = useAuth();
   const segments = useSegments();
   const navigationRouter = useRouter();
   const hadSessionRef = useRef(false);
@@ -38,10 +39,19 @@ export function AuthNavigationGuard() {
   }, [session]);
 
   useEffect(() => {
-    if (loading) return;
+    if (!authReady) return;
 
     const root = segments[0];
     if (!root || root === "index") return;
+
+    if (root === "onboarding" && session && profile?.onboarding_complete) {
+      if (navigationRouter.canDismiss()) {
+        navigationRouter.dismissAll();
+      }
+      navigationRouter.replace(TABS_HREF);
+      return;
+    }
+
     if (isPublicRoute(root)) return;
     if (isPasswordRecoveryRoute(root) && (session || passwordRecovery)) return;
     if (session) return;
@@ -75,7 +85,7 @@ export function AuthNavigationGuard() {
     return () => {
       cancelled = true;
     };
-  }, [session, loading, passwordRecovery, segments, navigationRouter]);
+  }, [session, authReady, profile, passwordRecovery, segments, navigationRouter]);
 
   return null;
 }

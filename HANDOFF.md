@@ -15,7 +15,8 @@ Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, wo
 
 Recent session work:
 
-- **Phase A — Platform ownership standard** — groups, comments, profiles on EntityActionSheet; content-type registry; consistent menus/messages/RLS
+- **Auth/profile resume fix (June 2026)** — Safari return no longer routes completed users to Set up Profile; `authReady` gate + profile cache + resume refresh
+- **Lucide SVG icons (June 2026)** — all UI icons migrated off font-based Ionicons for iOS Safari reliability
 - **Challenge management** — creator/viewer ⋯ menus on shared framework
 - **Post management (Priority 1)** — unified `usePostActions`, owner gets Share + Copy Link, viewer gets Block
 - **Logo clipping fix** — padded PNG + web-native `<img>` in `FrennixLogo.tsx`
@@ -168,12 +169,15 @@ Runtime access: `lib/config.ts` and `app.config.ts` → `extra`.
 ```
 App launch
   → ensureSupabaseInitialized()
+  → hydrate cached profile from sessionStorage (web resume)
   → getSession()
   → applySession(session)
-       → setSession, refreshProfile()
+       → setSession
+       → loadProfileForUser() — blocks authReady until profile fetch finishes
        → startPresenceTracking()
        → registerForPushNotifications()
-  → onAuthStateChange listener (sign-in, sign-out, PASSWORD_RECOVERY)
+  → onAuthStateChange listener (sign-in, sign-out, PASSWORD_RECOVERY, TOKEN_REFRESHED)
+  → visibility / AppState resume → refresh session + background profile refetch
 ```
 
 | Flow | Entry | Notes |
@@ -185,7 +189,13 @@ App launch
 | Onboarding | `app/onboarding.tsx` | Username, avatar, goals, activities → `onboarding_complete` |
 | Sign out | AuthProvider | Stops presence, clears push, `supabaseSignOut` |
 
-**Navigation guard:** `app/index.tsx` redirects: no config → welcome; no session → login; incomplete onboarding → `/onboarding`; password recovery → `/reset-password`; else tabs.
+**Navigation guard:** `app/index.tsx` waits for `authReady` before routing: no config → welcome; no session → login; incomplete onboarding → `/onboarding`; password recovery → `/reset-password`; else tabs.
+
+**Auth resume (June 2026 fix):** Returning from Safari/background no longer sends completed users to Set up Profile. Root causes addressed:
+- `TOKEN_REFRESHED` no longer marks auth as ready before profile fetch completes
+- `authReady` = session known + profile fetch finished for signed-in users
+- Profile cached in `sessionStorage` for stale-while-revalidate on web resume
+- `AuthNavigationGuard` redirects completed profiles away from `/onboarding`
 
 **Session resilience:** 1500 ms grace period on tab resume before treating session as lost (web background tab refresh).
 
@@ -611,6 +621,9 @@ cd apps/mobile
 # Phase A ownership framework (menus, hooks, RLS, moderation)
 pnpm verify:ownership
 
+# Auth/profile resume guards (authReady, onboarding redirect safety)
+pnpm verify:auth-resume
+
 # Matchmaking QA (Phases 4–13, expect 30+ PASS)
 npx tsx scripts/verify-matchmaking-qa.ts
 
@@ -638,7 +651,7 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 | Issue | Severity | Notes |
 |-------|----------|-------|
 | Phase 15 exit not met | High | Blocks 14B and new features |
-| Human device QA pending | Medium | Training partners production sign-off |
+| Human device QA pending | Medium | Training partners production sign-off; re-test auth resume on iPhone Safari after June 2026 fix |
 | Privacy policy URL | Medium | May need live site update |
 | Messaging N+1 | Medium | `getConversations` perf at scale |
 | Legacy `profiles.push_token` | Low | Coexists with `push_tokens` table |
@@ -756,6 +769,10 @@ pnpm build:web        # web bundle compiles with ownership framework
 ```
 
 Last run (June 25, 2026): **all checks passed**; web export succeeded.
+
+**Supabase (June 25, 2026):** All five `2025063000000*` migrations applied via `supabase db push`. Verified with `pnpm verify:phase-a-rls` — challenge UPDATE/DELETE RLS policies live.
+
+**Web production (June 25, 2026):** Deployed `dpl_5UNmkeqX7UVn16CTrz9T8vu1vo4Y` → https://frennix.vercel.app (bundle includes challenge ownership fixes).
 
 **Code audit QA (agent, post-push):** Two bugs fixed in `7f4e2b2` — saved-posts optimistic delete cache shape; comment deep links (`?comment=`) highlight and scroll on post detail. Challenge ownership hardened in follow-up — creator auto-join, discover ⋯ menu, immediate edit cache patch, delete rollback, resilient cover cleanup. **Requires `supabase db push`** for challenge UPDATE/DELETE RLS (`20250630000001`).
 

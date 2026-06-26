@@ -7,7 +7,7 @@ import { colors } from "@frennix/ui";
 
 export default function JoinReferralScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
-  const { session, profile, loading } = useAuth();
+  const { session, profile, authReady } = useAuth();
 
   useEffect(() => {
     if (code) {
@@ -15,7 +15,7 @@ export default function JoinReferralScreen() {
     }
   }, [code]);
 
-  if (loading) {
+  if (!authReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />
