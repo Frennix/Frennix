@@ -23,6 +23,9 @@ import {
   showAlert,
   showSuccess,
 } from "@/lib/alerts";
+import { removeChallengeFromLists } from "@/lib/entity-list-cache";
+import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
+import { ownershipMessages } from "@/lib/ownership/messages";
 
 interface UseChallengeActionsOptions {
   userId: string;
@@ -69,18 +72,24 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteChallenge(challengeId, userId),
-    onSuccess: async () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["discover-challenges"] });
+      await queryClient.cancelQueries({ queryKey: ["my-challenges", userId] });
+      removeChallengeFromLists(queryClient, challengeId, userId);
       queryClient.removeQueries({ queryKey: ["challenge", challengeId] });
       queryClient.removeQueries({ queryKey: ["challenge-posts", challengeId] });
       queryClient.removeQueries({ queryKey: ["challenge-joined", challengeId] });
       queryClient.removeQueries({ queryKey: ["challenge-participants", challengeId] });
+    },
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["discover-challenges"] });
       await queryClient.invalidateQueries({ queryKey: ["my-challenges", userId] });
-      showSuccess("Challenge deleted.");
+      showSuccess(ownershipMessages.deleted("Challenge"));
       onDeleted?.();
     },
     onError: (error) => {
-      showAlert("Something went wrong", getErrorMessage(error) || "Please try again.");
+      void invalidateChallengeLists();
+      showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
   });
 
@@ -88,10 +97,10 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
     mutationFn: () => closeChallengeEarly(challengeId, userId),
     onSuccess: async () => {
       await invalidateChallengeLists();
-      showSuccess("Challenge closed.");
+      showSuccess(ownershipMessages.closed("Challenge"));
     },
     onError: (error) => {
-      showAlert("Something went wrong", getErrorMessage(error) || "Please try again.");
+      showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
   });
 
@@ -103,9 +112,9 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
     onSuccess: () => {
       setReportVisible(false);
       closeMenu();
-      showSuccess("Report submitted. Our team will review it.");
+      showSuccess(ownershipMessages.reportSubmitted);
     },
-    onError: (error) => showAlert("Report failed", getErrorMessage(error)),
+    onError: (error) => showAlert(ownershipMessages.reportFailed, getErrorMessage(error)),
   });
 
   const blockMutation = useMutation({
@@ -113,11 +122,12 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
       if (!challenge) throw new Error("No challenge selected");
       return blockUser(userId, challenge.created_by);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       closeMenu();
-      showSuccess("User blocked");
+      await invalidateAfterBlock(queryClient, userId);
+      showSuccess(ownershipMessages.userBlocked);
     },
-    onError: (error) => showAlert("Block failed", getErrorMessage(error)),
+    onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),
   });
 
   const openChallengeActions = useCallback(() => {

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import type { Profile } from "@frennix/types";
 import { blockUser, getErrorMessage, reportUser } from "@frennix/api";
@@ -9,6 +9,7 @@ import { type EntityActionId } from "@/lib/entity-actions";
 import { profileActionsForRole } from "@/lib/profile-actions";
 import { copyProfileLink, shareProfileLink } from "@/lib/profile-link";
 import { confirmBlockUser, showAlert, showSuccess } from "@/lib/alerts";
+import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
 
 interface UseProfileActionsOptions {
@@ -17,6 +18,7 @@ interface UseProfileActionsOptions {
 }
 
 export function useProfileActions({ userId, profile }: UseProfileActionsOptions) {
+  const queryClient = useQueryClient();
   const [menuVisible, setMenuVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
 
@@ -48,8 +50,9 @@ export function useProfileActions({ userId, profile }: UseProfileActionsOptions)
       if (!profile) throw new Error("No profile selected");
       return blockUser(userId, profile.id);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       closeMenu();
+      await invalidateAfterBlock(queryClient, userId);
       showSuccess(ownershipMessages.userBlocked);
     },
     onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),

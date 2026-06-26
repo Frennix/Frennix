@@ -16,6 +16,12 @@ import { type EntityActionId } from "@/lib/entity-actions";
 import { eventActionsForRole } from "@/lib/event-actions";
 import { copyEventLink, shareEventLink } from "@/lib/event-link";
 import { confirmBlockUser, confirmCancelEvent, showAlert, showSuccess } from "@/lib/alerts";
+import {
+  markEventCancelledInCache,
+  removeEventFromLists,
+} from "@/lib/entity-list-cache";
+import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
+import { ownershipMessages } from "@/lib/ownership/messages";
 
 interface UseEventActionsOptions {
   userId: string;
@@ -56,12 +62,21 @@ export function useEventActions({ userId, event, onCancelled }: UseEventActionsO
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelWorkoutEvent(eventId, userId),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["workout-events", userId] });
+      removeEventFromLists(queryClient, eventId, userId);
+      markEventCancelledInCache(queryClient, eventId, userId);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["workout-events"] });
-      showSuccess("Event cancelled");
+      showSuccess(ownershipMessages.cancelled("Event"));
       onCancelled?.();
     },
-    onError: (error) => showAlert("Cancel failed", getErrorMessage(error)),
+    onError: (error) => {
+      void queryClient.invalidateQueries({ queryKey: ["workout-events", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["workout-event", eventId, userId] });
+      showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
+    },
   });
 
   const reportMutation = useMutation({
@@ -72,9 +87,9 @@ export function useEventActions({ userId, event, onCancelled }: UseEventActionsO
     onSuccess: () => {
       setReportVisible(false);
       closeMenu();
-      showSuccess("Report submitted. Our team will review it.");
+      showSuccess(ownershipMessages.reportSubmitted);
     },
-    onError: (error) => showAlert("Report failed", getErrorMessage(error)),
+    onError: (error) => showAlert(ownershipMessages.reportFailed, getErrorMessage(error)),
   });
 
   const blockMutation = useMutation({
@@ -82,11 +97,12 @@ export function useEventActions({ userId, event, onCancelled }: UseEventActionsO
       if (!event) throw new Error("No event selected");
       return blockUser(userId, event.created_by);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       closeMenu();
-      showSuccess("User blocked");
+      await invalidateAfterBlock(queryClient, userId);
+      showSuccess(ownershipMessages.userBlocked);
     },
-    onError: (error) => showAlert("Block failed", getErrorMessage(error)),
+    onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),
   });
 
   const openEventActions = useCallback(() => {

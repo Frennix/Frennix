@@ -376,21 +376,22 @@ Feed is a **client-side graph query**, not a single server RPC. RLS on `posts` c
 
 ### Interactions
 
-Hooks: `useFeedLike`, `usePostReaction`, `useSavePost`, `useSharePost`, `usePostOwnerActions`, `usePostViewerActions`.
+Hooks: `useFeedLike`, `usePostReaction`, `useSavePost`, `useSharePost`, `usePostActions`.
 
 **Post management (Priority 1 — live):**
 
 | Surface | Owner menu | Non-owner menu |
 |---------|------------|----------------|
-| Three-dot (⋯) | Edit Post, Delete Post, Cancel | Share, Copy Link, Report, Cancel |
+| Three-dot (⋯) | Edit Post, Delete Post, Share Post, Copy Link | Share Post, Copy Link, Report Post, Block User |
 
 | Action | Implementation |
 |--------|----------------|
 | Edit | `app/edit-post/[id].tsx` — caption, workout type, media add/remove/replace/reorder (up to 10 photos or 1 video) |
-| Delete | `usePostOwnerActions` → `deletePost()` — DB row + storage cleanup + optimistic cache removal |
+| Delete | `usePostActions` → `deletePost()` — DB row + storage cleanup + optimistic cache removal |
 | Copy link | `lib/post-link.ts` → `{APP_URL}/post/{id}` |
-| Share (non-owner ⋯) | Opens in-app `SharePostSheet` (message/group/challenge) |
-| Report | `useModeration.startPostReport` → `ReportReasonSheet` |
+| Share (owner ⋯) | In-app `SharePostSheet` when wired; otherwise native share |
+| Share (viewer ⋯) | Same — opens in-app share when available |
+| Report / Block | `usePostActions` → `ReportReasonSheet` / `confirmBlockUser` |
 
 Cache helpers: `lib/post-cache.ts` — `removePostFromAllCaches`, `updatePostInAllCaches`, `invalidatePostQueries`.
 
@@ -607,6 +608,9 @@ Bundle ID: `com.frennix.app`. Profiles in `eas.json`.
 ```bash
 cd apps/mobile
 
+# Phase A ownership framework (menus, hooks, RLS, moderation)
+pnpm verify:ownership
+
 # Matchmaking QA (Phases 4–13, expect 30+ PASS)
 npx tsx scripts/verify-matchmaking-qa.ts
 
@@ -692,6 +696,7 @@ Human QA checklists: `features/matching/QA.md`, `features/validation/*-RUT.md`.
 | Shared UI | `components/EntityListSheet.tsx` | Participants / members / attendees |
 | Link helpers | `lib/entity-link.ts` | Clipboard + native share |
 | Messages | `lib/ownership/messages.ts` | Consistent success/error copy |
+| List cache | `lib/entity-list-cache.ts` | Optimistic remove on delete/cancel |
 | Confirmations | `lib/alerts.ts` | `confirmDelete(label)`, `confirmBlockUser`, entity-specific wrappers |
 
 **Per entity:** `lib/{entity}-actions.ts` + `lib/use{Entity}Actions.tsx` + `lib/{entity}-link.ts` + edit route with owner guard + API `.eq(owner_field)` + Supabase RLS.
@@ -743,16 +748,36 @@ Run club posts = posts with `group_id`. Workout logs = posts with `post_type: wo
 | `20250630000004` | Group delete RLS + group reports |
 | `20250630000005` | Comment edit RLS |
 
-#### Phase A QA checklist (web + mobile)
+#### Automated verification
 
-- [ ] Posts: owner/viewer ⋯ menus; delete instant on feed; block/report
-- [ ] Comments: ⋯ menu; edit/delete owner; share/copy link; optimistic delete
-- [ ] Groups: ⋯ menu; edit/delete owner; view members; share `/group/{id}`
-- [ ] Challenges / Events: standard menus + participants/attendees
-- [ ] Profiles: ⋯ menu; share/copy `/user/{username}`; report/block on others
-- [ ] Profile grid long-press on any own post → owner menu
+```bash
+pnpm verify:ownership   # menu parity, hooks, edit guards, moderation API, migrations
+pnpm build:web        # web bundle compiles with ownership framework
+```
 
-**Do not start Priority 2 until user approves after QA passes.**
+Last run (June 25, 2026): **all checks passed**; web export succeeded.
+
+#### Phase A QA checklist (web + mobile — manual sign-off)
+
+Run each on **web** (https://frennix.vercel.app or local `expo export -p web`) and **native** (Expo Go / dev build):
+
+- [ ] Posts: owner/viewer ⋯ menus; delete instant on feed; block/report; copy link opens `/post/{id}`
+- [ ] Comments: ⋯ menu; edit/delete owner only; share/copy link; optimistic delete on post detail
+- [ ] Groups: ⋯ menu; edit/delete owner only; view members; share `/group/{id}`; delete removes from Discover → Groups
+- [ ] Challenges / Events: standard menus + participants/attendees; challenge delete removes from Discover; event cancel removes from Events tab
+- [ ] Profiles: ⋯ menu; share/copy `/user/{username}`; report/block on others only
+- [ ] Profile grid long-press on any own post → owner menu (Edit/Delete)
+
+**Do not start Priority 2 until user approves after manual QA passes.**
+
+#### Known gaps (deferred, not Phase A blockers)
+
+| Area | Status |
+|------|--------|
+| DM messages | Not on EntityActionSheet yet |
+| Trainer public profiles | No ⋯ menu (regular profiles covered) |
+| Recipes / marketplace | Registry stubs only — use same pattern when built |
+| Admin moderation UI | Reports stored; challenge/event/group columns added |
 
 ---
 

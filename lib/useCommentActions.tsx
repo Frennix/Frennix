@@ -20,6 +20,7 @@ import {
 } from "@/lib/comment-cache";
 import { copyCommentLink, shareCommentLink } from "@/lib/comment-link";
 import { confirmBlockUser, confirmDeleteComment, showAlert, showSuccess } from "@/lib/alerts";
+import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
 
 interface UseCommentActionsOptions {
@@ -105,8 +106,9 @@ export function useCommentActions({ userId, postId, onDeleted }: UseCommentActio
 
   const blockMutation = useMutation({
     mutationFn: (blockedId: string) => blockUser(userId, blockedId),
-    onSuccess: () => {
+    onSuccess: async () => {
       closeMenu();
+      await invalidateAfterBlock(queryClient, userId);
       showSuccess(ownershipMessages.userBlocked);
     },
     onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),

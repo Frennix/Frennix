@@ -9,6 +9,7 @@ import { type EntityActionId, isPlaceholderAction } from "@/lib/entity-actions";
 import { copyPostLink, sharePostLink } from "@/lib/post-link";
 import { postActionsForRole } from "@/lib/post-actions";
 import { confirmBlockUser, confirmDeletePost, showAlert, showSuccess } from "@/lib/alerts";
+import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
 import { invalidatePostQueries, removePostFromAllCaches } from "@/lib/post-cache";
 import { getSharedPostTargetId } from "@frennix/ui";
@@ -59,7 +60,7 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
       if (context?.previous) {
         queryClient.setQueryData(["feed", userId], context.previous);
       }
-      showAlert("Something went wrong", getErrorMessage(error) || "Please try again.");
+      showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
     onSuccess: async (_data, postId) => {
       queryClient.removeQueries({ queryKey: ["post", postId] });
@@ -79,18 +80,17 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
       closeMenu();
       showSuccess(ownershipMessages.reportSubmitted);
     },
-    onError: (error) => showAlert("Report failed", getErrorMessage(error)),
+    onError: (error) => showAlert(ownershipMessages.reportFailed, getErrorMessage(error)),
   });
 
   const blockMutation = useMutation({
     mutationFn: (blockedId: string) => blockUser(userId, blockedId),
     onSuccess: async () => {
       closeMenu();
-      await queryClient.invalidateQueries({ queryKey: ["feed", userId] });
-      await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+      await invalidateAfterBlock(queryClient, userId);
       showSuccess(ownershipMessages.userBlocked);
     },
-    onError: (error) => showAlert("Block failed", getErrorMessage(error)),
+    onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),
   });
 
   const handleAction = useCallback(

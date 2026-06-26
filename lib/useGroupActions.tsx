@@ -16,6 +16,8 @@ import { type EntityActionId, isPlaceholderAction } from "@/lib/entity-actions";
 import { groupActionsForRole } from "@/lib/group-actions";
 import { copyGroupLink, shareGroupLink } from "@/lib/group-link";
 import { confirmBlockUser, confirmDeleteGroup, showAlert, showSuccess } from "@/lib/alerts";
+import { removeGroupFromLists } from "@/lib/entity-list-cache";
+import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
 
 interface UseGroupActionsOptions {
@@ -63,6 +65,7 @@ export function useGroupActions({ userId, group, onDeleted }: UseGroupActionsOpt
     mutationFn: () => deleteGroup(groupId, userId),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["discover-groups"] });
+      removeGroupFromLists(queryClient, groupId);
       queryClient.removeQueries({ queryKey: ["group", groupId] });
       queryClient.removeQueries({ queryKey: ["group-posts", groupId] });
       queryClient.removeQueries({ queryKey: ["group-members", groupId] });
@@ -73,6 +76,7 @@ export function useGroupActions({ userId, group, onDeleted }: UseGroupActionsOpt
       onDeleted?.();
     },
     onError: (error) => {
+      void queryClient.invalidateQueries({ queryKey: ["discover-groups"] });
       showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
   });
@@ -95,8 +99,9 @@ export function useGroupActions({ userId, group, onDeleted }: UseGroupActionsOpt
       if (!group) throw new Error("No group selected");
       return blockUser(userId, group.owner_id);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       closeMenu();
+      await invalidateAfterBlock(queryClient, userId);
       showSuccess(ownershipMessages.userBlocked);
     },
     onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),

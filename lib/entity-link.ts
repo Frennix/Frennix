@@ -1,7 +1,11 @@
 import { Platform, Share } from "react-native";
 import { showAlert, showSuccess } from "@/lib/alerts";
+import { ownershipMessages } from "@/lib/ownership/messages";
 
-export async function copyEntityLink(link: string, successMessage = "Link copied to clipboard") {
+export async function copyEntityLink(
+  link: string,
+  successMessage = ownershipMessages.linkCopied
+) {
   if (Platform.OS === "web") {
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(link);
