@@ -82,7 +82,7 @@ export default function HomeScreen() {
   });
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
-  const { onScroll, isAtTop } = useScrollAtTop();
+  const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refetch(), refetchStories(), refetchSuggestions()]);
@@ -251,6 +251,8 @@ export default function HomeScreen() {
         updateCellsBatchingPeriod={32}
         removeClippedSubviews={Platform.OS !== "web"}
         onScroll={onScroll}
+        onScrollEndDrag={onScrollEnd}
+        onMomentumScrollEnd={onScrollEnd}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl

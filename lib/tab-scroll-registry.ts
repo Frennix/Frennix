@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 export type TabScrollKey = "feed" | "discover" | "events" | "messages" | "profile";
 
 type TabScrollController = {
@@ -52,9 +54,15 @@ type FlatListScrollRef = {
 export function scrollFlatListToTop(listRef: FlatListScrollRef | null) {
   if (!listRef) return;
 
-  listRef.scrollToOffset?.({ offset: 0, animated: true });
-
   const nativeScrollRef = listRef.getNativeScrollRef?.() ?? listRef.getScrollRef?.();
+
+  // RN Web scrollToOffset can be unreliable; prefer the underlying scroll view.
+  if (Platform.OS === "web" && nativeScrollRef?.scrollTo) {
+    nativeScrollRef.scrollTo({ y: 0, animated: true });
+    return;
+  }
+
+  listRef.scrollToOffset?.({ offset: 0, animated: true });
   nativeScrollRef?.scrollTo?.({ y: 0, animated: true });
 }
 

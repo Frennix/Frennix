@@ -7,11 +7,26 @@ const DEFAULT_THRESHOLD = 8;
 export function useScrollAtTop(threshold = DEFAULT_THRESHOLD) {
   const atTopRef = useRef(true);
 
-  const onScroll = useCallback(
+  const syncAtTop = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       atTopRef.current = event.nativeEvent.contentOffset.y <= threshold;
     },
     [threshold]
+  );
+
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      syncAtTop(event);
+    },
+    [syncAtTop]
+  );
+
+  /** Fires after animated scroll-to-top completes (web + native). */
+  const onScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      syncAtTop(event);
+    },
+    [syncAtTop]
   );
 
   const isAtTop = useCallback(() => atTopRef.current, []);
@@ -20,5 +35,5 @@ export function useScrollAtTop(threshold = DEFAULT_THRESHOLD) {
     atTopRef.current = true;
   }, []);
 
-  return { onScroll, isAtTop, resetAtTop };
+  return { onScroll, onScrollEnd, isAtTop, resetAtTop };
 }
