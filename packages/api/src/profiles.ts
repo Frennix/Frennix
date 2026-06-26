@@ -10,9 +10,12 @@ import {
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
 
+/** PostgREST view that masks presence fields for other users. Writes use `profiles`. */
+const PROFILES_READ = "profiles_reader";
+
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await getSupabase()
-    .from("profiles")
+    .from(PROFILES_READ)
     .select("*")
     .eq("id", userId)
     .single();
@@ -22,7 +25,7 @@ export async function getProfile(userId: string): Promise<Profile | null> {
 
 export async function getProfileByUsername(username: string): Promise<Profile | null> {
   const { data, error } = await getSupabase()
-    .from("profiles")
+    .from(PROFILES_READ)
     .select("*")
     .eq("username", username)
     .single();
@@ -122,7 +125,7 @@ export async function discoverProfiles(filters?: {
   city?: string;
 }, viewerId?: string): Promise<Profile[]> {
   let q = getSupabase()
-    .from("profiles")
+    .from(PROFILES_READ)
     .select("*")
     .eq("onboarding_complete", true)
     .eq("visibility", "public")
@@ -224,7 +227,7 @@ export async function getProfilesByIds(ids: string[]): Promise<Profile[]> {
   if (!uniqueIds.length) return [];
 
   const { data, error } = await getSupabase()
-    .from("profiles")
+    .from(PROFILES_READ)
     .select("*")
     .in("id", uniqueIds);
 

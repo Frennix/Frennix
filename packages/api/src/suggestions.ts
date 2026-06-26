@@ -89,7 +89,7 @@ export async function getSuggestedAthletes(
   const excludeIds = new Set([viewerId, ...followingIds, ...blockedIds]);
 
   const { data: candidates, error } = await getSupabase()
-    .from("profiles")
+    .from("profiles_reader")
     .select("*")
     .eq("onboarding_complete", true)
     .eq("visibility", "public")

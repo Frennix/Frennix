@@ -142,6 +142,8 @@ export interface Profile {
   is_banned?: boolean;
   last_seen_at?: string | null;
   is_online?: boolean;
+  /** When false, presence is hidden from other users. Only present on the signed-in user's profile. */
+  show_online_status?: boolean | null;
   created_at: string;
   updated_at: string;
 }

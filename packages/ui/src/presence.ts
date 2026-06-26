@@ -1,9 +1,14 @@
 import type { Profile } from "@frennix/types";
 
+export type PresenceProfile = Pick<Profile, "is_online" | "last_seen_at" | "show_online_status">;
+
+/** Whether presence indicators should render for this profile row. */
+export function isPresenceVisible(profile: PresenceProfile | null | undefined): boolean {
+  return profile?.show_online_status !== false;
+}
+
 /** Must match packages/api/src/presence.ts */
 export const PRESENCE_ONLINE_THRESHOLD_MS = 3 * 60 * 1000;
-
-export type PresenceProfile = Pick<Profile, "is_online" | "last_seen_at">;
 
 function isSameCalendarDay(a: Date, b: Date) {
   return (
@@ -23,6 +28,7 @@ export function isProfileOnline(
   profile: PresenceProfile | null | undefined,
   now = new Date()
 ): boolean {
+  if (!isPresenceVisible(profile)) return false;
   if (!profile?.last_seen_at || !profile.is_online) return false;
   const seenMs = new Date(profile.last_seen_at).getTime();
   if (Number.isNaN(seenMs)) return false;
@@ -31,12 +37,13 @@ export function isProfileOnline(
 
 /**
  * Human-readable presence for profile cards, chat headers, etc.
- * Returns null when no last_seen_at is recorded.
+ * Returns null when no last_seen_at is recorded or presence is hidden.
  */
 export function formatPresenceStatus(
   profile: PresenceProfile | null | undefined,
   now = new Date()
 ): string | null {
+  if (!isPresenceVisible(profile)) return null;
   if (!profile?.last_seen_at) return null;
   if (isProfileOnline(profile, now)) return "Online now";
 

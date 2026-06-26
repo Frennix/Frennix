@@ -141,6 +141,7 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />
+            <Stack.Screen name="privacy-settings" options={backScreen("Privacy")} />
             <Stack.Screen name="saved-posts" options={backScreen("Saved Posts")} />
             <Stack.Screen name="invite-friends" options={backScreen("Invite Friends")} />
             <Stack.Screen name="join/[code]" options={{ headerShown: false }} />

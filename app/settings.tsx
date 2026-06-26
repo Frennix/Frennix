@@ -162,6 +162,12 @@ export default function SettingsScreen() {
         </Pressable>
       </Link>
 
+      <Text style={styles.section}>Privacy</Text>
+      <Pressable onPress={() => pushScreen("/privacy-settings")}>
+        <Text style={styles.link}>Privacy settings</Text>
+        <Text style={styles.linkHint}>Online status and visibility controls</Text>
+      </Pressable>
+
       <Text style={styles.section}>Notifications</Text>
       <Link href="/notification-settings" asChild>
         <Pressable>

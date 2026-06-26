@@ -42,7 +42,7 @@ function buildStory(
 
 export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
   const [selfProfile, following] = await Promise.all([
-    getSupabase().from("profiles").select("*").eq("id", viewerId).single(),
+    getSupabase().from("profiles_reader").select("*").eq("id", viewerId).single(),
     getFollowing(viewerId),
   ]);
 

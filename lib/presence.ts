@@ -33,8 +33,16 @@ function enqueuePresenceRpc(run: () => Promise<void>) {
   presenceRpcChain = presenceRpcChain.then(run).catch(() => undefined);
 }
 
+let presenceSharingEnabled = true;
+
+export function setPresenceSharingEnabled(enabled: boolean) {
+  presenceSharingEnabled = enabled;
+}
+
 function canSendOnlinePresence() {
-  return !signingOut && Boolean(trackingUserId) && appInForeground;
+  return (
+    !signingOut && Boolean(trackingUserId) && appInForeground && presenceSharingEnabled
+  );
 }
 
 async function sendPresence(isOnline: boolean, reason?: string, offlineEpoch?: number) {

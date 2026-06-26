@@ -16,6 +16,7 @@ Frennix is a fitness social app (Expo 52 / React Native 0.76) with feed, DMs, wo
 Recent session work:
 
 - **Auth/profile resume fix (June 2026)** — Safari return no longer routes completed users to Set up Profile; `authReady` gate + profile cache + resume refresh
+- **Online status privacy (June 2026)** — Show Online Status toggle; backend masking via `profiles_reader` + `set_presence` guard
 - **Lucide SVG icons (June 2026)** — all UI icons migrated off font-based Ionicons for iOS Safari reliability
 - **Challenge management** — creator/viewer ⋯ menus on shared framework
 - **Post management (Priority 1)** — unified `usePostActions`, owner gets Share + Copy Link, viewer gets Block
@@ -529,11 +530,17 @@ Docs: `features/matching/README.md`, `features/trainers/README.md`.
 
 ## 14. Presence
 
-**Client:** `lib/presence.ts` — heartbeat every `PRESENCE_HEARTBEAT_MS`, offline debounce 2 s on background, RPC queue serialization.
+**Client:** `lib/presence.ts` — heartbeat every `PRESENCE_HEARTBEAT_MS`, offline debounce 2 s on background, RPC queue serialization. Skips online heartbeats when `show_online_status` is false.
 
-**Server:** `profiles.is_online`, `profiles.last_seen_at`; `set_presence` RPC; cron `expire_stale_presence` (5 min threshold).
+**Server:** `profiles.is_online`, `profiles.last_seen_at`, `profiles.show_online_status` (default **ON**); `set_presence` RPC respects privacy flag; `profiles_reader` view masks presence for other users; `profile_for_viewer()` used in search/match RPCs.
 
-**UI:** Realtime subscription on profile presence fields; shown on matches list and chat.
+**Privacy UI:** Settings → Privacy settings → **Show Online Status** toggle (`app/privacy-settings.tsx`).
+
+**UI:** Realtime subscription on profile presence fields (masked when hidden); green dot / “Online now” / “Last seen” hidden when `show_online_status` is false.
+
+**Verify:** `pnpm verify:online-status-privacy`
+
+**Two-account QA:** Account A toggles Show Online Status OFF → Account B sees A offline (no dot, no last seen). Toggle ON → B sees A online again.
 
 ---
 
@@ -623,6 +630,9 @@ pnpm verify:ownership
 
 # Auth/profile resume guards (authReady, onboarding redirect safety)
 pnpm verify:auth-resume
+
+# Online status privacy (profiles_reader, set_presence, UI toggle)
+pnpm verify:online-status-privacy
 
 # Matchmaking QA (Phases 4–13, expect 30+ PASS)
 npx tsx scripts/verify-matchmaking-qa.ts

@@ -321,9 +321,10 @@ export type PresenceFields = {
 };
 
 export function isUserOnline(
-  profile: PresenceFields | null | undefined,
+  profile: (PresenceFields & { show_online_status?: boolean | null }) | null | undefined,
   nowMs = Date.now()
 ): boolean {
+  if (profile?.show_online_status === false) return false;
   if (!profile?.last_seen_at || !profile.is_online) return false;
   const seenMs = new Date(profile.last_seen_at).getTime();
   if (Number.isNaN(seenMs)) return false;
@@ -361,10 +362,14 @@ export function subscribeToProfilesPresence(
         const row = payload.new as Record<string, unknown>;
         if (typeof row.id !== "string") return;
 
+        const showOnline =
+          row.show_online_status == null ? true : row.show_online_status === true;
+
         onUpdate({
           id: row.id,
-          is_online: row.is_online === true,
-          last_seen_at: typeof row.last_seen_at === "string" ? row.last_seen_at : null,
+          is_online: showOnline && row.is_online === true,
+          last_seen_at:
+            showOnline && typeof row.last_seen_at === "string" ? row.last_seen_at : null,
         });
       }
     );
