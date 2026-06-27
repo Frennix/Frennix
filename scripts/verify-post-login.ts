@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -86,13 +86,23 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: assertValidFeedPostCardHeader,
   },
   {
-    name: "Feed uses AnimatedFeedListItem without web-only Reanimated crash pattern",
+    name: "AnimatedFeedListItem disables Reanimated entering on web (Safari crash fix)",
     run: () => {
       assertIncludes(
         "components/AnimatedFeedListItem.tsx",
-        "Platform.OS",
+        'Platform.OS !== "web"',
         "entering animation must be disabled on web"
       );
+      const distFiles = readdirSync(join(ROOT, "dist/_expo/static/js/web")).filter((f) =>
+        f.startsWith("entry-")
+      );
+      if (distFiles.length === 0) {
+        throw new Error("Run build:web before verify:post-login (missing dist bundle)");
+      }
+      const bundle = read(`dist/_expo/static/js/web/${distFiles[0]}`);
+      if (bundle.includes("FadeInDown.duration(260).springify().damping(22)")) {
+        throw new Error("Web bundle still ships FadeInDown entering — Safari post-login crash risk");
+      }
     },
   },
   {
