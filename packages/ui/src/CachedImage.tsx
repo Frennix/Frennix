@@ -11,6 +11,7 @@ export type CachedImageProps = {
   recyclingKey?: string;
   accessibilityLabel?: string;
   onLoad?: () => void;
+  onLoadEnd?: () => void;
   onError?: () => void;
 };
 
@@ -25,6 +26,7 @@ export function CachedImage({
   recyclingKey,
   accessibilityLabel,
   onLoad,
+  onLoadEnd,
   onError,
 }: CachedImageProps) {
   return (
@@ -39,6 +41,7 @@ export function CachedImage({
       style={style}
       accessibilityLabel={accessibilityLabel}
       onLoad={onLoad}
+      onLoadEnd={onLoadEnd}
       onError={onError}
     />
   );

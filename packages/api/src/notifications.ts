@@ -40,6 +40,8 @@ export function notificationActorId(notification: Notification): string | null {
       return (payload.inviter_id as string) ?? null;
     case "challenge_join":
       return (payload.user_id as string) ?? null;
+    case "challenge_invite":
+      return (payload.inviter_id as string) ?? null;
     case "post_share":
       return (payload.sharer_id as string) ?? null;
     default:
@@ -109,6 +111,17 @@ export function buildNotificationDisplay(
       return { headline: "Challenge reminder", detail: "Your challenge is coming up" };
     case "challenge_join":
       return { headline: "Challenge join", detail: `${actorName} joined your challenge` };
+    case "challenge_invite": {
+      const title = payload.challenge_title as string | undefined;
+      const username = payload.inviter_username as string | undefined;
+      const who = username ? `@${username}` : actorName;
+      return {
+        headline: "Challenge invitation",
+        detail: title
+          ? `${who} invited you to join "${title}".`
+          : `${who} invited you to join a challenge.`,
+      };
+    }
     case "group_invite":
       return { headline: "Group invite", detail: `${actorName} invited you to a group` };
     case "event_join": {

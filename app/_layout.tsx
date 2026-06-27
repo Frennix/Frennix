@@ -114,6 +114,10 @@ export default function RootLayout() {
             <Stack.Screen name="user/[username]" options={backScreen("Profile", fadeScreen)} />
             <Stack.Screen name="group/[id]" options={backScreen("Group", fadeScreen)} />
             <Stack.Screen name="challenge/[id]" options={backScreen("Challenge", fadeScreen)} />
+            <Stack.Screen
+              name="challenge/[id]/invite"
+              options={backScreen("Invite Friends", fadeScreen)}
+            />
             <Stack.Screen name="chat/[conversationId]" options={backScreen("Chat", fadeScreen)} />
             <Stack.Screen name="followers/[userId]" options={backScreen("Followers")} />
             <Stack.Screen name="following/[userId]" options={backScreen("Following")} />

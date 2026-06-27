@@ -15,6 +15,9 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { refetchQueryKeys } from "@/lib/refreshQueries";
 import { DetailLoading } from "@/components/DetailLoading";
+import { ShareChallengeSheet } from "@/components/ShareChallengeSheet";
+import { shareChallengeToDestination } from "@/lib/share-challenge";
+import { showAlert } from "@/lib/alerts";
 import { Button, CachedImage, EmptyState, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
 
 import { isChallengeClosed } from "@/lib/challenge-actions";
@@ -26,6 +29,7 @@ export default function ChallengeDetailScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
@@ -92,11 +96,30 @@ export default function ChallengeDetailScreen() {
 
   const closed = isChallengeClosed(challenge);
 
+  const handleShareChallenge = useCallback(
+    async (destination: Parameters<typeof shareChallengeToDestination>[2]) => {
+      if (!id) return;
+      setShareVisible(false);
+      try {
+        await shareChallengeToDestination(id, challenge.title, destination);
+      } catch {
+        showAlert("Share failed", "Could not share this challenge. Try copying the link instead.");
+      }
+    },
+    [challenge.title, id]
+  );
+
   return (
     <View style={styles.container}>
       {postActionSheets}
       {challengeActionSheets}
       {shareSheet}
+      <ShareChallengeSheet
+        visible={shareVisible}
+        challengeTitle={challenge.title}
+        onSelect={handleShareChallenge}
+        onClose={() => setShareVisible(false)}
+      />
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
@@ -147,6 +170,23 @@ export default function ChallengeDetailScreen() {
               {new Date(challenge.end_date).toLocaleDateString()}
             </Text>
             <Text style={styles.participants}>{challenge.participant_count} participants</Text>
+
+            {!closed && userId ? (
+              <View style={styles.actionRow}>
+                <Button
+                  title="Invite Friends"
+                  variant="secondary"
+                  onPress={() => router.push(`/challenge/${id}/invite`)}
+                  style={styles.actionButton}
+                />
+                <Button
+                  title="Share Challenge"
+                  variant="secondary"
+                  onPress={() => setShareVisible(true)}
+                  style={styles.actionButton}
+                />
+              </View>
+            ) : null}
 
             {!closed && !joined ? (
               <Button
@@ -213,6 +253,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.md, flexGrow: 1 },
   header: { gap: spacing.sm, marginBottom: spacing.sm },
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
+  },
   titleRow: {
     flexDirection: "row",
     alignItems: "flex-start",

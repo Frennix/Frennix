@@ -36,6 +36,23 @@ export function useFeedInfiniteScroll({
   const [visiblePostIds, setVisiblePostIds] = useState<Set<string>>(() => new Set());
   const nearEndRef = useRef(false);
   const fetchInFlightRef = useRef(false);
+  const seededInitialPostsRef = useRef(false);
+
+  // FlatList viewability often does not fire on first paint (especially Safari web).
+  // Seed the first screen of posts so feed media mounts immediately.
+  useEffect(() => {
+    if (seededInitialPostsRef.current || posts.length === 0) return;
+    seededInitialPostsRef.current = true;
+
+    setVisiblePostIds((prev) => {
+      const next = new Set(prev);
+      const end = Math.min(posts.length - 1, MEDIA_LOOKAHEAD_ITEMS);
+      for (let i = 0; i <= end; i++) {
+        next.add(posts[i].id);
+      }
+      return next;
+    });
+  }, [posts]);
 
   const requestNextPage = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage || fetchInFlightRef.current) return;

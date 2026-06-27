@@ -43,7 +43,7 @@ export function FeedMediaSlot({
   }, [visible]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || active || !visible || typeof document === "undefined") return;
+    if (Platform.OS !== "web" || active || typeof document === "undefined") return;
 
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node || typeof IntersectionObserver === "undefined") {
@@ -63,12 +63,12 @@ export function FeedMediaSlot({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [active, mediaUrls, visible]);
+  }, [active, mediaUrls]);
 
   if (!active) {
     return (
-      <View ref={containerRef} collapsable={false}>
-        <FeedMediaSkeleton style={style} />
+      <View ref={containerRef} collapsable={false} style={style}>
+        <FeedMediaSkeleton />
       </View>
     );
   }

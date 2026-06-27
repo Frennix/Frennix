@@ -38,8 +38,14 @@ export * from "./ProfileAchievementBadges";
 export * from "./ProfileContentTabs";
 export * from "./SharedPostPreview";
 export * from "./ReactionBar";
-export * from "./CachedImage";
-export * from "./ScalePressable";
-export * from "./ProgressiveImage";
-export * from "./QueryErrorState";
+export {
+  CachedImage,
+  CachedAssetImage,
+  prefetchCachedImage,
+  prefetchCachedImages,
+  type CachedImageProps,
+} from "./CachedImage";
+export { ScalePressable } from "./ScalePressable";
+export { ProgressiveImage } from "./ProgressiveImage";
+export { QueryErrorState } from "./QueryErrorState";
 export * from "./ReactionPicker";

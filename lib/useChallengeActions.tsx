@@ -161,6 +161,10 @@ export function useChallengeActions({ userId, challenge, onDeleted }: UseChallen
           closeMenu();
           router.push(`/edit-challenge/${challenge.id}`);
           return;
+        case "invite":
+          closeMenu();
+          router.push(`/challenge/${challenge.id}/invite`);
+          return;
         case "delete":
           closeMenu();
           confirmDeleteChallenge(() => deleteMutation.mutate());

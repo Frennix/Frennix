@@ -53,6 +53,9 @@ export function ProgressiveImage({
           setLoaded(true);
           onLoad?.();
         }}
+        onLoadEnd={() => {
+          setLoaded(true);
+        }}
         onError={() => {
           setFailed(true);
           onError?.();

@@ -18,6 +18,7 @@ const DEFAULT_PREFERENCES = {
   event_join: true,
   event_invite: true,
   challenge_join: true,
+  challenge_invite: true,
   post_share: true,
 };
 
@@ -46,6 +47,8 @@ function actorIdFromPayload(type: string, payload: Record<string, unknown>): str
     case "challenge_join":
       return (payload.user_id as string) ?? null;
     case "event_invite":
+      return (payload.inviter_id as string) ?? null;
+    case "challenge_invite":
       return (payload.inviter_id as string) ?? null;
     case "post_share":
       return (payload.sharer_id as string) ?? null;
@@ -84,6 +87,8 @@ function pushTitle(type: string, payload: Record<string, unknown>): string {
       return "Event invitation";
     case "challenge_join":
       return "Challenge join";
+    case "challenge_invite":
+      return "Challenge invitation";
     case "post_share":
       return "Post shared";
     default:
@@ -146,6 +151,14 @@ function pushBody(
       return title
         ? `${actorName} joined your challenge "${title}"`
         : `${actorName} joined your challenge`;
+    }
+    case "challenge_invite": {
+      const title = payload.challenge_title as string | undefined;
+      const username = payload.inviter_username as string | undefined;
+      const who = username ? `@${username}` : actorName;
+      return title
+        ? `${who} invited you to join "${title}".`
+        : `${who} invited you to join a challenge.`;
     }
     case "post_share": {
       const dest = payload.destination as string | undefined;

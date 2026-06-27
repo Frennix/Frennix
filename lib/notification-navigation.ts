@@ -137,7 +137,7 @@ export function openNotificationTarget(notification: Notification): Notification
     return { ok: false, message: "This event is no longer available." };
   }
 
-  if (type === "challenge_join" || type === "challenge_reminder") {
+  if (type === "challenge_join" || type === "challenge_reminder" || type === "challenge_invite") {
     const challengeId = asString(payload.challenge_id);
     if (challengeId) return pushHref(`/challenge/${challengeId}`);
     return { ok: false, message: "This challenge is no longer available." };
@@ -232,7 +232,7 @@ export function openNotificationFromPushData(data: Record<string, unknown>): Not
     return { ok: false, message: "This event is no longer available." };
   }
 
-  if (type === "challenge_join" || type === "challenge_reminder") {
+  if (type === "challenge_join" || type === "challenge_reminder" || type === "challenge_invite") {
     const challengeId = asString(data.challenge_id) ?? asString(payload.challenge_id);
     if (challengeId) return pushHref(`/challenge/${challengeId}`);
     return { ok: false, message: "This challenge is no longer available." };

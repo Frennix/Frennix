@@ -43,9 +43,21 @@ export type NotificationType =
   | "group_invite"
   | "challenge_reminder"
   | "challenge_join"
+  | "challenge_invite"
   | "event_join"
   | "event_invite"
   | "post_share";
+
+export type ChallengeInvitationStatus = "pending" | "declined";
+
+export interface ChallengeInvitation {
+  challenge_id: string;
+  inviter_id: string;
+  invitee_id: string;
+  status: ChallengeInvitationStatus;
+  created_at: string;
+  updated_at: string;
+}
 
 export type MatchPreference = "same" | "opposite" | "any";
 
@@ -87,6 +99,7 @@ export type NotificationPreferenceKey =
   | "event_join"
   | "event_invite"
   | "challenge_join"
+  | "challenge_invite"
   | "post_share";
 
 export interface NotificationPreferences {
@@ -101,6 +114,7 @@ export interface NotificationPreferences {
   event_join: boolean;
   event_invite: boolean;
   challenge_join: boolean;
+  challenge_invite: boolean;
   post_share: boolean;
 }
 
@@ -116,6 +130,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   event_join: true,
   event_invite: true,
   challenge_join: true,
+  challenge_invite: true,
   post_share: true,
 };
 

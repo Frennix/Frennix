@@ -6,6 +6,7 @@ import {
 
 export const CHALLENGE_OWNER_ACTIONS: EntityActionDefinition[] = [
   entityAction("edit", "Edit Challenge"),
+  entityAction("invite", "Invite Friends"),
   entityAction("delete", "Delete Challenge", { tone: "danger" }),
   entityAction("share", "Share Challenge"),
   entityAction("copy_link", "Copy Link"),
@@ -16,6 +17,7 @@ export const CHALLENGE_OWNER_ACTIONS: EntityActionDefinition[] = [
 ];
 
 export const CHALLENGE_VIEWER_ACTIONS: EntityActionDefinition[] = [
+  entityAction("invite", "Invite Friends"),
   entityAction("share", "Share Challenge"),
   entityAction("copy_link", "Copy Link"),
   entityAction("report", "Report Challenge"),
@@ -32,7 +34,10 @@ export function challengeActionsForRole(
 ): EntityActionDefinition[] {
   const actions = isOwner ? CHALLENGE_OWNER_ACTIONS : CHALLENGE_VIEWER_ACTIONS;
   if (isOwner && challenge && isChallengeClosed(challenge)) {
-    return excludeActions(actions, ["close_early"]);
+    return excludeActions(actions, ["close_early", "invite"]);
+  }
+  if (!isOwner && challenge && isChallengeClosed(challenge)) {
+    return excludeActions(actions, ["invite"]);
   }
   return actions;
 }

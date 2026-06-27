@@ -13,6 +13,8 @@
     "verify:expo-image": "npx tsx scripts/verify-expo-image.ts",
     "verify:auth-resume": "npx tsx scripts/verify-auth-resume.ts",
     "verify:post-login": "npx tsx scripts/verify-post-login.ts",
+    "verify:ui-barrel": "npx tsx scripts/verify-ui-barrel.ts",
+    "verify:feed-media": "npx tsx scripts/verify-feed-media.ts",
     "verify:online-status-privacy": "npx tsx scripts/verify-online-status-privacy.ts",
     "build:web": "expo export -p web"
   },

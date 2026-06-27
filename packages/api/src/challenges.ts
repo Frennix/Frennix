@@ -1,4 +1,13 @@
-import type { Challenge, ChallengeParticipant, Post, Profile } from "@frennix/types";
+import type {
+  Challenge,
+  ChallengeInvitation,
+  ChallengeInvitationStatus,
+  ChallengeParticipant,
+  Post,
+  Profile,
+} from "@frennix/types";
+import { getFollowers, getFollowing } from "./follows";
+import { getMatches } from "./matching";
 import { enrichPostsWithInteractions } from "./posts";
 import { formatSupabaseError, normalizeImageExt, readImageBytes } from "./profile-utils";
 import { getSupabase } from "./supabase";
@@ -222,4 +231,82 @@ export async function closeChallengeEarly(challengeId: string, userId: string) {
   if (error) throw formatSupabaseError(error, "Failed to close challenge");
   if (!data) throw new Error("Challenge is already closed or you are not the creator");
   return data as Challenge;
+}
+
+function isChallengeOpen(challenge: Challenge) {
+  return new Date(challenge.end_date).getTime() > Date.now();
+}
+
+export async function getChallengeInviteCandidates(userId: string): Promise<Profile[]> {
+  const [following, followers, matches] = await Promise.all([
+    getFollowing(userId),
+    getFollowers(userId),
+    getMatches(userId),
+  ]);
+
+  const byId = new Map<string, Profile>();
+  for (const profile of [...following, ...followers]) {
+    byId.set(profile.id, profile);
+  }
+  for (const match of matches) {
+    if (match.other_user) byId.set(match.other_user.id, match.other_user);
+  }
+  byId.delete(userId);
+
+  return Array.from(byId.values()).sort((a, b) =>
+    a.display_name.localeCompare(b.display_name)
+  );
+}
+
+export async function getChallengeInvitationsByInviter(
+  challengeId: string,
+  inviterId: string
+): Promise<ChallengeInvitation[]> {
+  const { data, error } = await getSupabase()
+    .from("challenge_invitations")
+    .select("challenge_id, inviter_id, invitee_id, status, created_at, updated_at")
+    .eq("challenge_id", challengeId)
+    .eq("inviter_id", inviterId);
+
+  if (error) throw formatSupabaseError(error, "Failed to load challenge invitations");
+  return (data ?? []) as ChallengeInvitation[];
+}
+
+export async function inviteToChallenge(
+  challengeId: string,
+  inviterId: string,
+  inviteeId: string
+) {
+  if (inviterId === inviteeId) throw new Error("You cannot invite yourself");
+
+  const challenge = await getChallenge(challengeId);
+  if (!challenge) throw new Error("Challenge not found");
+  if (!isChallengeOpen(challenge)) throw new Error("This challenge has ended");
+
+  const alreadyJoined = await isChallengeParticipant(challengeId, inviteeId);
+  if (alreadyJoined) throw new Error("This athlete already joined the challenge");
+
+  const { error } = await getSupabase().from("challenge_invitations").insert({
+    challenge_id: challengeId,
+    inviter_id: inviterId,
+    invitee_id: inviteeId,
+    status: "pending",
+  });
+
+  if (error) {
+    if (error.code === "23505") throw new Error("This athlete was already invited");
+    throw formatSupabaseError(error, "Failed to send invitation");
+  }
+}
+
+export async function declineChallengeInvite(challengeId: string, inviteeId: string, inviterId: string) {
+  const { error } = await getSupabase()
+    .from("challenge_invitations")
+    .update({ status: "declined", updated_at: new Date().toISOString() })
+    .eq("challenge_id", challengeId)
+    .eq("invitee_id", inviteeId)
+    .eq("inviter_id", inviterId)
+    .eq("status", "pending");
+
+  if (error) throw formatSupabaseError(error, "Failed to decline invitation");
 }

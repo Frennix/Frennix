@@ -74,5 +74,10 @@ export const NOTIFICATION_SETTING_ITEMS: {
   { key: "event_invite", title: "Event invitations", description: "When someone invites you to a workout event" },
   { key: "event_join", title: "Event joins", description: "When someone joins your workout event" },
   { key: "challenge_join", title: "Challenge joins", description: "When someone joins your challenge" },
+  {
+    key: "challenge_invite",
+    title: "Challenge invitations",
+    description: "When someone invites you to join a challenge",
+  },
   { key: "post_share", title: "Post shares", description: "When someone shares your post" },
 ];

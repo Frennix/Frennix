@@ -63,7 +63,7 @@ export function MediaAspectFrame({
     [displayHeight, isFeed, layoutWidth, style]
   );
 
-  const ready = Boolean(dimensions) || failed;
+  const ready = Boolean(dimensions) || failed || (isFeed && layoutWidth > 0);
 
   return (
     <View
