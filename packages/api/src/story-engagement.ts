@@ -71,3 +71,25 @@ export async function sendStoryReply(
   const conversationId = await getOrCreateConversation(viewerId, storyUserId);
   return sendMessage(conversationId, viewerId, `Replied to your workout story: ${trimmed}`);
 }
+
+export async function sendStoryChallenge(
+  viewerId: string,
+  storyUserId: string,
+  message: string
+) {
+  if (viewerId === storyUserId) return;
+
+  const conversationId = await getOrCreateConversation(viewerId, storyUserId);
+  return sendMessage(conversationId, viewerId, message);
+}
+
+export async function sendStoryInviteToTrain(viewerId: string, storyUserId: string) {
+  if (viewerId === storyUserId) return;
+
+  const conversationId = await getOrCreateConversation(viewerId, storyUserId);
+  return sendMessage(
+    conversationId,
+    viewerId,
+    "Saw your workout story — want to train together? Let's plan a session! 💪"
+  );
+}

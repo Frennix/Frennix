@@ -6,11 +6,14 @@ import {
   getFeedStories,
   getSuggestedAthletes,
   getErrorMessage,
+  getOrCreateConversation,
   markStoryViewed,
-  sendStoryReaction,
+  sendStoryChallenge,
+  sendStoryInviteToTrain,
   sendStoryReply,
 } from "@frennix/api";
-import type { FeedStory, Post, StoryReactionEmoji } from "@frennix/types";
+import { STORY_CHALLENGE_RESPONSES, type FeedStory, type Post, type StoryChallengeKey } from "@frennix/types";
+import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
@@ -40,6 +43,7 @@ export default function HomeScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [storyMessageUserId, setStoryMessageUserId] = useState<string | null>(null);
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
@@ -68,10 +72,12 @@ export default function HomeScreen() {
     [queryClient, userId]
   );
 
-  const handleStoryReaction = useCallback(
-    async (storyUserId: string, postId: string, emoji: StoryReactionEmoji) => {
+  const handleStoryChallenge = useCallback(
+    async (storyUserId: string, key: StoryChallengeKey) => {
       if (!userId) return;
-      await sendStoryReaction(userId, storyUserId, postId, emoji);
+      const challenge = STORY_CHALLENGE_RESPONSES.find((item) => item.key === key);
+      if (!challenge) return;
+      await sendStoryChallenge(userId, storyUserId, challenge.message);
     },
     [userId]
   );
@@ -80,6 +86,54 @@ export default function HomeScreen() {
     async (storyUserId: string, text: string) => {
       if (!userId) return;
       await sendStoryReply(userId, storyUserId, text);
+    },
+    [userId]
+  );
+
+  const handleStoryFollow = useCallback(
+    (storyUserId: string, isFollowing: boolean) => {
+      if (!userId || isFollowing) return;
+      followMutation.mutate({ targetUserId: storyUserId, isFollowing: false });
+      queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
+        current?.map((story) =>
+          story.user_id === storyUserId ? { ...story, viewer_follows: true } : story
+        )
+      );
+    },
+    [followMutation, queryClient, userId]
+  );
+
+  const handleStoryMessage = useCallback(
+    async (storyUserId: string) => {
+      if (!userId) return;
+      setStoryMessageUserId(storyUserId);
+      try {
+        const convId = await getOrCreateConversation(userId, storyUserId);
+        setActiveStoryIndex(null);
+        pushScreen(`/chat/${convId}`);
+      } catch (error) {
+        showAlert("Could not open chat", getErrorMessage(error));
+      } finally {
+        setStoryMessageUserId(null);
+      }
+    },
+    [userId]
+  );
+
+  const handleStoryInviteToTrain = useCallback(
+    async (storyUserId: string) => {
+      if (!userId) return;
+      setStoryMessageUserId(storyUserId);
+      try {
+        await sendStoryInviteToTrain(userId, storyUserId);
+        const convId = await getOrCreateConversation(userId, storyUserId);
+        setActiveStoryIndex(null);
+        pushScreen(`/chat/${convId}`);
+      } catch (error) {
+        showAlert("Could not send invite", getErrorMessage(error));
+      } finally {
+        setStoryMessageUserId(null);
+      }
     },
     [userId]
   );
@@ -376,8 +430,22 @@ export default function HomeScreen() {
           openCreatePost();
         }}
         onMarkViewed={markStoryViewedOptimistic}
-        onReact={handleStoryReaction}
+        onChallenge={handleStoryChallenge}
         onReply={handleStoryReply}
+        onFollow={handleStoryFollow}
+        onMessage={handleStoryMessage}
+        onInviteToTrain={handleStoryInviteToTrain}
+        followLoading={
+          followMutation.isPending
+            ? followMutation.variables?.targetUserId ===
+              (activeStoryIndex !== null ? stories[activeStoryIndex]?.user_id : undefined)
+            : false
+        }
+        messageLoading={
+          storyMessageUserId !== null &&
+          storyMessageUserId ===
+            (activeStoryIndex !== null ? stories[activeStoryIndex]?.user_id : undefined)
+        }
       />
       {showBanner ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />

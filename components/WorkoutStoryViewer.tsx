@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import type { FeedStory } from "@frennix/types";
-import type { StoryReactionEmoji } from "@frennix/types";
+import type { StoryChallengeKey } from "@frennix/types";
 import {
   Avatar,
   Button,
@@ -21,15 +21,17 @@ import {
   spacing,
   typography,
 } from "@frennix/ui";
-import { StoryReactionBar } from "./story/StoryReactionBar";
+import { primaryStoryMilestone } from "@frennix/api";
+import { StoryChallengeBar } from "./story/StoryChallengeBar";
 import { StoryReplyBar } from "./story/StoryReplyBar";
 import { StoryStreakBadge } from "./story/StoryStreakBadge";
-import { StorySummaryOverlay } from "./story/StorySummaryOverlay";
+import { StoryAchievementMoment } from "./story/StoryAchievementMoment";
+import { WorkoutCompletionCard } from "./story/WorkoutCompletionCard";
+import { StoryQuickActions } from "./story/StoryQuickActions";
 import {
   buildStorySlides,
   prefetchStorySlide,
-  streakAchievementForStory,
-  type StorySlide,
+  type WorkoutStorySlide,
 } from "../lib/story-utils";
 
 const STORY_SLIDE_DURATION_MS = 5500;
@@ -82,7 +84,7 @@ function StorySlideContent({
   width,
   height,
 }: {
-  slide: StorySlide;
+  slide: WorkoutStorySlide;
   shouldPlayVideo: boolean;
   width: number;
   height: number;
@@ -134,8 +136,13 @@ export interface WorkoutStoryViewerProps {
   onShareWorkout?: () => void;
   onViewProfile?: (username: string) => void;
   onMarkViewed?: (storyUserId: string, postId: string | null) => void;
-  onReact?: (storyUserId: string, postId: string, emoji: StoryReactionEmoji) => void | Promise<void>;
+  onChallenge?: (storyUserId: string, key: StoryChallengeKey) => void | Promise<void>;
   onReply?: (storyUserId: string, text: string) => void | Promise<void>;
+  onFollow?: (storyUserId: string, isFollowing: boolean) => void | Promise<void>;
+  onMessage?: (storyUserId: string) => void | Promise<void>;
+  onInviteToTrain?: (storyUserId: string) => void | Promise<void>;
+  followLoading?: boolean;
+  messageLoading?: boolean;
 }
 
 /** Full-screen Instagram-style workout story viewer — not a post detail screen. */
@@ -147,8 +154,13 @@ export function WorkoutStoryViewer({
   onShareWorkout,
   onViewProfile,
   onMarkViewed,
-  onReact,
+  onChallenge,
   onReply,
+  onFollow,
+  onMessage,
+  onInviteToTrain,
+  followLoading,
+  messageLoading,
 }: WorkoutStoryViewerProps) {
   const { width, height } = useWindowDimensions();
   const [storyIndex, setStoryIndex] = useState(initialStoryIndex);
@@ -167,7 +179,7 @@ export function WorkoutStoryViewer({
   const activeSlide = slides[slideIndex] ?? slides[0];
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
-  const achievement = streakAchievementForStory(story?.workout_streak ?? 0);
+  const spotlightMilestone = primaryStoryMilestone(lastWorkout?.milestones ?? []);
 
   useEffect(() => {
     if (!visible) return;
@@ -370,12 +382,28 @@ export function WorkoutStoryViewer({
           </View>
 
           <StoryStreakBadge streak={story.workout_streak} resetKey={timerKey} />
-          <StorySummaryOverlay
-            lastWorkout={lastWorkout}
-            streak={story.workout_streak}
-            achievement={achievement}
-          />
+          {spotlightMilestone ? (
+            <StoryAchievementMoment milestone={spotlightMilestone} resetKey={timerKey} />
+          ) : null}
+          {canEngage ? (
+            <StoryQuickActions
+              isFollowing={story.viewer_follows}
+              followLoading={followLoading}
+              messageLoading={messageLoading}
+              disabled={paused}
+              onFollow={() => onFollow?.(story.user_id, story.viewer_follows)}
+              onMessage={() => onMessage?.(story.user_id)}
+              onInviteToTrain={() => onInviteToTrain?.(story.user_id)}
+              onViewProfile={() => onViewProfile?.(story.profile.username)}
+            />
+          ) : null}
         </View>
+
+        {lastWorkout ? (
+          <View style={styles.completionOverlay} pointerEvents="none">
+            <WorkoutCompletionCard lastWorkout={lastWorkout} streak={story.workout_streak} />
+          </View>
+        ) : null}
 
         {showCaption ? (
           <View style={styles.captionOverlay} pointerEvents="none">
@@ -395,9 +423,9 @@ export function WorkoutStoryViewer({
 
         {canEngage ? (
           <View style={styles.engagementOverlay}>
-            <StoryReactionBar
+            <StoryChallengeBar
               disabled={paused}
-              onReact={(emoji) => onReact?.(story.user_id, lastWorkout!.post_id, emoji)}
+              onChallenge={(key) => onChallenge?.(story.user_id, key)}
             />
             <StoryReplyBar
               disabled={paused}
@@ -530,7 +558,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: spacing.md,
     right: spacing.md,
-    bottom: 180,
+    bottom: 240,
+    zIndex: 3,
+  },
+  completionOverlay: {
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    bottom: 200,
     zIndex: 3,
   },
   captionText: {
@@ -577,11 +612,11 @@ const styles = StyleSheet.create({
   },
   tapZoneLeft: {
     flex: 1,
-    marginBottom: 160,
+    marginBottom: 220,
   },
   tapZoneRight: {
     flex: 1,
-    marginBottom: 160,
+    marginBottom: 220,
   },
   emptySlide: {
     alignItems: "center",

@@ -53,7 +53,9 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const src = read("components/WorkoutStoryViewer.tsx");
       if (!src.includes("<Avatar")) throw new Error("Profile avatar required in overlay");
-      if (!src.includes("StorySummaryOverlay")) throw new Error("Workout summary overlay required");
+      if (!src.includes("WorkoutCompletionCard")) {
+        throw new Error("Workout completion card required");
+      }
       if (src.includes("View post")) {
         throw new Error("Story viewer must not show feed/post action buttons");
       }
@@ -84,17 +86,21 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Story enhancement: streak badge, summary overlay, reactions, reply",
+    name: "Fitness-first story UI: completion card, achievements, challenges, quick actions",
     run: () => {
       const viewer = read("components/WorkoutStoryViewer.tsx");
       for (const token of [
         "StoryStreakBadge",
-        "StorySummaryOverlay",
-        "StoryReactionBar",
+        "WorkoutCompletionCard",
+        "StoryAchievementMoment",
+        "StoryChallengeBar",
+        "StoryQuickActions",
         "StoryReplyBar",
         "onMarkViewed",
-        "onReact",
-        "onReply",
+        "onChallenge",
+        "onFollow",
+        "onMessage",
+        "onInviteToTrain",
         "prefetchStorySlide",
       ]) {
         if (!viewer.includes(token)) throw new Error(`Missing ${token}`);
@@ -115,10 +121,20 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed wires story engagement callbacks",
+    name: "Feed wires fitness-first story callbacks",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
-      for (const token of ["markStoryViewed", "sendStoryReaction", "sendStoryReply", "onMarkViewed", "onReact", "onReply"]) {
+      for (const token of [
+        "markStoryViewed",
+        "sendStoryChallenge",
+        "sendStoryReply",
+        "sendStoryInviteToTrain",
+        "onMarkViewed",
+        "onChallenge",
+        "onFollow",
+        "onMessage",
+        "onInviteToTrain",
+      ]) {
         if (!feed.includes(token)) throw new Error(`Feed missing ${token}`);
       }
     },
@@ -134,17 +150,30 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Story engagement API and migration exist",
+    name: "Story engagement API, metrics migration, and future-ready types",
     run: () => {
       const api = read("packages/api/src/story-engagement.ts");
-      for (const fn of ["markStoryViewed", "sendStoryReaction", "sendStoryReply"]) {
+      for (const fn of [
+        "markStoryViewed",
+        "sendStoryReply",
+        "sendStoryChallenge",
+        "sendStoryInviteToTrain",
+      ]) {
         if (!api.includes(`export async function ${fn}`)) {
           throw new Error(`Missing ${fn}`);
         }
       }
-      const migration = read("supabase/migrations/20250630000011_story_engagement.sql");
-      if (!migration.includes("story_views") || !migration.includes("story_reactions")) {
-        throw new Error("Story engagement migration incomplete");
+      const types = read("packages/types/src/workout-story.ts");
+      for (const token of [
+        "WorkoutStoryMetrics",
+        "WorkoutStorySlideMeta",
+        "STORY_CHALLENGE_RESPONSES",
+      ]) {
+        if (!types.includes(token)) throw new Error(`Missing type ${token}`);
+      }
+      const migration = read("supabase/migrations/20250630000012_workout_story_metrics.sql");
+      if (!migration.includes("workout_metrics")) {
+        throw new Error("Workout metrics migration incomplete");
       }
     },
   },

@@ -4,12 +4,22 @@ import { getFollowing } from "./follows";
 import { getStoryViewsForViewer } from "./story-engagement";
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
+import { computeStoryMilestones, normalizeWorkoutStoryMetrics } from "./workout-story-utils";
 
 const WORKOUT_POST_TYPES = ["workout_update", "photo", "video"] as const;
 const RECENT_WORKOUT_MS = 24 * 60 * 60 * 1000;
 
-function toLastWorkout(post: Post): FeedStoryLastWorkout {
+function toLastWorkout(
+  post: Post,
+  streak: number,
+  workoutCount: number
+): FeedStoryLastWorkout {
   const normalized = normalizePostWorkoutFields(post);
+  const metrics = normalizeWorkoutStoryMetrics(
+    (normalized as Post).workout_metrics ?? null
+  );
+  const milestoneFlags = (normalized as Post).story_milestones ?? [];
+
   return {
     post_id: normalized.id,
     post_type: normalized.post_type,
@@ -19,17 +29,26 @@ function toLastWorkout(post: Post): FeedStoryLastWorkout {
     thumbnail_url: normalized.thumbnail_url ?? null,
     content: normalized.content,
     created_at: normalized.created_at,
+    metrics,
+    milestones: computeStoryMilestones({
+      streak,
+      workoutCount,
+      storyMilestoneFlags: milestoneFlags,
+    }),
   };
 }
 
 function buildStory(
   profile: Profile,
   viewerId: string,
+  followingIds: Set<string>,
   workoutDates: string[],
+  workoutCount: number,
   latestPost: Post | null,
   now: Date
 ): FeedStory {
-  const lastWorkout = latestPost ? toLastWorkout(latestPost) : null;
+  const streak = computeWorkoutStreakFromDates(workoutDates, now);
+  const lastWorkout = latestPost ? toLastWorkout(latestPost, streak, workoutCount) : null;
   const hasRecentWorkout = lastWorkout
     ? now.getTime() - new Date(lastWorkout.created_at).getTime() <= RECENT_WORKOUT_MS
     : false;
@@ -37,10 +56,12 @@ function buildStory(
   return {
     user_id: profile.id,
     profile,
-    workout_streak: computeWorkoutStreakFromDates(workoutDates, now),
+    workout_streak: streak,
+    workout_count: workoutCount,
     has_recent_workout: hasRecentWorkout,
     last_workout: lastWorkout,
     is_self: profile.id === viewerId,
+    viewer_follows: profile.id === viewerId || followingIds.has(profile.id),
   };
 }
 
@@ -56,6 +77,7 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
   const userIds = profiles.map((profile) => profile.id);
   if (!userIds.length) return [];
 
+  const followingIds = new Set(following.map((profile) => profile.id));
   const now = new Date();
 
   const [{ data: workoutPosts }, { data: latestPosts }] = await Promise.all([
@@ -76,6 +98,7 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
   if (latestPosts.error) throw latestPosts.error;
 
   const datesByUser = new Map<string, string[]>();
+  const countByUser = new Map<string, number>();
   const latestByUser = new Map<string, Post>();
 
   for (const row of workoutPosts ?? []) {
@@ -83,6 +106,7 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     const dates = datesByUser.get(authorId) ?? [];
     dates.push(row.created_at as string);
     datesByUser.set(authorId, dates);
+    countByUser.set(authorId, (countByUser.get(authorId) ?? 0) + 1);
   }
 
   for (const post of (latestPosts ?? []) as Post[]) {
@@ -95,7 +119,9 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     buildStory(
       profile,
       viewerId,
+      followingIds,
       datesByUser.get(profile.id) ?? [],
+      countByUser.get(profile.id) ?? 0,
       latestByUser.get(profile.id) ?? null,
       now
     )

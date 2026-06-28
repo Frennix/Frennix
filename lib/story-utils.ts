@@ -1,19 +1,33 @@
-import type { FeedStoryLastWorkout, ProfileAchievement } from "@frennix/types";
+import type {
+  FeedStoryLastWorkout,
+  WorkoutStorySlideMeta,
+} from "@frennix/types";
 import { normalizePostMediaItems } from "@frennix/types";
 import { prefetchCachedImages } from "../packages/ui/src/CachedImage";
 
-export type StorySlide =
+export type WorkoutStorySlide =
   | {
       kind: "media";
       url: string;
       mediaKind: "image" | "video";
       thumbnailUrl?: string | null;
+      meta?: WorkoutStorySlideMeta;
     }
-  | { kind: "text"; content: string }
-  | { kind: "empty" };
+  | { kind: "text"; content: string; meta?: WorkoutStorySlideMeta }
+  | { kind: "empty"; meta?: WorkoutStorySlideMeta };
 
-export function buildStorySlides(lastWorkout: FeedStoryLastWorkout | null): StorySlide[] {
+/** @deprecated Use WorkoutStorySlide */
+export type StorySlide = WorkoutStorySlide;
+
+export function buildStorySlides(lastWorkout: FeedStoryLastWorkout | null): WorkoutStorySlide[] {
   if (!lastWorkout) return [{ kind: "empty" }];
+
+  const meta: WorkoutStorySlideMeta = {
+    musicTrackId: null,
+    routeMap: null,
+    wearable: lastWorkout.metrics?.extra?.wearable as Record<string, unknown> | null,
+    aiSummary: null,
+  };
 
   if (lastWorkout.media_urls?.length) {
     return normalizePostMediaItems(lastWorkout.media_urls, {
@@ -24,46 +38,18 @@ export function buildStorySlides(lastWorkout: FeedStoryLastWorkout | null): Stor
       url: item.url,
       mediaKind: item.kind,
       thumbnailUrl: item.thumbnailUrl,
+      meta,
     }));
   }
 
   if (lastWorkout.content?.trim()) {
-    return [{ kind: "text", content: lastWorkout.content.trim() }];
+    return [{ kind: "text", content: lastWorkout.content.trim(), meta }];
   }
 
-  return [{ kind: "empty" }];
+  return [{ kind: "empty", meta }];
 }
 
-/** Best-effort streak achievement for story overlay. */
-export function streakAchievementForStory(streak: number): ProfileAchievement | null {
-  if (streak >= 30) {
-    return {
-      id: "streak_30",
-      emoji: "👑",
-      label: "Streak legend",
-      description: "30-day workout streak",
-    };
-  }
-  if (streak >= 7) {
-    return {
-      id: "streak_7",
-      emoji: "💪",
-      label: "Week warrior",
-      description: "7-day workout streak",
-    };
-  }
-  if (streak >= 3) {
-    return {
-      id: "streak_3",
-      emoji: "🔥",
-      label: "On fire",
-      description: "3-day workout streak",
-    };
-  }
-  return null;
-}
-
-export function prefetchStorySlide(slide: StorySlide | undefined) {
+export function prefetchStorySlide(slide: WorkoutStorySlide | undefined) {
   if (!slide || slide.kind !== "media" || slide.mediaKind !== "image") return;
   void prefetchCachedImages([slide.url]);
   if (slide.thumbnailUrl) void prefetchCachedImages([slide.thumbnailUrl]);

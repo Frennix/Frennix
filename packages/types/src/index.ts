@@ -1,5 +1,8 @@
 export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "💪"] as const;
 
+import type { WorkoutStoryMetrics, WorkoutStoryMilestone } from "./workout-story";
+export type { WorkoutStoryMetrics, WorkoutStoryMilestone } from "./workout-story";
+
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
 export interface ReactionSummary {
@@ -188,6 +191,10 @@ export interface Post {
   reactions?: ReactionSummary[];
   my_reaction?: string | null;
   preview_comments?: Comment[];
+  /** Optional workout stats for story completion card (wearable-ready). */
+  workout_metrics?: WorkoutStoryMetrics | null;
+  /** Story highlight flags, e.g. personal_record, goal_completed. */
+  story_milestones?: string[];
 }
 
 export interface SavedPost {
@@ -210,15 +217,19 @@ export interface FeedStoryLastWorkout {
   thumbnail_url?: string | null;
   content: string | null;
   created_at: string;
+  metrics?: WorkoutStoryMetrics | null;
+  milestones?: WorkoutStoryMilestone[];
 }
 
 export interface FeedStory {
   user_id: string;
   profile: Profile;
   workout_streak: number;
+  workout_count: number;
   has_recent_workout: boolean;
   last_workout: FeedStoryLastWorkout | null;
   is_self: boolean;
+  viewer_follows: boolean;
   /** True when the viewer has seen the current last_workout post. */
   viewed?: boolean;
 }
@@ -480,3 +491,4 @@ export * from "./analytics";
 export * from "./workout-types";
 export * from "./post-media";
 export * from "./story-engagement";
+export * from "./workout-story";
