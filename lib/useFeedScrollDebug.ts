@@ -145,8 +145,12 @@ function readScrollContainer(listRef: { getNativeScrollRef?: () => unknown } | n
   return `client=${scrollNode.clientHeight} scroll=${scrollNode.scrollHeight} overflowY=${style.overflowY} touch=${style.touchAction}`;
 }
 
+type ScrollRef = {
+  getNativeScrollRef?: () => unknown;
+};
+
 type UseFeedScrollDebugOptions = {
-  listRef: RefObject<{ getNativeScrollRef?: () => unknown } | null>;
+  listRef: RefObject<ScrollRef | null>;
   scrollEnabled: boolean;
   storyVisible: boolean;
   shareSheetVisible: boolean;

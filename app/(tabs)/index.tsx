@@ -4,6 +4,7 @@ import {
   FlatList,
   Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -41,7 +42,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
-import { handleTabRetap, scrollFlatListToTop } from "@/lib/tab-scroll-registry";
+import { handleTabRetap, scrollFlatListToTop, scrollScrollViewToTop } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useFeedLike } from "@/lib/useFeedLike";
@@ -54,6 +55,7 @@ import { useImageLightbox } from "@/lib/useImageLightbox";
 import { NewPostsBanner } from "@/components/NewPostsBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
+import { WebFeedScrollList } from "@/components/WebFeedScrollList";
 import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webVerticalScrollStyle } from "@/lib/flex-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
@@ -167,6 +169,8 @@ export default function HomeScreen() {
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
   const listRef = useRef<FlatList<FeedListRow>>(null);
+  const webScrollRef = useRef<ScrollView>(null);
+  const useWebScroll = Platform.OS === "web";
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const { height: viewportHeight } = useWindowDimensions();
@@ -233,7 +237,7 @@ export default function HomeScreen() {
     reportMetrics: reportFeedDebugMetrics,
     reportScroll: reportFeedDebugScroll,
   } = useFeedScrollDebug({
-    listRef,
+    listRef: useWebScroll ? webScrollRef : listRef,
     scrollEnabled: !storyVisible,
     storyVisible,
     shareSheetVisible: shareVisible,
@@ -271,11 +275,16 @@ export default function HomeScreen() {
     },
   });
 
+  const scrollFeedToTop = useCallback(() => {
+    if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
+    else scrollFlatListToTop(listRef.current);
+  }, [useWebScroll]);
+
   const handleNewPostsBannerPress = useCallback(async () => {
     clearBanner();
     await handleRefresh();
-    scrollFlatListToTop(listRef.current);
-  }, [clearBanner, handleRefresh]);
+    scrollFeedToTop();
+  }, [clearBanner, handleRefresh, scrollFeedToTop]);
 
   useTabScrollRegistration(
     "feed",
@@ -283,7 +292,7 @@ export default function HomeScreen() {
       () =>
         handleTabRetap({
           isAtTop,
-          scrollToTop: () => scrollFlatListToTop(listRef.current),
+          scrollToTop: scrollFeedToTop,
           refresh: () => {
             void handleRefresh();
           },
@@ -499,63 +508,110 @@ export default function HomeScreen() {
   return (
     <View style={styles.container} pointerEvents="box-none">
       <View style={styles.feedScrollShell} collapsable={false}>
-        <FlatList
-          ref={listRef}
-          style={styles.feedList}
-          data={listRows}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          scrollEnabled={!storyVisible}
-          nestedScrollEnabled
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={21}
-          updateCellsBatchingPeriod={16}
-          removeClippedSubviews={Platform.OS !== "web"}
-          onLayout={(event) => handleListLayout(event.nativeEvent.layout.height)}
-          onContentSizeChange={handleContentSizeChange}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          onScroll={handleScroll}
-          onScrollEndDrag={handleScrollEnd}
-          onMomentumScrollEnd={handleScrollEnd}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={
-                isRefetching || isStoriesRefetching || isSuggestionsRefetching
-              }
-              onRefresh={() => void handleRefresh()}
-              tintColor={colors.accent}
-              colors={[colors.accent]}
-              progressBackgroundColor={colors.surface}
-            />
-          }
-          onEndReachedThreshold={2}
-          onEndReached={() => {
-            if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-          }}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={
-            isLoading ? (
-              <View style={styles.initialSkeletons}>
-                <FeedPostCardSkeleton />
-                <FeedPostCardSkeleton />
-                <FeedPostCardSkeleton />
-              </View>
-            ) : (
-              <View style={styles.emptyWrap}>
-                <EmptyState
-                  title="Your feed is ready"
-                  description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
-                  actionLabel="Share a workout"
-                  onAction={() => openCreatePost()}
-                />
-              </View>
-            )
-          }
-          renderItem={renderItem}
-        />
+        {useWebScroll ? (
+          <WebFeedScrollList
+            scrollRef={webScrollRef}
+            style={styles.feedList}
+            contentContainerStyle={styles.list}
+            scrollEnabled={!storyVisible}
+            data={listRows}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={
+              isLoading ? (
+                <View style={styles.initialSkeletons}>
+                  <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
+                </View>
+              ) : (
+                <View style={styles.emptyWrap}>
+                  <EmptyState
+                    title="Your feed is ready"
+                    description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
+                    actionLabel="Share a workout"
+                    onAction={() => openCreatePost()}
+                  />
+                </View>
+              )
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={
+                  isRefetching || isStoriesRefetching || isSuggestionsRefetching
+                }
+                onRefresh={() => void handleRefresh()}
+                tintColor={colors.accent}
+                colors={[colors.accent]}
+                progressBackgroundColor={colors.surface}
+              />
+            }
+            onLayout={(height) => handleListLayout(height)}
+            onContentSizeChange={handleContentSizeChange}
+            onScroll={handleScroll}
+            onScrollEndDrag={handleScrollEnd}
+            onMomentumScrollEnd={handleScrollEnd}
+          />
+        ) : (
+          <FlatList
+            ref={listRef}
+            style={styles.feedList}
+            data={listRows}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            scrollEnabled={!storyVisible}
+            nestedScrollEnabled
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={21}
+            updateCellsBatchingPeriod={16}
+            removeClippedSubviews={false}
+            onLayout={(event) => handleListLayout(event.nativeEvent.layout.height)}
+            onContentSizeChange={handleContentSizeChange}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            onScroll={handleScroll}
+            onScrollEndDrag={handleScrollEnd}
+            onMomentumScrollEnd={handleScrollEnd}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={
+                  isRefetching || isStoriesRefetching || isSuggestionsRefetching
+                }
+                onRefresh={() => void handleRefresh()}
+                tintColor={colors.accent}
+                colors={[colors.accent]}
+                progressBackgroundColor={colors.surface}
+              />
+            }
+            onEndReachedThreshold={2}
+            onEndReached={() => {
+              if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+            }}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={
+              isLoading ? (
+                <View style={styles.initialSkeletons}>
+                  <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
+                </View>
+              ) : (
+                <View style={styles.emptyWrap}>
+                  <EmptyState
+                    title="Your feed is ready"
+                    description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
+                    actionLabel="Share a workout"
+                    onAction={() => openCreatePost()}
+                  />
+                </View>
+              )
+            }
+            renderItem={renderItem}
+          />
+        )}
       </View>
       {showBanner && !storyVisible ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />

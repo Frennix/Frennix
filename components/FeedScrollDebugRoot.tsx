@@ -62,7 +62,7 @@ export function FeedScrollDebugRoot() {
         Path: {pathname}
       </Text>
       <Text style={styles.line} numberOfLines={2}>
-        Mode: {isFeedScrollTestMode() ? "ScrollView test (add &feedScrollTest=0 for real feed)" : "Real FlatList feed"}
+        Mode: {isFeedScrollTestMode() ? "ScrollView isolation test (&feedScrollTest=1)" : "Normal feed"}
       </Text>
       {scrollTestHits > 0 ? (
         <Text style={styles.ok}>Scroll test events: {scrollTestHits}</Text>

@@ -41,8 +41,8 @@ export function FeedScrollTestView({ onScroll }: FeedScrollTestViewProps) {
       <View style={styles.callout}>
         <Text style={styles.calloutTitle}>SCROLL TEST MODE</Text>
         <Text style={styles.calloutBody}>
-          Swipe vertically. If these colored rows scroll, the parent layout is fine and the bug is
-          inside the real Feed FlatList. Add &feedScrollTest=0 to test the real feed.
+          Swipe vertically. If these colored rows scroll but the normal feed does not, the bug is
+          in FlatList on web. The production web feed now uses ScrollView instead.
         </Text>
         <Text style={styles.calloutMeta}>Last scroll offset: {lastOffset}px</Text>
       </View>

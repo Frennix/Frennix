@@ -32,15 +32,13 @@ export function isFeedScrollDebugEnabled(): boolean {
   }
 }
 
-/** When feedDebug is on, use dummy ScrollView unless feedScrollTest=0. */
+/** Isolation test only — add &feedScrollTest=1 (requires feedDebug=1). */
 export function isFeedScrollTestMode(): boolean {
   if (!isFeedScrollDebugEnabled() || typeof window === "undefined") return false;
   try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("feedScrollTest") === "0") return false;
-    return true;
+    return new URLSearchParams(window.location.search).get("feedScrollTest") === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 

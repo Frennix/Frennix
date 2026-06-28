@@ -132,18 +132,10 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed FlatList has flex layout for vertical scroll",
+    name: "Web feed uses ScrollView container instead of FlatList",
     run: () => {
-      const feed = read("app/(tabs)/index.tsx");
-      if (!feed.includes("feedScrollShell")) {
-        throw new Error("Feed must wrap FlatList in feedScrollShell (minHeight:0 scroll chain)");
-      }
-      if (!feed.includes("flexFill")) {
-        throw new Error("Feed must use flexFill for Safari web scroll");
-      }
-      if (feed.includes("feedHiddenWhileStory")) {
-        throw new Error("Remove feedHiddenWhileStory wrapper — it breaks web scroll");
-      }
+      assertIncludes("components/WebFeedScrollList.tsx", "WebFeedScrollList", "web scroll list required");
+      assertIncludes("app/(tabs)/index.tsx", "WebFeedScrollList", "feed must use web scroll list");
     },
   },
   {
