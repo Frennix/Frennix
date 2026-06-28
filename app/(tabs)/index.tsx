@@ -30,7 +30,7 @@ import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetI
 export default function HomeScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const [activeStory, setActiveStory] = useState<FeedStory | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
@@ -282,7 +282,10 @@ export default function HomeScreen() {
         followLoadingId={
           followMutation.isPending ? (followMutation.variables?.targetUserId ?? null) : null
         }
-        onStoryPress={(story) => setActiveStory(story)}
+        onStoryPress={(story) => {
+          const index = stories.findIndex((item) => item.user_id === story.user_id);
+          setActiveStoryIndex(index >= 0 ? index : null);
+        }}
         onFollowPress={(profileId) => toggleFollow(profileId)}
       />
     ),
@@ -321,19 +324,16 @@ export default function HomeScreen() {
       {shareSheet}
       {lightbox}
       <FeedStoryViewer
-        story={activeStory}
-        visible={Boolean(activeStory)}
-        onClose={() => setActiveStory(null)}
+        stories={stories}
+        visible={activeStoryIndex !== null}
+        initialStoryIndex={activeStoryIndex ?? 0}
+        onClose={() => setActiveStoryIndex(null)}
         onViewProfile={(username) => {
-          setActiveStory(null);
+          setActiveStoryIndex(null);
           pushScreen(`/user/${username}`);
         }}
-        onViewPost={(postId) => {
-          setActiveStory(null);
-          pushScreen(`/post/${postId}`);
-        }}
         onShareWorkout={() => {
-          setActiveStory(null);
+          setActiveStoryIndex(null);
           openCreatePost();
         }}
       />

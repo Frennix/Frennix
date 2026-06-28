@@ -18,6 +18,7 @@
     "verify:native-gallery": "npx tsx scripts/verify-native-gallery.ts",
     "verify:media-polish": "npx tsx scripts/verify-media-polish.ts",
     "verify:media-architecture": "npx tsx scripts/verify-media-architecture.ts",
+    "verify:workout-stories": "npx tsx scripts/verify-workout-stories.ts",
     "verify:online-status-privacy": "npx tsx scripts/verify-online-status-privacy.ts",
     "verify:post-workout-types": "npx tsx scripts/verify-post-workout-types.ts",
     "build:web": "expo export -p web"
