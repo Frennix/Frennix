@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryReplyBarProps {
   disabled?: boolean;
@@ -29,7 +29,7 @@ export function StoryReplyBar({ disabled, onSend }: StoryReplyBarProps) {
         value={text}
         onChangeText={setText}
         placeholder="Reply privately…"
-        placeholderTextColor="rgba(255,255,255,0.55)"
+        placeholderTextColor={overlays.whiteDim}
         style={styles.input}
         editable={!disabled && !sending}
         returnKeyType="send"
@@ -65,9 +65,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    backgroundColor: overlays.glass,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: overlays.glassBorderStrong,
     ...typography.bodySmall,
     color: colors.text,
   },

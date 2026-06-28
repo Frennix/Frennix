@@ -7,7 +7,8 @@ const goalLabels: Record<string, string> = {
   stay_active: "Stay active",
   improve_endurance: "Improve endurance",
   flexibility: "Flexibility",
-  mental_wellness: "Mental wellness",
+  accountability_partner: "Accountability partner",
+  find_training_partner: "Find a training partner",
 };
 
 const activityLabels: Record<string, string> = {

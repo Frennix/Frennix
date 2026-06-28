@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryQuickActionsProps {
   isFollowing: boolean;
@@ -86,15 +86,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "rgba(10, 10, 11, 0.55)",
+    backgroundColor: overlays.glassMedium,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
+    borderColor: overlays.glassBorderEmphasis,
     minHeight: 32,
     justifyContent: "center",
   },
   chipActive: {
     borderColor: colors.accent,
-    backgroundColor: "rgba(34, 197, 94, 0.14)",
+    backgroundColor: overlays.accentTintSoft,
   },
   chipDisabled: {
     opacity: 0.55,

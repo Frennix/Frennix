@@ -1,10 +1,12 @@
 import { memo } from "react";
 import { Platform } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { animation } from "@frennix/ui";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import type { Post } from "@frennix/types";
 
 const animatedPostIds = new Set<string>();
+const { duration, damping } = animation.feedEnter;
 
 type AnimatedFeedListItemProps = {
   post: Post;
@@ -20,7 +22,7 @@ export const AnimatedFeedListItem = memo(function AnimatedFeedListItem(props: An
   if (shouldAnimate) {
     animatedPostIds.add(props.post.id);
     return (
-      <Animated.View entering={FadeInDown.duration(260).springify().damping(22)}>
+      <Animated.View entering={FadeInDown.duration(duration).springify().damping(damping)}>
         <FeedListItem {...props} />
       </Animated.View>
     );

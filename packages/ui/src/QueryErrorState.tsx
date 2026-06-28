@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     flex: 0,
     paddingVertical: spacing.lg,
   },
-  title: { ...typography.heading, fontSize: 18, textAlign: "center" },
+  title: { ...typography.section, textAlign: "center" },
   message: { ...typography.bodySmall, textAlign: "center", lineHeight: 22, color: colors.textSecondary },
   button: { marginTop: spacing.sm, minWidth: 160 },
 });

@@ -1,6 +1,7 @@
 export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "💪"] as const;
 
 import type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
+import type { SkillLevel, TrainingEnvironment, TrainingScheduleSlot } from "./matching";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
@@ -163,6 +164,14 @@ export interface Profile {
   is_online?: boolean;
   /** When false, presence is hidden from other users. Only present on the signed-in user's profile. */
   show_online_status?: boolean | null;
+  /** Matching engine — optional until collected in profile settings. */
+  skill_level?: SkillLevel | null;
+  training_schedules?: TrainingScheduleSlot[];
+  home_gym?: string | null;
+  training_environment?: TrainingEnvironment | null;
+  discovery_radius_miles?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -468,6 +477,8 @@ export const FITNESS_GOALS = [
   "improve_endurance",
   "flexibility",
   "mental_wellness",
+  "accountability_partner",
+  "find_training_partner",
 ] as const;
 
 export const SPORTS = ["football", "soccer", "basketball", "martial_arts"] as const;
@@ -496,3 +507,4 @@ export * from "./workout-types";
 export * from "./post-media";
 export * from "./story-engagement";
 export * from "./workout-story";
+export * from "./matching";

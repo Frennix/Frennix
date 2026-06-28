@@ -23,6 +23,7 @@ import {
   Avatar,
   Button,
   EmptyState,
+  MenuIconButton,
   PostCard,
   getSharedPostTargetId,
   UserRow,
@@ -167,14 +168,7 @@ export default function EventDetailScreen() {
             <Text style={styles.title}>{event.title}</Text>
           </View>
           {userId ? (
-            <Pressable
-              style={styles.menuButton}
-              onPress={openEventActions}
-              hitSlop={8}
-              accessibilityLabel="Event options"
-            >
-              <Text style={styles.menuIcon}>⋯</Text>
-            </Pressable>
+            <MenuIconButton onPress={openEventActions} accessibilityLabel="Event options" />
           ) : null}
         </View>
         {event.workout_type ? (
@@ -321,18 +315,7 @@ const styles = StyleSheet.create({
   },
   titleBlock: { flex: 1, alignItems: "center", gap: spacing.xs },
   emoji: { fontSize: 40 },
-  title: { ...typography.title, fontSize: 26, textAlign: "center", color: colors.text },
-  menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
+  title: { ...typography.screenTitle, textAlign: "center" },
   workoutType: { ...typography.body, color: colors.accent, fontWeight: "600" },
   metaCard: {
     backgroundColor: colors.surface,

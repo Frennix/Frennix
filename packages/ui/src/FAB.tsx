@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from "react-native";
-import { colors, radius, spacing } from "./theme";
+import { colors, radius, spacing, typography, applyShadow } from "./theme";
 
 interface FABProps {
   icon?: string;
@@ -30,11 +30,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
-    elevation: 4,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    ...applyShadow("md"),
   },
   icon: { color: colors.black, fontSize: 28, fontWeight: "600", lineHeight: 32 },
   label: { color: colors.black, fontSize: 16, fontWeight: "600" },

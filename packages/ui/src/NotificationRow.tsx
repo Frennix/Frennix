@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.background,
   },
-  content: { flex: 1, gap: 6 },
+  content: { flex: 1, gap: spacing.xs },
   text: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },
   unreadText: { color: colors.text, fontWeight: "600" },
   metaRow: {

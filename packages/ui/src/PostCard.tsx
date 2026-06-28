@@ -9,6 +9,7 @@ import { PostMediaCarousel } from "./PostMediaCarousel";
 import { ReactionBar } from "./ReactionBar";
 import { ReactionPicker } from "./ReactionPicker";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
+import { MenuIconButton } from "./MenuIconButton";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface PostCardProps {
@@ -58,23 +59,17 @@ export function PostCard({
   return (
     <View style={styles.card}>
       {isOwn ? (
-        <Pressable
-          style={styles.menuButton}
+        <MenuIconButton
+          style={styles.menuAnchor}
           onPress={onOwnerActionsPress}
-          hitSlop={8}
           accessibilityLabel="Post options"
-        >
-          <Text style={styles.menuIcon}>⋯</Text>
-        </Pressable>
+        />
       ) : onModerationPress ? (
-        <Pressable
-          style={styles.menuButton}
+        <MenuIconButton
+          style={styles.menuAnchor}
           onPress={onModerationPress}
-          hitSlop={8}
-            accessibilityLabel="Post options"
-        >
-          <Text style={styles.menuIcon}>⋯</Text>
-        </Pressable>
+          accessibilityLabel="Post options"
+        />
       ) : null}
 
       <Pressable style={styles.header} onPress={onAuthorPress}>
@@ -173,23 +168,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     position: "relative",
   },
-  menuButton: {
+  menuAnchor: {
     position: "absolute",
     top: spacing.sm,
     right: spacing.sm,
     zIndex: 2,
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: colors.surfaceElevated,
-  },
-  menuIcon: {
-    fontSize: 20,
-    lineHeight: 22,
-    color: colors.textSecondary,
-    fontWeight: "700",
+    borderRadius: radius.sm,
   },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingRight: spacing.xl },
   headerText: { flex: 1, gap: 2 },

@@ -5,6 +5,7 @@
     "paths": {
       "@/*": ["./*"],
       "@frennix/api": ["./packages/api/src"],
+      "@frennix/matching": ["./packages/matching/src"],
       "@frennix/types": ["./packages/types/src"],
       "@frennix/ui": ["./packages/ui/src"]
     }

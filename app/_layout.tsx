@@ -15,9 +15,9 @@ import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
-import { StackBackButton } from "@/components/StackBackButton";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
-import { colors } from "@frennix/ui";
+import { backScreen, fadeScreen } from "@/lib/stack-navigation";
+import { animation, colors } from "@frennix/ui";
 
 initSentry();
 
@@ -27,22 +27,8 @@ const stackDefaults = {
   contentStyle: { backgroundColor: colors.background },
   headerShadowVisible: false,
   animation: "fade" as const,
-  animationDuration: 200,
+  animationDuration: animation.stackFadeMs,
 } as const;
-
-const fadeScreen = {
-  animation: "fade" as const,
-  animationDuration: 200,
-} as const;
-
-function backScreen(title: string, extra?: object) {
-  return {
-    title,
-    headerBackVisible: false,
-    headerLeft: () => <StackBackButton />,
-    ...extra,
-  };
-}
 
 function TabBadgeRoot({ children }: { children: ReactNode }) {
   const { session } = useAuth();

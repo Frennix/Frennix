@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Comment } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { formatRelativeTime } from "./formatRelativeTime";
+import { MenuIconButton } from "./MenuIconButton";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface CommentRowProps {
@@ -47,14 +48,11 @@ export function CommentRow({
               <Text style={styles.time}>{formatRelativeTime(comment.created_at)}</Text>
             </View>
             {showMenu ? (
-              <Pressable
-                style={styles.menuButton}
+              <MenuIconButton
+                compact
                 onPress={() => onMenuPress?.(comment)}
-                hitSlop={8}
                 accessibilityLabel="Comment options"
-              >
-                <Text style={styles.menuIcon}>⋯</Text>
-              </Pressable>
+              />
             ) : null}
           </View>
           <Text style={styles.content}>{comment.content}</Text>
@@ -105,14 +103,6 @@ const styles = StyleSheet.create({
   body: { flex: 1, gap: spacing.xs },
   metaRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
   meta: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  menuButton: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuIcon: { fontSize: 18, lineHeight: 20, color: colors.textSecondary, fontWeight: "700" },
   author: { ...typography.bodySmall, fontWeight: "600", color: colors.text },
   time: { ...typography.caption, color: colors.textMuted },
   content: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },

@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from "react-native";
-import { colors, radius, spacing, typography } from "@frennix/ui";
+import { colors, radius, spacing, typography, applyShadow } from "@frennix/ui";
 
 type NewPostsBannerProps = {
   count: number;
@@ -33,11 +33,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    ...applyShadow("md"),
   },
   text: {
     ...typography.bodySmall,

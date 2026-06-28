@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { StoryInsights } from "@frennix/types";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryInsightsStripProps {
   insights: StoryInsights;
@@ -48,9 +48,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(10, 10, 11, 0.55)",
+    backgroundColor: overlays.glassMedium,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: overlays.glassBorderStrong,
     alignItems: "center",
     minWidth: 56,
   },
@@ -62,12 +62,12 @@ const styles = StyleSheet.create({
   label: {
     ...typography.caption,
     fontSize: 9,
-    color: "rgba(255,255,255,0.78)",
+    color: overlays.whiteSoft,
     fontWeight: "600",
   },
   empty: {
     ...typography.caption,
-    color: "rgba(255,255,255,0.72)",
+    color: overlays.whiteFaint,
     fontWeight: "600",
   },
 });

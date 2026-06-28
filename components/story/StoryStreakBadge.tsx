@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text } from "react-native";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryStreakBadgeProps {
   streak: number;
@@ -48,9 +48,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    backgroundColor: overlays.accentTintStrong,
     borderWidth: 1,
-    borderColor: "rgba(34, 197, 94, 0.55)",
+    borderColor: overlays.accentBorder,
   },
   text: {
     ...typography.caption,

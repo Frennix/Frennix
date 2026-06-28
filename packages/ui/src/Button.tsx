@@ -8,7 +8,7 @@ import {
   View,
   type PressableProps,
 } from "react-native";
-import { colors, radius, spacing } from "./theme";
+import { colors, radius, spacing, typography } from "./theme";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.5 },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  text: { fontSize: 16, fontWeight: "600" },
+  text: { ...typography.button },
   primaryText: { color: colors.black },
   secondaryText: { color: colors.text },
   ghostText: { color: colors.accent },

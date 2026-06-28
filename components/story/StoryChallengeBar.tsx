@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { STORY_CHALLENGE_RESPONSES, type StoryChallengeKey } from "@frennix/types";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryChallengeBarProps {
   disabled?: boolean;
@@ -49,13 +49,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 12,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    backgroundColor: overlays.glass,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: overlays.glassBorder,
   },
   buttonActive: {
     borderColor: colors.accent,
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
+    backgroundColor: overlays.accentTint,
   },
   label: {
     ...typography.caption,

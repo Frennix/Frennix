@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { FeedStoryLastWorkout } from "@frennix/types";
-import { WorkoutTypeChips, formatStreakBadgeLabel, colors, spacing, typography } from "@frennix/ui";
+import { WorkoutTypeChips, formatStreakBadgeLabel, colors, overlays, spacing, typography } from "@frennix/ui";
 import {
   formatStoryCalories,
   formatStoryCompletedTime,
@@ -80,9 +80,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 16,
-    backgroundColor: "rgba(10, 10, 11, 0.72)",
+    backgroundColor: overlays.glassStrong,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: overlays.glassBorderStrong,
   },
   statsGrid: {
     flexDirection: "row",
@@ -93,14 +93,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: overlays.whiteGhost,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: overlays.whiteGhostBorder,
   },
   statLabel: {
     ...typography.caption,
     fontSize: 9,
-    color: "rgba(255,255,255,0.62)",
+    color: overlays.whiteMuted,
     fontWeight: "600",
   },
   statValue: {
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   completed: {
     ...typography.caption,
-    color: "rgba(255,255,255,0.78)",
+    color: overlays.whiteSoft,
     fontWeight: "600",
   },
   streak: {
@@ -123,9 +123,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(234, 179, 8, 0.14)",
+    backgroundColor: overlays.warningTintSoft,
     borderWidth: 1,
-    borderColor: "rgba(234, 179, 8, 0.45)",
+    borderColor: overlays.warningBorderSoft,
   },
   achievementText: {
     ...typography.caption,
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   aiSummary: {
     ...typography.caption,
-    color: "rgba(255,255,255,0.88)",
+    color: overlays.whiteStrong,
     lineHeight: 16,
     fontStyle: "italic",
   },

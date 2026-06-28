@@ -50,8 +50,8 @@ const checks: Array<{ name: string; test: () => boolean; hint?: string }> = [
     },
   },
   {
-    name: "No Reanimated FadeInDown entering on web feed rows",
-    test: () => !bundle.includes("FadeInDown.duration(260).springify().damping(22)"),
+    name: "Feed enter animation guarded on web",
+    test: () => bundle.includes("animatedPostIds") && bundle.includes('Platform.OS!=="web"'),
   },
 ];
 

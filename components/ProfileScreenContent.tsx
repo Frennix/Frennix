@@ -21,6 +21,7 @@ import {
   CachedImage,
   Chip,
   EditableAvatar,
+  MenuIconButton,
   PostGrid,
   ProfileAchievementBadges,
   ProfileContentTab,
@@ -188,14 +189,7 @@ export function ProfileScreenContent({
               <Text style={styles.username}>@{profile.username}</Text>
             </View>
             {onProfileMenuPress ? (
-              <Pressable
-                style={styles.menuButton}
-                onPress={onProfileMenuPress}
-                hitSlop={8}
-                accessibilityLabel="Profile options"
-              >
-                <Text style={styles.menuIcon}>⋯</Text>
-              </Pressable>
+              <MenuIconButton onPress={onProfileMenuPress} accessibilityLabel="Profile options" />
             ) : null}
           </View>
           {presenceLabel ? (
@@ -421,18 +415,7 @@ const styles = StyleSheet.create({
   nameBlock: { marginTop: spacing.xs, gap: spacing.xs },
   nameRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
   nameTextBlock: { flex: 1 },
-  menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
-  name: { ...typography.title, fontSize: 24 },
+  name: { ...typography.screenTitle },
   username: { ...typography.caption, color: colors.accent, marginTop: 2 },
   presence: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
   presenceOnline: { color: colors.accent, fontWeight: "600" },

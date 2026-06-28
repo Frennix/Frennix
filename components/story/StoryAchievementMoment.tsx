@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text } from "react-native";
 import type { WorkoutStoryMilestone } from "@frennix/types";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryAchievementMomentProps {
   milestone: WorkoutStoryMilestone;
@@ -47,9 +47,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "rgba(234, 179, 8, 0.16)",
+    backgroundColor: overlays.warningTint,
     borderWidth: 1,
-    borderColor: "rgba(234, 179, 8, 0.55)",
+    borderColor: overlays.warningBorder,
   },
   text: {
     ...typography.caption,

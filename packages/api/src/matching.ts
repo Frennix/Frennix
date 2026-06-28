@@ -1,12 +1,20 @@
+import {
+  DEFAULT_MATCHING_WEIGHTS,
+  buildMatchReasons,
+  scoreFromReasons,
+} from "@frennix/matching";
 import type {
   Match,
+  MatchCandidate,
   MatchSwipe,
+  MatchableProfile,
   Profile,
   RecordMatchSwipeResult,
   SwipeDirection,
 } from "@frennix/types";
 import { formatSupabaseError } from "./profile-utils";
-import { getProfilesByIds, updateProfile } from "./profiles";
+import { getProfile, getProfilesByIds, updateProfile } from "./profiles";
+import { getWorkoutStreaksForUserIds } from "./matching-streaks";
 import { getSupabase } from "./supabase";
 
 const DEFAULT_CANDIDATE_LIMIT = 20;
@@ -26,30 +34,59 @@ function coerceStringArray(value: unknown): string[] {
   return [];
 }
 
-function normalizeMatchCandidate(row: unknown): Profile {
+function normalizeMatchableProfile(row: unknown): MatchableProfile {
   if (!row || typeof row !== "object" || Array.isArray(row)) {
     throw new Error("Invalid match candidate profile");
   }
 
-  const profile = row as Profile;
+  const profile = row as MatchableProfile;
   return {
     ...profile,
     fitness_goals: coerceStringArray(profile.fitness_goals),
     activities: coerceStringArray(profile.activities),
+    training_schedules: coerceStringArray(profile.training_schedules),
   };
 }
 
-function parseMatchCandidates(value: unknown): Profile[] {
+function parseMatchCandidates(value: unknown): MatchableProfile[] {
   if (value == null) return [];
   const rows = Array.isArray(value) ? value : [value];
 
   return rows.flatMap((row) => {
     try {
-      return [normalizeMatchCandidate(row)];
+      return [normalizeMatchableProfile(row)];
     } catch {
       return [];
     }
   });
+}
+
+function enrichCandidates(
+  viewer: MatchableProfile,
+  candidates: MatchableProfile[],
+  streaks: Map<string, number>
+): MatchCandidate[] {
+  const viewerStreak = streaks.get(viewer.id) ?? 0;
+
+  return candidates
+    .map((candidate) => {
+      const candidateStreak = streaks.get(candidate.id) ?? 0;
+      const match_reasons = buildMatchReasons(viewer, candidate, DEFAULT_MATCHING_WEIGHTS, {
+        viewerStreak,
+        candidateStreak,
+      });
+
+      return {
+        ...candidate,
+        match_score: scoreFromReasons(match_reasons),
+        match_reasons,
+        workout_streak: candidateStreak,
+      };
+    })
+    .sort((a, b) => {
+      if (b.match_score !== a.match_score) return b.match_score - a.match_score;
+      return (b.workout_streak ?? 0) - (a.workout_streak ?? 0);
+    });
 }
 
 function parseSwipeDirection(value: unknown): SwipeDirection {
@@ -125,7 +162,15 @@ function parseRecordMatchSwipeResult(value: unknown): RecordMatchSwipeResult {
   };
 }
 
-export async function getMatchCandidates(limit = DEFAULT_CANDIDATE_LIMIT): Promise<Profile[]> {
+export async function getMatchCandidates(
+  viewerId: string,
+  limit = DEFAULT_CANDIDATE_LIMIT
+): Promise<MatchCandidate[]> {
+  const viewer = await getProfile(viewerId);
+  if (!viewer) {
+    throw new Error("Profile not found");
+  }
+
   const { data, error } = await getSupabase().rpc("get_match_candidates", {
     p_limit: clampCandidateLimit(limit),
   });
@@ -134,8 +179,15 @@ export async function getMatchCandidates(limit = DEFAULT_CANDIDATE_LIMIT): Promi
     throw formatSupabaseError(error, "Failed to load match candidates");
   }
 
-  return parseMatchCandidates(data);
+  const candidates = parseMatchCandidates(data);
+  if (!candidates.length) return [];
+
+  const streaks = await getWorkoutStreaksForUserIds([viewerId, ...candidates.map((c) => c.id)]);
+  return enrichCandidates(viewer, candidates, streaks);
 }
+
+/** @deprecated Use getMatchCandidates(viewerId) — kept for internal re-exports. */
+export type { MatchCandidate };
 
 export async function recordMatchSwipe(
   swipeeId: string,

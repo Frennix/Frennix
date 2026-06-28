@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { STORY_REACTIONS, type StoryReactionEmoji } from "@frennix/types";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryReactionBarProps {
   disabled?: boolean;
@@ -45,14 +45,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: spacing.sm,
     borderRadius: 12,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    backgroundColor: overlays.glass,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: overlays.glassBorder,
     gap: 2,
   },
   buttonActive: {
     borderColor: colors.accent,
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
+    backgroundColor: overlays.accentTint,
   },
   emoji: {
     fontSize: 20,

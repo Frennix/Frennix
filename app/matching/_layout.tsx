@@ -1,31 +1,13 @@
 import { Stack } from "expo-router";
 import { MatchingRouteErrorBoundary } from "@/components/MatchingRouteErrorBoundary";
-import { StackBackButton } from "@/components/StackBackButton";
-import { colors } from "@frennix/ui";
-
-function backScreen(title: string) {
-  return {
-    title,
-    headerBackVisible: false,
-    headerLeft: () => <StackBackButton />,
-    headerStyle: { backgroundColor: colors.background },
-    headerTintColor: colors.text,
-    headerShadowVisible: false,
-  };
-}
+import { nestedBackScreen, nestedStackScreenOptions } from "@/lib/stack-navigation";
 
 export default function MatchingLayout() {
   return (
     <MatchingRouteErrorBoundary>
-    <Stack
-      screenOptions={{
-        contentStyle: { backgroundColor: colors.background },
-        animation: "fade",
-        animationDuration: 150,
-      }}
-    >
-      <Stack.Screen name="index" options={backScreen("Training partners")} />
-      <Stack.Screen name="matches" options={backScreen("Training matches")} />
+    <Stack screenOptions={nestedStackScreenOptions()}>
+      <Stack.Screen name="index" options={nestedBackScreen("Training partners")} />
+      <Stack.Screen name="matches" options={nestedBackScreen("Training matches")} />
     </Stack>
     </MatchingRouteErrorBoundary>
   );

@@ -1,8 +1,8 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { Challenge } from "@frennix/types";
 import { useChallengeActions } from "@/lib/useChallengeActions";
-import { ChallengeCard, colors, radius, spacing } from "@frennix/ui";
+import { ChallengeCard, MenuIconButton, spacing } from "@frennix/ui";
 
 interface DiscoverChallengeRowProps {
   challenge: Challenge;
@@ -26,14 +26,7 @@ export function DiscoverChallengeRow({ challenge, userId }: DiscoverChallengeRow
           />
         </View>
         {userId ? (
-          <Pressable
-            style={styles.menuButton}
-            onPress={openChallengeActions}
-            hitSlop={8}
-            accessibilityLabel="Challenge options"
-          >
-            <Text style={styles.menuIcon}>⋯</Text>
-          </Pressable>
+          <MenuIconButton onPress={openChallengeActions} accessibilityLabel="Challenge options" />
         ) : null}
       </View>
     </>
@@ -47,16 +40,4 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardWrap: { flex: 1 },
-  menuButton: {
-    width: 36,
-    height: 36,
-    marginTop: spacing.sm,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
 });

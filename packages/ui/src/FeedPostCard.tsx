@@ -16,6 +16,7 @@ import { FeedMediaSlot } from "./FeedMediaSlot";
 import { ReactionBar } from "./ReactionBar";
 import { ReactionPicker } from "./ReactionPicker";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
+import { MenuIconButton } from "./MenuIconButton";
 import { colors, spacing, typography } from "./theme";
 
 interface FeedPostCardProps {
@@ -87,23 +88,9 @@ export const FeedPostCard = memo(function FeedPostCard({
         </ScalePressable>
 
         {isOwn ? (
-          <Pressable
-            style={styles.menuButton}
-            onPress={onOwnerActionsPress}
-            hitSlop={8}
-            accessibilityLabel="Post options"
-          >
-            <Text style={styles.menuIcon}>⋯</Text>
-          </Pressable>
+          <MenuIconButton onPress={onOwnerActionsPress} accessibilityLabel="Post options" />
         ) : onModerationPress ? (
-          <Pressable
-            style={styles.menuButton}
-            onPress={onModerationPress}
-            hitSlop={8}
-            accessibilityLabel="Post options"
-          >
-            <Text style={styles.menuIcon}>⋯</Text>
-          </Pressable>
+          <MenuIconButton onPress={onModerationPress} accessibilityLabel="Post options" />
         ) : null}
       </View>
 
@@ -228,20 +215,6 @@ const styles = StyleSheet.create({
   username: { ...typography.caption, color: colors.accent },
   meta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   workoutChips: { marginTop: 4 },
-  menuButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-  },
-  menuIcon: {
-    fontSize: 20,
-    lineHeight: 22,
-    color: colors.textSecondary,
-    fontWeight: "700",
-  },
   caption: {
     ...typography.body,
     lineHeight: 22,

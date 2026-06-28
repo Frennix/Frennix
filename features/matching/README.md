@@ -132,6 +132,28 @@ Realtime profile presence, stale cleanup, foreground heartbeat, background offli
 
 ---
 
+## Phase A — Match quality & explainability (in progress)
+
+**Goal:** Make every recommendation explain itself — modular scoring architecture for long-term match quality.
+
+| Layer | Path | Purpose |
+|-------|------|---------|
+| Types | `packages/types/src/matching.ts` | `MatchCandidate`, `MatchReason`, `MatchingWeights`, profile dimensions |
+| Scoring engine | `packages/matching/` | Dimension scoring, reason copy, tunable weights |
+| API | `packages/api/src/matching.ts` | Fetch candidates → score → sort → return `match_reasons` |
+| Streaks | `packages/api/src/matching-streaks.ts` | Batch workout streak for scoring |
+| UI | `components/MatchReasonsList.tsx` | “Why we matched you” on every card |
+| Card | `components/TrainingPartnerCard.tsx` | Large avatar, presence, streak, mutual interests |
+| Migration | `20250630000014_matching_scoring_phase_a.sql` | Profile dimensions + streak RPCs |
+
+**Scoring dimensions (extensible):** shared goals · shared activities · same city · distance (when geo set) · schedule · skill · gym · environment · streak · recently active · discovery enabled
+
+**Verify:** `pnpm verify:matching-scoring`
+
+**Next (Phase B):** Premium swipe deck · profile settings for schedule/skill/gym · gesture animations · infinite preload
+
+---
+
 ## Roadmap — after production (not started)
 
 Phases 4–13 cover **peer training partner** matching (athlete ↔ athlete). The following is planned **after** production sign-off. **Do not build until explicitly approved.**

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { STORY_DAILY_MOTIVATIONS } from "@frennix/types";
-import { Button, colors, spacing, typography } from "@frennix/ui";
+import { Button, colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryDailyMotivationProps {
   onShareWorkout?: () => void;
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   },
   body: {
     ...typography.bodySmall,
-    color: "rgba(255,255,255,0.85)",
+    color: overlays.whiteSubtle,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: spacing.xs,

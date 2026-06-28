@@ -1,6 +1,5 @@
 import { memo, useCallback } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -17,7 +16,9 @@ import { openNotificationTargetAsync } from "@/lib/notification-navigation";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { showAlert } from "@/lib/alerts";
-import { EmptyState, colors, spacing, typography } from "@frennix/ui";
+import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { NotificationsListSkeleton } from "@/components/NotificationsListSkeleton";
+import { EmptyState, QueryErrorState, ScreenSpinner, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { FrennixNotificationRow } from "@/components/FrennixNotificationRow";
 
@@ -128,11 +129,7 @@ export default function NotificationsScreen() {
   );
 
   if (authLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+    return <ScreenSpinner />;
   }
 
   if (!userId) {
@@ -144,24 +141,18 @@ export default function NotificationsScreen() {
   }
 
   if (isLoading && !notifications.length) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+    return <NotificationsListSkeleton />;
   }
 
   if (isError) {
     const message = getErrorMessage(error);
     console.error("[notifications] failed to load notifications", error);
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorTitle}>Could not load notifications</Text>
-        <Text style={styles.errorText}>{message}</Text>
-        <Pressable onPress={() => refetch()} style={styles.retryButton}>
-          <Text style={styles.retryText}>Try again</Text>
-        </Pressable>
-      </View>
+      <QueryErrorState
+        title="Could not load notifications"
+        message={message}
+        onRetry={() => refetch()}
+      />
     );
   }
 
@@ -225,23 +216,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  errorTitle: { ...typography.heading, textAlign: "center" },
   errorText: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center" },
-  retryButton: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  retryText: { ...typography.bodySmall, color: colors.accent, fontWeight: "700" },
   summary: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
-    gap: 4,
+    gap: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,

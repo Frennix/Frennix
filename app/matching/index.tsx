@@ -2,7 +2,6 @@ import { AppIcon } from "@/components/AppIcon";
 import { Stack, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -17,7 +16,7 @@ import {
   getOrCreateConversation,
   recordMatchSwipe,
 } from "@frennix/api";
-import type { Profile } from "@frennix/types";
+import type { MatchCandidate } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import {
   TrainingMatchModal,
@@ -31,7 +30,7 @@ import { logMatchmakingError } from "@/lib/matchmaking-observability";
 import { hapticMatch } from "@/lib/haptics";
 import { isTrainingPartnerDiscoveryReady } from "@/lib/training-partner-readiness";
 import { useAuth } from "@/providers/AuthProvider";
-import { Button, EmptyState, colors, spacing, typography } from "@frennix/ui";
+import { Button, EmptyState, ScreenSpinner, prefetchCachedImage, colors, spacing, typography } from "@frennix/ui";
 
 function MatchingHeaderActions() {
   return (
@@ -51,11 +50,11 @@ export default function TrainingPartnerDiscoveryScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
 
-  const [deck, setDeck] = useState<Profile[]>([]);
+  const [deck, setDeck] = useState<MatchCandidate[]>([]);
   const [deckInitialized, setDeckInitialized] = useState(false);
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState("");
-  const [matchPartner, setMatchPartner] = useState<Profile | null>(null);
+  const [matchPartner, setMatchPartner] = useState<MatchCandidate | null>(null);
   const [matchModalVisible, setMatchModalVisible] = useState(false);
   const [openingMessage, setOpeningMessage] = useState(false);
 
@@ -71,11 +70,11 @@ export default function TrainingPartnerDiscoveryScreen() {
     isRefetching,
   } = useQuery({
     queryKey: ["training-partner-candidates", userId],
-    queryFn: () => getMatchCandidates(20),
+    queryFn: () => getMatchCandidates(userId, 20),
     enabled: !!userId && discoveryEnabled,
   });
 
-  const syncDeck = useCallback((incoming: Profile[]) => {
+  const syncDeck = useCallback((incoming: MatchCandidate[]) => {
     setDeck(Array.isArray(incoming) ? incoming : []);
     setDeckInitialized(true);
   }, []);
@@ -92,7 +91,14 @@ export default function TrainingPartnerDiscoveryScreen() {
   }, [isError, error]);
 
   const currentCandidate = deck[0] ?? null;
+  const nextCandidate = deck[1] ?? null;
   const remainingCount = Math.max(deck.length - 1, 0);
+
+  useEffect(() => {
+    if (nextCandidate?.avatar_url) {
+      void prefetchCachedImage(nextCandidate.avatar_url);
+    }
+  }, [nextCandidate?.avatar_url]);
 
   async function handleRefresh() {
     setDeckInitialized(false);
@@ -168,8 +174,8 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <View style={styles.centered}>
-          {authLoading || session ? (
-            <ActivityIndicator color={colors.accent} size="large" />
+          {!authReady || session ? (
+            <ScreenSpinner />
           ) : (
             <EmptyState
               title="Could not load your profile"
@@ -223,7 +229,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} size="large" />
+          <ScreenSpinner />
           <Text style={styles.loadingText}>Finding training partners…</Text>
         </View>
       </>

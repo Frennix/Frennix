@@ -1,5 +1,5 @@
 {
-  "name": "@frennix/api",
+  "name": "@frennix/matching",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",
@@ -9,16 +9,9 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@frennix/matching": "workspace:*",
-    "@frennix/types": "workspace:*",
-    "@supabase/supabase-js": "^2.47.10",
-    "@tanstack/react-query": "^5.62.8"
-  },
-  "peerDependencies": {
-    "react": "*"
+    "@frennix/types": "workspace:*"
   },
   "devDependencies": {
-    "@types/react": "~18.3.12",
     "typescript": "^5.7.2"
   }
 }

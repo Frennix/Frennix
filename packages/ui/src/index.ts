@@ -53,4 +53,6 @@ export { FeedVideoPlayer } from "./FeedVideoPlayer";
 export { FullscreenVideoSlide } from "./FullscreenVideoSlide";
 export { useMediaVisibility, MEDIA_AUTOPLAY_VISIBILITY_THRESHOLD } from "./useMediaVisibility";
 export { QueryErrorState } from "./QueryErrorState";
+export { MenuIconButton } from "./MenuIconButton";
+export { ScreenSpinner } from "./ScreenSpinner";
 export * from "./ReactionPicker";

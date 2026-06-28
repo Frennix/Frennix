@@ -18,7 +18,7 @@ import { DetailLoading } from "@/components/DetailLoading";
 import { ShareChallengeSheet } from "@/components/ShareChallengeSheet";
 import { shareChallengeToDestination } from "@/lib/share-challenge";
 import { showAlert } from "@/lib/alerts";
-import { Button, CachedImage, EmptyState, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, CachedImage, EmptyState, MenuIconButton, PostCard, getSharedPostTargetId, colors, radius, spacing, typography } from "@frennix/ui";
 
 import { isChallengeClosed } from "@/lib/challenge-actions";
 
@@ -132,14 +132,7 @@ export default function ChallengeDetailScreen() {
             <View style={styles.titleRow}>
               <Text style={styles.title}>{challenge.title}</Text>
               {userId ? (
-                <Pressable
-                  style={styles.menuButton}
-                  onPress={openChallengeActions}
-                  hitSlop={8}
-                  accessibilityLabel="Challenge options"
-                >
-                  <Text style={styles.menuIcon}>⋯</Text>
-                </Pressable>
+                <MenuIconButton onPress={openChallengeActions} accessibilityLabel="Challenge options" />
               ) : null}
             </View>
 
@@ -267,17 +260,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: { ...typography.title, flex: 1 },
-  menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  menuIcon: { fontSize: 22, lineHeight: 24, color: colors.textSecondary, fontWeight: "700" },
   closedBanner: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
@@ -299,6 +281,6 @@ const styles = StyleSheet.create({
   dates: { color: colors.accent, fontWeight: "600" },
   participants: { ...typography.caption },
   joined: { ...typography.body, color: colors.accent },
-  section: { ...typography.heading, fontSize: 18, marginTop: spacing.md, marginBottom: spacing.sm },
+  section: { ...typography.section, marginTop: spacing.md, marginBottom: spacing.sm },
   emptyWrap: { flex: 1, backgroundColor: colors.background, justifyContent: "center" },
 });

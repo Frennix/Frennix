@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
   },
-  header: { ...typography.heading, fontSize: 22 },
+  header: { ...typography.section },
   createLink: { ...typography.body, color: colors.accent, fontWeight: "700" },
   list: { padding: spacing.md, flexGrow: 1 },
 });

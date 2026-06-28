@@ -6,7 +6,7 @@ import {
   type StoryChallengeKey,
   type StoryQuickReactionEmoji,
 } from "@frennix/types";
-import { colors, spacing, typography } from "@frennix/ui";
+import { colors, overlays, spacing, typography } from "@frennix/ui";
 import { StoryReplyBar } from "./StoryReplyBar";
 
 interface StoryActionDockProps {
@@ -170,9 +170,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: spacing.xs,
     borderRadius: 12,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    backgroundColor: overlays.glass,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: overlays.glassBorder,
     gap: 2,
   },
   reactionEmoji: {
@@ -195,9 +195,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    backgroundColor: overlays.glass,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: overlays.glassBorder,
   },
   challengeText: {
     ...typography.caption,
@@ -215,9 +215,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: 4,
     borderRadius: 12,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    backgroundColor: overlays.glass,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: overlays.glassBorder,
     gap: 2,
   },
   iconActionEmoji: {
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   sent: {
     borderColor: colors.accent,
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
+    backgroundColor: overlays.accentTint,
   },
   disabled: {
     opacity: 0.55,
