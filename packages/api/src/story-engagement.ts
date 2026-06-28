@@ -1,11 +1,16 @@
-import type { StoryReactionEmoji, StoryViewRecord } from "@frennix/types";
+import type { StoryQuickReactionEmoji } from "@frennix/types";
 import { getOrCreateConversation, sendMessage } from "./messaging";
+import { trackStoryEngagementEvent } from "./story-insights";
+import { sendStoryTrainInvite } from "./story-train-invites";
 import { getSupabase } from "./supabase";
+
+export * from "./story-insights";
+export * from "./story-train-invites";
 
 export async function getStoryViewsForViewer(
   viewerId: string,
   storyUserIds: string[]
-): Promise<StoryViewRecord[]> {
+) {
   if (!storyUserIds.length) return [];
 
   const { data, error } = await getSupabase()
@@ -15,7 +20,7 @@ export async function getStoryViewsForViewer(
     .in("story_user_id", storyUserIds);
 
   if (error) throw error;
-  return (data ?? []) as StoryViewRecord[];
+  return data ?? [];
 }
 
 export async function markStoryViewed(
@@ -36,13 +41,22 @@ export async function markStoryViewed(
   );
 
   if (error) throw error;
+
+  if (viewerId !== storyUserId) {
+    await trackStoryEngagementEvent({
+      viewerId,
+      storyUserId,
+      postId,
+      eventType: "view",
+    }).catch(() => undefined);
+  }
 }
 
-export async function sendStoryReaction(
+export async function sendStoryQuickReaction(
   viewerId: string,
   storyUserId: string,
   postId: string,
-  emoji: StoryReactionEmoji
+  emoji: StoryQuickReactionEmoji
 ) {
   if (viewerId === storyUserId) return;
 
@@ -57,39 +71,110 @@ export async function sendStoryReaction(
   );
 
   if (error) throw error;
+
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId,
+    postId,
+    eventType: "reaction",
+    metadata: { emoji },
+  }).catch(() => undefined);
+}
+
+/** @deprecated Use sendStoryQuickReaction */
+export async function sendStoryReaction(
+  viewerId: string,
+  storyUserId: string,
+  postId: string,
+  emoji: StoryQuickReactionEmoji
+) {
+  return sendStoryQuickReaction(viewerId, storyUserId, postId, emoji);
 }
 
 export async function sendStoryReply(
   viewerId: string,
   storyUserId: string,
-  replyText: string
+  replyText: string,
+  postId?: string | null
 ) {
   const trimmed = replyText.trim();
   if (!trimmed) throw new Error("Reply cannot be empty");
   if (viewerId === storyUserId) throw new Error("You cannot reply to your own story");
 
   const conversationId = await getOrCreateConversation(viewerId, storyUserId);
-  return sendMessage(conversationId, viewerId, `Replied to your workout story: ${trimmed}`);
+  const message = await sendMessage(
+    conversationId,
+    viewerId,
+    `Replied to your workout story: ${trimmed}`
+  );
+
+  if (postId) {
+    await trackStoryEngagementEvent({
+      viewerId,
+      storyUserId,
+      postId,
+      eventType: "reply",
+    }).catch(() => undefined);
+  }
+
+  return message;
 }
 
 export async function sendStoryChallenge(
   viewerId: string,
   storyUserId: string,
-  message: string
+  message: string,
+  postId?: string | null
 ) {
   if (viewerId === storyUserId) return;
 
   const conversationId = await getOrCreateConversation(viewerId, storyUserId);
-  return sendMessage(conversationId, viewerId, message);
+  const result = await sendMessage(conversationId, viewerId, message);
+
+  if (postId) {
+    await trackStoryEngagementEvent({
+      viewerId,
+      storyUserId,
+      postId,
+      eventType: "challenge",
+    }).catch(() => undefined);
+  }
+
+  return result;
 }
 
-export async function sendStoryInviteToTrain(viewerId: string, storyUserId: string) {
-  if (viewerId === storyUserId) return;
+export async function sendStoryInviteToTrain(
+  viewerId: string,
+  storyUserId: string,
+  postId?: string | null
+) {
+  return sendStoryTrainInvite(viewerId, storyUserId, postId ?? null);
+}
 
-  const conversationId = await getOrCreateConversation(viewerId, storyUserId);
-  return sendMessage(
-    conversationId,
+export async function trackStoryProfileVisit(
+  viewerId: string,
+  storyUserId: string,
+  postId: string | null
+) {
+  if (!postId || viewerId === storyUserId) return;
+  await trackStoryEngagementEvent({
     viewerId,
-    "Saw your workout story — want to train together? Let's plan a session! 💪"
-  );
+    storyUserId,
+    postId,
+    eventType: "profile_visit",
+  }).catch(() => undefined);
+}
+
+export async function trackStoryFollowFromStory(
+  viewerId: string,
+  storyUserId: string,
+  postId: string | null
+) {
+  if (!postId || viewerId === storyUserId) return;
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId,
+    postId,
+    eventType: "follow",
+  }).catch(() => undefined);
 }

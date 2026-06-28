@@ -6,13 +6,22 @@ import {
   getFeedStories,
   getSuggestedAthletes,
   getErrorMessage,
-  getOrCreateConversation,
+  getStoryInsights,
   markStoryViewed,
   sendStoryChallenge,
   sendStoryInviteToTrain,
+  sendStoryQuickReaction,
   sendStoryReply,
+  trackStoryFollowFromStory,
+  trackStoryProfileVisit,
 } from "@frennix/api";
-import { STORY_CHALLENGE_RESPONSES, type FeedStory, type Post, type StoryChallengeKey } from "@frennix/types";
+import {
+  STORY_CHALLENGE_RESPONSES,
+  type FeedStory,
+  type Post,
+  type StoryChallengeKey,
+  type StoryQuickReactionEmoji,
+} from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
@@ -43,7 +52,7 @@ export default function HomeScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
-  const [storyMessageUserId, setStoryMessageUserId] = useState<string | null>(null);
+  const [storyInviteUserId, setStoryInviteUserId] = useState<string | null>(null);
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
@@ -72,67 +81,60 @@ export default function HomeScreen() {
     [queryClient, userId]
   );
 
+  const handleStoryReact = useCallback(
+    async (storyUserId: string, postId: string, emoji: StoryQuickReactionEmoji) => {
+      if (!userId) return;
+      await sendStoryQuickReaction(userId, storyUserId, postId, emoji);
+    },
+    [userId]
+  );
+
   const handleStoryChallenge = useCallback(
     async (storyUserId: string, key: StoryChallengeKey) => {
       if (!userId) return;
       const challenge = STORY_CHALLENGE_RESPONSES.find((item) => item.key === key);
+      const postId = stories.find((story) => story.user_id === storyUserId)?.last_workout?.post_id;
       if (!challenge) return;
-      await sendStoryChallenge(userId, storyUserId, challenge.message);
+      await sendStoryChallenge(userId, storyUserId, challenge.message, postId ?? null);
     },
-    [userId]
+    [userId, stories]
   );
 
   const handleStoryReply = useCallback(
     async (storyUserId: string, text: string) => {
       if (!userId) return;
-      await sendStoryReply(userId, storyUserId, text);
+      const postId = stories.find((story) => story.user_id === storyUserId)?.last_workout?.post_id;
+      await sendStoryReply(userId, storyUserId, text, postId ?? null);
     },
-    [userId]
+    [userId, stories]
   );
 
   const handleStoryFollow = useCallback(
     (storyUserId: string, isFollowing: boolean) => {
       if (!userId || isFollowing) return;
+      const postId = stories.find((story) => story.user_id === storyUserId)?.last_workout?.post_id ?? null;
       followMutation.mutate({ targetUserId: storyUserId, isFollowing: false });
       queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
         current?.map((story) =>
           story.user_id === storyUserId ? { ...story, viewer_follows: true } : story
         )
       );
+      void trackStoryFollowFromStory(userId, storyUserId, postId).catch(() => undefined);
     },
-    [followMutation, queryClient, userId]
-  );
-
-  const handleStoryMessage = useCallback(
-    async (storyUserId: string) => {
-      if (!userId) return;
-      setStoryMessageUserId(storyUserId);
-      try {
-        const convId = await getOrCreateConversation(userId, storyUserId);
-        setActiveStoryIndex(null);
-        pushScreen(`/chat/${convId}`);
-      } catch (error) {
-        showAlert("Could not open chat", getErrorMessage(error));
-      } finally {
-        setStoryMessageUserId(null);
-      }
-    },
-    [userId]
+    [followMutation, queryClient, stories, userId]
   );
 
   const handleStoryInviteToTrain = useCallback(
-    async (storyUserId: string) => {
+    async (storyUserId: string, postId: string | null) => {
       if (!userId) return;
-      setStoryMessageUserId(storyUserId);
+      setStoryInviteUserId(storyUserId);
       try {
-        await sendStoryInviteToTrain(userId, storyUserId);
-        const convId = await getOrCreateConversation(userId, storyUserId);
-        setActiveStoryIndex(null);
-        pushScreen(`/chat/${convId}`);
+        await sendStoryInviteToTrain(userId, storyUserId, postId);
+        showAlert("Invite sent", "They'll get a notification to train with you.");
       } catch (error) {
         showAlert("Could not send invite", getErrorMessage(error));
       } finally {
-        setStoryMessageUserId(null);
+        setStoryInviteUserId(null);
       }
     },
     [userId]
@@ -399,6 +401,15 @@ export default function HomeScreen() {
     [onScrollEnd]
   );
 
+  const activeStory = activeStoryIndex !== null ? stories[activeStoryIndex] ?? null : null;
+
+  const { data: storyInsights } = useQuery({
+    queryKey: ["story-insights", userId, activeStory?.last_workout?.post_id],
+    queryFn: () => getStoryInsights(userId, activeStory!.last_workout!.post_id),
+    enabled: Boolean(activeStory?.is_self && activeStory?.last_workout?.post_id && activeStoryIndex !== null),
+    staleTime: 30_000,
+  });
+
   const storyVisible = activeStoryIndex !== null;
 
   if (isError && posts.length === 0) {
@@ -427,26 +438,30 @@ export default function HomeScreen() {
           setActiveStoryIndex(null);
           pushScreen(`/user/${username}`);
         }}
+        onViewProfileFromStory={(storyUserId, username) => {
+          const postId = stories.find((item) => item.user_id === storyUserId)?.last_workout?.post_id ?? null;
+          void trackStoryProfileVisit(userId, storyUserId, postId).catch(() => undefined);
+          setActiveStoryIndex(null);
+          pushScreen(`/user/${username}`);
+        }}
         onShareWorkout={() => {
           setActiveStoryIndex(null);
           openCreatePost();
         }}
         onMarkViewed={markStoryViewedOptimistic}
+        onReact={handleStoryReact}
         onChallenge={handleStoryChallenge}
         onReply={handleStoryReply}
         onFollow={handleStoryFollow}
-        onMessage={handleStoryMessage}
         onInviteToTrain={handleStoryInviteToTrain}
+        storyInsights={storyInsights ?? null}
         followLoading={
           followMutation.isPending
-            ? followMutation.variables?.targetUserId ===
-              (activeStoryIndex !== null ? stories[activeStoryIndex]?.user_id : undefined)
+            ? followMutation.variables?.targetUserId === activeStory?.user_id
             : false
         }
-        messageLoading={
-          storyMessageUserId !== null &&
-          storyMessageUserId ===
-            (activeStoryIndex !== null ? stories[activeStoryIndex]?.user_id : undefined)
+        inviteLoading={
+          storyInviteUserId !== null && storyInviteUserId === activeStory?.user_id
         }
       />
       {showBanner && !storyVisible ? (

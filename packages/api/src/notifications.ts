@@ -44,6 +44,8 @@ export function notificationActorId(notification: Notification): string | null {
       return (payload.inviter_id as string) ?? null;
     case "post_share":
       return (payload.sharer_id as string) ?? null;
+    case "story_train_invite":
+      return (payload.inviter_id as string) ?? null;
     default:
       return null;
   }
@@ -153,6 +155,11 @@ export function buildNotificationDisplay(
       }
       return { headline: "Post shared", detail: `${actorName} shared your post` };
     }
+    case "story_train_invite":
+      return {
+        headline: "Train invite",
+        detail: `${actorName} invited you to train.`,
+      };
     default:
       return { headline: "Frennix", detail: "New activity on Frennix" };
   }

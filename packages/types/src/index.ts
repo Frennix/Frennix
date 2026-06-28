@@ -1,7 +1,7 @@
 export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "💪"] as const;
 
-import type { WorkoutStoryMetrics, WorkoutStoryMilestone } from "./workout-story";
-export type { WorkoutStoryMetrics, WorkoutStoryMilestone } from "./workout-story";
+import type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
+export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
@@ -49,7 +49,8 @@ export type NotificationType =
   | "challenge_invite"
   | "event_join"
   | "event_invite"
-  | "post_share";
+  | "post_share"
+  | "story_train_invite";
 
 export type ChallengeInvitationStatus = "pending" | "declined";
 
@@ -195,6 +196,8 @@ export interface Post {
   workout_metrics?: WorkoutStoryMetrics | null;
   /** Story highlight flags, e.g. personal_record, goal_completed. */
   story_milestones?: string[];
+  /** Workout Story audience when this post appears in stories. */
+  story_audience?: StoryAudience;
 }
 
 export interface SavedPost {
@@ -219,6 +222,7 @@ export interface FeedStoryLastWorkout {
   created_at: string;
   metrics?: WorkoutStoryMetrics | null;
   milestones?: WorkoutStoryMilestone[];
+  story_audience?: StoryAudience;
 }
 
 export interface FeedStory {

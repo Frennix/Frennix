@@ -10,14 +10,31 @@ export function normalizeWorkoutStoryMetrics(
   const distance_meters =
     typeof raw.distance_meters === "number" ? raw.distance_meters : null;
   const calories = typeof raw.calories === "number" ? raw.calories : null;
+  const pace_seconds_per_km =
+    typeof raw.pace_seconds_per_km === "number" ? raw.pace_seconds_per_km : null;
+  const elevation_meters =
+    typeof raw.elevation_meters === "number" ? raw.elevation_meters : null;
+  const source = typeof raw.source === "string" ? raw.source : null;
+  const route_polyline = typeof raw.route_polyline === "string" ? raw.route_polyline : null;
+  const location_shared = raw.location_shared === true;
   const extra =
     raw.extra && typeof raw.extra === "object"
       ? (raw.extra as Record<string, unknown>)
       : undefined;
 
-  if (!duration_seconds && !distance_meters && !calories && !extra) return null;
+  if (!duration_seconds && !distance_meters && !calories && !extra && !route_polyline) return null;
 
-  return { duration_seconds, distance_meters, calories, extra };
+  return {
+    duration_seconds,
+    distance_meters,
+    calories,
+    pace_seconds_per_km,
+    elevation_meters,
+    source,
+    route_polyline,
+    location_shared,
+    extra,
+  };
 }
 
 export function computeStoryMilestones(input: {
@@ -42,6 +59,14 @@ export function computeStoryMilestones(input: {
       emoji: "🎯",
       label: "Goal Completed",
       kind: "goal_completed",
+    });
+  }
+  if (workoutCount === 1) {
+    milestones.push({
+      id: "first_workout",
+      emoji: "⭐",
+      label: "First Workout",
+      kind: "first_workout",
     });
   }
   if (workoutCount === 100) {
@@ -78,6 +103,7 @@ export function primaryStoryMilestone(
 ): WorkoutStoryMilestone | null {
   const priority: WorkoutStoryMilestone["kind"][] = [
     "personal_record",
+    "first_workout",
     "workout_100",
     "goal_completed",
     "streak_30",

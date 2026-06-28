@@ -12,68 +12,98 @@ interface WorkoutCompletionCardProps {
   lastWorkout: FeedStoryLastWorkout;
   streak: number;
   achievement?: { emoji: string; label: string } | null;
+  aiSummary?: string | null;
 }
 
-/** Fitness-first completion summary in the story footer. */
+/** Premium workout summary card for story footer. */
 export function WorkoutCompletionCard({
   lastWorkout,
   streak,
   achievement,
+  aiSummary,
 }: WorkoutCompletionCardProps) {
   const metrics = lastWorkout.metrics;
   const duration = formatStoryDuration(metrics?.duration_seconds);
-  const distance = formatStoryDistance(metrics?.distance_meters);
   const calories = formatStoryCalories(metrics?.calories);
-  const statParts = [duration, distance, calories].filter(Boolean);
+  const distance = formatStoryDistance(metrics?.distance_meters);
 
   return (
     <View style={styles.card} pointerEvents="none">
       <WorkoutTypeChips types={lastWorkout} maxVisible={2} size="compact" overlay />
-      {statParts.length ? (
-        <Text style={styles.stats} numberOfLines={1}>
-          {statParts.join(" · ")}
-        </Text>
-      ) : null}
+
+      <View style={styles.statsGrid}>
+        {duration ? <StatPill label="Duration" value={duration} /> : null}
+        {calories ? <StatPill label="Calories" value={calories} /> : null}
+        {distance ? <StatPill label="Distance" value={distance} /> : null}
+      </View>
+
+      <Text style={styles.completed} numberOfLines={1}>
+        {formatStoryCompletedTime(lastWorkout.created_at)}
+      </Text>
+
       {streak > 0 ? (
         <Text style={styles.streak} numberOfLines={1}>
           {formatStreakBadgeLabel(streak)}
         </Text>
       ) : null}
+
       {achievement ? (
-        <Text style={styles.achievement} numberOfLines={1}>
-          {achievement.emoji} {achievement.label}
+        <View style={styles.achievementBadge}>
+          <Text style={styles.achievementText} numberOfLines={1}>
+            {achievement.emoji} {achievement.label}
+          </Text>
+        </View>
+      ) : null}
+
+      {aiSummary ? (
+        <Text style={styles.aiSummary} numberOfLines={2}>
+          {aiSummary}
         </Text>
       ) : null}
-      <Text style={styles.completed} numberOfLines={1}>
-        Completed {formatStoryCompletedTime(lastWorkout.created_at)}
-      </Text>
+    </View>
+  );
+}
+
+function StatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statPill}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    alignSelf: "flex-start",
-    maxWidth: "88%",
-    gap: 4,
-    paddingHorizontal: spacing.sm,
+    alignSelf: "stretch",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 14,
-    backgroundColor: "rgba(10, 10, 11, 0.62)",
+    borderRadius: 16,
+    backgroundColor: "rgba(10, 10, 11, 0.72)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
-  stats: {
-    ...typography.caption,
-    color: colors.text,
-    fontWeight: "700",
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
   },
-  streak: {
-    ...typography.caption,
-    color: colors.accent,
-    fontWeight: "800",
+  statPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  achievement: {
+  statLabel: {
+    ...typography.caption,
+    fontSize: 9,
+    color: "rgba(255,255,255,0.62)",
+    fontWeight: "600",
+  },
+  statValue: {
     ...typography.caption,
     color: colors.text,
     fontWeight: "800",
@@ -82,5 +112,30 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: "rgba(255,255,255,0.78)",
     fontWeight: "600",
+  },
+  streak: {
+    ...typography.caption,
+    color: colors.accent,
+    fontWeight: "800",
+  },
+  achievementBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(234, 179, 8, 0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(234, 179, 8, 0.45)",
+  },
+  achievementText: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: "800",
+  },
+  aiSummary: {
+    ...typography.caption,
+    color: "rgba(255,255,255,0.88)",
+    lineHeight: 16,
+    fontStyle: "italic",
   },
 });

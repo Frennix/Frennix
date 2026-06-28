@@ -92,22 +92,18 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Fitness-first story UI: completion card, achievements, challenges, quick actions",
+    name: "Workout Stories 2.0 UI: action dock, motivation, insights",
     run: () => {
       const viewer = read("components/WorkoutStoryViewer.tsx");
       for (const token of [
+        "StoryActionDock",
+        "StoryDailyMotivation",
+        "StoryInsightsStrip",
         "WorkoutCompletionCard",
         "StoryAchievementMoment",
-        "StoryChallengeBar",
-        "StoryQuickActions",
-        "StoryReplyBar",
-        "onMarkViewed",
-        "onChallenge",
-        "onFollow",
-        "onMessage",
+        "onReact",
         "onInviteToTrain",
-        "prefetchStorySlide",
-        "formatRelativeTime",
+        "presentationStyle=\"fullScreen\"",
       ]) {
         if (!viewer.includes(token)) throw new Error(`Missing ${token}`);
       }
@@ -132,13 +128,15 @@ const checks: Array<{ name: string; run: () => void }> = [
       const feed = read("app/(tabs)/index.tsx");
       for (const token of [
         "markStoryViewed",
+        "sendStoryQuickReaction",
         "sendStoryChallenge",
         "sendStoryReply",
         "sendStoryInviteToTrain",
+        "getStoryInsights",
         "onMarkViewed",
+        "onReact",
         "onChallenge",
         "onFollow",
-        "onMessage",
         "onInviteToTrain",
       ]) {
         if (!feed.includes(token)) throw new Error(`Feed missing ${token}`);
@@ -168,30 +166,38 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Story engagement API, metrics migration, and future-ready types",
+    name: "Workout Stories 2.0 API, privacy, invites, and architecture",
     run: () => {
-      const api = read("packages/api/src/story-engagement.ts");
-      for (const fn of [
-        "markStoryViewed",
-        "sendStoryReply",
-        "sendStoryChallenge",
-        "sendStoryInviteToTrain",
-      ]) {
-        if (!api.includes(`export async function ${fn}`)) {
+      const engagement = read("packages/api/src/story-engagement.ts");
+      for (const fn of ["sendStoryQuickReaction", "trackStoryProfileVisit"]) {
+        if (!engagement.includes(`export async function ${fn}`)) {
           throw new Error(`Missing ${fn}`);
         }
       }
+      const invites = read("packages/api/src/story-train-invites.ts");
+      if (!invites.includes("sendStoryTrainInvite")) {
+        throw new Error("Missing sendStoryTrainInvite");
+      }
+      const insights = read("packages/api/src/story-insights.ts");
+      if (!insights.includes("getStoryInsights")) throw new Error("Missing getStoryInsights");
       const types = read("packages/types/src/workout-story.ts");
       for (const token of [
-        "WorkoutStoryMetrics",
-        "WorkoutStorySlideMeta",
-        "STORY_CHALLENGE_RESPONSES",
+        "STORY_QUICK_REACTIONS",
+        "STORY_DAILY_MOTIVATIONS",
+        "STORY_HIGHLIGHT_PRESETS",
+        "first_workout",
+        "routeMap",
+        "aiSummary",
       ]) {
         if (!types.includes(token)) throw new Error(`Missing type ${token}`);
       }
-      const migration = read("supabase/migrations/20250630000012_workout_story_metrics.sql");
-      if (!migration.includes("workout_metrics")) {
-        throw new Error("Workout metrics migration incomplete");
+      const migration = read("supabase/migrations/20250630000013_workout_stories_2.sql");
+      for (const token of ["story_audience", "story_train_invites", "story_highlights"]) {
+        if (!migration.includes(token)) throw new Error(`Migration missing ${token}`);
+      }
+      const createPost = read("app/create-post.tsx");
+      if (!createPost.includes("story_audience")) {
+        throw new Error("Create post must support story audience");
       }
     },
   },

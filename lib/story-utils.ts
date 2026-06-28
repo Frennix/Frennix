@@ -24,9 +24,26 @@ export function buildStorySlides(lastWorkout: FeedStoryLastWorkout | null): Work
 
   const meta: WorkoutStorySlideMeta = {
     musicTrackId: null,
-    routeMap: null,
-    wearable: lastWorkout.metrics?.extra?.wearable as Record<string, unknown> | null,
-    aiSummary: null,
+    routeMap: lastWorkout.metrics?.route_polyline
+      ? {
+          polyline: lastWorkout.metrics.route_polyline,
+          distance_meters: lastWorkout.metrics.distance_meters ?? undefined,
+          pace_seconds_per_km:
+            (lastWorkout.metrics.extra?.pace_seconds_per_km as number | undefined) ?? undefined,
+          elevation_meters:
+            (lastWorkout.metrics.extra?.elevation_meters as number | undefined) ?? undefined,
+          location_shared: lastWorkout.metrics.location_shared,
+        }
+      : null,
+    wearable: lastWorkout.metrics?.source
+      ? {
+          provider: lastWorkout.metrics.source,
+          payload: lastWorkout.metrics.extra?.wearable as Record<string, unknown> | undefined,
+        }
+      : null,
+    aiSummary:
+      (lastWorkout.metrics?.extra?.ai_summary as string | undefined) ??
+      null,
   };
 
   if (lastWorkout.media_urls?.length) {

@@ -1,4 +1,4 @@
-import type { FeedStory, FeedStoryLastWorkout, Post, Profile } from "@frennix/types";
+import type { FeedStory, FeedStoryLastWorkout, Post, Profile, StoryAudience } from "@frennix/types";
 import { normalizePostWorkoutFields } from "@frennix/types";
 import { getFollowing } from "./follows";
 import { getStoryViewsForViewer } from "./story-engagement";
@@ -35,7 +35,24 @@ function toLastWorkout(
       workoutCount,
       storyMilestoneFlags: milestoneFlags,
     }),
+    story_audience: ((normalized as Post).story_audience ?? "public") as StoryAudience,
   };
+}
+
+function canViewerSeeStory(
+  post: Post | null,
+  authorId: string,
+  viewerId: string,
+  followingIds: Set<string>,
+  mutualFriendIds: Set<string>
+): boolean {
+  if (authorId === viewerId) return true;
+  if (!post) return true;
+  const audience = post.story_audience ?? "public";
+  if (audience === "private") return false;
+  if (audience === "friends") return mutualFriendIds.has(authorId);
+  if (audience === "followers") return followingIds.has(authorId);
+  return true;
 }
 
 function buildStory(
@@ -80,6 +97,17 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
   const followingIds = new Set(following.map((profile) => profile.id));
   const now = new Date();
 
+  const { data: followersOfViewer } = await getSupabase()
+    .from("follows")
+    .select("follower_id")
+    .eq("following_id", viewerId);
+
+  const mutualFriendIds = new Set<string>();
+  for (const row of followersOfViewer ?? []) {
+    const followerId = row.follower_id as string;
+    if (followingIds.has(followerId)) mutualFriendIds.add(followerId);
+  }
+
   const [{ data: workoutPosts }, { data: latestPosts }] = await Promise.all([
     getSupabase()
       .from("posts")
@@ -115,17 +143,27 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     }
   }
 
-  const stories = profiles.map((profile) =>
-    buildStory(
-      profile,
-      viewerId,
-      followingIds,
-      datesByUser.get(profile.id) ?? [],
-      countByUser.get(profile.id) ?? 0,
-      latestByUser.get(profile.id) ?? null,
-      now
+  const stories = profiles
+    .map((profile) =>
+      buildStory(
+        profile,
+        viewerId,
+        followingIds,
+        datesByUser.get(profile.id) ?? [],
+        countByUser.get(profile.id) ?? 0,
+        latestByUser.get(profile.id) ?? null,
+        now
+      )
     )
-  );
+    .filter((story) =>
+      canViewerSeeStory(
+        latestByUser.get(story.user_id) ?? null,
+        story.user_id,
+        viewerId,
+        followingIds,
+        mutualFriendIds
+      )
+    );
 
   stories.sort((a, b) => {
     if (a.is_self) return -1;

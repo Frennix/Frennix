@@ -294,6 +294,7 @@ export async function createPost(input: {
   challenge_id?: string | null;
   event_id?: string | null;
   shared_post_id?: string | null;
+  story_audience?: import("@frennix/types").StoryAudience;
 }) {
   const workout_types =
     input.workout_types?.length
@@ -302,11 +303,15 @@ export async function createPost(input: {
         ? [input.workout_type]
         : [];
 
-  const { workout_type: _legacy, workout_types: _ignored, ...rest } = input;
+  const { workout_type: _legacy, workout_types: _ignored, story_audience, ...rest } = input;
 
   const { data, error } = await getSupabase()
     .from("posts")
-    .insert({ ...rest, workout_types })
+    .insert({
+      ...rest,
+      workout_types,
+      ...(story_audience ? { story_audience } : {}),
+    })
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
     .single();
   if (error) throw formatSupabaseError(error, "Failed to create post");

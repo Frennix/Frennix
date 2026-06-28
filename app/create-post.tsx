@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { ACTIVITIES } from "@frennix/types";
+import { ACTIVITIES, STORY_AUDIENCE_OPTIONS, type StoryAudience } from "@frennix/types";
 import {
   createPost,
   getErrorMessage,
@@ -141,6 +141,7 @@ export default function CreatePostScreen() {
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
   const [error, setError] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<SelectedMediaItem[]>([]);
+  const [storyAudience, setStoryAudience] = useState<StoryAudience>("public");
 
   const {
     hydrated,
@@ -404,6 +405,7 @@ export default function CreatePostScreen() {
             thumbnail_url: thumbnailUrl,
             post_type: postType,
             workout_types: workoutTypes,
+            story_audience: postDestination === "home" ? storyAudience : undefined,
             group_id: groupId ?? null,
             challenge_id: challengeId ?? null,
             event_id: eventId ?? null,
@@ -510,6 +512,29 @@ export default function CreatePostScreen() {
             </Pressable>
           ))}
         </View>
+
+        {!isContextPost ? (
+          <>
+            <Text style={styles.sectionLabel}>Story audience</Text>
+            <Text style={styles.sectionHint}>Who can see this in Workout Stories</Text>
+            <View style={styles.chips}>
+              {STORY_AUDIENCE_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.value}
+                  style={[styles.chip, storyAudience === option.value && styles.chipActive]}
+                  onPress={() => setStoryAudience(option.value)}
+                  disabled={isFormLocked}
+                >
+                  <Text
+                    style={[styles.chipText, storyAudience === option.value && styles.chipTextActive]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.captionBlock}>
           <Input
@@ -656,6 +681,11 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
   sectionLabel: { ...typography.body, fontWeight: "600" },
+  sectionHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md,

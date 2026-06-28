@@ -11,10 +11,10 @@ import {
   useWindowDimensions,
 } from "react-native";
 import type { FeedStory } from "@frennix/types";
-import type { StoryChallengeKey } from "@frennix/types";
+import type { StoryChallengeKey, StoryQuickReactionEmoji } from "@frennix/types";
+import type { StoryInsights } from "@frennix/types";
 import {
   Avatar,
-  Button,
   FeedVideoPlayer,
   ProgressiveImage,
   colors,
@@ -24,11 +24,11 @@ import {
   typography,
 } from "@frennix/ui";
 import { primaryStoryMilestone } from "@frennix/api";
-import { StoryChallengeBar } from "./story/StoryChallengeBar";
-import { StoryReplyBar } from "./story/StoryReplyBar";
+import { StoryActionDock } from "./story/StoryActionDock";
+import { StoryDailyMotivation } from "./story/StoryDailyMotivation";
 import { StoryAchievementMoment } from "./story/StoryAchievementMoment";
+import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
 import { WorkoutCompletionCard } from "./story/WorkoutCompletionCard";
-import { StoryQuickActions } from "./story/StoryQuickActions";
 import {
   buildStorySlides,
   prefetchStorySlide,
@@ -151,13 +151,15 @@ export interface WorkoutStoryViewerProps {
   onShareWorkout?: () => void;
   onViewProfile?: (username: string) => void;
   onMarkViewed?: (storyUserId: string, postId: string | null) => void;
+  onReact?: (storyUserId: string, postId: string, emoji: StoryQuickReactionEmoji) => void | Promise<void>;
   onChallenge?: (storyUserId: string, key: StoryChallengeKey) => void | Promise<void>;
   onReply?: (storyUserId: string, text: string) => void | Promise<void>;
   onFollow?: (storyUserId: string, isFollowing: boolean) => void | Promise<void>;
-  onMessage?: (storyUserId: string) => void | Promise<void>;
-  onInviteToTrain?: (storyUserId: string) => void | Promise<void>;
+  onInviteToTrain?: (storyUserId: string, postId: string | null) => void | Promise<void>;
+  onViewProfileFromStory?: (storyUserId: string, username: string) => void;
+  storyInsights?: StoryInsights | null;
   followLoading?: boolean;
-  messageLoading?: boolean;
+  inviteLoading?: boolean;
 }
 
 /** Full-screen Instagram-style workout story viewer — not a post detail screen. */
@@ -169,13 +171,15 @@ export function WorkoutStoryViewer({
   onShareWorkout,
   onViewProfile,
   onMarkViewed,
+  onReact,
   onChallenge,
   onReply,
   onFollow,
-  onMessage,
   onInviteToTrain,
+  onViewProfileFromStory,
+  storyInsights,
   followLoading,
-  messageLoading,
+  inviteLoading,
 }: WorkoutStoryViewerProps) {
   const { width, height } = useWindowDimensions();
   const [storyIndex, setStoryIndex] = useState(initialStoryIndex);
@@ -353,6 +357,10 @@ export function WorkoutStoryViewer({
   const canEngage = Boolean(lastWorkout?.post_id) && !story.is_self;
 
   const timePosted = lastWorkout ? formatRelativeTime(lastWorkout.created_at) : "";
+  const aiSummary =
+    (activeSlide?.meta?.aiSummary as string | undefined) ??
+    (lastWorkout?.metrics?.extra?.ai_summary as string | undefined) ??
+    null;
 
   return (
     <Modal
@@ -418,18 +426,7 @@ export function WorkoutStoryViewer({
               <StoryAchievementMoment milestone={spotlightMilestone} resetKey={timerKey} />
             ) : null}
 
-            {canEngage ? (
-              <StoryQuickActions
-                isFollowing={story.viewer_follows}
-                followLoading={followLoading}
-                messageLoading={messageLoading}
-                disabled={paused}
-                onFollow={() => onFollow?.(story.user_id, story.viewer_follows)}
-                onMessage={() => onMessage?.(story.user_id)}
-                onInviteToTrain={() => onInviteToTrain?.(story.user_id)}
-                onViewProfile={() => onViewProfile?.(story.profile.username)}
-              />
-            ) : null}
+            {story.is_self && storyInsights ? <StoryInsightsStrip insights={storyInsights} /> : null}
           </View>
 
           <View style={styles.footer} pointerEvents="box-none">
@@ -442,32 +439,32 @@ export function WorkoutStoryViewer({
                     ? { emoji: spotlightMilestone.emoji, label: spotlightMilestone.label }
                     : null
                 }
+                aiSummary={aiSummary}
               />
             ) : null}
 
             {showCaption ? <Text style={styles.captionText}>{caption}</Text> : null}
 
             {showEmptySelfCta ? (
-              <View style={styles.emptyCta}>
-                <Text style={styles.emptyCtaTitle}>Share your latest workout</Text>
-                <Text style={styles.emptyCtaBody}>
-                  Post a photo, video, or progress update to show up in stories.
-                </Text>
-                <Button title="Share workout" onPress={onShareWorkout} />
-              </View>
+              <StoryDailyMotivation onShareWorkout={onShareWorkout} seed={story.user_id} />
             ) : null}
 
             {canEngage ? (
-              <View style={styles.engagement}>
-                <StoryChallengeBar
-                  disabled={paused}
-                  onChallenge={(key) => onChallenge?.(story.user_id, key)}
-                />
-                <StoryReplyBar
-                  disabled={paused}
-                  onSend={(text) => onReply?.(story.user_id, text) ?? Promise.resolve()}
-                />
-              </View>
+              <StoryActionDock
+                disabled={paused}
+                isFollowing={story.viewer_follows}
+                followLoading={followLoading}
+                inviteLoading={inviteLoading}
+                onReact={(emoji) => onReact?.(story.user_id, lastWorkout!.post_id, emoji)}
+                onChallenge={(key) => onChallenge?.(story.user_id, key)}
+                onReply={(text) => onReply?.(story.user_id, text) ?? Promise.resolve()}
+                onFollow={() => onFollow?.(story.user_id, story.viewer_follows)}
+                onInviteToTrain={() => onInviteToTrain?.(story.user_id, lastWorkout?.post_id ?? null)}
+                onViewProfile={() =>
+                  onViewProfileFromStory?.(story.user_id, story.profile.username) ??
+                  onViewProfile?.(story.profile.username)
+                }
+              />
             ) : null}
           </View>
 
@@ -548,6 +545,7 @@ const styles = StyleSheet.create({
     bottom: spacing.lg,
     zIndex: 4,
     gap: spacing.sm,
+    maxHeight: "42%",
   },
   progressRow: {
     flexDirection: "row",
@@ -649,7 +647,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 240,
+    bottom: 280,
     flexDirection: "row",
     zIndex: 3,
   },
