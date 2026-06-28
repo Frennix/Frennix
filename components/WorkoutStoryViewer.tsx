@@ -10,55 +10,31 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import type { FeedStory, FeedStoryLastWorkout } from "@frennix/types";
-import { normalizePostMediaItems } from "@frennix/types";
+import type { FeedStory } from "@frennix/types";
+import type { StoryReactionEmoji } from "@frennix/types";
 import {
   Avatar,
   Button,
   FeedVideoPlayer,
   ProgressiveImage,
-  WorkoutTypeChips,
   colors,
-  formatRelativeTime,
-  formatStreakBadgeLabel,
   spacing,
   typography,
 } from "@frennix/ui";
+import { StoryReactionBar } from "./story/StoryReactionBar";
+import { StoryReplyBar } from "./story/StoryReplyBar";
+import { StoryStreakBadge } from "./story/StoryStreakBadge";
+import { StorySummaryOverlay } from "./story/StorySummaryOverlay";
+import {
+  buildStorySlides,
+  prefetchStorySlide,
+  streakAchievementForStory,
+  type StorySlide,
+} from "../lib/story-utils";
 
 const STORY_SLIDE_DURATION_MS = 5500;
 const TOP_INSET = Platform.OS === "web" ? spacing.lg : spacing.xxl;
-
-type StorySlide =
-  | {
-      kind: "media";
-      url: string;
-      mediaKind: "image" | "video";
-      thumbnailUrl?: string | null;
-    }
-  | { kind: "text"; content: string }
-  | { kind: "empty" };
-
-function buildStorySlides(lastWorkout: FeedStoryLastWorkout | null): StorySlide[] {
-  if (!lastWorkout) return [{ kind: "empty" }];
-
-  if (lastWorkout.media_urls?.length) {
-    return normalizePostMediaItems(lastWorkout.media_urls, {
-      postType: lastWorkout.post_type,
-      thumbnailUrl: lastWorkout.thumbnail_url,
-    }).map((item) => ({
-      kind: "media" as const,
-      url: item.url,
-      mediaKind: item.kind,
-      thumbnailUrl: item.thumbnailUrl,
-    }));
-  }
-
-  if (lastWorkout.content?.trim()) {
-    return [{ kind: "text", content: lastWorkout.content.trim() }];
-  }
-
-  return [{ kind: "empty" }];
-}
+const HOLD_THRESHOLD_MS = 220;
 
 function StoryProgressBars({
   total,
@@ -157,6 +133,9 @@ export interface WorkoutStoryViewerProps {
   onClose: () => void;
   onShareWorkout?: () => void;
   onViewProfile?: (username: string) => void;
+  onMarkViewed?: (storyUserId: string, postId: string | null) => void;
+  onReact?: (storyUserId: string, postId: string, emoji: StoryReactionEmoji) => void | Promise<void>;
+  onReply?: (storyUserId: string, text: string) => void | Promise<void>;
 }
 
 /** Full-screen Instagram-style workout story viewer — not a post detail screen. */
@@ -167,26 +146,42 @@ export function WorkoutStoryViewer({
   onClose,
   onShareWorkout,
   onViewProfile,
+  onMarkViewed,
+  onReact,
+  onReply,
 }: WorkoutStoryViewerProps) {
   const { width, height } = useWindowDimensions();
   const [storyIndex, setStoryIndex] = useState(initialStoryIndex);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<Animated.CompositeAnimation | null>(null);
+  const elapsedMsRef = useRef(0);
+  const holdStartedAtRef = useRef<number | null>(null);
+  const didHoldRef = useRef(false);
 
   const story = stories[storyIndex] ?? null;
   const lastWorkout = story?.last_workout ?? null;
   const slides = useMemo(() => buildStorySlides(lastWorkout), [lastWorkout]);
   const activeSlide = slides[slideIndex] ?? slides[0];
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
+  const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
+  const achievement = streakAchievementForStory(story?.workout_streak ?? 0);
 
   useEffect(() => {
     if (!visible) return;
     setStoryIndex(initialStoryIndex);
     setSlideIndex(0);
+    setPaused(false);
     dismissY.setValue(0);
+    elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
+
+  useEffect(() => {
+    if (!visible || !story) return;
+    onMarkViewed?.(story.user_id, lastWorkout?.post_id ?? null);
+  }, [visible, story?.user_id, lastWorkout?.post_id, onMarkViewed, story]);
 
   const goNext = useCallback(() => {
     if (slideIndex < slides.length - 1) {
@@ -213,36 +208,90 @@ export function WorkoutStoryViewer({
     }
   }, [slideIndex, storyIndex, stories]);
 
+  const stopTimer = useCallback(() => {
+    timerRef.current?.stop();
+  }, []);
+
+  const startTimer = useCallback(
+    (fromMs: number) => {
+      stopTimer();
+      elapsedMsRef.current = fromMs;
+      const fraction = Math.min(fromMs / STORY_SLIDE_DURATION_MS, 1);
+      progress.setValue(fraction);
+      if (fromMs >= STORY_SLIDE_DURATION_MS) {
+        goNext();
+        return;
+      }
+      timerRef.current = Animated.timing(progress, {
+        toValue: 1,
+        duration: STORY_SLIDE_DURATION_MS - fromMs,
+        useNativeDriver: false,
+      });
+      timerRef.current.start(({ finished }) => {
+        if (finished) goNext();
+      });
+    },
+    [goNext, progress, stopTimer]
+  );
+
   useEffect(() => {
-    if (!visible || !story || isVideoSlide) {
-      timerRef.current?.stop();
+    elapsedMsRef.current = 0;
+    progress.setValue(0);
+  }, [timerKey, progress]);
+
+  useEffect(() => {
+    if (!visible || !story) {
+      stopTimer();
       progress.setValue(0);
+      elapsedMsRef.current = 0;
       return;
     }
 
-    progress.setValue(0);
-    timerRef.current?.stop();
-    timerRef.current = Animated.timing(progress, {
-      toValue: 1,
-      duration: STORY_SLIDE_DURATION_MS,
-      useNativeDriver: false,
-    });
-    timerRef.current.start(({ finished }) => {
-      if (finished) goNext();
-    });
+    if (paused) {
+      stopTimer();
+      progress.stopAnimation((value) => {
+        elapsedMsRef.current = value * STORY_SLIDE_DURATION_MS;
+      });
+      return;
+    }
 
-    return () => timerRef.current?.stop();
-  }, [visible, story, slideIndex, storyIndex, isVideoSlide, progress, goNext]);
+    startTimer(elapsedMsRef.current);
+    return stopTimer;
+  }, [timerKey, visible, story, paused, startTimer, stopTimer, progress]);
+
+  useEffect(() => {
+    prefetchStorySlide(slides[slideIndex + 1]);
+    const nextStory = stories[storyIndex + 1];
+    if (slideIndex >= slides.length - 1 && nextStory) {
+      prefetchStorySlide(buildStorySlides(nextStory.last_workout)[0]);
+    }
+  }, [slideIndex, slides, storyIndex, stories]);
+
+  const beginHold = useCallback(() => {
+    didHoldRef.current = false;
+    holdStartedAtRef.current = Date.now();
+    setPaused(true);
+    setTimeout(() => {
+      if (holdStartedAtRef.current !== null) didHoldRef.current = true;
+    }, HOLD_THRESHOLD_MS);
+  }, []);
+
+  const endHold = useCallback(() => {
+    holdStartedAtRef.current = null;
+    setPaused(false);
+  }, []);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
           gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderGrant: () => beginHold(),
         onPanResponderMove: (_, gesture) => {
           if (gesture.dy > 0) dismissY.setValue(gesture.dy);
         },
         onPanResponderRelease: (_, gesture) => {
+          endHold();
           if (gesture.dy > 120 || gesture.vy > 1.2) {
             onClose();
             return;
@@ -253,26 +302,20 @@ export function WorkoutStoryViewer({
             bounciness: 0,
           }).start();
         },
+        onPanResponderTerminate: () => endHold(),
       }),
-    [dismissY, onClose]
+    [beginHold, dismissY, endHold, onClose]
   );
 
   if (!visible || !story) return null;
 
-  const streakLabel = formatStreakBadgeLabel(story.workout_streak);
-  const timeLabel = lastWorkout ? formatRelativeTime(lastWorkout.created_at) : null;
   const caption = lastWorkout?.content?.trim() ?? "";
   const showCaption = Boolean(caption) && activeSlide?.kind !== "text";
   const showEmptySelfCta = story.is_self && !lastWorkout;
+  const canEngage = Boolean(lastWorkout?.post_id) && !story.is_self;
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View
         style={[
           styles.backdrop,
@@ -289,7 +332,7 @@ export function WorkoutStoryViewer({
       >
         <StorySlideContent
           slide={activeSlide}
-          shouldPlayVideo={visible && isVideoSlide}
+          shouldPlayVideo={visible && isVideoSlide && !paused}
           width={width}
           height={height}
         />
@@ -312,10 +355,6 @@ export function WorkoutStoryViewer({
                 <Text style={styles.headerUsername} numberOfLines={1}>
                   {story.is_self ? "Your story" : story.profile.display_name}
                 </Text>
-                <Text style={styles.headerMeta} numberOfLines={1}>
-                  {streakLabel}
-                  {timeLabel ? ` · ${timeLabel}` : ""}
-                </Text>
               </View>
             </Pressable>
 
@@ -330,15 +369,12 @@ export function WorkoutStoryViewer({
             </Pressable>
           </View>
 
-          {lastWorkout ? (
-            <WorkoutTypeChips
-              types={lastWorkout}
-              maxVisible={3}
-              size="compact"
-              overlay
-              style={styles.workoutChips}
-            />
-          ) : null}
+          <StoryStreakBadge streak={story.workout_streak} resetKey={timerKey} />
+          <StorySummaryOverlay
+            lastWorkout={lastWorkout}
+            streak={story.workout_streak}
+            achievement={achievement}
+          />
         </View>
 
         {showCaption ? (
@@ -357,16 +393,37 @@ export function WorkoutStoryViewer({
           </View>
         ) : null}
 
+        {canEngage ? (
+          <View style={styles.engagementOverlay}>
+            <StoryReactionBar
+              disabled={paused}
+              onReact={(emoji) => onReact?.(story.user_id, lastWorkout!.post_id, emoji)}
+            />
+            <StoryReplyBar
+              disabled={paused}
+              onSend={(text) => onReply?.(story.user_id, text) ?? Promise.resolve()}
+            />
+          </View>
+        ) : null}
+
         <View style={styles.tapZones} pointerEvents="box-none">
           <Pressable
             style={styles.tapZoneLeft}
-            onPress={goPrev}
+            onPress={() => {
+              if (!didHoldRef.current) goPrev();
+            }}
+            onPressIn={beginHold}
+            onPressOut={endHold}
             accessibilityRole="button"
             accessibilityLabel="Previous story slide"
           />
           <Pressable
             style={styles.tapZoneRight}
-            onPress={goNext}
+            onPress={() => {
+              if (!didHoldRef.current) goNext();
+            }}
+            onPressIn={beginHold}
+            onPressOut={endHold}
             accessibilityRole="button"
             accessibilityLabel="Next story slide"
           />
@@ -435,10 +492,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "700",
   },
-  headerMeta: {
-    ...typography.caption,
-    color: "rgba(255,255,255,0.82)",
-  },
   closeButton: {
     width: 36,
     height: 36,
@@ -455,15 +508,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "700",
   },
-  workoutChips: {
-    marginTop: spacing.sm,
-  },
   gradientTop: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: 160,
+    height: 180,
     backgroundColor: "rgba(10, 10, 11, 0.45)",
     zIndex: 1,
   },
@@ -472,7 +522,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 200,
+    height: 260,
     backgroundColor: "rgba(10, 10, 11, 0.55)",
     zIndex: 1,
   },
@@ -480,7 +530,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: spacing.md,
     right: spacing.md,
-    bottom: spacing.xl,
+    bottom: 180,
     zIndex: 3,
   },
   captionText: {
@@ -490,6 +540,14 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  engagementOverlay: {
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.lg,
+    zIndex: 5,
+    gap: spacing.sm,
   },
   emptyCtaOverlay: {
     position: "absolute",
@@ -519,9 +577,11 @@ const styles = StyleSheet.create({
   },
   tapZoneLeft: {
     flex: 1,
+    marginBottom: 160,
   },
   tapZoneRight: {
     flex: 1,
+    marginBottom: 160,
   },
   emptySlide: {
     alignItems: "center",

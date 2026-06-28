@@ -219,6 +219,8 @@ export interface FeedStory {
   has_recent_workout: boolean;
   last_workout: FeedStoryLastWorkout | null;
   is_self: boolean;
+  /** True when the viewer has seen the current last_workout post. */
+  viewed?: boolean;
 }
 
 export interface SuggestedAthlete {
@@ -477,3 +479,4 @@ export * from "./trainer";
 export * from "./analytics";
 export * from "./workout-types";
 export * from "./post-media";
+export * from "./story-engagement";

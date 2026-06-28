@@ -11,10 +11,15 @@ interface FeedStoriesRowProps {
 }
 
 function StoryAvatar({ story }: { story: FeedStory }) {
-  const activeRing = story.has_recent_workout || story.is_self;
+  const hasStoryContent = Boolean(story.last_workout) || story.is_self;
+  const ringStyle = !hasStoryContent
+    ? styles.avatarRingMuted
+    : story.viewed
+      ? styles.avatarRingViewed
+      : styles.avatarRingUnviewed;
 
   return (
-    <View style={[styles.avatarRing, activeRing ? styles.avatarRingActive : styles.avatarRingMuted]}>
+    <View style={[styles.avatarRing, ringStyle]}>
       <View style={styles.avatarInner}>
         <Avatar uri={story.profile.avatar_url} name={story.profile.display_name} size={58} />
       </View>
@@ -104,8 +109,11 @@ const styles = StyleSheet.create({
     padding: 3,
     position: "relative",
   },
-  avatarRingActive: {
+  avatarRingUnviewed: {
     backgroundColor: colors.accent,
+  },
+  avatarRingViewed: {
+    backgroundColor: colors.border,
   },
   avatarRingMuted: {
     backgroundColor: colors.border,

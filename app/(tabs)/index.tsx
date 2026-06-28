@@ -1,8 +1,16 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { getFeed, getFeedStories, getSuggestedAthletes, getErrorMessage } from "@frennix/api";
-import type { FeedStory, Post } from "@frennix/types";
+import {
+  getFeed,
+  getFeedStories,
+  getSuggestedAthletes,
+  getErrorMessage,
+  markStoryViewed,
+  sendStoryReaction,
+  sendStoryReply,
+} from "@frennix/api";
+import type { FeedStory, Post, StoryReactionEmoji } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
@@ -30,6 +38,7 @@ import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetI
 export default function HomeScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+  const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
@@ -45,6 +54,36 @@ export default function HomeScreen() {
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
   }, []);
+
+  const markStoryViewedOptimistic = useCallback(
+    (storyUserId: string, postId: string | null) => {
+      if (!userId || !postId) return;
+      queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
+        current?.map((story) =>
+          story.user_id === storyUserId ? { ...story, viewed: true } : story
+        )
+      );
+      void markStoryViewed(userId, storyUserId, postId).catch(() => undefined);
+    },
+    [queryClient, userId]
+  );
+
+  const handleStoryReaction = useCallback(
+    async (storyUserId: string, postId: string, emoji: StoryReactionEmoji) => {
+      if (!userId) return;
+      await sendStoryReaction(userId, storyUserId, postId, emoji);
+    },
+    [userId]
+  );
+
+  const handleStoryReply = useCallback(
+    async (storyUserId: string, text: string) => {
+      if (!userId) return;
+      await sendStoryReply(userId, storyUserId, text);
+    },
+    [userId]
+  );
+
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
   const listRef = useRef<FlatList<FeedListRow>>(null);
@@ -336,6 +375,9 @@ export default function HomeScreen() {
           setActiveStoryIndex(null);
           openCreatePost();
         }}
+        onMarkViewed={markStoryViewedOptimistic}
+        onReact={handleStoryReaction}
+        onReply={handleStoryReply}
       />
       {showBanner ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />

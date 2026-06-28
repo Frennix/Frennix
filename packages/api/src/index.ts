@@ -22,6 +22,7 @@ export * from "./referrals";
 export * from "./feedback";
 export * from "./reactions";
 export * from "./stories";
+export * from "./story-engagement";
 export * from "./push-tokens";
 export * from "./suggestions";
 export * from "./achievements";

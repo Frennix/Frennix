@@ -53,8 +53,8 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const src = read("components/WorkoutStoryViewer.tsx");
       if (!src.includes("<Avatar")) throw new Error("Profile avatar required in overlay");
-      if (!src.includes("WorkoutTypeChips")) throw new Error("Workout type chips required");
-      if (src.includes("Like") || src.includes("Comment") || src.includes("View post")) {
+      if (!src.includes("StorySummaryOverlay")) throw new Error("Workout summary overlay required");
+      if (src.includes("View post")) {
         throw new Error("Story viewer must not show feed/post action buttons");
       }
     },
@@ -80,6 +80,71 @@ const checks: Array<{ name: string; run: () => void }> = [
       const src = read("components/WorkoutStoryViewer.tsx");
       if (!src.includes("captionOverlay")) {
         throw new Error("Caption must use overlay styling");
+      }
+    },
+  },
+  {
+    name: "Story enhancement: streak badge, summary overlay, reactions, reply",
+    run: () => {
+      const viewer = read("components/WorkoutStoryViewer.tsx");
+      for (const token of [
+        "StoryStreakBadge",
+        "StorySummaryOverlay",
+        "StoryReactionBar",
+        "StoryReplyBar",
+        "onMarkViewed",
+        "onReact",
+        "onReply",
+        "prefetchStorySlide",
+      ]) {
+        if (!viewer.includes(token)) throw new Error(`Missing ${token}`);
+      }
+    },
+  },
+  {
+    name: "Story auto-advance with pause on press/hold",
+    run: () => {
+      const src = read("components/WorkoutStoryViewer.tsx");
+      if (!src.includes("STORY_SLIDE_DURATION_MS")) {
+        throw new Error("Auto-advance duration required");
+      }
+      if (!src.includes("beginHold") || !src.includes("endHold")) {
+        throw new Error("Press/hold pause handlers required");
+      }
+      if (!src.includes("setPaused")) throw new Error("Paused state required for hold");
+    },
+  },
+  {
+    name: "Feed wires story engagement callbacks",
+    run: () => {
+      const feed = read("app/(tabs)/index.tsx");
+      for (const token of ["markStoryViewed", "sendStoryReaction", "sendStoryReply", "onMarkViewed", "onReact", "onReply"]) {
+        if (!feed.includes(token)) throw new Error(`Feed missing ${token}`);
+      }
+    },
+  },
+  {
+    name: "Story rings use viewed state (green unviewed, gray viewed)",
+    run: () => {
+      const row = read("packages/ui/src/FeedStoriesRow.tsx");
+      if (!row.includes("story.viewed")) throw new Error("FeedStoriesRow must use story.viewed");
+      if (!row.includes("avatarRingUnviewed") || !row.includes("avatarRingViewed")) {
+        throw new Error("Unviewed/viewed ring styles required");
+      }
+    },
+  },
+  {
+    name: "Story engagement API and migration exist",
+    run: () => {
+      const api = read("packages/api/src/story-engagement.ts");
+      for (const fn of ["markStoryViewed", "sendStoryReaction", "sendStoryReply"]) {
+        if (!api.includes(`export async function ${fn}`)) {
+          throw new Error(`Missing ${fn}`);
+        }
+      }
+      const migration = read("supabase/migrations/20250630000011_story_engagement.sql");
+      if (!migration.includes("story_views") || !migration.includes("story_reactions")) {
+        throw new Error("Story engagement migration incomplete");
       }
     },
   },

@@ -1,6 +1,7 @@
 import type { FeedStory, FeedStoryLastWorkout, Post, Profile } from "@frennix/types";
 import { normalizePostWorkoutFields } from "@frennix/types";
 import { getFollowing } from "./follows";
+import { getStoryViewsForViewer } from "./story-engagement";
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
 
@@ -111,5 +112,20 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     return bTime - aTime;
   });
 
-  return stories;
+  const views = await getStoryViewsForViewer(
+    viewerId,
+    stories.map((story) => story.user_id)
+  );
+  const viewedPostByUser = new Map(
+    views.map((view) => [view.story_user_id, view.last_viewed_post_id])
+  );
+
+  return stories.map((story) => {
+    const postId = story.last_workout?.post_id ?? null;
+    const viewedPostId = viewedPostByUser.get(story.user_id) ?? null;
+    return {
+      ...story,
+      viewed: Boolean(postId && viewedPostId === postId),
+    };
+  });
 }
