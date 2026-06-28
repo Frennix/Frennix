@@ -13,7 +13,7 @@ export type FeedListItemActions = {
   onReaction: (post: Post, emoji: string) => void;
   onModerationPress: (post: Post) => void;
   onOwnerActionsPress: (post: Post) => void;
-  onMediaPress: (post: Post, uri: string) => void;
+  onMediaPress: (post: Post, uri: string, index: number) => void;
 };
 
 type FeedListItemProps = {
@@ -22,11 +22,15 @@ type FeedListItemProps = {
   actions: FeedListItemActions;
   /** When true, mount feed media (images/videos). Deferred until row is near viewport. */
   mediaActive?: boolean;
+  mediaPageIndex?: number;
+  onMediaPageIndexChange?: (index: number) => void;
 };
 
 function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
   if (prev.userId !== next.userId) return false;
   if (prev.mediaActive !== next.mediaActive) return false;
+  if (prev.mediaPageIndex !== next.mediaPageIndex) return false;
+  if (prev.onMediaPageIndexChange !== next.onMediaPageIndexChange) return false;
   if (prev.post.id !== next.post.id) return false;
 
   const a = prev.post;
@@ -40,6 +44,7 @@ function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
     a.my_reaction === b.my_reaction &&
     a.content === b.content &&
     a.updated_at === b.updated_at &&
+    a.media_urls === b.media_urls &&
     a.reactions === b.reactions &&
     a.preview_comments === b.preview_comments
   );
@@ -50,6 +55,8 @@ export const FeedListItem = memo(function FeedListItem({
   userId,
   actions,
   mediaActive = true,
+  mediaPageIndex,
+  onMediaPageIndexChange,
 }: FeedListItemProps) {
   const handlers = useMemo(
     () => ({
@@ -63,7 +70,7 @@ export const FeedListItem = memo(function FeedListItem({
       onReaction: (emoji: string) => actions.onReaction(post, emoji),
       onModerationPress: () => actions.onModerationPress(post),
       onOwnerActionsPress: () => actions.onOwnerActionsPress(post),
-      onMediaPress: (uri: string) => actions.onMediaPress(post, uri),
+      onMediaPress: (uri: string, index: number) => actions.onMediaPress(post, uri, index),
     }),
     [actions, post]
   );
@@ -84,6 +91,8 @@ export const FeedListItem = memo(function FeedListItem({
       onOwnerActionsPress={handlers.onOwnerActionsPress}
       onMediaPress={handlers.onMediaPress}
       mediaActive={mediaActive}
+      mediaPageIndex={mediaPageIndex}
+      onMediaPageIndexChange={onMediaPageIndexChange}
     />
   );
 }, feedItemPropsEqual);

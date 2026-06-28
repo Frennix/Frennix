@@ -40,7 +40,11 @@ export default function HomeScreen() {
   const postReaction = usePostReaction(userId);
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
   const { toggleLikePost } = useFeedLike(userId);
-  const { openImage, lightbox } = useImageLightbox();
+  const { openGallery, lightbox } = useImageLightbox();
+  const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
+  const setCarouselIndex = useCallback((postId: string, index: number) => {
+    setCarouselIndices((current) => ({ ...current, [postId]: index }));
+  }, []);
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
   const listRef = useRef<FlatList<FeedListRow>>(null);
@@ -220,8 +224,12 @@ export default function HomeScreen() {
     onOwnerActionsPress: (post: Post) => {
       openPostActions(post);
     },
-    onMediaPress: (_post: Post, uri: string) => {
-      openImage(uri);
+    onMediaPress: (post: Post, _uri: string, index: number) => {
+      const displayPost = post.shared_post ?? post;
+      setCarouselIndex(post.id, index);
+      openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
+        setCarouselIndex(post.id, finalIndex);
+      });
     },
   };
 
@@ -237,7 +245,7 @@ export default function HomeScreen() {
       onReaction: (post, emoji) => feedActionsRef.current.onReaction(post, emoji),
       onModerationPress: (post) => feedActionsRef.current.onModerationPress(post),
       onOwnerActionsPress: (post) => feedActionsRef.current.onOwnerActionsPress(post),
-      onMediaPress: (post, uri) => feedActionsRef.current.onMediaPress(post, uri),
+      onMediaPress: (post, uri, index) => feedActionsRef.current.onMediaPress(post, uri, index),
     }),
     []
   );
@@ -254,10 +262,12 @@ export default function HomeScreen() {
           userId={userId}
           actions={feedActions}
           mediaActive={visiblePostIds.has(item.post.id)}
+          mediaPageIndex={carouselIndices[item.post.id] ?? 0}
+          onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
         />
       );
     },
-    [feedActions, userId, visiblePostIds]
+    [feedActions, userId, visiblePostIds, carouselIndices, setCarouselIndex]
   );
 
   const listHeader = useMemo(

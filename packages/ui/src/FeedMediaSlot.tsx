@@ -13,7 +13,9 @@ interface FeedMediaSlotProps {
   postType?: PostType;
   thumbnailUrl?: string | null;
   style?: ViewStyle;
-  onMediaPress?: (uri: string) => void;
+  onMediaPress?: (uri: string, index: number) => void;
+  pageIndex?: number;
+  onPageIndexChange?: (index: number) => void;
   /** When false, show a skeleton until the row is near the viewport. Once active, stays mounted. */
   visible?: boolean;
 }
@@ -33,6 +35,8 @@ export function FeedMediaSlot({
   thumbnailUrl,
   style,
   onMediaPress,
+  pageIndex,
+  onPageIndexChange,
   visible = true,
 }: FeedMediaSlotProps) {
   const containerRef = useRef<View>(null);
@@ -80,6 +84,8 @@ export function FeedMediaSlot({
       thumbnailUrl={thumbnailUrl}
       style={style}
       onMediaPress={onMediaPress}
+      pageIndex={pageIndex}
+      onPageIndexChange={onPageIndexChange}
     />
   );
 }

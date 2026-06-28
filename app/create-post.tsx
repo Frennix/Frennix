@@ -35,9 +35,10 @@ import {
 import { showAlert } from "@/lib/alerts";
 import { logCreatePostError, logCreatePostInfo } from "@/lib/create-post-logging";
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
+import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
-import { Button, CachedImage, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const CAPTION_MAX = 500;
 const SUCCESS_NAV_DELAY_MS = 2000;
@@ -271,6 +272,16 @@ export default function CreatePostScreen() {
       first.file,
       null
     );
+  }
+
+  function reorderMedia(fromIndex: number, toIndex: number) {
+    if (isFormLocked || fromIndex === toIndex) return;
+    setSelectedMedia((current) => {
+      const next = [...current];
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return next;
+    });
   }
 
   async function removeMediaAt(index: number) {
@@ -517,23 +528,17 @@ export default function CreatePostScreen() {
 
         {selectedMedia.length ? (
           <View style={styles.mediaSection}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
-              {selectedMedia.map((item, index) => {
-                const itemIsVideo = isVideoMime(item.mimeType);
-                return (
+            {hasVideo ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
+                {selectedMedia.map((item, index) => (
                   <View key={`${item.uri}-${index}`} style={styles.previewWrapper}>
-                    {itemIsVideo ? (
-                      <Video
-                        source={{ uri: item.uri }}
-                        style={styles.preview}
-                        useNativeControls
-                        resizeMode={ResizeMode.CONTAIN}
-                        isLooping={false}
-                      />
-                    ) : (
-                      <CachedImage uri={item.uri} style={styles.preview} contentFit="cover" recyclingKey={`draft-${item.uri}`} />
-                    )}
-
+                    <Video
+                      source={{ uri: item.uri }}
+                      style={styles.preview}
+                      useNativeControls
+                      resizeMode={ResizeMode.CONTAIN}
+                      isLooping={false}
+                    />
                     <Pressable
                       style={styles.previewClose}
                       onPress={() => removeMediaAt(index)}
@@ -543,16 +548,22 @@ export default function CreatePostScreen() {
                     >
                       <Text style={styles.previewCloseText}>✕</Text>
                     </Pressable>
-
                     <View style={styles.typeBadge}>
-                      <Text style={styles.typeBadgeText}>
-                        {itemIsVideo ? "Video" : `Photo ${index + 1}`}
-                      </Text>
+                      <Text style={styles.typeBadgeText}>Video</Text>
                     </View>
                   </View>
-                );
-              })}
-            </ScrollView>
+                ))}
+              </ScrollView>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
+                <ReorderablePhotoStrip
+                  photos={selectedMedia.map((item) => ({ uri: item.uri, key: item.uri }))}
+                  onReorder={reorderMedia}
+                  onRemove={removeMediaAt}
+                  disabled={isFormLocked}
+                />
+              </ScrollView>
+            )}
 
             <Text style={styles.mediaHint}>
               {hasVideo && selectedMedia[0]?.durationSeconds != null

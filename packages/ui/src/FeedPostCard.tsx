@@ -31,9 +31,11 @@ interface FeedPostCardProps {
   onCommentAuthorPress?: (username: string) => void;
   isOwn?: boolean;
   onOwnerActionsPress?: () => void;
-  onMediaPress?: (uri: string) => void;
+  onMediaPress?: (uri: string, index: number) => void;
   /** Defer heavy media until the row is near the viewport. */
   mediaActive?: boolean;
+  mediaPageIndex?: number;
+  onMediaPageIndexChange?: (index: number) => void;
 }
 
 export const FeedPostCard = memo(function FeedPostCard({
@@ -51,6 +53,8 @@ export const FeedPostCard = memo(function FeedPostCard({
   onOwnerActionsPress,
   onMediaPress,
   mediaActive = true,
+  mediaPageIndex,
+  onMediaPageIndexChange,
 }: FeedPostCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const author = post.author;
@@ -114,6 +118,8 @@ export const FeedPostCard = memo(function FeedPostCard({
           thumbnailUrl={displayPost.thumbnail_url}
           style={styles.media}
           onMediaPress={onMediaPress}
+          pageIndex={mediaPageIndex}
+          onPageIndexChange={onMediaPageIndexChange}
           visible={mediaActive}
         />
       ) : !showCaption && post.content ? (

@@ -11,6 +11,8 @@ type AnimatedFeedListItemProps = {
   userId: string;
   actions: FeedListItemActions;
   mediaActive?: boolean;
+  mediaPageIndex?: number;
+  onMediaPageIndexChange?: (index: number) => void;
 };
 
 export const AnimatedFeedListItem = memo(function AnimatedFeedListItem(props: AnimatedFeedListItemProps) {

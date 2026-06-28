@@ -5,7 +5,7 @@ import { normalizeWorkoutTypes } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { formatRelativeTime } from "./formatRelativeTime";
 import { WorkoutTypeChips } from "./WorkoutTypeChips";
-import { PostMedia } from "./PostMedia";
+import { PostMediaCarousel } from "./PostMediaCarousel";
 import { ReactionBar } from "./ReactionBar";
 import { ReactionPicker } from "./ReactionPicker";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
@@ -23,7 +23,9 @@ interface PostCardProps {
   onAuthorPress?: () => void;
   isOwn?: boolean;
   onOwnerActionsPress?: () => void;
-  onMediaPress?: (uri: string) => void;
+  onMediaPress?: (uri: string, index: number) => void;
+  mediaPageIndex?: number;
+  onMediaPageIndexChange?: (index: number) => void;
 }
 
 export function PostCard({
@@ -39,6 +41,8 @@ export function PostCard({
   isOwn,
   onOwnerActionsPress,
   onMediaPress,
+  mediaPageIndex,
+  onMediaPageIndexChange,
 }: PostCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const author = post.author;
@@ -49,7 +53,7 @@ export function PostCard({
     ? `Shared a post · ${formatRelativeTime(post.created_at)}`
     : formatRelativeTime(post.created_at);
   const workoutTypes = isShared ? [] : normalizeWorkoutTypes(displayPost);
-  const hasMedia = Boolean(displayPost.media_urls?.[0]);
+  const hasMedia = Boolean(displayPost.media_urls?.length);
 
   return (
     <View style={styles.card}>
@@ -90,13 +94,13 @@ export function PostCard({
         <>
           {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
           {hasMedia ? (
-            <PostMedia
-              uri={displayPost.media_urls![0]}
+            <PostMediaCarousel
+              mediaUrls={displayPost.media_urls ?? []}
               postType={displayPost.post_type}
               thumbnailUrl={displayPost.thumbnail_url}
-              onImagePress={
-                onMediaPress ? () => onMediaPress(displayPost.media_urls![0]) : undefined
-              }
+              onMediaPress={onMediaPress}
+              pageIndex={mediaPageIndex}
+              onPageIndexChange={onMediaPageIndexChange}
             />
           ) : null}
         </>

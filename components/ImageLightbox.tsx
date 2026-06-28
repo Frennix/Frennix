@@ -1,32 +1,52 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
-  Platform,
   useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
-import { CachedImage } from "@frennix/ui";
+import { CachedImage, prefetchCachedImages } from "../packages/ui/src/CachedImage";
+import { colors, spacing, typography } from "../packages/ui/src/theme";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { colors, spacing, typography } from "@frennix/ui";
+
+export interface ImageGalleryState {
+  images: string[];
+  index: number;
+}
 
 interface ImageLightboxProps {
-  uri: string | null;
-  onClose: () => void;
+  gallery: ImageGalleryState | null;
+  onClose: (index: number) => void;
 }
 
 function clampScale(value: number) {
   return Math.min(Math.max(value, 1), 4);
 }
 
-function NativeLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth: number; maxHeight: number }) {
+function NativeZoomableImage({
+  uri,
+  maxWidth,
+  maxHeight,
+  isActive,
+  onZoomChange,
+}: {
+  uri: string;
+  maxWidth: number;
+  maxHeight: number;
+  isActive: boolean;
+  onZoomChange: (zoomed: boolean) => void;
+}) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -34,32 +54,66 @@ function NativeLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWid
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
+  useEffect(() => {
+    scale.value = 1;
+    savedScale.value = 1;
+    translateX.value = 0;
+    translateY.value = 0;
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+    onZoomChange(false);
+  }, [uri, isActive, onZoomChange, scale, savedScale, translateX, translateY, savedTranslateX, savedTranslateY]);
+
+  const resetZoom = useCallback(() => {
+    scale.value = withTiming(1);
+    savedScale.value = 1;
+    translateX.value = withTiming(0);
+    translateY.value = withTiming(0);
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+    onZoomChange(false);
+  }, [onZoomChange, scale, savedScale, translateX, translateY, savedTranslateX, savedTranslateY]);
+
   const pinch = Gesture.Pinch()
     .onUpdate((event) => {
-      scale.value = clampScale(savedScale.value * event.scale);
+      const next = clampScale(savedScale.value * event.scale);
+      scale.value = next;
+      onZoomChange(next > 1.01);
     })
     .onEnd(() => {
-      if (scale.value <= 1) {
-        scale.value = withTiming(1);
-        savedScale.value = 1;
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
+      if (scale.value <= 1.01) {
+        resetZoom();
         return;
       }
       savedScale.value = scale.value;
+      onZoomChange(true);
     });
 
   const pan = Gesture.Pan()
+    .manualActivation(true)
+    .onTouchesMove((_event, state) => {
+      if (scale.value > 1.01) state.activate();
+      else state.fail();
+    })
     .onUpdate((event) => {
-      if (scale.value <= 1) return;
       translateX.value = savedTranslateX.value + event.translationX;
       translateY.value = savedTranslateY.value + event.translationY;
     })
     .onEnd(() => {
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scale.value > 1.01) {
+        resetZoom();
+        return;
+      }
+      scale.value = withTiming(2);
+      savedScale.value = 2;
+      onZoomChange(true);
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -72,7 +126,7 @@ function NativeLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWid
 
   return (
     <View style={[styles.imageFrame, { width: maxWidth, height: maxHeight }]}>
-      <GestureDetector gesture={Gesture.Simultaneous(pinch, pan)}>
+      <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
         <Animated.View style={[styles.image, animatedStyle]}>
           <CachedImage uri={uri} style={styles.imageFill} contentFit="contain" recyclingKey={`lightbox-${uri}`} />
         </Animated.View>
@@ -81,27 +135,37 @@ function NativeLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWid
   );
 }
 
-function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth: number; maxHeight: number }) {
+function WebZoomableImage({
+  uri,
+  maxWidth,
+  maxHeight,
+  onZoomChange,
+}: {
+  uri: string;
+  maxWidth: number;
+  maxHeight: number;
+  onZoomChange: (zoomed: boolean) => void;
+}) {
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
-  const frameRef = useRef<View>(null);
+  const lastTap = useRef(0);
 
   useEffect(() => {
     setScale(1);
     setPan({ x: 0, y: 0 });
-  }, [uri]);
+    onZoomChange(false);
+  }, [uri, onZoomChange]);
 
   useEffect(() => {
-    if (!uri) return;
-
     function onWheel(event: WheelEvent) {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const delta = event.deltaY > 0 ? -0.15 : 0.15;
       setScale((current) => {
         const next = clampScale(current + delta);
+        onZoomChange(next > 1.01);
         if (next <= 1) setPan({ x: 0, y: 0 });
         return next;
       });
@@ -109,7 +173,7 @@ function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth:
 
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel);
-  }, [uri]);
+  }, [uri, onZoomChange]);
 
   function distance(touches: TouchList) {
     if (touches.length < 2) return 0;
@@ -118,9 +182,25 @@ function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth:
     return Math.hypot(dx, dy);
   }
 
+  function handleDoubleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      if (scale > 1.01) {
+        setScale(1);
+        setPan({ x: 0, y: 0 });
+        onZoomChange(false);
+      } else {
+        setScale(2);
+        onZoomChange(true);
+      }
+      lastTap.current = 0;
+      return;
+    }
+    lastTap.current = now;
+  }
+
   return (
     <View
-      ref={frameRef}
       style={[styles.imageFrame, { width: maxWidth, height: maxHeight }]}
       collapsable={false}
       onTouchStart={(event) => {
@@ -147,6 +227,7 @@ function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth:
           if (!pinchStart.current.distance) return;
           const next = clampScale((pinchStart.current.scale * dist) / pinchStart.current.distance);
           setScale(next);
+          onZoomChange(next > 1.01);
           if (next <= 1) setPan({ x: 0, y: 0 });
           return;
         }
@@ -161,6 +242,8 @@ function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth:
         dragStart.current = null;
         pinchStart.current = null;
       }}
+      // @ts-expect-error web double-click zoom
+      onDoubleClick={handleDoubleTap}
     >
       <CachedImage
         uri={uri}
@@ -179,42 +262,119 @@ function WebLightboxImage({ uri, maxWidth, maxHeight }: { uri: string; maxWidth:
   );
 }
 
-export function ImageLightbox({ uri, onClose }: ImageLightboxProps) {
+export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
   const { width, height } = useWindowDimensions();
-  const imageMaxWidth = width - spacing.xl * 2;
-  const imageMaxHeight = height - spacing.xxl * 4;
+  const imageMaxWidth = width;
+  const imageMaxHeight = height - spacing.xxl * 2;
+  const [index, setIndex] = useState(0);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [pageWidth, setPageWidth] = useState(0);
+  const listRef = useRef<FlatList<string>>(null);
+
+  const images = gallery?.images ?? [];
+  const visible = Boolean(gallery?.images.length);
+
+  useEffect(() => {
+    if (!gallery || !pageWidth) return;
+    setIndex(gallery.index);
+    setScrollEnabled(true);
+    if (gallery.index > 0) {
+      listRef.current?.scrollToOffset({ offset: pageWidth * gallery.index, animated: false });
+    }
+  }, [gallery, pageWidth]);
+
+  useEffect(() => {
+    if (!images.length) return;
+    const neighbors = [images[index + 1], images[index - 1]].filter(Boolean) as string[];
+    if (neighbors.length) void prefetchCachedImages(neighbors);
+  }, [images, index]);
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!pageWidth) return;
+      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+      const clamped = Math.min(Math.max(nextIndex, 0), images.length - 1);
+      setIndex((current) => (current === clamped ? current : clamped));
+    },
+    [pageWidth, images.length]
+  );
+
+  const handleZoomChange = useCallback((zoomed: boolean) => {
+    setScrollEnabled(!zoomed);
+  }, []);
+
+  const dismiss = useCallback(() => {
+    onClose(index);
+  }, [index, onClose]);
+
+  if (!visible) return null;
 
   return (
-    <Modal
-      visible={!!uri}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <View style={styles.backdrop}>
-        <Pressable
-          style={styles.dismissArea}
-          onPress={onClose}
-          accessibilityLabel="Dismiss image preview"
-        />
+    <Modal visible transparent animationType="fade" onRequestClose={dismiss} statusBarTranslucent>
+      <View style={styles.backdrop} onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}>
+        <Pressable style={styles.dismissArea} onPress={dismiss} accessibilityLabel="Dismiss image preview" />
 
         <View style={styles.content} pointerEvents="box-none">
           <Pressable
             style={styles.closeButton}
-            onPress={onClose}
+            onPress={dismiss}
             accessibilityRole="button"
             accessibilityLabel="Close"
           >
             <Text style={styles.closeText}>✕</Text>
           </Pressable>
 
-          {uri ? (
-            Platform.OS === "web" ? (
-              <WebLightboxImage uri={uri} maxWidth={imageMaxWidth} maxHeight={imageMaxHeight} />
-            ) : (
-              <NativeLightboxImage uri={uri} maxWidth={imageMaxWidth} maxHeight={imageMaxHeight} />
-            )
+          {images.length > 1 ? (
+            <View style={styles.galleryCounter} pointerEvents="none">
+              <Text style={styles.galleryCounterText}>
+                {index + 1}/{images.length}
+              </Text>
+            </View>
+          ) : null}
+
+          {pageWidth > 0 ? (
+            <FlatList
+              ref={listRef}
+              data={images}
+              horizontal
+              pagingEnabled
+              nestedScrollEnabled
+              scrollEnabled={scrollEnabled}
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(uri, itemIndex) => `${uri}-${itemIndex}`}
+              getItemLayout={(_, itemIndex) => ({
+                length: pageWidth,
+                offset: pageWidth * itemIndex,
+                index: itemIndex,
+              })}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+              onMomentumScrollEnd={handleScroll}
+              initialNumToRender={Math.min(3, images.length)}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              style={styles.galleryList}
+              renderItem={({ item, index: itemIndex }) => (
+                <View style={[styles.galleryPage, { width: pageWidth }]}>
+                  {Platform.OS === "web" ? (
+                    <WebZoomableImage
+                      uri={item}
+                      maxWidth={imageMaxWidth - spacing.xl * 2}
+                      maxHeight={imageMaxHeight}
+                      onZoomChange={handleZoomChange}
+                    />
+                  ) : (
+                    <NativeZoomableImage
+                      uri={item}
+                      maxWidth={imageMaxWidth - spacing.xl * 2}
+                      maxHeight={imageMaxHeight}
+                      isActive={itemIndex === index}
+                      onZoomChange={handleZoomChange}
+                    />
+                  )}
+                </View>
+              )}
+            />
           ) : null}
         </View>
       </View>
@@ -226,8 +386,6 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(10, 10, 11, 0.96)",
-    justifyContent: "center",
-    alignItems: "center",
   },
   dismissArea: {
     ...StyleSheet.absoluteFillObject,
@@ -236,8 +394,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    padding: spacing.xl,
     zIndex: 1,
+  },
+  galleryList: {
+    flex: 1,
+    width: "100%",
+  },
+  galleryPage: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeButton: {
     position: "absolute",
@@ -259,6 +425,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     lineHeight: 20,
+  },
+  galleryCounter: {
+    position: "absolute",
+    top: Platform.OS === "web" ? spacing.lg : spacing.xxl,
+    left: spacing.lg,
+    zIndex: 20,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(10, 10, 11, 0.75)",
+  },
+  galleryCounterText: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: "700",
   },
   imageFrame: {
     zIndex: 1,

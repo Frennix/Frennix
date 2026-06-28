@@ -63,6 +63,67 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
     },
   },
+  {
+    name: "PostMediaCarousel uses measured width for horizontal paging",
+    run: () => {
+      const src = read("packages/ui/src/PostMediaCarousel.tsx");
+      if (!src.includes("containerWidth")) {
+        throw new Error("PostMediaCarousel must measure container width in state");
+      }
+      if (!src.includes("getItemLayout")) {
+        throw new Error("PostMediaCarousel must define getItemLayout for paging");
+      }
+      if (!src.includes("nestedScrollEnabled")) {
+        throw new Error("PostMediaCarousel must enable nested horizontal scroll in feed");
+      }
+    },
+  },
+  {
+    name: "Image lightbox supports multi-image gallery swipe",
+    run: () => {
+      const src = read("components/ImageLightbox.tsx");
+      if (!src.includes("scrollEnabled={scrollEnabled}")) {
+        throw new Error("ImageLightbox must disable gallery scroll while zoomed");
+      }
+      if (!src.includes("galleryCounter")) {
+        throw new Error("ImageLightbox must show image counter in gallery");
+      }
+    },
+  },
+  {
+    name: "Gallery restores feed carousel index on close",
+    run: () => {
+      const hook = read("lib/useImageLightbox.tsx");
+      const carousel = read("packages/ui/src/PostMediaCarousel.tsx");
+      if (!hook.includes("GalleryCloseHandler")) {
+        throw new Error("useImageLightbox must accept gallery close callback with index");
+      }
+      if (!carousel.includes("pageIndex")) {
+        throw new Error("PostMediaCarousel must accept controlled pageIndex");
+      }
+    },
+  },
+  {
+    name: "Create post supports drag reorder for photo cover",
+    run: () => {
+      const src = read("app/create-post.tsx");
+      if (!src.includes("ReorderablePhotoStrip")) {
+        throw new Error("create-post must use ReorderablePhotoStrip");
+      }
+      if (!src.includes("reorderMedia")) {
+        throw new Error("create-post must reorder selectedMedia before upload");
+      }
+    },
+  },
+  {
+    name: "Single-image posts hide carousel dots and counter",
+    run: () => {
+      const src = read("packages/ui/src/PostMediaCarousel.tsx");
+      if (!src.includes("mediaUrls.length === 1")) {
+        throw new Error("PostMediaCarousel must short-circuit single-image posts");
+      }
+    },
+  },
 ];
 
 let failed = 0;

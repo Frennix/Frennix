@@ -1,14 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
-import { PostMedia } from "./PostMedia";
+import { PostMediaCarousel } from "./PostMediaCarousel";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface SharedPostPreviewProps {
   post: Post & { author?: Profile };
   onPress?: () => void;
   compact?: boolean;
-  onMediaPress?: (uri: string) => void;
+  onMediaPress?: (uri: string, index: number) => void;
 }
 
 export function SharedPostPreview({
@@ -18,7 +18,7 @@ export function SharedPostPreview({
   onMediaPress,
 }: SharedPostPreviewProps) {
   const author = post.author;
-  const hasMedia = Boolean(post.media_urls?.[0]);
+  const hasMedia = Boolean(post.media_urls?.length);
 
   return (
     <Pressable
@@ -44,14 +44,11 @@ export function SharedPostPreview({
 
       {hasMedia ? (
         <View style={styles.mediaWrap}>
-          <PostMedia
-            uri={post.media_urls![0]}
+          <PostMediaCarousel
+            mediaUrls={post.media_urls ?? []}
             postType={post.post_type}
             thumbnailUrl={post.thumbnail_url}
-            maxHeight={compact ? 220 : undefined}
-            onImagePress={
-              onMediaPress ? () => onMediaPress(post.media_urls![0]) : undefined
-            }
+            onMediaPress={onMediaPress}
           />
         </View>
       ) : null}

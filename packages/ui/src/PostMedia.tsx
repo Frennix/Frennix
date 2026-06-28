@@ -3,6 +3,7 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  TouchableOpacity,
   View,
   type StyleProp,
   type ViewStyle,
@@ -24,6 +25,7 @@ interface PostMediaProps {
   style?: ViewStyle;
   layout?: MediaLayout;
   onImagePress?: () => void;
+  pressDelayMs?: number;
   maxHeight?: number;
 }
 
@@ -103,6 +105,7 @@ export function PostMedia({
   style,
   layout = "inline",
   onImagePress,
+  pressDelayMs,
   maxHeight,
 }: PostMediaProps) {
   const isVideo = isVideoMedia(postType, uri);
@@ -153,6 +156,7 @@ export function PostMedia({
       style={style}
       layout={layout}
       onImagePress={onImagePress}
+      pressDelayMs={pressDelayMs}
       maxHeight={maxHeight}
     />
   );
@@ -164,6 +168,7 @@ function FeedImage({
   style,
   layout,
   onImagePress,
+  pressDelayMs,
   maxHeight,
 }: {
   uri: string;
@@ -171,6 +176,7 @@ function FeedImage({
   style: StyleProp<ViewStyle>;
   layout: MediaLayout;
   onImagePress?: () => void;
+  pressDelayMs?: number;
   maxHeight?: number;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -202,15 +208,18 @@ function FeedImage({
   );
 
   if (onImagePress) {
-    return (
-      <Pressable
+    const pressable = (
+      <TouchableOpacity
+        activeOpacity={0.95}
+        delayPressIn={pressDelayMs ?? 0}
         onPress={onImagePress}
         accessibilityRole="button"
         accessibilityLabel="View full image"
       >
         {content}
-      </Pressable>
+      </TouchableOpacity>
     );
+    return pressable;
   }
 
   return content;

@@ -84,7 +84,8 @@ export default function PostDetailScreen() {
     enabled: !!id && !!userId,
   });
 
-  const { openImage, lightbox } = useImageLightbox();
+  const { openGallery, lightbox } = useImageLightbox();
+  const [mediaPageIndex, setMediaPageIndex] = useState(0);
 
   type CommentMutationVars = {
     text: string;
@@ -211,7 +212,13 @@ export default function PostDetailScreen() {
           post={post}
           isOwn={post.author_id === userId}
           onOwnerActionsPress={() => openPostActions(post)}
-          onMediaPress={openImage}
+          onMediaPress={(uri, index) => {
+            const displayPost = post.shared_post ?? post;
+            setMediaPageIndex(index);
+            openGallery(displayPost.media_urls ?? [uri], index, setMediaPageIndex);
+          }}
+          mediaPageIndex={mediaPageIndex}
+          onMediaPageIndexChange={setMediaPageIndex}
           onPress={() => {
             const targetId = getSharedPostTargetId(post);
             if (targetId !== post.id) router.push(`/post/${targetId}`);

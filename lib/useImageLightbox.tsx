@@ -1,18 +1,35 @@
-import { useCallback, useState } from "react";
-import { ImageLightbox } from "@/components/ImageLightbox";
+import { useCallback, useRef, useState } from "react";
+import { ImageLightbox, type ImageGalleryState } from "@/components/ImageLightbox";
+
+export type GalleryCloseHandler = (index: number) => void;
 
 export function useImageLightbox() {
-  const [uri, setUri] = useState<string | null>(null);
+  const [gallery, setGallery] = useState<ImageGalleryState | null>(null);
+  const closeHandlerRef = useRef<GalleryCloseHandler | null>(null);
 
-  const openImage = useCallback((nextUri: string) => {
-    setUri(nextUri);
+  const openImage = useCallback((uri: string) => {
+    closeHandlerRef.current = null;
+    setGallery({ images: [uri], index: 0 });
   }, []);
 
-  const closeImage = useCallback(() => {
-    setUri(null);
+  const openGallery = useCallback(
+    (images: string[], index = 0, onClosed?: GalleryCloseHandler) => {
+      const filtered = images.filter(Boolean);
+      if (!filtered.length) return;
+      const clampedIndex = Math.min(Math.max(index, 0), filtered.length - 1);
+      closeHandlerRef.current = onClosed ?? null;
+      setGallery({ images: filtered, index: clampedIndex });
+    },
+    []
+  );
+
+  const handleClose = useCallback((finalIndex: number) => {
+    closeHandlerRef.current?.(finalIndex);
+    closeHandlerRef.current = null;
+    setGallery(null);
   }, []);
 
-  const lightbox = <ImageLightbox uri={uri} onClose={closeImage} />;
+  const lightbox = <ImageLightbox gallery={gallery} onClose={handleClose} />;
 
-  return { openImage, closeImage, lightbox };
+  return { openImage, openGallery, closeImage: handleClose, lightbox };
 }
