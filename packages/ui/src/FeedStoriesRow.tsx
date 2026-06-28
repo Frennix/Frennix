@@ -41,6 +41,7 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
       <FlatList
         data={stories}
         horizontal
+        nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.user_id}
         contentContainerStyle={styles.listContent}

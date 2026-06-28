@@ -216,12 +216,16 @@ export function WorkoutStoryViewer({
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
-    if (!visible) return;
+
+    if (!visible) {
+      document.body.style.overflow = "";
+      return;
+    }
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = previousOverflow || "";
     };
   }, [visible]);
 

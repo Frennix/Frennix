@@ -131,6 +131,18 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
     },
   },
+  {
+    name: "Feed FlatList has flex layout for vertical scroll",
+    run: () => {
+      const feed = read("app/(tabs)/index.tsx");
+      if (!feed.includes("feedList: { flex: 1 }")) {
+        throw new Error("Feed FlatList must use flex:1");
+      }
+      if (feed.includes("feedHiddenWhileStory")) {
+        throw new Error("Remove feedHiddenWhileStory wrapper — it breaks web scroll");
+      }
+    },
+  },
 ];
 
 let failed = 0;

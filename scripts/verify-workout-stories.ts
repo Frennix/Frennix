@@ -144,14 +144,17 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed is hidden while story viewer is open",
+    name: "Feed scrolls while story viewer is closed",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
-      if (!feed.includes("feedHiddenWhileStory")) {
-        throw new Error("Feed must hide while story is open");
-      }
       if (!feed.includes("scrollEnabled={!storyVisible}")) {
         throw new Error("Feed scrolling must be disabled while story is open");
+      }
+      if (!feed.includes("feedList: { flex: 1 }")) {
+        throw new Error("Feed FlatList must use flex:1 for vertical scroll");
+      }
+      if (!feed.includes("nestedScrollEnabled")) {
+        throw new Error("Feed FlatList must enable nestedScrollEnabled for story row");
       }
     },
   },

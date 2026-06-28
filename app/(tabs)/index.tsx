@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import {
   getFeed,
   getFeedStories,
@@ -412,6 +412,13 @@ export default function HomeScreen() {
 
   const storyVisible = activeStoryIndex !== null;
 
+  // Story viewer sets body overflow hidden on web — restore when feed is active.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    if (storyVisible) return;
+    document.body.style.overflow = "";
+  }, [storyVisible]);
+
   if (isError && posts.length === 0) {
     return (
       <View style={styles.container}>
@@ -467,16 +474,14 @@ export default function HomeScreen() {
       {showBanner && !storyVisible ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
       ) : null}
-      <View
-        style={storyVisible ? styles.feedHiddenWhileStory : undefined}
-        pointerEvents={storyVisible ? "none" : "auto"}
-      >
-        <FlatList
-          ref={listRef}
-          data={listRows}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          scrollEnabled={!storyVisible}
+      <FlatList
+        ref={listRef}
+        style={styles.feedList}
+        data={listRows}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        scrollEnabled={!storyVisible}
+        nestedScrollEnabled
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={21}
@@ -523,17 +528,14 @@ export default function HomeScreen() {
           )
         }
         renderItem={renderItem}
-        />
-      </View>
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  feedHiddenWhileStory: {
-    opacity: 0,
-  },
+  feedList: { flex: 1 },
   list: { flexGrow: 1, paddingBottom: spacing.xl },
   emptyWrap: { padding: spacing.lg },
   initialSkeletons: { gap: 0 },
