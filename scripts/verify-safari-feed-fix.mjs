@@ -165,6 +165,12 @@ async function main() {
   await page.waitForTimeout(3000);
 
   const layout = await page.evaluate(() => window.__FRENNIX_FEED_LAYOUT__ ?? null);
+  const rootEl = await page.evaluate(() => {
+    const el = document.getElementById("root");
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { height: Math.round(rect.height) };
+  });
   const feedEl = await page.evaluate(() => {
     const el = document.getElementById("feed-root-container");
     if (!el) return null;
@@ -180,24 +186,56 @@ async function main() {
   );
   const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   const bodyText = await page.locator("body").innerText();
-  const feedVisible = /Safari feed fix verification post|Your feed is ready|Workouts, progress/i.test(
-    bodyText
-  );
+  const scrollWorks = await page.evaluate(() => {
+    const findScrollable = (root) => {
+      if (!root) return null;
+      const queue = [root];
+      while (queue.length) {
+        const el = queue.shift();
+        const style = getComputedStyle(el);
+        const canScroll =
+          el.scrollHeight > el.clientHeight + 4 &&
+          (style.overflowY === "auto" || style.overflowY === "scroll");
+        if (canScroll) return el;
+        for (const child of el.children) queue.push(child);
+      }
+      return root;
+    };
+
+    const root = document.getElementById("feed-scroll-list");
+    const el = findScrollable(root);
+    if (!el) return false;
+    const before = el.scrollTop;
+    el.scrollTop = before + 240;
+    return el.scrollTop > before + 5;
+  });
+
+  const hasOverflow = layout?.scrollMetrics?.hasOverflow === true;
 
   console.log("\n=== Safari feed fix verification ===");
+  console.log("#root:", rootEl);
   console.log("feed-root-container:", feedEl);
   console.log("body background:", bodyBg);
   console.log("hidden modal nodes:", modalCount);
-  console.log("feed content visible:", feedVisible);
+  console.log("feed scroll works:", scrollWorks, hasOverflow ? "(overflow present)" : "(no overflow — skipped)");
+  const feedVisible = /Safari feed fix verification post|Your feed is ready|Workouts, progress/i.test(
+    bodyText
+  );
   console.log("layout snapshot issue:", layout?.issue ?? "none");
 
+  const rootHeightOk = (rootEl?.height ?? 0) > 80;
   const feedHeightOk = (feedEl?.height ?? 0) > 80;
   const modalsOk = modalCount === 0;
   const contentOk = feedVisible;
+  const scrollOk = !hasOverflow || scrollWorks;
+  const overlayOk = layout?.issue == null;
 
-  if (!feedHeightOk || !modalsOk || !contentOk) {
+  if (!rootHeightOk || !feedHeightOk || !modalsOk || !contentOk || !overlayOk || !scrollOk) {
     console.error("\n[verify-safari-feed-fix] FAILED");
+    if (!rootHeightOk) console.error("- #root height <= 80");
     if (!feedHeightOk) console.error("- feed-root-container height <= 80");
+    if (!overlayOk) console.error(`- layout issue: ${layout?.issue}`);
+    if (!scrollOk) console.error("- feed-scroll-list could not scroll");
     if (!modalsOk) console.error(`- unexpected modal nodes: ${modalCount}`);
     if (!contentOk) console.error("- feed text not visible in body");
     process.exitCode = 1;

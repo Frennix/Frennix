@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { webAppShell } from "@/lib/flex-layout";
 
 interface Props {
   children: ReactNode;
@@ -56,12 +57,12 @@ export class PostLoginShellErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return <View key={resetKey} style={styles.flex}>{this.props.children}</View>;
+    return <View key={resetKey} pointerEvents="box-none" style={styles.flex}>{this.props.children}</View>;
   }
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, minHeight: 0, backgroundColor: "#0A0A0B" },
+  flex: { ...{ flex: 1, minHeight: 0, backgroundColor: "#0A0A0B" }, ...webAppShell },
   container: {
     flex: 1,
     backgroundColor: "#1a0000",

@@ -12,7 +12,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
-import { flexFill } from "@/lib/flex-layout";
+import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
 
 const HeaderBell = memo(function HeaderBell() {
   const { session } = useAuth();
@@ -62,6 +62,12 @@ const TabsShell = memo(function TabsShell() {
   return (
     <>
       <TabPrefetchCoordinator />
+      <View
+        style={[flexFill, webTabSceneShell]}
+        collapsable={false}
+        nativeID="feed-tab-scene"
+        pointerEvents="box-none"
+      >
       <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
@@ -73,6 +79,7 @@ const TabsShell = memo(function TabsShell() {
         tabBarItemStyle: { minWidth: 56 },
         sceneContainerStyle: {
           ...flexFill,
+          ...webTabSceneShell,
           backgroundColor: colors.background,
         },
         lazy: false,
@@ -154,6 +161,7 @@ const TabsShell = memo(function TabsShell() {
         }}
       />
     </Tabs>
+      </View>
     </>
   );
 });

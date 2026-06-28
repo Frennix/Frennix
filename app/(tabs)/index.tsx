@@ -57,7 +57,8 @@ import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
 import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
-import { flexFill, webVerticalScrollStyle } from "@/lib/flex-layout";
+import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
+import { useWebTabSceneHeight, webTabSceneHeightStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
 import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
 import { markFeedRender } from "@/lib/feed-render-trace";
@@ -187,6 +188,8 @@ export default function HomeScreen() {
   const listRef = useRef<FlatList<FeedListRow>>(null);
   const webScrollRef = useRef<ScrollView>(null);
   const useWebScroll = Platform.OS === "web";
+  const webTabSceneHeight = useWebTabSceneHeight();
+  const webHeightStyle = webTabSceneHeightStyle(webTabSceneHeight);
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const { height: viewportHeight } = useWindowDimensions();
@@ -588,17 +591,17 @@ export default function HomeScreen() {
   return (
     <FeedRenderTraceProbe id="feed:ui:container">
       <View
-        style={styles.container}
+        style={[styles.container, webHeightStyle]}
         pointerEvents="box-none"
         nativeID="feed-root-container"
       >
-        <View style={styles.feedScrollShell} collapsable={false} nativeID="feed-scroll-shell">
+        <View style={[styles.feedScrollShell, webHeightStyle]} collapsable={false} nativeID="feed-scroll-shell">
           {useWebScroll ? (
             <FeedRenderTraceProbe id="feed:ui:scroll-list" detail="WebFeedScrollList">
               <WebFeedScrollList
             scrollRef={webScrollRef}
             nativeID="feed-scroll-list"
-            style={styles.feedList}
+            style={[styles.feedList, webHeightStyle]}
             contentContainerStyle={styles.list}
             scrollEnabled={!storyVisible}
             data={listRows}
@@ -759,9 +762,9 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { ...flexFill, backgroundColor: colors.background },
-  feedScrollShell: { ...flexFill },
-  feedList: { ...flexFill, ...webVerticalScrollStyle },
+  container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.background },
+  feedScrollShell: { ...flexFill, ...webTabSceneShell },
+  feedList: { ...flexFill, ...webScrollSurface },
   list: {
     flexGrow: 1,
     paddingBottom: spacing.xl,

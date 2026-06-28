@@ -129,44 +129,84 @@ function readAncestorChain(fromId: string): string {
   return parts.join(" ← ");
 }
 
+const APP_SHELL_OVERLAY_IDS = new Set([
+  "root",
+  "app-root-shell",
+  "feed-tab-scene",
+  "feed-root-container",
+  "feed-scroll-shell",
+  "feed-scroll-list",
+]);
+
+function isAppShellOverlay(el: Element): boolean {
+  const id = (el as HTMLElement).id;
+  if (id && APP_SHELL_OVERLAY_IDS.has(id)) return true;
+
+  const feedScroll = document.getElementById("feed-scroll-list");
+  if (!feedScroll) return false;
+  if (feedScroll === el || feedScroll.contains(el)) return true;
+  if (el.contains(feedScroll)) return true;
+
+  return false;
+}
+
+function isIgnorableOverlay(el: Element): boolean {
+  if (isAppShellOverlay(el)) return true;
+
+  const id = (el as HTMLElement).id;
+  if (id === "frennix-emergency-debug" || id === "frennix-emergency-html") return true;
+
+  const style = getComputedStyle(el);
+  if (style.pointerEvents === "none") return true;
+
+  // App shell uses the dark background — not a white/transparent blocking sheet.
+  if (style.backgroundColor === "rgb(10, 10, 11)") return true;
+
+  return false;
+}
+
+function isActionableOverlay(el: Element, viewportW: number, viewportH: number): boolean {
+  if (isIgnorableOverlay(el)) return false;
+
+  const style = getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  if (parseFloat(style.opacity || "1") <= 0.01) return false;
+
+  const rect = el.getBoundingClientRect();
+  const coversViewport =
+    rect.width >= viewportW * 0.92 &&
+    rect.height >= viewportH * 0.85 &&
+    rect.top <= viewportH * 0.08;
+  if (!coversViewport) return false;
+
+  const role = el.getAttribute("role");
+  const ariaModal = el.getAttribute("aria-modal");
+  const position = style.position;
+  const zIndex = Number.parseInt(style.zIndex || "0", 10) || 0;
+
+  return (
+    role === "dialog" ||
+    ariaModal === "true" ||
+    position === "fixed" ||
+    (position === "absolute" && zIndex >= 50) ||
+    zIndex >= 1000
+  );
+}
+
 function scanViewportOverlays(viewportW: number, viewportH: number): FeedLayoutOverlayProbe[] {
   if (typeof document === "undefined") return [];
 
   const probes: FeedLayoutOverlayProbe[] = [];
-  const selectors = '[role="dialog"],[aria-modal="true"],[data-focusable="true"]';
   const seen = new Set<Element>();
 
-  document.querySelectorAll(selectors).forEach((el) => {
-    if (seen.has(el)) return;
+  document.querySelectorAll('[role="dialog"],[aria-modal="true"]').forEach((el) => {
+    if (seen.has(el) || !isActionableOverlay(el, viewportW, viewportH)) return;
     seen.add(el);
     probes.push(readOverlayElement(el, "modal", viewportW, viewportH));
   });
 
   document.body.querySelectorAll("*").forEach((el) => {
-    if (seen.has(el)) return;
-    if (el.id === "frennix-emergency-debug" || el.id === "frennix-emergency-html") return;
-
-    const style = getComputedStyle(el);
-    if (style.display === "none" || style.visibility === "hidden") return;
-    if (parseFloat(style.opacity || "1") <= 0.01) return;
-
-    const rect = el.getBoundingClientRect();
-    const coversViewport =
-      rect.width >= viewportW * 0.92 &&
-      rect.height >= viewportH * 0.85 &&
-      rect.top <= viewportH * 0.08;
-
-    const position = style.position;
-    const zIndex = Number.parseInt(style.zIndex || "0", 10) || 0;
-    const isLayer =
-      coversViewport &&
-      (position === "fixed" ||
-        position === "absolute" ||
-        zIndex >= 50 ||
-        style.pointerEvents === "auto");
-
-    if (!isLayer) return;
-
+    if (seen.has(el) || !isActionableOverlay(el, viewportW, viewportH)) return;
     seen.add(el);
     probes.push(readOverlayElement(el, "layer", viewportW, viewportH));
   });
@@ -280,6 +320,7 @@ function detectIssue(
       overlay.coversViewport &&
       overlay.opacity > 0.01 &&
       overlay.pointerEvents !== "none" &&
+      !APP_SHELL_OVERLAY_IDS.has(overlay.label) &&
       (overlay.backgroundColor.includes("255, 255, 255") ||
         overlay.backgroundColor === "rgba(0, 0, 0, 0)" ||
         overlay.backgroundColor === "transparent")
@@ -288,10 +329,19 @@ function detectIssue(
     return `viewport overlay ${blocking.label} may block feed (bg=${blocking.backgroundColor})`;
   }
 
-  const anyModal = overlays.filter((overlay) => overlay.coversViewport);
+  const modalOverlays = overlays.filter(
+    (overlay) =>
+      overlay.coversViewport &&
+      overlay.pointerEvents !== "none" &&
+      (overlay.label.startsWith("modal") ||
+        overlay.zIndex >= 100 ||
+        overlay.backgroundColor.includes("255, 255, 255") ||
+        overlay.backgroundColor === "rgba(0, 0, 0, 0)" ||
+        overlay.backgroundColor === "transparent")
+  );
   const reactClosed = !reactOverlays.share && !reactOverlays.lightbox && !reactOverlays.story;
-  if (reactClosed && anyModal.length > 0) {
-    return `DOM modal/layer present while React overlays closed (${anyModal[0]?.label})`;
+  if (reactClosed && modalOverlays.length > 0) {
+    return `DOM modal/layer present while React overlays closed (${modalOverlays[0]?.label})`;
   }
   if (reactClosed && hiddenModalCount > 0) {
     return `hidden Modal DOM nodes=${hiddenModalCount} while React overlays closed`;

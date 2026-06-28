@@ -2,6 +2,7 @@ import "@/lib/init-supabase";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
+import { Platform } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
@@ -21,14 +22,18 @@ import { markStartupMount } from "@/lib/startup-mount-trace";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
-import { flexFill } from "@/lib/flex-layout";
+import { flexFill, webAppShell } from "@/lib/flex-layout";
 
 initSentry();
 
 const stackDefaults = {
   headerStyle: { backgroundColor: colors.background },
   headerTintColor: colors.text,
-  contentStyle: { backgroundColor: colors.background },
+  contentStyle: {
+    backgroundColor: colors.background,
+    ...flexFill,
+    ...(Platform.OS === "web" ? webAppShell : null),
+  },
   headerShadowVisible: false,
   animation: "fade" as const,
   animationDuration: animation.stackFadeMs,
@@ -62,7 +67,11 @@ export default function RootLayout() {
 
   return (
     <StartupMountProbe id="gesture-handler">
-      <GestureHandlerRootView style={{ ...flexFill, backgroundColor: colors.background }}>
+      <GestureHandlerRootView
+        pointerEvents="box-none"
+        style={{ ...flexFill, ...webAppShell, backgroundColor: colors.background }}
+        {...(Platform.OS === "web" ? ({ nativeID: "app-root-shell" } as object) : null)}
+      >
         <StartupMountProbe id="app-error-boundary-root">
           <AppErrorBoundary scope="root">
             <StartupMountProbe id="query-provider">

@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { FeedListRow } from "@/lib/feed-list-rows";
-import { flexFill, webVerticalScrollStyle } from "@/lib/flex-layout";
+import { flexFill, webScrollSurface } from "@/lib/flex-layout";
 
 type WebFeedScrollListProps = {
   scrollRef: RefObject<ScrollView | null>;
@@ -60,7 +60,8 @@ export function WebFeedScrollList({
     <ScrollView
       ref={scrollRef}
       nativeID={nativeID}
-      style={[styles.list, style, webVerticalScrollStyle]}
+      pointerEvents="auto"
+      style={[styles.list, style, webScrollSurface]}
       contentContainerStyle={contentContainerStyle}
       scrollEnabled={scrollEnabled}
       nestedScrollEnabled
