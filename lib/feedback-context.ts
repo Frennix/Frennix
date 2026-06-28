@@ -3,11 +3,29 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import type { FeedbackFeatureArea } from "@frennix/types";
 
+function readBuildNumber(): string | null {
+  const config = Constants.expoConfig;
+  if (!config) return Constants.nativeBuildVersion ?? null;
+  const iosBuild = config.ios?.buildNumber;
+  const androidBuild = config.android?.versionCode;
+  if (iosBuild) return String(iosBuild);
+  if (androidBuild != null) return String(androidBuild);
+  return Constants.nativeBuildVersion ?? null;
+}
+
+function readBrowser(): string | null {
+  if (Platform.OS !== "web" || typeof navigator === "undefined") return null;
+  return navigator.userAgent ?? null;
+}
+
 export function getFeedbackContext(screenPath?: string) {
   return {
     app_version: Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? null,
     platform: Platform.OS,
     screen_path: screenPath ?? null,
+    os_version: Platform.Version != null ? String(Platform.Version) : null,
+    browser: readBrowser(),
+    build_number: readBuildNumber(),
   };
 }
 

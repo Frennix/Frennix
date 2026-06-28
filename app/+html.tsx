@@ -1,5 +1,6 @@
 import { ScrollViewStyleReset } from "expo-router/html";
 import type { PropsWithChildren } from "react";
+import { frennixWebDocumentCss, FRENNIX_WEB_BACKGROUND } from "@/lib/web-document-styles";
 
 /**
  * Web document shell. Keeps Expo's body overflow:hidden (FlatList scrolls internally)
@@ -15,21 +16,10 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
+        <meta name="theme-color" content={FRENNIX_WEB_BACKGROUND} />
+        <meta name="color-scheme" content="dark" />
         <ScrollViewStyleReset />
-        <style>{`
-          html {
-            height: 100%;
-            height: -webkit-fill-available;
-          }
-          body {
-            height: 100%;
-            min-height: 100dvh;
-            min-height: -webkit-fill-available;
-          }
-          #root {
-            min-height: 0;
-          }
-        `}</style>
+        <style id="frennix-web-scroll">{frennixWebDocumentCss}</style>
       </head>
       <body>{children}</body>
     </html>

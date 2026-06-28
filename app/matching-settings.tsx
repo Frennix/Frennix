@@ -7,10 +7,16 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { setMatchingEnabled, updateProfile } from "@frennix/api";
-import type { MatchPreference, Profile } from "@frennix/types";
+import type { MatchPreference, Profile, SkillLevel, TrainingEnvironment, TrainingScheduleSlot } from "@frennix/types";
+import {
+  SKILL_LEVEL_OPTIONS,
+  TRAINING_ENVIRONMENT_OPTIONS,
+  TRAINING_SCHEDULE_OPTIONS,
+} from "@/lib/matching-compatibility-options";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
 import { formatActivity, formatGoal } from "@/lib/labels";
@@ -94,7 +100,10 @@ export default function MatchingSettingsScreen() {
   const [discoveryEnabled, setDiscoveryEnabled] = useState(false);
   const [gender, setGender] = useState<TrainingPartnerGender | null>(null);
   const [partnerPreference, setPartnerPreference] = useState<MatchPreference>("any");
-  const [saving, setSaving] = useState(false);
+  const [skillLevel, setSkillLevel] = useState<SkillLevel | null>(null);
+  const [trainingSchedules, setTrainingSchedules] = useState<TrainingScheduleSlot[]>([]);
+  const [trainingEnvironment, setTrainingEnvironment] = useState<TrainingEnvironment | null>(null);
+  const [homeGym, setHomeGym] = useState("");
   const [error, setError] = useState("");
 
   const profileReady = profile ? isTrainingPartnerDiscoveryReady(profile) : false;
@@ -104,6 +113,10 @@ export default function MatchingSettingsScreen() {
     setDiscoveryEnabled(profile.matching_enabled ?? false);
     setGender((profile.gender as TrainingPartnerGender | null) ?? null);
     setPartnerPreference(profile.match_preference ?? "any");
+    setSkillLevel(profile.skill_level ?? null);
+    setTrainingSchedules(profile.training_schedules ?? []);
+    setTrainingEnvironment(profile.training_environment ?? null);
+    setHomeGym(profile.home_gym ?? "");
   }, [profile?.id, profile?.updated_at, profile?.matching_enabled]);
 
   function handleDiscoveryToggle(next: boolean) {
@@ -141,6 +154,10 @@ export default function MatchingSettingsScreen() {
       await updateProfile(userId, {
         gender,
         match_preference: partnerPreference,
+        skill_level: skillLevel,
+        training_schedules: trainingSchedules,
+        training_environment: trainingEnvironment,
+        home_gym: homeGym.trim() || null,
       });
       await setMatchingEnabled(userId, discoveryEnabled);
       await refreshProfile();
@@ -206,6 +223,7 @@ export default function MatchingSettingsScreen() {
           trackColor={{ false: colors.border, true: colors.accentMuted }}
           thumbColor={discoveryEnabled ? colors.accent : colors.textMuted}
           ios_backgroundColor={colors.border}
+          accessibilityLabel="Show me in training partner discovery"
         />
       </View>
 
@@ -249,6 +267,66 @@ export default function MatchingSettingsScreen() {
           <Text style={styles.prefDescription}>{description}</Text>
         </View>
       ))}
+
+      <Text style={styles.sectionLabel}>Training compatibility (optional)</Text>
+      <Text style={styles.filterHint}>
+        Improves match quality and &quot;Why we matched you&quot; reasons. Shown on your public
+        profile where relevant.
+      </Text>
+
+      <Text style={styles.fieldLabel}>Experience level</Text>
+      <View style={styles.chipRow}>
+        {SKILL_LEVEL_OPTIONS.map(({ value, label }) => (
+          <Chip
+            key={value}
+            label={label}
+            selected={skillLevel === value}
+            onPress={() => setSkillLevel(skillLevel === value ? null : value)}
+          />
+        ))}
+      </View>
+
+      <Text style={styles.fieldLabel}>When you usually train</Text>
+      <View style={styles.chipRow}>
+        {TRAINING_SCHEDULE_OPTIONS.map(({ value, label }) => (
+          <Chip
+            key={value}
+            label={label}
+            selected={trainingSchedules.includes(value)}
+            onPress={() =>
+              setTrainingSchedules((prev) =>
+                prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]
+              )
+            }
+          />
+        ))}
+      </View>
+
+      <Text style={styles.fieldLabel}>Training environment</Text>
+      <View style={styles.chipRow}>
+        {TRAINING_ENVIRONMENT_OPTIONS.map(({ value, label }) => (
+          <Chip
+            key={value}
+            label={label}
+            selected={trainingEnvironment === value}
+            onPress={() => setTrainingEnvironment(trainingEnvironment === value ? null : value)}
+          />
+        ))}
+      </View>
+
+      <Text style={styles.fieldLabel}>Home gym (optional)</Text>
+      <Text style={styles.fieldDescription}>
+        Helps match athletes who train at the same gym.
+      </Text>
+      <TextInput
+        value={homeGym}
+        onChangeText={setHomeGym}
+        placeholder="e.g. Gold's Gym Downtown"
+        placeholderTextColor={colors.textMuted}
+        style={styles.homeGymInput}
+        autoCapitalize="words"
+        accessibilityLabel="Home gym name"
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -345,4 +423,14 @@ const styles = StyleSheet.create({
   previewMetaMuted: { ...typography.caption, color: colors.textMuted },
   editLink: { ...typography.bodySmall, color: colors.accent, marginTop: spacing.xs },
   error: { color: colors.danger, fontSize: 14 },
+  homeGymInput: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    color: colors.text,
+    backgroundColor: colors.background,
+    ...typography.bodySmall,
+  },
 });

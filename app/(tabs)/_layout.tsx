@@ -46,6 +46,11 @@ const TabsShell = memo(function TabsShell() {
   const messagesBadge =
     unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
 
+  const tabBarStyle = {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.border,
+  };
+
   const renderFeedHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
   const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
   const renderProfileHeaderTitle = useCallback(() => <FrennixLogo variant="icon" height={24} />, []);
@@ -73,7 +78,7 @@ const TabsShell = memo(function TabsShell() {
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
         headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarStyle,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarItemStyle: { minWidth: 56 },

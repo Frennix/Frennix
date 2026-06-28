@@ -1,3 +1,5 @@
 packages:
   - "."
   - "packages/*"
+allowBuilds:
+  '@sentry/cli': set this to true or false

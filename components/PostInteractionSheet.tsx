@@ -29,8 +29,9 @@ import { Avatar, ScalePressable, colors, radius, spacing, touchTarget, typograph
 
 type PostInteractionPanel = "primary" | "more";
 
-const REACTION_HIGHLIGHT_MS = 380;
-const DISMISS_DRAG_THRESHOLD = 72;
+const REACTION_HIGHLIGHT_MS = 480;
+const DISMISS_DRAG_THRESHOLD = 120;
+const MIN_BACKDROP_DISMISS_MS = 520;
 const FONT_SCALE_MAX = 1.4;
 
 type PostInteractionSheetProps = {
@@ -170,6 +171,7 @@ export function PostInteractionSheet({
   const dragY = useRef(new Animated.Value(0)).current;
   const [highlightedId, setHighlightedId] = useState<PostInteractionActionId | null>(null);
   const dismissingRef = useRef(false);
+  const openedAtRef = useRef(0);
 
   const primaryActions = useMemo(
     () => buildPrimaryActions(lastReactionId),
@@ -192,6 +194,7 @@ export function PostInteractionSheet({
     slide.setValue(0);
     fade.setValue(0);
     dragY.setValue(0);
+    openedAtRef.current = Date.now();
     Animated.parallel([
       Animated.timing(fade, {
         toValue: 1,
@@ -251,6 +254,11 @@ export function PostInteractionSheet({
       dismissingRef.current = false;
     });
   }, [dragY, fade, onClose, slide]);
+
+  const handleBackdropPress = useCallback(() => {
+    if (Date.now() - openedAtRef.current < MIN_BACKDROP_DISMISS_MS) return;
+    handleDismiss();
+  }, [handleDismiss]);
 
   const dismissRef = useRef(handleDismiss);
   dismissRef.current = handleDismiss;
@@ -339,7 +347,7 @@ export function PostInteractionSheet({
         <Animated.View style={[styles.backdrop, styles.backdropBlur, { opacity: fade }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
-            onPress={handleDismiss}
+            onPress={handleBackdropPress}
             accessibilityRole="button"
             accessibilityLabel="Dismiss post actions"
           />
@@ -501,6 +509,7 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: "flex-end",
+    backgroundColor: "rgba(10, 10, 11, 0.01)",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getConversations,
@@ -218,8 +219,7 @@ export default function TrainingMatchesScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => void handleRefresh()}
-              tintColor={colors.accent}
+              onRefresh={() => void handleRefresh()} {...frennixRefreshControlProps}
             />
           }
           ListEmptyComponent={

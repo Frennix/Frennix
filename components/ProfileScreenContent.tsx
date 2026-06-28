@@ -9,6 +9,7 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ViewStyle,
 } from "react-native";
 import type { Post, Profile, ProfileStats } from "@frennix/types";
 import { computeProfileAchievements } from "@frennix/api";
@@ -16,6 +17,10 @@ import { formatActivity, formatGoal } from "@/lib/labels";
 import { getProfileBio } from "@/lib/profile";
 import { splitProfileActivities } from "@/lib/profile-interests";
 import { avatarDisplayUri } from "@/lib/avatar";
+import {
+  tabScreenContainer,
+  tabScreenScrollSurface,
+} from "@/lib/screen-shell";
 import {
   Button,
   CachedImage,
@@ -60,6 +65,8 @@ interface ProfileScreenContentProps {
   profileActionSheet?: ReactNode;
   scrollViewRef?: RefObject<ScrollView>;
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /** Safari web tab scene height (pass from tab screens only). */
+  webShellStyle?: ViewStyle;
 }
 
 const COVER_HEIGHT = 200;
@@ -106,6 +113,7 @@ export function ProfileScreenContent({
   profileActionSheet,
   scrollViewRef,
   onScroll,
+  webShellStyle,
 }: ProfileScreenContentProps) {
   const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
@@ -128,7 +136,7 @@ export function ProfileScreenContent({
       ref={scrollViewRef}
       onScroll={onScroll}
       scrollEventThrottle={16}
-      style={styles.container}
+      style={[styles.container, tabScreenScrollSurface, webShellStyle]}
       contentContainerStyle={styles.content}
     >
       {postActionSheet}
@@ -334,7 +342,7 @@ export function ProfileScreenContent({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: tabScreenContainer,
   content: { paddingBottom: spacing.xxl },
   coverWrap: { position: "relative" },
   cover: {

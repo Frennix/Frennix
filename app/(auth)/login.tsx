@@ -1,6 +1,7 @@
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
   formatAuthErrorForDisplay,
@@ -17,6 +18,7 @@ import { isSupabaseConfigured } from "@/lib/config";
 
 export default function LoginScreen() {
   const { applySession } = useAuth();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -87,7 +89,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <FrennixLogo variant="full" height={56} style={styles.logo} />
@@ -126,8 +128,8 @@ const styles = StyleSheet.create({
   logo: { alignSelf: "center", marginBottom: spacing.sm },
   title: { ...typography.title },
   subtitle: { ...typography.bodySmall, marginBottom: spacing.md },
-  error: { color: colors.danger, fontSize: 14 },
+  error: { ...typography.bodySmall, color: colors.danger },
   apple: { height: 48, width: "100%" },
   link: { alignItems: "center", marginTop: spacing.md },
-  linkText: { color: colors.accent, fontSize: 16 },
+  linkText: { ...typography.body, color: colors.accent },
 });

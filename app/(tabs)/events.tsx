@@ -17,12 +17,19 @@ import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
+import {
+  frennixRefreshControlProps,
+  tabScreenContainer,
+  tabScreenScrollSurface,
+  useTabScreenWebHeightStyle,
+} from "@/lib/screen-shell";
 import { EventListSkeleton } from "@/components/EventListSkeleton";
 import { EmptyState, EventCard, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
 
 export default function EventsTabScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+  const webHeightStyle = useTabScreenWebHeightStyle();
   const listRef = useRef<FlatList<WorkoutEvent>>(null);
   const { onScroll, isAtTop } = useScrollAtTop();
 
@@ -56,8 +63,13 @@ export default function EventsTabScreen() {
 
   if (!userId) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Sign in to view events.</Text>
+      <View style={[styles.centered, webHeightStyle]}>
+        <EmptyState
+          title="Sign in to view events"
+          description="Create and join workout events with athletes in your community."
+          actionLabel="Sign in"
+          onAction={() => router.push("/(auth)/login")}
+        />
       </View>
     );
   }
@@ -78,7 +90,7 @@ export default function EventsTabScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, webHeightStyle]}>
       <View style={styles.headerRow}>
         <Text style={styles.header}>Upcoming workouts</Text>
         <Pressable onPress={() => router.push("/create-event")} hitSlop={8}>
@@ -88,6 +100,7 @@ export default function EventsTabScreen() {
 
       <FlatList
         ref={listRef}
+        style={[tabScreenScrollSurface, webHeightStyle]}
         data={events}
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -97,7 +110,7 @@ export default function EventsTabScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={() => void onRefresh()}
-            tintColor={colors.accent}
+            {...frennixRefreshControlProps}
           />
         }
         ListEmptyComponent={
@@ -118,10 +131,9 @@ export default function EventsTabScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: tabScreenContainer,
   centered: {
-    flex: 1,
-    backgroundColor: colors.background,
+    ...tabScreenContainer,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,

@@ -16,6 +16,7 @@ import { ProgressiveImage } from "../packages/ui/src/ProgressiveImage";
 import { colors, spacing, typography } from "../packages/ui/src/theme";
 import type { PostMediaItem } from "@frennix/types";
 import { galleryNeighborImageUris } from "@frennix/types";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -318,7 +319,9 @@ function WebZoomableImage({
 }
 
 export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
-  const topInset = Platform.OS === "web" ? spacing.lg + 40 : spacing.xxl + 40;
+  const insets = useSafeAreaInsets();
+  const chromeTop = Math.max(insets.top, spacing.lg);
+  const topInset = chromeTop + spacing.lg + 40;
   const [index, setIndex] = useState(0);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [pageWidth, setPageWidth] = useState(0);
@@ -382,7 +385,7 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
 
         <View style={styles.content} pointerEvents="box-none">
           <Pressable
-            style={styles.closeButton}
+            style={[styles.closeButton, { top: chromeTop }]}
             onPress={dismiss}
             accessibilityRole="button"
             accessibilityLabel="Close"
@@ -391,7 +394,7 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
           </Pressable>
 
           {items.length > 1 ? (
-            <View style={styles.galleryCounter} pointerEvents="none">
+            <View style={[styles.galleryCounter, { top: chromeTop }]} pointerEvents="none">
               <Text style={styles.galleryCounterText}>
                 {index + 1}/{items.length}
               </Text>
@@ -494,7 +497,6 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: "absolute",
-    top: Platform.OS === "web" ? spacing.lg : spacing.xxl,
     right: spacing.lg,
     zIndex: 20,
     elevation: 20,
@@ -515,7 +517,6 @@ const styles = StyleSheet.create({
   },
   galleryCounter: {
     position: "absolute",
-    top: Platform.OS === "web" ? spacing.lg : spacing.xxl,
     left: spacing.lg,
     zIndex: 20,
     paddingHorizontal: spacing.sm,

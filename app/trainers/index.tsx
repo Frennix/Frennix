@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { searchTrainers } from "@frennix/api";
 import type { TrainerSearchFilters } from "@frennix/types";
 import { TrainerDiscoveryCard } from "@/components/TrainerDiscoveryCard";
@@ -81,7 +82,7 @@ export default function TrainerDiscoveryScreen() {
         keyExtractor={(item) => item.profile.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} {...frennixRefreshControlProps} />
         }
         ListHeaderComponent={
           isLoading ? <ActivityIndicator color={colors.accent} style={styles.loader} /> : null

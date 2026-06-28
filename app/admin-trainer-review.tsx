@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getPendingTrainerCertifications,
   reviewTrainerCertification,
@@ -60,7 +61,7 @@ export default function AdminTrainerReviewScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} {...frennixRefreshControlProps} />
         }
         ListEmptyComponent={
           !isLoading ? (

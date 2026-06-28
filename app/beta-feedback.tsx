@@ -1,10 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getErrorMessage, submitFeedback } from "@frennix/api";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { getErrorMessage, submitFeedback, uploadFeedbackScreenshot } from "@frennix/api";
 import type { FeedbackFeatureArea, FeedbackType } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { getFeedbackContext, useFeedbackParams } from "@/lib/feedback-context";
+import { pickImageFromLibrary, type PickedImage } from "@/lib/pick-image";
 import { showAlert, showSuccess } from "@/lib/alerts";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
@@ -39,10 +40,23 @@ export default function BetaFeedbackScreen() {
   const { featureArea, screenPath } = useFeedbackParams();
   const [tab, setTab] = useState<Tab>("bug");
   const [message, setMessage] = useState("");
+  const [screenshot, setScreenshot] = useState<PickedImage | null>(null);
+  const [pickingScreenshot, setPickingScreenshot] = useState(false);
 
   const submitMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const ctx = getFeedbackContext(screenPath ?? undefined);
+      let screenshotUrl: string | null = null;
+
+      if (screenshot) {
+        screenshotUrl = await uploadFeedbackScreenshot(
+          userId,
+          screenshot.uri,
+          screenshot.mimeType,
+          screenshot.file
+        );
+      }
+
       return submitFeedback({
         user_id: userId,
         type: tab,
@@ -51,14 +65,31 @@ export default function BetaFeedbackScreen() {
         screen_path: ctx.screen_path,
         app_version: ctx.app_version,
         platform: ctx.platform,
+        os_version: ctx.os_version,
+        browser: ctx.browser,
+        build_number: ctx.build_number,
+        screenshot_url: screenshotUrl,
       });
     },
     onSuccess: () => {
       setMessage("");
+      setScreenshot(null);
       showSuccess("Thanks for your feedback!");
     },
     onError: (error) => showAlert("Could not submit", getErrorMessage(error)),
   });
+
+  async function handlePickScreenshot() {
+    try {
+      setPickingScreenshot(true);
+      const picked = await pickImageFromLibrary();
+      if (picked) setScreenshot(picked);
+    } catch (error) {
+      showAlert("Could not attach screenshot", getErrorMessage(error));
+    } finally {
+      setPickingScreenshot(false);
+    }
+  }
 
   function handleSubmit() {
     if (!userId) {
@@ -118,6 +149,25 @@ export default function BetaFeedbackScreen() {
           numberOfLines={6}
         />
 
+        <View style={styles.screenshotSection}>
+          <Text style={styles.label}>Screenshot (optional)</Text>
+          {screenshot ? (
+            <View style={styles.screenshotPreview}>
+              <Image source={{ uri: screenshot.uri }} style={styles.screenshotImage} resizeMode="cover" />
+              <Pressable onPress={() => setScreenshot(null)}>
+                <Text style={styles.removeScreenshot}>Remove screenshot</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Button
+              title="Attach screenshot"
+              variant="secondary"
+              onPress={() => void handlePickScreenshot()}
+              loading={pickingScreenshot}
+            />
+          )}
+        </View>
+
         <Button
           title="Submit feedback"
           onPress={handleSubmit}
@@ -149,4 +199,8 @@ const styles = StyleSheet.create({
   tabDescription: { ...typography.bodySmall, color: colors.textMuted },
   form: { gap: spacing.md },
   label: { ...typography.body, fontWeight: "600", color: colors.text },
+  screenshotSection: { gap: spacing.sm },
+  screenshotPreview: { gap: spacing.xs },
+  screenshotImage: { width: "100%", height: 180, borderRadius: radius.md, backgroundColor: colors.surface },
+  removeScreenshot: { ...typography.caption, color: colors.accent, fontWeight: "600" },
 });

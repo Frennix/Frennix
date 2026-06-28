@@ -13,6 +13,7 @@ import { useProfileActions } from "@/lib/useProfileActions";
 import { scrollScrollViewToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
+import { useTabScreenWebHeightStyle } from "@/lib/screen-shell";
 
 const EMPTY_STATS = {
   posts: 0,
@@ -34,6 +35,7 @@ export default function ProfileTabScreen() {
     profile,
   });
   const scrollRef = useRef<ScrollView>(null);
+  const webShellStyle = useTabScreenWebHeightStyle();
   const { onScroll, isAtTop } = useScrollAtTop();
 
   const { data: stats, refetch: refetchStats } = useQuery({
@@ -119,6 +121,7 @@ export default function ProfileTabScreen() {
       profileActionSheet={profileActionSheets}
       scrollViewRef={scrollRef}
       onScroll={onScroll}
+      webShellStyle={webShellStyle}
     />
   );
 }

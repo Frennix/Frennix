@@ -31,3 +31,5 @@ export * from "./presence";
 export * from "./matching";
 export * from "./trainer";
 export * from "./analytics";
+export * from "./feature-flags";
+export * from "./founder";

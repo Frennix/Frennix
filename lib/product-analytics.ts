@@ -66,3 +66,30 @@ export function trackMessagingLoad(durationMs: number, conversationId: string, m
     message_count: messageCount,
   });
 }
+
+export function trackMatchingDeckLoaded(durationMs: number, candidateCount: number): void {
+  trackAnalyticsEvent("perf_matching_load", {
+    duration_ms: Math.round(durationMs),
+    candidate_count: candidateCount,
+  });
+}
+
+export function trackMatchSkip(partnerId: string, deckRemaining: number): void {
+  trackAnalyticsEvent("match_skip", { partner_id: partnerId, deck_remaining: deckRemaining });
+}
+
+export function trackMatchConnect(partnerId: string, isMutual: boolean, matchScore?: number): void {
+  trackAnalyticsEvent("match_connect", {
+    partner_id: partnerId,
+    is_mutual: isMutual,
+    match_score: matchScore ?? null,
+  });
+}
+
+export function trackMatchDeckEmpty(): void {
+  trackAnalyticsEvent("match_deck_empty", {});
+}
+
+export function trackMatchDeckLoaded(count: number): void {
+  trackAnalyticsEvent("match_deck_loaded", { candidate_count: count });
+}

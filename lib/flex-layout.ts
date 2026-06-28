@@ -49,6 +49,7 @@ export const webScrollSurface: ViewStyle | undefined =
         overflow: "auto",
         WebkitOverflowScrolling: "touch",
         touchAction: "pan-y",
+        backgroundColor: "#0A0A0B",
       } as ViewStyle)
     : undefined;
 

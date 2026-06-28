@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@frennix/ui";
-import { flexFill } from "@/lib/flex-layout";
+import { flexFill, webAppShell } from "@/lib/flex-layout";
 
 interface Props {
   children: ReactNode;
@@ -60,7 +60,11 @@ export class AppErrorBoundary extends Component<Props, State> {
 }
 
 const styles = StyleSheet.create({
-  flex: flexFill,
+  flex: {
+    ...flexFill,
+    backgroundColor: colors.background,
+    ...(Platform.OS === "web" ? webAppShell : null),
+  },
   container: {
     flex: 1,
     alignItems: "center",

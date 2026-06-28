@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { MatchCandidate, MatchableProfile } from "@frennix/types";
 import { MatchReasonsList } from "@/components/MatchReasonsList";
 import { pushScreen } from "@/lib/press-utils";
+import { formatMatchScore } from "@/lib/matching-compatibility-options";
 import {
   formatCandidateActivities,
   formatCandidateGoals,
@@ -25,6 +26,7 @@ type TrainingPartnerCardProps = {
   candidate: MatchCandidate | MatchableProfile;
   viewer: MatchableProfile;
   onPressProfile?: () => void;
+  accessibilityLabel?: string;
 };
 
 function isScoredCandidate(
@@ -33,7 +35,12 @@ function isScoredCandidate(
   return "match_reasons" in candidate && Array.isArray(candidate.match_reasons);
 }
 
-export function TrainingPartnerCard({ candidate, viewer, onPressProfile }: TrainingPartnerCardProps) {
+export function TrainingPartnerCard({
+  candidate,
+  viewer,
+  onPressProfile,
+  accessibilityLabel,
+}: TrainingPartnerCardProps) {
   const sharedGoals = formatSharedGoalLabels(viewer, candidate);
   const sharedActivities = formatSharedActivityLabels(viewer, candidate);
   const goals = formatCandidateGoals(candidate);
@@ -43,6 +50,8 @@ export function TrainingPartnerCard({ candidate, viewer, onPressProfile }: Train
   const streak = isScoredCandidate(candidate) ? candidate.workout_streak : 0;
   const presenceOnline = isProfileOnline(candidate);
   const presenceLabel = formatPresenceStatus(candidate);
+
+  const matchScore = isScoredCandidate(candidate) ? candidate.match_score : null;
 
   function openProfile() {
     if (onPressProfile) {
@@ -55,7 +64,16 @@ export function TrainingPartnerCard({ candidate, viewer, onPressProfile }: Train
   }
 
   return (
-    <View style={styles.card}>
+    <View
+      style={styles.card}
+      accessibilityLabel={accessibilityLabel}
+      accessible={Boolean(accessibilityLabel)}
+    >
+      {matchScore != null && matchScore > 0 ? (
+        <View style={styles.scoreBadge} accessibilityLabel={formatMatchScore(matchScore)}>
+          <Text style={styles.scoreText}>{formatMatchScore(matchScore)}</Text>
+        </View>
+      ) : null}
       <View style={styles.hero}>
         <View style={styles.avatarWrap}>
           <Avatar uri={candidate.avatar_url} name={candidate.display_name} size={112} />
@@ -73,7 +91,7 @@ export function TrainingPartnerCard({ candidate, viewer, onPressProfile }: Train
           ) : null}
           {candidate.city ? (
             <Text style={[styles.location, sameCity && styles.locationMatch]}>
-              {sameCity ? "📍 Same city · " : "📍 "}
+              {sameCity ? "Same city · " : ""}
               {candidate.city}
             </Text>
           ) : null}
@@ -128,7 +146,12 @@ export function TrainingPartnerCard({ candidate, viewer, onPressProfile }: Train
       ) : null}
 
       {candidate.username ? (
-        <Pressable onPress={openProfile} hitSlop={8}>
+        <Pressable
+          onPress={openProfile}
+          hitSlop={8}
+          accessibilityRole="link"
+          accessibilityLabel={`View full profile for ${candidate.display_name}`}
+        >
           <Text style={styles.profileLink}>View full profile →</Text>
         </Pressable>
       ) : null}
@@ -145,7 +168,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.lg,
     gap: spacing.md,
+    position: "relative",
   },
+  scoreBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.accentMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  scoreText: { ...typography.caption, color: colors.accent, fontWeight: "700" },
   hero: {
     flexDirection: "row",
     alignItems: "flex-start",

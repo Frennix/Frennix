@@ -3,11 +3,12 @@ import { router } from "expo-router";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
+import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
 import { AppIcon } from "@/components/AppIcon";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
-import { getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
+import { getErrorMessage, getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
 import type { SuggestedAthlete } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { DiscoverChallengeRow } from "@/components/DiscoverChallengeRow";
@@ -16,10 +17,17 @@ import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import {
+  frennixRefreshControlProps,
+  tabScreenContainer,
+  tabScreenScrollSurface,
+  useTabScreenWebHeightStyle,
+} from "@/lib/screen-shell";
+import {
   DiscoverProfileCard,
   EmptyState,
   GroupCard,
   Input,
+  QueryErrorState,
   colors,
   spacing,
   typography,
@@ -34,6 +42,7 @@ function profileInterestLabels(activities: string[] | undefined, limit = 4) {
 export default function DiscoverScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+  const webHeightStyle = useTabScreenWebHeightStyle();
   const [tab, setTab] = useState<Tab>("people");
   const [peopleSearch, setPeopleSearch] = useState("");
   const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
@@ -50,6 +59,8 @@ export default function DiscoverScreen() {
   const {
     data: searchResults = [],
     isFetching: searchLoading,
+    isError: searchError,
+    error: searchQueryError,
     refetch: refetchSearch,
     isRefetching: searchRefetching,
   } = useQuery({
@@ -63,6 +74,8 @@ export default function DiscoverScreen() {
   const {
     data: suggestions = [],
     isFetching: suggestionsLoading,
+    isError: suggestionsError,
+    error: suggestionsQueryError,
     refetch: refetchSuggestions,
     isRefetching: suggestionsRefetching,
   } = useQuery({
@@ -73,7 +86,14 @@ export default function DiscoverScreen() {
     placeholderData: (previousData) => previousData,
   });
 
-  const { data: groups = [], refetch: refetchGroups, isRefetching: groupsRefetching } = useQuery({
+  const {
+    data: groups = [],
+    isFetching: groupsLoading,
+    isError: groupsError,
+    error: groupsQueryError,
+    refetch: refetchGroups,
+    isRefetching: groupsRefetching,
+  } = useQuery({
     queryKey: ["discover-groups", groupQuery],
     queryFn: () => getGroups({ query: groupQuery || undefined }),
     enabled: tab === "groups",
@@ -81,7 +101,14 @@ export default function DiscoverScreen() {
     placeholderData: (previousData) => previousData,
   });
 
-  const { data: challenges = [], refetch: refetchChallenges, isRefetching: challengesRefetching } = useQuery({
+  const {
+    data: challenges = [],
+    isFetching: challengesLoading,
+    isError: challengesError,
+    error: challengesQueryError,
+    refetch: refetchChallenges,
+    isRefetching: challengesRefetching,
+  } = useQuery({
     queryKey: ["discover-challenges"],
     queryFn: getChallenges,
     enabled: tab === "challenges",
@@ -125,6 +152,8 @@ export default function DiscoverScreen() {
     : suggestions;
 
   const peopleLoading = isSearchingPeople ? searchLoading : suggestionsLoading;
+  const peopleError = isSearchingPeople ? searchError : suggestionsError;
+  const peopleQueryError = isSearchingPeople ? searchQueryError : suggestionsQueryError;
   const peopleRefetching = isSearchingPeople ? searchRefetching : suggestionsRefetching;
 
   const peopleListRef = useRef<FlatList<SuggestedAthlete>>(null);
@@ -153,8 +182,44 @@ export default function DiscoverScreen() {
     }, [isAtTop, onRefreshChallenges, onRefreshGroups, onRefreshPeople, tab])
   );
 
+  if (tab === "people" && peopleError && peopleData.length === 0) {
+    return (
+      <View style={[styles.container, webHeightStyle]}>
+        <QueryErrorState
+          title="Could not load people"
+          message={getErrorMessage(peopleQueryError)}
+          onRetry={() => void (isSearchingPeople ? refetchSearch() : refetchSuggestions())}
+        />
+      </View>
+    );
+  }
+
+  if (tab === "groups" && groupsError && groups.length === 0) {
+    return (
+      <View style={[styles.container, webHeightStyle]}>
+        <QueryErrorState
+          title="Could not load groups"
+          message={getErrorMessage(groupsQueryError)}
+          onRetry={() => void refetchGroups()}
+        />
+      </View>
+    );
+  }
+
+  if (tab === "challenges" && challengesError && challenges.length === 0) {
+    return (
+      <View style={[styles.container, webHeightStyle]}>
+        <QueryErrorState
+          title="Could not load challenges"
+          message={getErrorMessage(challengesQueryError)}
+          onRetry={() => void refetchChallenges()}
+        />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, webHeightStyle]}>
       <Text style={styles.header}>Find your training community</Text>
 
       <Text style={styles.matchingSectionTitle}>Matching</Text>
@@ -218,6 +283,7 @@ export default function DiscoverScreen() {
       {tab === "people" ? (
         <FlatList
           ref={peopleListRef}
+          style={[tabScreenScrollSurface, webHeightStyle]}
           data={peopleData}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -228,7 +294,7 @@ export default function DiscoverScreen() {
             <RefreshControl
               refreshing={peopleRefetching}
               onRefresh={() => void onRefreshPeople()}
-              tintColor={colors.accent}
+              {...frennixRefreshControlProps}
             />
           }
           ListHeaderComponent={
@@ -278,6 +344,7 @@ export default function DiscoverScreen() {
       {tab === "groups" ? (
         <FlatList
           ref={groupsListRef}
+          style={[tabScreenScrollSurface, webHeightStyle]}
           data={groups}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -287,7 +354,7 @@ export default function DiscoverScreen() {
             <RefreshControl
               refreshing={groupsRefetching}
               onRefresh={() => void onRefreshGroups()}
-              tintColor={colors.accent}
+              {...frennixRefreshControlProps}
             />
           }
           ListHeaderComponent={
@@ -296,12 +363,16 @@ export default function DiscoverScreen() {
             </Pressable>
           }
           ListEmptyComponent={
-            <EmptyState
-              title="No groups found"
-              description="Start a group for your marathon crew, pickup league, or gym community."
-              actionLabel="Create group"
-              onAction={() => router.push("/create-group")}
-            />
+            groupsLoading ? (
+              <DiscoverListSkeleton />
+            ) : (
+              <EmptyState
+                title="No groups found"
+                description="Start a group for your marathon crew, pickup league, or gym community."
+                actionLabel="Create group"
+                onAction={() => router.push("/create-group")}
+              />
+            )
           }
           renderItem={({ item }) => (
             <GroupCard group={item} onPress={() => router.push(`/group/${item.id}`)} />
@@ -312,6 +383,7 @@ export default function DiscoverScreen() {
       {tab === "challenges" ? (
         <FlatList
           ref={challengesListRef}
+          style={[tabScreenScrollSurface, webHeightStyle]}
           data={challenges}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -321,7 +393,7 @@ export default function DiscoverScreen() {
             <RefreshControl
               refreshing={challengesRefetching}
               onRefresh={() => void onRefreshChallenges()}
-              tintColor={colors.accent}
+              {...frennixRefreshControlProps}
             />
           }
           ListHeaderComponent={
@@ -330,12 +402,16 @@ export default function DiscoverScreen() {
             </Pressable>
           }
           ListEmptyComponent={
-            <EmptyState
-              title="No active challenges"
-              description="Join or create a challenge to stay accountable with your community."
-              actionLabel="Create challenge"
-              onAction={() => router.push("/create-challenge")}
-            />
+            challengesLoading ? (
+              <DiscoverListSkeleton />
+            ) : (
+              <EmptyState
+                title="No active challenges"
+                description="Join or create a challenge to stay accountable with your community."
+                actionLabel="Create challenge"
+                onAction={() => router.push("/create-challenge")}
+              />
+            )
           }
           renderItem={({ item }) => <DiscoverChallengeRow challenge={item} userId={userId} />}
         />
@@ -345,7 +421,7 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+  container: { ...tabScreenContainer, padding: spacing.md },
   header: { ...typography.heading, marginBottom: spacing.sm },
   matchingSectionTitle: {
     ...typography.bodySmall,

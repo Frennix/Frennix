@@ -1,10 +1,13 @@
 import "@/lib/init-supabase";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import { useEffect, type ReactNode } from "react";
 import { Platform } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
+import { ThemeProvider } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { TabBadgeProvider } from "@/providers/TabBadgeProvider";
@@ -23,6 +26,7 @@ import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
+import { frennixNavigationTheme } from "@/lib/navigation-theme";
 
 initSentry();
 
@@ -65,7 +69,14 @@ function NotificationBootstrap() {
 export default function RootLayout() {
   markStartupMount("root-layout:render", "sync");
 
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    void SystemUI.setBackgroundColorAsync(colors.background);
+  }, []);
+
   return (
+    <SafeAreaProvider>
+      <ThemeProvider value={frennixNavigationTheme}>
     <StartupMountProbe id="gesture-handler">
       <GestureHandlerRootView
         pointerEvents="box-none"
@@ -175,6 +186,8 @@ export default function RootLayout() {
             <Stack.Screen name="trainer-profile" options={{ headerShown: false }} />
             <Stack.Screen name="admin-trainer-review" options={backScreen("Trainer review")} />
             <Stack.Screen name="admin-analytics" options={backScreen("Analytics")} />
+            <Stack.Screen name="founder" options={{ headerShown: false }} />
+            <Stack.Screen name="staff/join" options={{ headerShown: false, title: "Staff invite" }} />
                               </Stack>
                             </StartupMountProbe>
                           </AppErrorBoundary>
@@ -189,5 +202,7 @@ export default function RootLayout() {
         </StartupMountProbe>
       </GestureHandlerRootView>
     </StartupMountProbe>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

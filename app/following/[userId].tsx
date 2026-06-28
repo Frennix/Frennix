@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { getFollowing, getFollowingIds } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { UserFollowRow } from "@/components/UserFollowRow";
+import { UserFollowListSkeleton } from "@/components/UserFollowListSkeleton";
 import { EmptyState, colors, spacing } from "@frennix/ui";
 
 export default function FollowingScreen() {
@@ -32,15 +34,17 @@ export default function FollowingScreen() {
         keyExtractor={(profile) => profile.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} {...frennixRefreshControlProps} />
         }
         ListEmptyComponent={
-          !isLoading ? (
+          isLoading ? (
+            <UserFollowListSkeleton />
+          ) : (
             <EmptyState
               title="Not following anyone"
               description="People this user follows will show up here."
             />
-          ) : null
+          )
         }
         renderItem={({ item }) => (
           <UserFollowRow

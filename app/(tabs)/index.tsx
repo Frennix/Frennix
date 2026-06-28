@@ -9,6 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getFeed,
   getFeedStories,
@@ -478,6 +479,7 @@ export default function HomeScreen() {
     () => (
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <FeedHeader
+          showTopRow={false}
           stories={stories}
           suggestions={suggestions}
           followingIds={followingIds}
@@ -650,10 +652,7 @@ export default function HomeScreen() {
                 refreshing={
                   isRefetching || isStoriesRefetching || isSuggestionsRefetching
                 }
-                onRefresh={() => void handleRefresh()}
-                tintColor={colors.accent}
-                colors={[colors.accent]}
-                progressBackgroundColor={colors.surface}
+                onRefresh={() => void handleRefresh()} {...frennixRefreshControlProps}
               />
             }
             onLayout={(height) => handleListLayout(height)}
@@ -691,10 +690,7 @@ export default function HomeScreen() {
                 refreshing={
                   isRefetching || isStoriesRefetching || isSuggestionsRefetching
                 }
-                onRefresh={() => void handleRefresh()}
-                tintColor={colors.accent}
-                colors={[colors.accent]}
-                progressBackgroundColor={colors.surface}
+                onRefresh={() => void handleRefresh()} {...frennixRefreshControlProps}
               />
             }
             onEndReachedThreshold={2}
@@ -783,7 +779,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.background },
-  feedScrollShell: { ...flexFill, ...webTabSceneShell },
+  feedScrollShell: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.background },
   feedList: { ...flexFill, ...webScrollSurface },
   list: {
     flexGrow: 1,

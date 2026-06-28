@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { EmptyState, colors } from "@frennix/ui";
+import { flexFill } from "@/lib/flex-layout";
 
 interface Props {
   children: ReactNode;
@@ -48,7 +49,7 @@ export class MatchingRouteErrorBoundary extends Component<Props, State> {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { ...flexFill, backgroundColor: colors.background },
   container: {
     flex: 1,
     backgroundColor: colors.background,

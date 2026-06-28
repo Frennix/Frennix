@@ -6,9 +6,9 @@ import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOT = join(__dirname, "../../..");
-const MOBILE = join(ROOT, "apps/mobile");
-const SUPABASE = join(ROOT, "supabase/migrations");
+const MOBILE = join(__dirname, "..");
+const ROOT = join(MOBILE, "../..");
+const SUPABASE = join(MOBILE, "supabase/migrations");
 
 type CheckResult = { id: string; area: string; status: "PASS" | "FAIL" | "MANUAL"; detail: string };
 
@@ -33,6 +33,9 @@ const REQUIRED_MIGRATIONS = [
   "20250624000002_training_match_message_notifications.sql",
   "20250625000001_training_match_removal_and_block.sql",
   "20250626000001_production_readiness.sql",
+  "20250630000014_matching_scoring_phase_a.sql",
+  "20250704000001_p1_training_matchmaking_flag.sql",
+  "20250705000001_p1_matchmaking_analytics.sql",
 ];
 
 const REQUIRED_RPCS = [
@@ -44,6 +47,8 @@ const REQUIRED_RPCS = [
   "expire_stale_presence",
   "notify_on_match",
   "dispatch_push_notification",
+  "evaluate_feature_flag",
+  "get_matchmaking_analytics",
 ];
 
 const COPY_BANNED = [
@@ -61,6 +66,8 @@ const COPY_FILES = [
   "components/TrainingMatchModal.tsx",
   "components/TrainingMatchRow.tsx",
   "components/TrainingPartnerCard.tsx",
+  "components/TrainingPartnerDeckSafety.tsx",
+  "lib/product-analytics.ts",
   "components/FrennixNotificationRow.tsx",
   "app/notifications.tsx",
   "packages/api/src/notifications.ts",
@@ -95,7 +102,7 @@ function checkRpcsInMigrations() {
 
 function checkCopyAudit() {
   for (const rel of COPY_FILES) {
-    const path = join(ROOT, rel.startsWith("packages") ? rel : `apps/mobile/${rel}`);
+    const path = join(MOBILE, rel);
     if (!existsSync(path)) {
       fail(`COPY-${rel}`, "Copy", `File missing: ${rel}`);
       continue;
@@ -124,7 +131,7 @@ function checkBrandingImports() {
 
 function checkRemoteMigrations() {
   try {
-    const out = execSync("supabase migration list", { cwd: ROOT, encoding: "utf8" });
+    const out = execSync("supabase migration list", { cwd: MOBILE, encoding: "utf8" });
     const unsynced = out
       .split("\n")
       .filter((l) => /^\s+\d{14}\s+\|/.test(l))
@@ -144,7 +151,7 @@ function checkRemoteMigrations() {
 
 function checkSendPushDeployed() {
   try {
-    const out = execSync("supabase functions list", { cwd: ROOT, encoding: "utf8" });
+    const out = execSync("supabase functions list", { cwd: MOBILE, encoding: "utf8" });
     if (/send-push.*ACTIVE/i.test(out.replace(/\n/g, " "))) {
       pass("FN-SEND-PUSH", "Deploy", "send-push edge function ACTIVE on remote");
     } else {

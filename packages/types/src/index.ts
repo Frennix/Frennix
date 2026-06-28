@@ -404,8 +404,9 @@ export interface Referral {
   created_at: string;
 }
 
-export type FeedbackType = "bug" | "feature" | "general" | "rating";
-export type FeedbackStatus = "open" | "resolved";
+export type FeedbackType = "bug" | "feature" | "general" | "rating" | "crash";
+export type FeedbackStatus = "new" | "in_progress" | "fixed" | "released" | "closed";
+export type FeedbackPriority = "critical" | "high" | "medium" | "low";
 
 export type FeedbackFeatureArea =
   | "training_partners"
@@ -422,15 +423,30 @@ export interface BetaFeedback {
   message: string | null;
   rating: number | null;
   status: FeedbackStatus;
+  priority: FeedbackPriority;
   feature_area: string | null;
   screen_path: string | null;
   app_version: string | null;
   platform: string | null;
+  os_version: string | null;
+  browser: string | null;
+  build_number: string | null;
+  screenshot_url: string | null;
+  milestone_code: string | null;
+  release_version: string | null;
+  github_issue_url: string | null;
+  github_commit_sha: string | null;
+  notify_tester_when_resolved: boolean;
+  tester_notified_at: string | null;
   metadata: Record<string, unknown>;
   resolved_at: string | null;
   resolved_by: string | null;
   created_at: string;
+  updated_at: string;
   user?: Profile;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string | null;
 }
 
 export interface Report {
@@ -503,6 +519,7 @@ export type Activity = (typeof ACTIVITIES)[number];
 
 export * from "./trainer";
 export * from "./analytics";
+export * from "./founder-dashboard";
 export * from "./workout-types";
 export * from "./post-media";
 export * from "./story-engagement";

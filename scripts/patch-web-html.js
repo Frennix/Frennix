@@ -4,6 +4,10 @@
  */
 const { readFileSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
+const {
+  frennixWebDocumentCss,
+  FRENNIX_WEB_BACKGROUND,
+} = require("../lib/web-document-styles.js");
 
 const indexPath = join(__dirname, "..", "dist", "index.html");
 let html = readFileSync(indexPath, "utf8");
@@ -17,44 +21,23 @@ if (!html.includes("viewport-fit=cover")) {
   );
 }
 
+if (!html.includes('name="theme-color"')) {
+  html = html.replace(
+    "<title>Frennix</title>",
+    `<title>Frennix</title>\n    <meta name="theme-color" content="${FRENNIX_WEB_BACKGROUND}" />\n    <meta name="color-scheme" content="dark" />`
+  );
+}
+
 const patchId = "frennix-web-scroll";
-const scrollPatch = `
-    <style id="${patchId}">
-      html {
-        height: 100%;
-        height: -webkit-fill-available;
-        min-height: 100%;
-        background-color: #0A0A0B;
-      }
-      body {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 100dvh;
-        min-height: -webkit-fill-available;
-        margin: 0;
-        background-color: #0A0A0B;
-        overflow: hidden;
-      }
-      #root {
-        flex: 1 1 auto;
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        height: 100%;
-        min-height: 100%;
-        background-color: #0A0A0B;
-        pointer-events: none;
-      }
-    </style>`;
+const scrollPatch = `<style id="${patchId}">${frennixWebDocumentCss}\n    </style>`;
 
 if (html.includes(`id="${patchId}"`)) {
   html = html.replace(
     new RegExp(`<style id="${patchId}">[\\s\\S]*?</style>`),
-    scrollPatch.trim()
+    scrollPatch
   );
 } else {
-  html = html.replace("</style>", `</style>${scrollPatch}`);
+  html = html.replace("</head>", `    ${scrollPatch}\n  </head>`);
 }
 
 // Remove legacy pre-JS emergency banner if present from an older export.

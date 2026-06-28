@@ -2,6 +2,10 @@ export const PRODUCT_EVENT_NAMES = [
   "user_signed_up",
   "daily_active_user",
   "training_partner_match",
+  "match_skip",
+  "match_connect",
+  "match_deck_loaded",
+  "match_deck_empty",
   "trainer_connection_requested",
   "trainer_connection_accepted",
   "message_sent",
@@ -9,6 +13,7 @@ export const PRODUCT_EVENT_NAMES = [
   "perf_screen_load",
   "perf_feed_load",
   "perf_messaging_load",
+  "perf_matching_load",
   "feedback_submitted",
 ] as const;
 

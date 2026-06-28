@@ -1,6 +1,6 @@
 import { AppIcon } from "@/components/AppIcon";
 import { Stack, router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
@@ -24,9 +25,18 @@ import {
 } from "@/components/TrainingMatchModal";
 import { TrainingPartnerCard } from "@/components/TrainingPartnerCard";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
+import { TrainingPartnerDeckSafety } from "@/components/TrainingPartnerDeckSafety";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen } from "@/lib/press-utils";
 import { logMatchmakingError } from "@/lib/matchmaking-observability";
+import {
+  trackMatchConnect,
+  trackMatchDeckEmpty,
+  trackMatchDeckLoaded,
+  trackMatchSkip,
+  trackMatchingDeckLoaded,
+} from "@/lib/product-analytics";
+import { useFeatureFlag } from "@/lib/useFeatureFlag";
 import { hapticMatch } from "@/lib/haptics";
 import { isTrainingPartnerDiscoveryReady } from "@/lib/training-partner-readiness";
 import { useAuth } from "@/providers/AuthProvider";
@@ -35,10 +45,20 @@ import { Button, EmptyState, ScreenSpinner, prefetchCachedImage, colors, spacing
 function MatchingHeaderActions() {
   return (
     <View style={styles.headerActions}>
-      <Pressable onPress={() => pushScreen("/matching/matches")} hitSlop={8}>
+      <Pressable
+        onPress={() => pushScreen("/matching/matches")}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="View training matches"
+      >
         <AppIcon name="users" color={colors.text} size={22} />
       </Pressable>
-      <Pressable onPress={() => pushScreen("/matching-settings")} hitSlop={8}>
+      <Pressable
+        onPress={() => pushScreen("/matching-settings")}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Training partner preferences"
+      >
         <AppIcon name="sliders" color={colors.text} size={22} />
       </Pressable>
     </View>
@@ -57,6 +77,12 @@ export default function TrainingPartnerDiscoveryScreen() {
   const [matchPartner, setMatchPartner] = useState<MatchCandidate | null>(null);
   const [matchModalVisible, setMatchModalVisible] = useState(false);
   const [openingMessage, setOpeningMessage] = useState(false);
+
+  const { enabled: matchmakingEnabled, isLoading: flagLoading } = useFeatureFlag(
+    "training_matchmaking",
+    true
+  );
+  const loadStartedAt = useRef(Date.now());
 
   const discoveryEnabled = profile?.matching_enabled ?? false;
   const profileReady = profile ? isTrainingPartnerDiscoveryReady(profile) : false;
@@ -85,10 +111,25 @@ export default function TrainingPartnerDiscoveryScreen() {
   }, [candidates, deckInitialized, discoveryEnabled, isLoading, syncDeck]);
 
   useEffect(() => {
+    if (!discoveryEnabled || isLoading || !deckInitialized) return;
+    const durationMs = Date.now() - loadStartedAt.current;
+    trackMatchingDeckLoaded(durationMs, deck.length);
+    if (deck.length > 0) {
+      trackMatchDeckLoaded(deck.length);
+    }
+  }, [deckInitialized, deck.length, discoveryEnabled, isLoading]);
+
+  useEffect(() => {
     if (isError && error) {
       logMatchmakingError("match_candidates", error);
     }
   }, [isError, error]);
+
+  useEffect(() => {
+    if (deckInitialized && !isLoading && discoveryEnabled && deck.length === 0 && !isError) {
+      trackMatchDeckEmpty();
+    }
+  }, [deckInitialized, deck.length, discoveryEnabled, isError, isLoading]);
 
   const currentCandidate = deck[0] ?? null;
   const nextCandidate = deck[1] ?? null;
@@ -122,6 +163,16 @@ export default function TrainingPartnerDiscoveryScreen() {
 
     try {
       const result = await recordMatchSwipe(currentCandidate.id, direction);
+
+      if (direction === "left") {
+        trackMatchSkip(currentCandidate.id, Math.max(deck.length - 1, 0));
+      } else {
+        trackMatchConnect(
+          currentCandidate.id,
+          Boolean(result.is_mutual && result.match),
+          currentCandidate.match_score
+        );
+      }
 
       if (direction === "right" && result.is_mutual && result.match) {
         hapticMatch();
@@ -169,7 +220,7 @@ export default function TrainingPartnerDiscoveryScreen() {
     setMatchPartner(null);
   }
 
-  if (!authReady || !profile) {
+  if (!authReady || !profile || flagLoading) {
     return (
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
@@ -184,6 +235,21 @@ export default function TrainingPartnerDiscoveryScreen() {
               onAction={() => void refreshProfile()}
             />
           )}
+        </View>
+      </>
+    );
+  }
+
+  if (!matchmakingEnabled) {
+    return (
+      <>
+        <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
+        <View style={styles.gated}>
+          <FrennixLogo variant="full" height={34} style={styles.logo} />
+          <EmptyState
+            title="Training partners temporarily unavailable"
+            description="We are making improvements to training partner discovery. Please check back soon."
+          />
         </View>
       </>
     );
@@ -262,8 +328,7 @@ export default function TrainingPartnerDiscoveryScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => void handleRefresh()}
-              tintColor={colors.accent}
+              onRefresh={() => void handleRefresh()} {...frennixRefreshControlProps}
             />
           }
         >
@@ -312,7 +377,11 @@ export default function TrainingPartnerDiscoveryScreen() {
           ) : null}
 
           <View style={styles.frontCard}>
-            <TrainingPartnerCard candidate={currentCandidate} viewer={profile} />
+            <TrainingPartnerCard
+              candidate={currentCandidate}
+              viewer={profile}
+              accessibilityLabel={`Training partner ${currentCandidate.display_name}`}
+            />
           </View>
         </View>
 
@@ -330,6 +399,13 @@ export default function TrainingPartnerDiscoveryScreen() {
         ) : (
           <Text style={styles.actingHint}>Connect to train together · Skip to see the next athlete</Text>
         )}
+
+        <TrainingPartnerDeckSafety
+          userId={userId}
+          partnerId={currentCandidate.id}
+          partnerName={currentCandidate.display_name}
+          onPartnerRemoved={() => void advanceDeck()}
+        />
 
         <ReportIssueLink area="training_partners" from="/matching" />
       </View>

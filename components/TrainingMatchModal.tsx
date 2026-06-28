@@ -22,7 +22,13 @@ export function TrainingMatchModal({
   if (!partner) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onKeepBrowsing}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onKeepBrowsing}
+      accessibilityViewIsModal
+    >
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <FrennixLogo variant="icon" height={32} style={styles.logo} />
@@ -43,7 +49,13 @@ export function TrainingMatchModal({
             loading={messaging}
             style={styles.primaryAction}
           />
-          <Pressable onPress={onKeepBrowsing} style={styles.secondaryAction} hitSlop={8}>
+          <Pressable
+            onPress={onKeepBrowsing}
+            style={styles.secondaryAction}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Keep browsing training partners"
+          >
             <Text style={styles.secondaryLabel}>Keep browsing partners</Text>
           </Pressable>
         </View>

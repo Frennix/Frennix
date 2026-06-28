@@ -12,6 +12,11 @@ interface FeedHeaderProps {
   followLoadingId?: string | null;
   onStoryPress?: (story: FeedStory) => void;
   onFollowPress?: (profileId: string, isFollowing: boolean) => void;
+  /** Bisection: top logo row only */
+  showTopRow?: boolean;
+  showSuggestions?: boolean;
+  showStories?: boolean;
+  showQuickActions?: boolean;
 }
 
 export const FeedHeader = memo(function FeedHeader({
@@ -21,49 +26,61 @@ export const FeedHeader = memo(function FeedHeader({
   followLoadingId = null,
   onStoryPress,
   onFollowPress,
+  showTopRow = true,
+  showSuggestions = true,
+  showStories = true,
+  showQuickActions = true,
 }: FeedHeaderProps) {
   return (
     <View style={styles.container}>
-      <View style={styles.topRow}>
-        <View style={styles.titleBlock}>
-          <FrennixLogo variant="full" height={34} />
-          <Text style={styles.subtitle}>Workouts, progress, and wins from your network</Text>
+      {showTopRow ? (
+        <View style={styles.topRow}>
+          <View style={styles.titleBlock}>
+            <FrennixLogo variant="full" height={34} />
+            <Text style={styles.subtitle}>Workouts, progress, and wins from your network</Text>
+          </View>
+          <Pressable
+            style={styles.createButton}
+            onPress={openCreatePost}
+            accessibilityRole="button"
+            accessibilityLabel="Create post"
+          >
+            <Text style={styles.createIcon}>＋</Text>
+          </Pressable>
         </View>
-        <Pressable
-          style={styles.createButton}
-          onPress={openCreatePost}
-          accessibilityRole="button"
-          accessibilityLabel="Create post"
-        >
-          <Text style={styles.createIcon}>＋</Text>
-        </Pressable>
-      </View>
+      ) : null}
 
-      <PeopleYouMayKnowCarousel
-        suggestions={suggestions}
-        followingIds={followingIds}
-        onProfilePress={(username) => pushScreen(`/user/${username}`)}
-        onFollowPress={onFollowPress}
-        followLoadingId={followLoadingId}
-      />
+      {showSuggestions ? (
+        <PeopleYouMayKnowCarousel
+          suggestions={suggestions}
+          followingIds={followingIds}
+          onProfilePress={(username) => pushScreen(`/user/${username}`)}
+          onFollowPress={onFollowPress}
+          followLoadingId={followLoadingId}
+        />
+      ) : null}
 
-      <FeedStoriesRow
-        stories={stories}
-        onStoryPress={onStoryPress}
-        onAddStoryPress={openCreatePost}
-      />
+      {showStories ? (
+        <FeedStoriesRow
+          stories={stories}
+          onStoryPress={onStoryPress}
+          onAddStoryPress={openCreatePost}
+        />
+      ) : null}
 
-      <View style={styles.quickActions}>
-        <Pressable style={styles.chip} onPress={openCreatePost}>
-          <Text style={styles.chipText}>Share workout</Text>
-        </Pressable>
-        <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/discover")}>
-          <Text style={styles.chipText}>Find athletes</Text>
-        </Pressable>
-        <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/events")}>
-          <Text style={styles.chipText}>Events</Text>
-        </Pressable>
-      </View>
+      {showQuickActions ? (
+        <View style={styles.quickActions}>
+          <Pressable style={styles.chip} onPress={openCreatePost}>
+            <Text style={styles.chipText}>Share workout</Text>
+          </Pressable>
+          <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/discover")}>
+            <Text style={styles.chipText}>Find athletes</Text>
+          </Pressable>
+          <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/events")}>
+            <Text style={styles.chipText}>Events</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 });

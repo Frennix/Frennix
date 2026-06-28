@@ -16,6 +16,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { config } from "@/lib/config";
 import { unregisterPushNotifications } from "@/lib/notifications";
 import { pushScreen } from "@/lib/press-utils";
+import { useStaffAccess } from "@/lib/founder/useStaffAccess";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
@@ -48,6 +49,7 @@ function showError(message: string) {
 
 export default function SettingsScreen() {
   const { profile, signOut, session } = useAuth();
+  const { canAccessDashboard } = useStaffAccess();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -128,6 +130,16 @@ export default function SettingsScreen() {
         </Pressable>
       </Link>
 
+      {canAccessDashboard ? (
+        <>
+          <Text style={styles.section}>Founder</Text>
+          <Pressable onPress={() => pushScreen("/founder")}>
+            <Text style={styles.link}>Founder Dashboard</Text>
+            <Text style={styles.linkHint}>Operations, analytics, and release management</Text>
+          </Pressable>
+        </>
+      ) : null}
+
       {profile?.is_admin ? (
         <>
           <Text style={styles.section}>Admin</Text>
@@ -136,9 +148,9 @@ export default function SettingsScreen() {
               <Text style={styles.link}>Moderation panel</Text>
             </Pressable>
           </Link>
-          <Link href="/admin-feedback" asChild>
+          <Link href="/founder/support" asChild>
             <Pressable>
-              <Text style={styles.link}>Feedback dashboard</Text>
+              <Text style={styles.link}>Beta feedback dashboard</Text>
             </Pressable>
           </Link>
           <Link href="/admin-trainer-review" asChild>

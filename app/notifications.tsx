@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead } from "@frennix/api";
 import type { Notification } from "@frennix/types";
@@ -190,8 +191,7 @@ export default function NotificationsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={() => void onRefresh()}
-            tintColor={colors.accent}
+            onRefresh={() => void onRefresh()} {...frennixRefreshControlProps}
           />
         }
         ListEmptyComponent={

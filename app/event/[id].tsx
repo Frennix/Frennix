@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getErrorMessage,
   getEventAttendees,
@@ -146,7 +147,7 @@ export default function EventDetailScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} {...frennixRefreshControlProps} />
       }
     >
       {postActionSheets}

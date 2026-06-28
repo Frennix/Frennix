@@ -89,6 +89,16 @@ Status key: ⬜ Not run · ✅ Pass · ❌ Fail · ⏭ N/A
 | SF-02 | Block → removed from training matches list | ⬜ | ⬜ | ⬜ |
 | SF-03 | Block → auto-unmatch | ⬜ | ⬜ | ⬜ |
 | SF-04 | Unblock → does not rematch or restore deck | ⬜ | ⬜ | ⬜ |
+| SF-05 | In-deck report/block removes current candidate | ⬜ | ⬜ | ⬜ |
+
+### Accessibility (P1)
+
+| ID | Test | iOS | Android | Web |
+|----|------|-----|---------|-----|
+| A11Y-01 | Connect/Skip buttons labeled | ⬜ | ⬜ | ⬜ |
+| A11Y-02 | Header matches/settings icons labeled | ⬜ | ⬜ | ⬜ |
+| A11Y-03 | Match modal announced as modal | ⬜ | ⬜ | ⬜ |
+| A11Y-04 | Training partner card readable end-to-end | ⬜ | ⬜ | ⬜ |
 
 ### Settings & onboarding (Phase 11)
 

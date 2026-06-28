@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getChallenge,
   getChallengePosts,
@@ -125,7 +126,7 @@ export default function ChallengeDetailScreen() {
         keyExtractor={(p) => p.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} {...frennixRefreshControlProps} />
         }
         ListHeaderComponent={
           <View style={styles.header}>

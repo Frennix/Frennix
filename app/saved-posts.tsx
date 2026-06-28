@@ -1,12 +1,13 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { frennixRefreshControlProps } from "@/lib/screen-shell";
 import { getSavedPosts } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePostActions } from "@/lib/usePostActions";
 import { useSavePost } from "@/lib/useSavePost";
 import { useSharePost } from "@/lib/useSharePost";
-import { EmptyState, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { EmptyState, FeedPostCardSkeleton, PostCard, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 
 export default function SavedPostsScreen() {
   const { session } = useAuth();
@@ -45,7 +46,7 @@ export default function SavedPostsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} {...frennixRefreshControlProps} />
         }
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
@@ -58,7 +59,11 @@ export default function SavedPostsScreen() {
         }
         ListEmptyComponent={
           isLoading ? (
-            <ActivityIndicator color={colors.accent} style={styles.footer} />
+            <View style={styles.initialSkeletons}>
+              <FeedPostCardSkeleton />
+              <FeedPostCardSkeleton />
+              <FeedPostCardSkeleton />
+            </View>
           ) : (
             <EmptyState
               title="No saved posts yet"
@@ -90,4 +95,5 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.md, flexGrow: 1 },
   footer: { paddingVertical: spacing.lg },
+  initialSkeletons: { gap: 0 },
 });

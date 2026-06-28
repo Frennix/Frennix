@@ -29,6 +29,7 @@ import {
 import {
   formatStoryDuration,
   formatStoryCompletedTime,
+  formatStoryCalories,
 } from "@/lib/story-format";
 import { primaryStoryMilestone } from "@frennix/api";
 import { StoryActionDock } from "./story/StoryActionDock";
@@ -36,7 +37,6 @@ import { StoryFooterGradient } from "./story/StoryFooterGradient";
 import { StoryDailyMotivation } from "./story/StoryDailyMotivation";
 import { StoryAchievementMoment } from "./story/StoryAchievementMoment";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
-import { WorkoutCompletionCard } from "./story/WorkoutCompletionCard";
 import {
   buildStorySlides,
   prefetchStorySlide,
@@ -194,6 +194,7 @@ export function WorkoutStoryViewer({
   const [slideIndex, setSlideIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [interactionLocked, setInteractionLocked] = useState(false);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -216,6 +217,7 @@ export function WorkoutStoryViewer({
     setSlideIndex(0);
     setPaused(false);
     setInteractionLocked(false);
+    setCaptionExpanded(false);
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
@@ -302,6 +304,7 @@ export function WorkoutStoryViewer({
 
   useEffect(() => {
     setInteractionLocked(false);
+    setCaptionExpanded(false);
   }, [timerKey]);
 
   useEffect(() => {
@@ -376,14 +379,11 @@ export function WorkoutStoryViewer({
 
   const caption = lastWorkout?.content?.trim() ?? "";
   const showCaption = Boolean(caption) && activeSlide?.kind !== "text";
+  const captionNeedsMore = caption.length > 96 || caption.includes("\n");
   const showEmptySelfCta = story.is_self && !lastWorkout;
   const canEngage = Boolean(lastWorkout?.post_id) && !story.is_self;
 
   const timePosted = lastWorkout ? formatRelativeTime(lastWorkout.created_at) : "";
-  const aiSummary =
-    (activeSlide?.meta?.aiSummary as string | undefined) ??
-    (lastWorkout?.metrics?.extra?.ai_summary as string | undefined) ??
-    null;
 
   const headerTopPad = Math.max(insets.top, Platform.OS === "web" ? spacing.md : spacing.lg);
   const footerBottomPad = Math.max(insets.bottom, spacing.md, Platform.OS === "web" ? 12 : 0);
@@ -457,17 +457,20 @@ export function WorkoutStoryViewer({
           </View>
 
           <View style={[styles.footer, { paddingBottom: footerBottomPad }]} pointerEvents="box-none">
-            {!canEngage && lastWorkout ? (
-              <WorkoutCompletionCard
-                lastWorkout={lastWorkout}
-                streak={story.workout_streak}
-                achievement={
-                  spotlightMilestone
-                    ? { emoji: spotlightMilestone.emoji, label: spotlightMilestone.label }
-                    : null
-                }
-                aiSummary={aiSummary}
-              />
+            {lastWorkout && !canEngage ? (
+              <View style={styles.compactWorkoutMeta} pointerEvents="none">
+                <WorkoutTypeChips types={lastWorkout} maxVisible={2} size="compact" overlay />
+                <Text style={styles.compactWorkoutText} numberOfLines={1}>
+                  {[
+                    formatStoryDuration(lastWorkout.metrics?.duration_seconds),
+                    formatStoryCalories(lastWorkout.metrics?.calories),
+                    story.workout_streak > 0 ? formatStreakBadgeLabel(story.workout_streak) : null,
+                    formatStoryCompletedTime(lastWorkout.created_at),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </View>
             ) : null}
 
             {canEngage && lastWorkout ? (
@@ -485,9 +488,27 @@ export function WorkoutStoryViewer({
             ) : null}
 
             {showCaption ? (
-              <Text style={styles.captionText} numberOfLines={2}>
-                {caption}
-              </Text>
+              <View style={styles.captionBlock}>
+                <Text
+                  style={styles.captionText}
+                  numberOfLines={captionExpanded ? undefined : 2}
+                >
+                  {caption}
+                </Text>
+                {captionNeedsMore && !captionExpanded ? (
+                  <Pressable
+                    onPress={() => {
+                      setCaptionExpanded(true);
+                      setPaused(true);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show full caption"
+                  >
+                    <Text style={styles.captionMore}>More</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
 
             {showEmptySelfCta ? (
@@ -669,6 +690,15 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  captionBlock: {
+    gap: 2,
+    marginBottom: spacing.xs,
+  },
+  captionMore: {
+    ...typography.caption,
+    color: "rgba(255,255,255,0.72)",
+    fontWeight: "700",
   },
   engagement: {
     gap: spacing.sm,
