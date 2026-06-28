@@ -18,6 +18,7 @@ import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
+import { flexFill } from "@/lib/flex-layout";
 
 initSentry();
 
@@ -55,7 +56,7 @@ function NotificationBootstrap() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+    <GestureHandlerRootView style={{ ...flexFill, backgroundColor: colors.background }}>
       <AppErrorBoundary scope="root">
         <QueryProvider>
           <AppResumeCoordinator />

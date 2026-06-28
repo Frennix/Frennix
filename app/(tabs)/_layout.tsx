@@ -11,6 +11,7 @@ import { FrennixLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
+import { flexFill } from "@/lib/flex-layout";
 
 const HeaderBell = memo(function HeaderBell() {
   const { session } = useAuth();
@@ -69,7 +70,7 @@ const TabsShell = memo(function TabsShell() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarItemStyle: { minWidth: 56 },
-        sceneContainerStyle: { backgroundColor: colors.background },
+        sceneContainerStyle: { ...flexFill, backgroundColor: colors.background },
         lazy: false,
         freezeOnBlur: true,
         headerTitleContainerStyle: { overflow: "visible" },

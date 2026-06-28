@@ -218,14 +218,18 @@ export function WorkoutStoryViewer({
     if (Platform.OS !== "web" || typeof document === "undefined") return;
 
     if (!visible) {
-      document.body.style.overflow = "";
+      document.body.style.removeProperty("overflow");
       return;
     }
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = previousOverflow || "";
+      if (previousOverflow) {
+        document.body.style.overflow = previousOverflow;
+      } else {
+        document.body.style.removeProperty("overflow");
+      }
     };
   }, [visible]);
 

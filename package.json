@@ -22,7 +22,7 @@
     "verify:matching-scoring": "npx tsx scripts/verify-matching-scoring.ts",
     "verify:online-status-privacy": "npx tsx scripts/verify-online-status-privacy.ts",
     "verify:post-workout-types": "npx tsx scripts/verify-post-workout-types.ts",
-    "build:web": "expo export -p web"
+    "build:web": "expo export -p web && node scripts/patch-web-html.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",

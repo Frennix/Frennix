@@ -1,4 +1,4 @@
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { SuggestedAthlete } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { Button } from "./Button";
@@ -30,6 +30,7 @@ export function PeopleYouMayKnowCarousel({
       <FlatList
         data={suggestions}
         horizontal
+        style={WEB_HORIZONTAL_SCROLL_STYLE}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.profile.id}
         contentContainerStyle={styles.listContent}
@@ -84,6 +85,13 @@ export function PeopleYouMayKnowCarousel({
     </View>
   );
 }
+
+const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
+  Platform.OS === "web"
+    ? ({
+        touchAction: "pan-x pinch-zoom",
+      } as ViewStyle)
+    : undefined;
 
 const styles = StyleSheet.create({
   container: {

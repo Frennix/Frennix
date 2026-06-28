@@ -135,12 +135,22 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Feed FlatList has flex layout for vertical scroll",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
-      if (!feed.includes("feedList: { flex: 1 }")) {
-        throw new Error("Feed FlatList must use flex:1");
+      if (!feed.includes("feedScrollShell")) {
+        throw new Error("Feed must wrap FlatList in feedScrollShell (minHeight:0 scroll chain)");
+      }
+      if (!feed.includes("flexFill")) {
+        throw new Error("Feed must use flexFill for Safari web scroll");
       }
       if (feed.includes("feedHiddenWhileStory")) {
         throw new Error("Remove feedHiddenWhileStory wrapper — it breaks web scroll");
       }
+    },
+  },
+  {
+    name: "Feed scroll debug helper exists for production diagnosis",
+    run: () => {
+      assertIncludes("lib/feed-scroll-debug.ts", "feed-scroll-debug", "debug helper required");
+      assertIncludes("app/(tabs)/index.tsx", "installFeedScrollTouchDebug", "feed must install debug hooks");
     },
   },
 ];

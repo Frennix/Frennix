@@ -1,4 +1,4 @@
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { FeedStory } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { formatLastWorkoutLabel, formatStreakBadgeLabel } from "./formatRelativeTime";
@@ -42,6 +42,7 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
         data={stories}
         horizontal
         nestedScrollEnabled
+        style={WEB_HORIZONTAL_SCROLL_STYLE}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.user_id}
         contentContainerStyle={styles.listContent}
@@ -78,6 +79,13 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
     </View>
   );
 }
+
+const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
+  Platform.OS === "web"
+    ? ({
+        touchAction: "pan-x pinch-zoom",
+      } as ViewStyle)
+    : undefined;
 
 const styles = StyleSheet.create({
   container: {
