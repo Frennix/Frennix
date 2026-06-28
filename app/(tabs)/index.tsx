@@ -52,15 +52,10 @@ import type { FeedListRow } from "@/lib/feed-list-rows";
 import { trackFeedLoad } from "@/lib/product-analytics";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import { NewPostsBanner } from "@/components/NewPostsBanner";
+import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webVerticalScrollStyle } from "@/lib/flex-layout";
-import {
-  inspectFeedScrollContainer,
-  installFeedScrollTouchDebug,
-  isFeedScrollDebugEnabled,
-  logFeedScrollEvent,
-  logFeedScrollMetrics,
-} from "@/lib/feed-scroll-debug";
+import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
 
 export default function HomeScreen() {
   const { session } = useAuth();
@@ -68,7 +63,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyInviteUserId, setStoryInviteUserId] = useState<string | null>(null);
-  const { openShare, shareSheet } = useSharePost(userId);
+  const { openShare, shareSheet, shareVisible } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (post) => openShare(post.shared_post ?? post),
@@ -77,7 +72,8 @@ export default function HomeScreen() {
   const postReaction = usePostReaction(userId);
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
   const { toggleLikePost } = useFeedLike(userId);
-  const { openGallery, lightbox } = useImageLightbox();
+  const { openGallery, lightbox, lightboxVisible } = useImageLightbox();
+  const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
@@ -226,15 +222,31 @@ export default function HomeScreen() {
     onScrollBase: onScroll,
   });
 
+  const storyVisible = activeStoryIndex !== null;
+
+  const {
+    enabled: feedDebugEnabled,
+    snapshot: feedDebugSnapshot,
+    reportMetrics: reportFeedDebugMetrics,
+    reportScroll: reportFeedDebugScroll,
+  } = useFeedScrollDebug({
+    listRef,
+    scrollEnabled: !storyVisible,
+    storyVisible,
+    shareSheetVisible: shareVisible,
+    lightboxVisible,
+    viewportHeight,
+  });
+
   const handleScroll = useCallback(
     (event: Parameters<typeof handleFeedScroll>[0]) => {
       handleFeedScroll(event);
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      logFeedScrollEvent(contentOffset.y, contentSize.height, layoutMeasurement.height);
+      const { contentOffset } = event.nativeEvent;
+      reportFeedDebugScroll(contentOffset.y);
       const atTop = contentOffset.y <= 8;
       setFeedAtTop((prev) => (prev === atTop ? prev : atTop));
     },
-    [handleFeedScroll]
+    [handleFeedScroll, reportFeedDebugScroll]
   );
 
   const refreshFeedData = useCallback(async () => {
@@ -430,46 +442,26 @@ export default function HomeScreen() {
     staleTime: 30_000,
   });
 
-  const storyVisible = activeStoryIndex !== null;
-
-  const reportFeedScrollMetrics = useCallback(
-    (listLayoutHeight: number, contentHeight: number) => {
-      logFeedScrollMetrics({
-        listLayoutHeight,
-        contentHeight,
-        viewportHeight,
-        scrollEnabled: !storyVisible,
-        storyVisible,
-      });
-      inspectFeedScrollContainer(listRef.current);
-    },
-    [storyVisible, viewportHeight]
-  );
-
   const handleListLayout = useCallback(
     (height: number) => {
       listLayoutHeightRef.current = height;
-      reportFeedScrollMetrics(height, contentHeightRef.current);
+      reportFeedDebugMetrics(height, contentHeightRef.current);
     },
-    [reportFeedScrollMetrics]
+    [reportFeedDebugMetrics]
   );
 
   const handleContentSizeChange = useCallback(
     (_width: number, height: number) => {
       contentHeightRef.current = height;
-      reportFeedScrollMetrics(listLayoutHeightRef.current, height);
+      reportFeedDebugMetrics(listLayoutHeightRef.current, height);
     },
-    [reportFeedScrollMetrics]
+    [reportFeedDebugMetrics]
   );
 
   useEffect(() => {
-    installFeedScrollTouchDebug();
-  }, []);
-
-  useEffect(() => {
-    if (!isFeedScrollDebugEnabled()) return;
-    reportFeedScrollMetrics(listLayoutHeightRef.current, contentHeightRef.current);
-  }, [isFeedReady, listRows.length, reportFeedScrollMetrics]);
+    if (!feedDebugEnabled) return;
+    reportFeedDebugMetrics(listLayoutHeightRef.current, contentHeightRef.current);
+  }, [feedDebugEnabled, isFeedReady, listRows.length, reportFeedDebugMetrics]);
 
   if (isError && posts.length === 0) {
     return (
@@ -585,6 +577,13 @@ export default function HomeScreen() {
           storyInviteUserId !== null && storyInviteUserId === activeStory?.user_id
         }
       />
+      {feedDebugEnabled ? (
+        <FeedScrollDebugOverlay
+          snapshot={feedDebugSnapshot}
+          collapsed={feedDebugCollapsed}
+          onToggleCollapsed={() => setFeedDebugCollapsed((value) => !value)}
+        />
+      ) : null}
     </View>
   );
 }

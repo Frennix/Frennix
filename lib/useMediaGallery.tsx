@@ -89,6 +89,7 @@ export function useImageLightbox() {
     openGallery: media.openGallery,
     closeImage: media.closeGallery,
     lightbox: media.lightbox,
+    lightboxVisible: Boolean(media.gallery),
   };
 }
 

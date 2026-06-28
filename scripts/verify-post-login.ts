@@ -147,10 +147,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed scroll debug helper exists for production diagnosis",
+    name: "Feed scroll debug overlay for ?feedDebug=1",
     run: () => {
-      assertIncludes("lib/feed-scroll-debug.ts", "feed-scroll-debug", "debug helper required");
-      assertIncludes("app/(tabs)/index.tsx", "installFeedScrollTouchDebug", "feed must install debug hooks");
+      assertIncludes("components/FeedScrollDebugOverlay.tsx", "FeedScrollDebugOverlay", "debug overlay required");
+      assertIncludes("lib/useFeedScrollDebug.ts", "useFeedScrollDebug", "debug hook required");
+      assertIncludes("app/(tabs)/index.tsx", "FeedScrollDebugOverlay", "feed must render debug overlay");
     },
   },
 ];

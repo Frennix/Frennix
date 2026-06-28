@@ -94,5 +94,5 @@ export function useSharePost(userId: string) {
     />
   );
 
-  return { openShare, shareSheet };
+  return { openShare, shareSheet, shareVisible: visible };
 }
