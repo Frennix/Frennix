@@ -16,12 +16,12 @@ node scripts/verify-post-interaction.mjs
 
 | ID | Test | iPhone Safari | Android Chrome | Desktop | Pass |
 |----|------|:-------------:|:--------------:|:-------:|:----:|
-| PI-01 | Tap post media opens interaction sheet (not lightbox first) | ⬜ | ⬜ | ⬜ | |
-| PI-02 | Feed does **not** scroll while sheet is open | ⬜ | ⬜ | ⬜ | |
+| PI-01 | Tap post media opens interaction sheet (not lightbox first) | ✅ auto | ✅ auto | ✅ auto | |
+| PI-02 | Feed does **not** scroll while sheet is open | ✅ auto | ✅ auto | ✅ auto | |
 | PI-03 | Sheet slides up smoothly on open | ⬜ | ⬜ | ⬜ | |
-| PI-04 | Sheet dismisses smoothly (✕, backdrop tap, swipe down) | ⬜ | ⬜ | ⬜ | |
-| PI-05 | Post image/video + caption remain visible above sheet | ⬜ | ⬜ | ⬜ | |
-| PI-06 | Primary actions: Like, Strong Work (or last reaction), Reply, More | ⬜ | ⬜ | ⬜ | |
+| PI-04 | Sheet dismisses smoothly (✕, backdrop tap, swipe down) | ✅ auto (✕) | ✅ auto (✕) | ✅ auto (✕) | |
+| PI-05 | Post image/video + caption remain visible above sheet | ✅ auto | ✅ auto | ✅ auto | |
+| PI-06 | Primary actions: Like, Strong Work (or last reaction), Reply, More | ✅ auto | ✅ auto | ✅ auto | |
 | PI-07 | More menu scrolls when >6 secondary actions | ⬜ | ⬜ | ⬜ | |
 | PI-08 | Reaction highlight animates before dismiss | ⬜ | ⬜ | N/A | |
 | PI-09 | Last-used reaction appears in primary slot on reopen | ⬜ | ⬜ | ⬜ | |
@@ -29,14 +29,14 @@ node scripts/verify-post-interaction.mjs
 | PI-11 | Medium haptic on Invite to Train / Challenge Accepted (native only) | ⬜ | ⬜ | N/A | |
 | PI-12 | VoiceOver / TalkBack reads action labels and hints | ⬜ | ⬜ | ⬜ | |
 | PI-13 | Dynamic Type / large text does not clip action labels | ⬜ | ⬜ | ⬜ | |
-| PI-14 | No emergency debug banner visible | ⬜ | ⬜ | ⬜ | |
-| PI-15 | Feed scroll works normally after sheet closes | ⬜ | ⬜ | ⬜ | |
+| PI-14 | No emergency debug banner visible | ✅ auto | ✅ auto | ✅ auto | |
+| PI-15 | Feed scroll works normally after sheet closes | ✅ auto | ✅ auto | ✅ auto | |
 
 ## Sign-off log
 
 | Date | Tester | Build / deploy | Automated | Device QA | Notes |
 |------|--------|----------------|-----------|-----------|-------|
-| | | | | | |
+| 2026-06-25 | Cursor agent | `dpl_621wH7iaXxJY4fa46Qr9AeQT615R` / commit `a0f9671` | PASS (desktop + iPhone UA + Android UA) | Pending manual spot-check | Production: https://frennix.vercel.app |
 
 ## Feature complete criteria
 
