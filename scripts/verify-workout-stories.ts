@@ -32,6 +32,12 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("statusBarTranslucent")) {
         throw new Error("Story viewer must be full-screen");
       }
+      if (src.includes("transparent")) {
+        throw new Error("Story viewer must use opaque modal (no transparent prop)");
+      }
+      if (!src.includes('presentationStyle="fullScreen"')) {
+        throw new Error("Story viewer must use fullScreen presentation");
+      }
       if (src.includes("PostMediaCarousel")) {
         throw new Error("Story viewer must not reuse feed PostMediaCarousel");
       }
@@ -77,11 +83,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Caption renders as overlay not feed post body",
+    name: "Caption renders in story footer not feed post body",
     run: () => {
       const src = read("components/WorkoutStoryViewer.tsx");
-      if (!src.includes("captionOverlay")) {
-        throw new Error("Caption must use overlay styling");
+      if (!src.includes("captionText")) {
+        throw new Error("Caption must use story footer styling");
       }
     },
   },
@@ -90,7 +96,6 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const viewer = read("components/WorkoutStoryViewer.tsx");
       for (const token of [
-        "StoryStreakBadge",
         "WorkoutCompletionCard",
         "StoryAchievementMoment",
         "StoryChallengeBar",
@@ -102,6 +107,7 @@ const checks: Array<{ name: string; run: () => void }> = [
         "onMessage",
         "onInviteToTrain",
         "prefetchStorySlide",
+        "formatRelativeTime",
       ]) {
         if (!viewer.includes(token)) throw new Error(`Missing ${token}`);
       }
@@ -136,6 +142,18 @@ const checks: Array<{ name: string; run: () => void }> = [
         "onInviteToTrain",
       ]) {
         if (!feed.includes(token)) throw new Error(`Feed missing ${token}`);
+      }
+    },
+  },
+  {
+    name: "Feed is hidden while story viewer is open",
+    run: () => {
+      const feed = read("app/(tabs)/index.tsx");
+      if (!feed.includes("feedHiddenWhileStory")) {
+        throw new Error("Feed must hide while story is open");
+      }
+      if (!feed.includes("scrollEnabled={!storyVisible}")) {
+        throw new Error("Feed scrolling must be disabled while story is open");
       }
     },
   },

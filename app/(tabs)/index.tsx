@@ -399,6 +399,8 @@ export default function HomeScreen() {
     [onScrollEnd]
   );
 
+  const storyVisible = activeStoryIndex !== null;
+
   if (isError && posts.length === 0) {
     return (
       <View style={styles.container}>
@@ -447,14 +449,19 @@ export default function HomeScreen() {
             (activeStoryIndex !== null ? stories[activeStoryIndex]?.user_id : undefined)
         }
       />
-      {showBanner ? (
+      {showBanner && !storyVisible ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
       ) : null}
-      <FlatList
-        ref={listRef}
-        data={listRows}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+      <View
+        style={storyVisible ? styles.feedHiddenWhileStory : undefined}
+        pointerEvents={storyVisible ? "none" : "auto"}
+      >
+        <FlatList
+          ref={listRef}
+          data={listRows}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          scrollEnabled={!storyVisible}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={21}
@@ -501,13 +508,17 @@ export default function HomeScreen() {
           )
         }
         renderItem={renderItem}
-      />
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  feedHiddenWhileStory: {
+    opacity: 0,
+  },
   list: { flexGrow: 1, paddingBottom: spacing.xl },
   emptyWrap: { padding: spacing.lg },
   initialSkeletons: { gap: 0 },

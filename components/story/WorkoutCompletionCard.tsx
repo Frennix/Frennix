@@ -11,10 +11,15 @@ import {
 interface WorkoutCompletionCardProps {
   lastWorkout: FeedStoryLastWorkout;
   streak: number;
+  achievement?: { emoji: string; label: string } | null;
 }
 
-/** Fitness-first completion summary — minimal glass card, non-blocking. */
-export function WorkoutCompletionCard({ lastWorkout, streak }: WorkoutCompletionCardProps) {
+/** Fitness-first completion summary in the story footer. */
+export function WorkoutCompletionCard({
+  lastWorkout,
+  streak,
+  achievement,
+}: WorkoutCompletionCardProps) {
   const metrics = lastWorkout.metrics;
   const duration = formatStoryDuration(metrics?.duration_seconds);
   const distance = formatStoryDistance(metrics?.distance_meters);
@@ -32,6 +37,11 @@ export function WorkoutCompletionCard({ lastWorkout, streak }: WorkoutCompletion
       {streak > 0 ? (
         <Text style={styles.streak} numberOfLines={1}>
           {formatStreakBadgeLabel(streak)}
+        </Text>
+      ) : null}
+      {achievement ? (
+        <Text style={styles.achievement} numberOfLines={1}>
+          {achievement.emoji} {achievement.label}
         </Text>
       ) : null}
       <Text style={styles.completed} numberOfLines={1}>
@@ -61,6 +71,11 @@ const styles = StyleSheet.create({
   streak: {
     ...typography.caption,
     color: colors.accent,
+    fontWeight: "800",
+  },
+  achievement: {
+    ...typography.caption,
+    color: colors.text,
     fontWeight: "800",
   },
   completed: {
