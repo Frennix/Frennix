@@ -7,7 +7,7 @@ interface FeedRenderTraceProbeProps {
   children?: ReactNode;
 }
 
-/** Records production feed subtree mount — visible via EmergencyDebugBanner. */
+/** Records production feed subtree mount for optional dev traces. */
 export function FeedRenderTraceProbe({ id, detail, children }: FeedRenderTraceProbeProps) {
   markFeedRender(`${id}:render`, "sync", detail);
 

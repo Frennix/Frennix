@@ -14,9 +14,9 @@ import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
 import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
+import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
-import { EmergencyDebugBanner } from "@/components/EmergencyDebugBanner";
 import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
 import { markStartupMount } from "@/lib/startup-mount-trace";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
@@ -79,9 +79,6 @@ export default function RootLayout() {
                 <AppResumeCoordinator />
                 <StartupMountProbe id="auth-provider">
                   <AuthProvider>
-                    <StartupMountProbe id="emergency-banner">
-                      <EmergencyDebugBanner />
-                    </StartupMountProbe>
                     <StartupMountProbe id="tab-badge-root">
                       <TabBadgeRoot>
                         <StartupMountProbe id="navigation-error-boundary">

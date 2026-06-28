@@ -63,11 +63,8 @@ import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
 import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
 import { markFeedRender } from "@/lib/feed-render-trace";
 import { markFeedHook } from "@/lib/feed-hook-trace";
-import { EMERGENCY_BANNER_CLEARANCE } from "@/lib/emergency-debug";
 import { useFeedRenderStateTrace } from "@/lib/useFeedRenderStateTrace";
 import { FeedRenderTraceProbe } from "@/components/FeedRenderTraceProbe";
-import { useFeedLayoutDiagnostics } from "@/lib/useFeedLayoutDiagnostics";
-import { sampleFeedLayout } from "@/lib/feed-layout-diagnostics";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -252,15 +249,6 @@ export default function HomeScreen() {
 
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
-
-  useFeedLayoutDiagnostics({
-    enabled: Platform.OS === "web" && !!userId && !feedScrollTestMode,
-    overlays: {
-      share: shareVisible,
-      lightbox: lightboxVisible,
-      story: storyVisible,
-    },
-  });
 
   const {
     enabled: feedDebugEnabled,
@@ -509,16 +497,9 @@ export default function HomeScreen() {
         "data",
         `listH=${Math.round(height)} contentH=${Math.round(contentHeightRef.current)}`
       );
-      if (Platform.OS === "web") {
-        sampleFeedLayout({
-          share: shareVisible,
-          lightbox: lightboxVisible,
-          story: storyVisible,
-        });
-      }
       reportFeedDebugMetrics(height, contentHeightRef.current);
     },
-    [reportFeedDebugMetrics, shareVisible, lightboxVisible, storyVisible]
+    [reportFeedDebugMetrics]
   );
 
   const handleContentSizeChange = useCallback(
@@ -768,7 +749,6 @@ const styles = StyleSheet.create({
   list: {
     flexGrow: 1,
     paddingBottom: spacing.xl,
-    ...(Platform.OS === "web" ? { paddingTop: EMERGENCY_BANNER_CLEARANCE } : null),
   },
   emptyWrap: { padding: spacing.lg },
   initialSkeletons: { gap: 0 },

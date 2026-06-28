@@ -57,19 +57,8 @@ if (html.includes(`id="${patchId}"`)) {
   html = html.replace("</style>", `</style>${scrollPatch}`);
 }
 
-const emergencyId = "frennix-emergency-html";
-const emergencyBanner = `<div id="${emergencyId}" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b00020;color:#fff;font:bold 12px/1.4 system-ui,sans-serif;padding:10px 12px;border-bottom:4px solid #ffea00;pointer-events:none;">
-      EMERGENCY DEBUG (pre-JS) — build 2025-06-25-safari-feed-overlay-fix — waiting for React
-    </div>`;
-
-if (html.includes(emergencyId)) {
-  html = html.replace(
-    new RegExp(`<div id="${emergencyId}"[\\s\\S]*?</div>`),
-    emergencyBanner
-  );
-} else {
-  html = html.replace("<body>", `<body>\n    ${emergencyBanner}`);
-}
+// Remove legacy pre-JS emergency banner if present from an older export.
+html = html.replace(/\s*<div id="frennix-emergency-html"[\s\S]*?<\/div>\s*/g, "\n");
 
 writeFileSync(indexPath, html);
-console.log("[patch-web-html] dist/index.html updated for Safari scroll + emergency banner");
+console.log("[patch-web-html] dist/index.html updated for Safari scroll shell");

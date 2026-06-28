@@ -15,7 +15,6 @@ export const STARTUP_MOUNT_EXPECTED = [
   "query-provider:mounted",
   "auth-provider:render",
   "auth-provider:mounted",
-  "emergency-banner:mounted",
   "tab-badge-root:render",
   "navigation-error-boundary:render",
   "navigation-error-boundary:mounted",
@@ -60,15 +59,6 @@ function publishToWindow() {
   if (typeof window === "undefined") return;
   (window as Window & { __FRENNIX_MOUNT_TRACE__?: StartupMountEvent[] }).__FRENNIX_MOUNT_TRACE__ =
     [...events];
-  updatePreJsBanner();
-}
-
-function updatePreJsBanner() {
-  if (typeof document === "undefined") return;
-  const el = document.getElementById("frennix-emergency-html");
-  if (!el) return;
-  const last = events[events.length - 1];
-  el.textContent = `EMERGENCY DEBUG — React active — last mount: ${last?.id ?? "none"}`;
 }
 
 export function markStartupMount(id: StartupMountId, kind: "sync" | "effect" = "sync") {

@@ -142,17 +142,15 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Emergency debug banner mounts before navigation",
+    name: "Safari web shell patch keeps scroll layout without emergency banner",
     run: () => {
-      assertIncludes("components/EmergencyDebugBanner.tsx", "EMERGENCY DEBUG", "emergency banner required");
-      assertIncludes("lib/emergency-debug.ts", "EMERGENCY_DEBUG_BUILD", "emergency build id required");
       const layout = read("app/_layout.tsx");
-      const emergencyIdx = layout.indexOf("<EmergencyDebugBanner");
-      const tabsIdx = layout.indexOf("<TabBadgeRoot");
-      if (emergencyIdx < 0 || tabsIdx < 0 || emergencyIdx > tabsIdx) {
-        throw new Error("EmergencyDebugBanner must mount inside AuthProvider before TabBadgeRoot");
+      if (layout.includes("<EmergencyDebugBanner")) {
+        throw new Error("EmergencyDebugBanner must not mount in production root layout");
       }
-      assertIncludes("scripts/patch-web-html.js", "frennix-emergency-html", "pre-JS emergency HTML required");
+      assertIncludes("scripts/patch-web-html.js", "frennix-web-scroll", "Safari scroll shell patch required");
+      assertExcludes("scripts/patch-web-html.js", "frennix-emergency-html", "pre-JS emergency banner must be removed");
+      assertIncludes("scripts/patch-web-html.js", "pointer-events: none", "#root pointer pass-through required");
     },
   },
   {
