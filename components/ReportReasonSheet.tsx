@@ -1,4 +1,4 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { REPORT_REASONS } from "@frennix/types";
 import { colors, radius, spacing, typography } from "@frennix/ui";
 
@@ -15,6 +15,8 @@ export function ReportReasonSheet({
   onClose,
   onSelect,
 }: ReportReasonSheetProps) {
+  if (Platform.OS === "web" && !visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>

@@ -1,5 +1,6 @@
 import { Redirect } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
+import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { useAuth } from "@/providers/AuthProvider";
 import { colors } from "@frennix/ui";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -7,6 +8,29 @@ import { isSupabaseConfigured } from "@/lib/config";
 export default function Index() {
   const { session, profile, authReady, passwordRecovery } = useAuth();
 
+  return (
+    <StartupMountProbe id="index-route">
+      <IndexGate
+        session={session}
+        profile={profile}
+        authReady={authReady}
+        passwordRecovery={passwordRecovery}
+      />
+    </StartupMountProbe>
+  );
+}
+
+function IndexGate({
+  session,
+  profile,
+  authReady,
+  passwordRecovery,
+}: {
+  session: ReturnType<typeof useAuth>["session"];
+  profile: ReturnType<typeof useAuth>["profile"];
+  authReady: boolean;
+  passwordRecovery: boolean;
+}) {
   if (!isSupabaseConfigured()) {
     return <Redirect href="/(auth)/welcome" />;
   }

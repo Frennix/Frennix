@@ -27,6 +27,7 @@ type WebFeedScrollListProps = {
   onMomentumScrollEnd?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onLayout?: (height: number) => void;
   onContentSizeChange?: (width: number, height: number) => void;
+  nativeID?: string;
 };
 
 /** Web-only feed scroll surface — avoids RN Web FlatList / VirtualizedList Safari bugs. */
@@ -46,6 +47,7 @@ export function WebFeedScrollList({
   onMomentumScrollEnd,
   onLayout,
   onContentSizeChange,
+  nativeID,
 }: WebFeedScrollListProps) {
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -57,6 +59,7 @@ export function WebFeedScrollList({
   return (
     <ScrollView
       ref={scrollRef}
+      nativeID={nativeID}
       style={[styles.list, style, webVerticalScrollStyle]}
       contentContainerStyle={contentContainerStyle}
       scrollEnabled={scrollEnabled}

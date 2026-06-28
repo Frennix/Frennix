@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -167,6 +168,8 @@ export function SharePostSheet({
       "challenge"
     );
   }
+
+  if (Platform.OS === "web" && !visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>

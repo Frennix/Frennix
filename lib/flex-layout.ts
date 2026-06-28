@@ -4,6 +4,7 @@ import { Platform, type ViewStyle } from "react-native";
 export const flexFill: ViewStyle = {
   flex: 1,
   minHeight: 0,
+  ...(Platform.OS === "web" ? ({ flexBasis: 0 } as ViewStyle) : null),
 };
 
 /** Vertical scroll lists on web — keeps pan-y on the feed while nested rows use pan-x. */

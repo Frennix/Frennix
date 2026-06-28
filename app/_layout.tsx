@@ -15,7 +15,9 @@ import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
-import { FeedScrollDebugRoot } from "@/components/FeedScrollDebugRoot";
+import { EmergencyDebugBanner } from "@/components/EmergencyDebugBanner";
+import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
+import { markStartupMount } from "@/lib/startup-mount-trace";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
@@ -56,21 +58,38 @@ function NotificationBootstrap() {
 }
 
 export default function RootLayout() {
+  markStartupMount("root-layout:render", "sync");
+
   return (
-    <GestureHandlerRootView style={{ ...flexFill, backgroundColor: colors.background }}>
-      <AppErrorBoundary scope="root">
-        <QueryProvider>
-          <AppResumeCoordinator />
-          <AuthProvider>
-            <TabBadgeRoot>
-            <AppErrorBoundary scope="navigation">
-              <NotificationBootstrap />
-              <PushRegistrationBootstrap />
-              <ProductAnalyticsBootstrap />
-              <PresenceCoordinator />
-              <AuthNavigationGuard />
-              <StatusBar style="light" />
-              <Stack screenOptions={stackDefaults}>
+    <StartupMountProbe id="gesture-handler">
+      <GestureHandlerRootView style={{ ...flexFill, backgroundColor: colors.background }}>
+        <StartupMountProbe id="app-error-boundary-root">
+          <AppErrorBoundary scope="root">
+            <StartupMountProbe id="query-provider">
+              <QueryProvider>
+                <AppResumeCoordinator />
+                <StartupMountProbe id="auth-provider">
+                  <AuthProvider>
+                    <StartupMountProbe id="emergency-banner">
+                      <EmergencyDebugBanner />
+                    </StartupMountProbe>
+                    <StartupMountProbe id="tab-badge-root">
+                      <TabBadgeRoot>
+                        <StartupMountProbe id="navigation-error-boundary">
+                          <AppErrorBoundary scope="navigation">
+                            <StartupMountMarker id="notification-bootstrap" />
+                            <NotificationBootstrap />
+                            <StartupMountMarker id="push-registration-bootstrap" />
+                            <PushRegistrationBootstrap />
+                            <StartupMountMarker id="product-analytics-bootstrap" />
+                            <ProductAnalyticsBootstrap />
+                            <StartupMountMarker id="presence-coordinator" />
+                            <PresenceCoordinator />
+                            <StartupMountMarker id="auth-navigation-guard" />
+                            <AuthNavigationGuard />
+                            <StatusBar style="light" />
+                            <StartupMountProbe id="stack">
+                              <Stack screenOptions={stackDefaults}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="reset-password" options={backScreen("New password")} />
@@ -150,13 +169,19 @@ export default function RootLayout() {
             <Stack.Screen name="trainer-profile" options={{ headerShown: false }} />
             <Stack.Screen name="admin-trainer-review" options={backScreen("Trainer review")} />
             <Stack.Screen name="admin-analytics" options={backScreen("Analytics")} />
-              </Stack>
-              <FeedScrollDebugRoot />
-            </AppErrorBoundary>
-            </TabBadgeRoot>
-          </AuthProvider>
-        </QueryProvider>
-      </AppErrorBoundary>
-    </GestureHandlerRootView>
+                              </Stack>
+                            </StartupMountProbe>
+                          </AppErrorBoundary>
+                        </StartupMountProbe>
+                      </TabBadgeRoot>
+                    </StartupMountProbe>
+                  </AuthProvider>
+                </StartupMountProbe>
+              </QueryProvider>
+            </StartupMountProbe>
+          </AppErrorBoundary>
+        </StartupMountProbe>
+      </GestureHandlerRootView>
+    </StartupMountProbe>
   );
 }

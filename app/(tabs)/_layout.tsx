@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { memo, useCallback } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
@@ -9,6 +9,7 @@ import { TabPrefetchCoordinator } from "@/components/TabPrefetchCoordinator";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
+import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 import { flexFill } from "@/lib/flex-layout";
@@ -70,7 +71,10 @@ const TabsShell = memo(function TabsShell() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarItemStyle: { minWidth: 56 },
-        sceneContainerStyle: { ...flexFill, backgroundColor: colors.background },
+        sceneContainerStyle: {
+          ...flexFill,
+          backgroundColor: colors.background,
+        },
         lazy: false,
         freezeOnBlur: true,
         headerTitleContainerStyle: { overflow: "visible" },
@@ -155,7 +159,11 @@ const TabsShell = memo(function TabsShell() {
 });
 
 export default function TabsLayout() {
-  return <TabsShell />;
+  return (
+    <PostLoginShellErrorBoundary label="tabs layout">
+      <TabsShell />
+    </PostLoginShellErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({

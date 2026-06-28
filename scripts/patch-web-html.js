@@ -18,26 +18,49 @@ if (!html.includes("viewport-fit=cover")) {
 }
 
 const patchId = "frennix-web-scroll";
-if (!html.includes(patchId)) {
-  html = html.replace(
-    "</style>",
-    `</style>
+const scrollPatch = `
     <style id="${patchId}">
       html {
         height: 100%;
         height: -webkit-fill-available;
+        background-color: #0A0A0B;
       }
       body {
         height: 100%;
         min-height: 100dvh;
         min-height: -webkit-fill-available;
+        background-color: #0A0A0B;
       }
       #root {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
         min-height: 0;
       }
-    </style>`
+    </style>`;
+
+if (html.includes(`id="${patchId}"`)) {
+  html = html.replace(
+    new RegExp(`<style id="${patchId}">[\\s\\S]*?</style>`),
+    scrollPatch.trim()
   );
+} else {
+  html = html.replace("</style>", `</style>${scrollPatch}`);
+}
+
+const emergencyId = "frennix-emergency-html";
+const emergencyBanner = `<div id="${emergencyId}" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b00020;color:#fff;font:bold 12px/1.4 system-ui,sans-serif;padding:10px 12px;border-bottom:4px solid #ffea00;pointer-events:none;">
+      EMERGENCY DEBUG (pre-JS) — build 2025-06-25-safari-feed-fix — waiting for React
+    </div>`;
+
+if (html.includes(emergencyId)) {
+  html = html.replace(
+    new RegExp(`<div id="${emergencyId}"[\\s\\S]*?</div>`),
+    emergencyBanner
+  );
+} else {
+  html = html.replace("<body>", `<body>\n    ${emergencyBanner}`);
 }
 
 writeFileSync(indexPath, html);
-console.log("[patch-web-html] dist/index.html updated for Safari scroll");
+console.log("[patch-web-html] dist/index.html updated for Safari scroll + emergency banner");

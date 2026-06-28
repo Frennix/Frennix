@@ -1,5 +1,8 @@
 import { initSupabase, isSupabaseInitialized } from "@frennix/api";
 import { config, isSupabaseConfigured } from "./config";
+import { markStartupMount } from "./startup-mount-trace";
+
+markStartupMount("init-supabase:module", "sync");
 
 const FRENNIX_PRODUCTION_SUPABASE_URL = "https://wkrwncovmpsveatlrqel.supabase.co";
 

@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@frennix/ui";
 import { flexFill } from "@/lib/flex-layout";
 
@@ -37,9 +37,12 @@ export class AppErrorBoundary extends Component<Props, State> {
       return (
         <View style={styles.container}>
           <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>
-            Frennix hit an unexpected error. Tap retry to restore the screen.
-          </Text>
+          <Text style={styles.message}>{error.message}</Text>
+          {error.stack ? (
+            <Text style={styles.stack} numberOfLines={12}>
+              {error.stack}
+            </Text>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Retry"
@@ -78,6 +81,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: "center",
     maxWidth: 320,
+  },
+  stack: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 15,
+    maxWidth: 340,
+    textAlign: "left",
+    fontFamily: Platform.OS === "web" ? "monospace" : undefined,
   },
   button: {
     marginTop: 8,

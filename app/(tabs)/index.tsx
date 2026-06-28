@@ -60,23 +60,38 @@ import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetI
 import { flexFill, webVerticalScrollStyle } from "@/lib/flex-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
 import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
+import { markFeedRender } from "@/lib/feed-render-trace";
+import { markFeedHook } from "@/lib/feed-hook-trace";
+import { EMERGENCY_BANNER_CLEARANCE } from "@/lib/emergency-debug";
+import { useFeedRenderStateTrace } from "@/lib/useFeedRenderStateTrace";
+import { FeedRenderTraceProbe } from "@/components/FeedRenderTraceProbe";
+import { useFeedLayoutDiagnostics } from "@/lib/useFeedLayoutDiagnostics";
+import { sampleFeedLayout } from "@/lib/feed-layout-diagnostics";
 
 export default function HomeScreen() {
+  markFeedRender("feed:HomeScreen:render");
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyInviteUserId, setStoryInviteUserId] = useState<string | null>(null);
   const { openShare, shareSheet, shareVisible } = useSharePost(userId);
+  markFeedHook("share-post");
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
+  markFeedHook("post-actions");
   const { toggleSavePost } = useSavePost(userId);
+  markFeedHook("save-post");
   const postReaction = usePostReaction(userId);
+  markFeedHook("post-reaction");
   const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
+  markFeedHook("suggested-follow");
   const { toggleLikePost } = useFeedLike(userId);
+  markFeedHook("feed-like");
   const { openGallery, lightbox, lightboxVisible } = useImageLightbox();
+  markFeedHook("image-lightbox");
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
   const setCarouselIndex = useCallback((postId: string, index: number) => {
@@ -106,6 +121,7 @@ export default function HomeScreen() {
     enabled: !!userId,
     staleTime: 60_000,
   });
+  markFeedHook("stories-query");
 
   const handleStoryReact = useCallback(
     async (storyUserId: string, postId: string, emoji: StoryQuickReactionEmoji) => {
@@ -195,6 +211,7 @@ export default function HomeScreen() {
     staleTime: 60_000,
     placeholderData: (previousData) => previousData,
   });
+  markFeedHook("feed-query");
 
   const {
     data: suggestions = [],
@@ -206,6 +223,7 @@ export default function HomeScreen() {
     enabled: !!userId && isFeedReady,
     staleTime: 120_000,
   });
+  markFeedHook("suggestions-query");
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
   const pageCount = data?.pages.length ?? 0;
@@ -227,9 +245,19 @@ export default function HomeScreen() {
     fetchNextPage,
     onScrollBase: onScroll,
   });
+  markFeedHook("feed-infinite-scroll");
 
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
+
+  useFeedLayoutDiagnostics({
+    enabled: Platform.OS === "web" && !!userId && !feedScrollTestMode,
+    overlays: {
+      share: shareVisible,
+      lightbox: lightboxVisible,
+      story: storyVisible,
+    },
+  });
 
   const {
     enabled: feedDebugEnabled,
@@ -244,6 +272,7 @@ export default function HomeScreen() {
     lightboxVisible,
     viewportHeight,
   });
+  markFeedHook("feed-scroll-debug");
 
   const handleScroll = useCallback(
     (event: Parameters<typeof handleFeedScroll>[0]) => {
@@ -274,6 +303,7 @@ export default function HomeScreen() {
       void handleRefresh();
     },
   });
+  markFeedHook("new-posts-banner");
 
   const scrollFeedToTop = useCallback(() => {
     if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
@@ -300,6 +330,7 @@ export default function HomeScreen() {
       [handleRefresh, isAtTop]
     )
   );
+  markFeedHook("tab-scroll");
 
   useEffect(() => {
     if (userId) {
@@ -398,6 +429,8 @@ export default function HomeScreen() {
         return <FeedPostCardSkeleton />;
       }
 
+      markFeedRender("feed:ui:first-post-card", "data", item.post.id.slice(0, 8));
+
       return (
         <AnimatedFeedListItem
           post={item.post}
@@ -414,19 +447,21 @@ export default function HomeScreen() {
 
   const listHeader = useMemo(
     () => (
-      <FeedHeader
-        stories={stories}
-        suggestions={suggestions}
-        followingIds={followingIds}
-        followLoadingId={
-          followMutation.isPending ? (followMutation.variables?.targetUserId ?? null) : null
-        }
-        onStoryPress={(story) => {
-          const index = stories.findIndex((item) => item.user_id === story.user_id);
-          setActiveStoryIndex(index >= 0 ? index : null);
-        }}
-        onFollowPress={(profileId) => toggleFollow(profileId)}
-      />
+      <FeedRenderTraceProbe id="feed:ui:list-header">
+        <FeedHeader
+          stories={stories}
+          suggestions={suggestions}
+          followingIds={followingIds}
+          followLoadingId={
+            followMutation.isPending ? (followMutation.variables?.targetUserId ?? null) : null
+          }
+          onStoryPress={(story) => {
+            const index = stories.findIndex((item) => item.user_id === story.user_id);
+            setActiveStoryIndex(index >= 0 ? index : null);
+          }}
+          onFollowPress={(profileId) => toggleFollow(profileId)}
+        />
+      </FeedRenderTraceProbe>
     ),
     [
       stories,
@@ -437,6 +472,14 @@ export default function HomeScreen() {
       toggleFollow,
     ]
   );
+
+  markFeedRender("feed:HomeScreen:hooks-complete");
+
+  const feedBranch: "scroll-test" | "error" | "main" = feedScrollTestMode
+    ? "scroll-test"
+    : isError && posts.length === 0
+      ? "error"
+      : "main";
 
   const handleScrollEnd = useCallback(
     (event: Parameters<typeof onScrollEnd>[0]) => {
@@ -453,22 +496,55 @@ export default function HomeScreen() {
     enabled: Boolean(activeStory?.is_self && activeStory?.last_workout?.post_id && activeStoryIndex !== null),
     staleTime: 30_000,
   });
+  markFeedHook("story-insights-query");
 
   const handleListLayout = useCallback(
     (height: number) => {
       listLayoutHeightRef.current = height;
+      markFeedRender(
+        "feed:ui:scroll-list-layout",
+        "data",
+        `listH=${Math.round(height)} contentH=${Math.round(contentHeightRef.current)}`
+      );
+      if (Platform.OS === "web") {
+        sampleFeedLayout({
+          share: shareVisible,
+          lightbox: lightboxVisible,
+          story: storyVisible,
+        });
+      }
       reportFeedDebugMetrics(height, contentHeightRef.current);
     },
-    [reportFeedDebugMetrics]
+    [reportFeedDebugMetrics, shareVisible, lightboxVisible, storyVisible]
   );
 
   const handleContentSizeChange = useCallback(
     (_width: number, height: number) => {
       contentHeightRef.current = height;
+      if (listLayoutHeightRef.current > 0) {
+        markFeedRender(
+          "feed:ui:scroll-list-layout",
+          "data",
+          `listH=${Math.round(listLayoutHeightRef.current)} contentH=${Math.round(height)}`
+        );
+      }
       reportFeedDebugMetrics(listLayoutHeightRef.current, height);
     },
     [reportFeedDebugMetrics]
   );
+
+  useFeedRenderStateTrace({
+    userId,
+    storiesCount: stories.length,
+    postsCount: posts.length,
+    listRowsCount: listRows.length,
+    isLoading,
+    isFeedReady,
+    isError,
+    isStoriesLoading: false,
+    suggestionsCount: suggestions.length,
+    branch: feedBranch,
+  });
 
   useEffect(() => {
     if (!feedDebugEnabled) return;
@@ -476,6 +552,7 @@ export default function HomeScreen() {
   }, [feedDebugEnabled, isFeedReady, listRows.length, reportFeedDebugMetrics]);
 
   if (feedScrollTestMode) {
+    markFeedRender("feed:branch:scroll-test");
     return (
       <View style={styles.container}>
         <FeedScrollTestView onScroll={(y) => reportFeedDebugScroll(y)} />
@@ -494,6 +571,7 @@ export default function HomeScreen() {
   }
 
   if (isError && posts.length === 0) {
+    markFeedRender("feed:branch:error", "data", getErrorMessage(error));
     return (
       <View style={styles.container}>
         <QueryErrorState
@@ -505,12 +583,21 @@ export default function HomeScreen() {
     );
   }
 
+  markFeedRender("feed:branch:main");
+
   return (
-    <View style={styles.container} pointerEvents="box-none">
-      <View style={styles.feedScrollShell} collapsable={false}>
-        {useWebScroll ? (
-          <WebFeedScrollList
+    <FeedRenderTraceProbe id="feed:ui:container">
+      <View
+        style={styles.container}
+        pointerEvents="box-none"
+        nativeID="feed-root-container"
+      >
+        <View style={styles.feedScrollShell} collapsable={false} nativeID="feed-scroll-shell">
+          {useWebScroll ? (
+            <FeedRenderTraceProbe id="feed:ui:scroll-list" detail="WebFeedScrollList">
+              <WebFeedScrollList
             scrollRef={webScrollRef}
+            nativeID="feed-scroll-list"
             style={styles.feedList}
             contentContainerStyle={styles.list}
             scrollEnabled={!storyVisible}
@@ -553,7 +640,9 @@ export default function HomeScreen() {
             onScrollEndDrag={handleScrollEnd}
             onMomentumScrollEnd={handleScrollEnd}
           />
+            </FeedRenderTraceProbe>
         ) : (
+          <FeedRenderTraceProbe id="feed:ui:scroll-list" detail="FlatList">
           <FlatList
             ref={listRef}
             style={styles.feedList}
@@ -611,14 +700,16 @@ export default function HomeScreen() {
             }
             renderItem={renderItem}
           />
+          </FeedRenderTraceProbe>
         )}
       </View>
       {showBanner && !storyVisible ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
       ) : null}
-      {postActionSheets}
-      {shareSheet}
-      {lightbox}
+      <FeedRenderTraceProbe id="feed:ui:post-action-sheets">{postActionSheets}</FeedRenderTraceProbe>
+      <FeedRenderTraceProbe id="feed:ui:share-sheet">{shareSheet}</FeedRenderTraceProbe>
+      <FeedRenderTraceProbe id="feed:ui:lightbox">{lightbox}</FeedRenderTraceProbe>
+      <FeedRenderTraceProbe id="feed:ui:story-viewer">
       <FeedStoryViewer
         stories={stories}
         visible={activeStoryIndex !== null}
@@ -654,6 +745,7 @@ export default function HomeScreen() {
           storyInviteUserId !== null && storyInviteUserId === activeStory?.user_id
         }
       />
+      </FeedRenderTraceProbe>
       {feedDebugEnabled ? (
         <FeedScrollDebugOverlay
           snapshot={feedDebugSnapshot}
@@ -661,7 +753,8 @@ export default function HomeScreen() {
           onToggleCollapsed={() => setFeedDebugCollapsed((value) => !value)}
         />
       ) : null}
-    </View>
+      </View>
+    </FeedRenderTraceProbe>
   );
 }
 
@@ -669,7 +762,11 @@ const styles = StyleSheet.create({
   container: { ...flexFill, backgroundColor: colors.background },
   feedScrollShell: { ...flexFill },
   feedList: { ...flexFill, ...webVerticalScrollStyle },
-  list: { flexGrow: 1, paddingBottom: spacing.xl },
+  list: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl,
+    ...(Platform.OS === "web" ? { paddingTop: EMERGENCY_BANNER_CLEARANCE } : null),
+  },
   emptyWrap: { padding: spacing.lg },
   initialSkeletons: { gap: 0 },
 });

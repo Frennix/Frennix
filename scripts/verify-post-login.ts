@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -17,6 +17,22 @@ function assertExcludes(file: string, needle: string, message: string) {
   if (read(file).includes(needle)) {
     throw new Error(`${message} (found in ${file})`);
   }
+}
+
+function readMainWebBundle() {
+  const webDir = join(ROOT, "dist/_expo/static/js/web");
+  const distFiles = readdirSync(webDir).filter(
+    (file) => file.startsWith("entry-") || file.startsWith("index-")
+  );
+  if (distFiles.length === 0) {
+    throw new Error("Run build:web before verify:post-login (missing dist bundle)");
+  }
+  const mainBundle = distFiles.reduce((largest, file) => {
+    const size = statSync(join(webDir, file)).size;
+    const largestSize = statSync(join(webDir, largest)).size;
+    return size > largestSize ? file : largest;
+  });
+  return read(`dist/_expo/static/js/web/${mainBundle}`);
 }
 
 function assertValidFeedPostCardHeader() {
@@ -93,13 +109,7 @@ const checks: Array<{ name: string; run: () => void }> = [
         'Platform.OS !== "web"',
         "entering animation must be disabled on web"
       );
-      const distFiles = readdirSync(join(ROOT, "dist/_expo/static/js/web")).filter((f) =>
-        f.startsWith("entry-")
-      );
-      if (distFiles.length === 0) {
-        throw new Error("Run build:web before verify:post-login (missing dist bundle)");
-      }
-      const bundle = read(`dist/_expo/static/js/web/${distFiles[0]}`);
+      const bundle = readMainWebBundle();
       if (bundle.includes("FadeInDown.duration(260).springify().damping(22)")) {
         throw new Error("Web bundle still ships FadeInDown entering — Safari post-login crash risk");
       }
@@ -132,20 +142,65 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Web feed uses ScrollView container instead of FlatList",
+    name: "Emergency debug banner mounts before navigation",
     run: () => {
-      assertIncludes("components/WebFeedScrollList.tsx", "WebFeedScrollList", "web scroll list required");
-      assertIncludes("app/(tabs)/index.tsx", "WebFeedScrollList", "feed must use web scroll list");
+      assertIncludes("components/EmergencyDebugBanner.tsx", "EMERGENCY DEBUG", "emergency banner required");
+      assertIncludes("lib/emergency-debug.ts", "EMERGENCY_DEBUG_BUILD", "emergency build id required");
+      const layout = read("app/_layout.tsx");
+      const emergencyIdx = layout.indexOf("<EmergencyDebugBanner");
+      const tabsIdx = layout.indexOf("<TabBadgeRoot");
+      if (emergencyIdx < 0 || tabsIdx < 0 || emergencyIdx > tabsIdx) {
+        throw new Error("EmergencyDebugBanner must mount inside AuthProvider before TabBadgeRoot");
+      }
+      assertIncludes("scripts/patch-web-html.js", "frennix-emergency-html", "pre-JS emergency HTML required");
     },
   },
   {
-    name: "Feed scroll debug overlay for ?feedDebug=1",
+    name: "Post-login shell error boundary wraps tabs",
     run: () => {
-      assertIncludes("components/FeedScrollDebugOverlay.tsx", "FeedScrollDebugOverlay", "debug overlay required");
-      assertIncludes("components/FeedScrollDebugRoot.tsx", "FeedScrollDebugRoot", "root debug banner required");
-      assertIncludes("lib/feed-scroll-debug.ts", "bootstrapFeedScrollDebug", "debug must persist through login");
-      assertIncludes("app/_layout.tsx", "FeedScrollDebugRoot", "root layout must mount debug banner");
-      assertIncludes("app/(tabs)/index.tsx", "FeedScrollDebugOverlay", "feed must render debug overlay");
+      assertIncludes("components/PostLoginShellErrorBoundary.tsx", "Post-login shell error", "shell boundary required");
+      assertIncludes("app/(tabs)/_layout.tsx", "PostLoginShellErrorBoundary", "tabs must use shell boundary");
+    },
+  },
+  {
+    name: "Web feed uses incremental bisection screen",
+    run: () => {
+      assertIncludes("components/FeedBisectionScreen.tsx", "Feed is rendering", "bisection baseline copy required");
+      assertIncludes("lib/feed-bisection.ts", "feedStep", "feed step query param required");
+      assertIncludes("app/(tabs)/index.web.tsx", "FeedBisectionScreen", "web feed must use bisection screen");
+      if (existsSync(join(ROOT, "app/(tabs)/_layout.web.tsx"))) {
+        throw new Error("app/(tabs)/_layout.web.tsx must be removed — use real tabs shell on web");
+      }
+    },
+  },
+  {
+    name: "Feed header supports bisection visibility flags",
+    run: () => {
+      assertIncludes("components/FeedHeader.tsx", "showQuickActions", "FeedHeader must gate quick actions");
+      assertIncludes("components/FeedHeader.tsx", "showStories", "FeedHeader must gate stories");
+    },
+  },
+  {
+    name: "Feed layout diagnostics probe zero-height parents",
+    run: () => {
+      assertIncludes("components/FeedLayoutDiagnostics.tsx", "Feed layout probes", "layout diagnostics required");
+      assertIncludes("components/FeedLayoutDiagnostics.tsx", "display:none", "layout diagnostics must flag hidden nodes");
+    },
+  },
+  {
+    name: "Web bundle ships feed bisection strings",
+    run: () => {
+      const bundle = readMainWebBundle();
+      if (!bundle.includes("Feed is rendering")) {
+        throw new Error("Web bundle must include feed bisection baseline copy");
+      }
+      if (!bundle.includes("FEED BISECTION")) {
+        throw new Error("Web bundle must include feed bisection banner");
+      }
+      const html = read("dist/index.html");
+      if (!html.includes("2025-06-28-feed-bisection")) {
+        throw new Error("dist/index.html must include feed bisection build id");
+      }
     },
   },
 ];

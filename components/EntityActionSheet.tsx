@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import type { EntityActionDefinition, EntityActionId } from "@/lib/entity-actions";
 import { colors, radius, spacing, typography } from "@frennix/ui";
 
@@ -23,6 +23,8 @@ export function EntityActionSheet({
   onSelect,
   onClose,
 }: EntityActionSheetProps) {
+  if (Platform.OS === "web" && !visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
