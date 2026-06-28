@@ -1,4 +1,8 @@
 import { getSupabase, getSupabaseInitUrl } from "./supabase";
+import {
+  subscribePostgresChanges,
+  type RealtimeSubscription,
+} from "./realtime-utils";
 
 /** Frennix Production Supabase project (SQL Editor reference). */
 const FRENNIX_PRODUCTION_SUPABASE_URL = "https://wkrwncovmpsveatlrqel.supabase.co";
@@ -337,30 +341,34 @@ export type ProfilePresenceUpdate = {
   last_seen_at: string | null;
 };
 
+export type ProfilesPresenceSubscription = RealtimeSubscription & {
+  ok: boolean;
+};
+
 export function subscribeToProfilesPresence(
   profileIds: string[],
   onUpdate: (update: ProfilePresenceUpdate) => void
-) {
+): ProfilesPresenceSubscription {
   const uniqueIds = [...new Set(profileIds.filter(Boolean))];
   if (!uniqueIds.length) {
-    return { unsubscribe: () => undefined };
+    return { channel: null, ok: true, unsubscribe: () => undefined };
   }
 
-  const channelName = `presence:${uniqueIds.slice().sort().join("-").slice(0, 120)}`;
-  let channel = getSupabase().channel(channelName);
+  const sortedKey = uniqueIds.slice().sort().join(",").slice(0, 80);
 
-  for (const profileId of uniqueIds) {
-    channel = channel.on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
+  const subscription = subscribePostgresChanges(
+    "presence",
+    sortedKey,
+    uniqueIds.map((profileId) => ({
+      config: {
+        event: "UPDATE" as const,
         schema: "public",
         table: "profiles",
         filter: `id=eq.${profileId}`,
       },
-      (payload) => {
-        const row = payload.new as Record<string, unknown>;
-        if (typeof row.id !== "string") return;
+      callback: (payload) => {
+        const row = (payload as { new?: Record<string, unknown> }).new;
+        if (!row || typeof row.id !== "string") return;
 
         const showOnline =
           row.show_online_status == null ? true : row.show_online_status === true;
@@ -371,15 +379,12 @@ export function subscribeToProfilesPresence(
           last_seen_at:
             showOnline && typeof row.last_seen_at === "string" ? row.last_seen_at : null,
         });
-      }
-    );
-  }
-
-  channel.subscribe();
+      },
+    }))
+  );
 
   return {
-    unsubscribe: () => {
-      void getSupabase().removeChannel(channel);
-    },
+    ...subscription,
+    ok: subscription.channel != null,
   };
 }

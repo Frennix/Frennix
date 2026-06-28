@@ -1,6 +1,7 @@
 import type { Message, Post, ReactionSummary } from "@frennix/types";
 import { REACTION_EMOJIS } from "@frennix/types";
 import { getSupabase } from "./supabase";
+import { subscribePostgresChanges, type RealtimeSubscription } from "./realtime-utils";
 
 type RawReactionRow = {
   emoji: string;
@@ -138,13 +139,23 @@ export async function enrichMessagesWithReactions(
   });
 }
 
-export function subscribeToMessageReactions(onChange: () => void) {
-  return getSupabase()
-    .channel("message-reactions")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "message_reactions" },
-      () => onChange()
-    )
-    .subscribe();
+export type MessageReactionsSubscription = RealtimeSubscription & {
+  ok: boolean;
+};
+
+export function subscribeToMessageReactions(
+  conversationId: string,
+  onChange: () => void
+): MessageReactionsSubscription {
+  const subscription = subscribePostgresChanges("message-reactions", conversationId, [
+    {
+      config: { event: "*", schema: "public", table: "message_reactions" },
+      callback: () => onChange(),
+    },
+  ]);
+
+  return {
+    ...subscription,
+    ok: subscription.channel != null,
+  };
 }

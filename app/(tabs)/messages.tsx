@@ -91,7 +91,7 @@ export default function MessagesScreen() {
     [conversations]
   );
 
-  useProfilesPresence(userId, partnerIds);
+  const { realtimeUnavailable } = useProfilesPresence(userId, partnerIds);
 
   const handlePress = useCallback((id: string) => {
     pushScreen(`/chat/${id}`);
@@ -139,6 +139,13 @@ export default function MessagesScreen() {
 
   return (
     <View style={styles.container}>
+      {realtimeUnavailable ? (
+        <View style={styles.realtimeBanner}>
+          <Text style={styles.realtimeBannerText}>
+            Live presence updates are temporarily unavailable. Your messages still load normally.
+          </Text>
+        </View>
+      ) : null}
       <FlatList
         ref={listRef}
         data={conversations}
@@ -200,4 +207,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   badgeText: { color: colors.black, fontSize: 12, fontWeight: "700" },
+  realtimeBanner: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  realtimeBannerText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
 });

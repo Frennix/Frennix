@@ -56,9 +56,19 @@ async function main() {
   assert(getSupabase(), "getSupabase() should return client after init");
 
   console.log("3. subscribeToMessages() works after init");
-  const channel = subscribeToMessages("00000000-0000-0000-0000-000000000001", () => undefined);
-  assert(typeof channel.unsubscribe === "function", "subscribeToMessages should return a channel");
-  await channel.unsubscribe();
+  const subscription = subscribeToMessages("00000000-0000-0000-0000-000000000001", () => undefined);
+  assert(subscription.ok, "subscribeToMessages should succeed after init");
+  assert(typeof subscription.unsubscribe === "function", "subscribeToMessages should return unsubscribe");
+  subscription.unsubscribe();
+
+  console.log("3b. duplicate presence subscriptions do not throw");
+  const { subscribeToProfilesPresence } = await import("@frennix/api");
+  const partnerId = "00000000-0000-0000-0000-000000000099";
+  const presenceA = subscribeToProfilesPresence([partnerId], () => undefined);
+  const presenceB = subscribeToProfilesPresence([partnerId], () => undefined);
+  assert(presenceA.ok && presenceB.ok, "duplicate presence subscriptions should both succeed");
+  presenceA.unsubscribe();
+  presenceB.unsubscribe();
 
   console.log("4. getMessages() reaches Supabase after init");
   const messages = await getMessages("00000000-0000-0000-0000-000000000001");

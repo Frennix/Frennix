@@ -11,7 +11,7 @@ import {
 import { AppState, Platform } from "react-native";
 import * as Linking from "expo-linking";
 import type { Profile } from "@frennix/types";
-import { getProfile, getSession, onAuthStateChange, signOut as supabaseSignOut } from "@frennix/api";
+import { getProfile, getSession, onAuthStateChange, resetMessagingRealtimeState, signOut as supabaseSignOut } from "@frennix/api";
 import type { Session } from "@supabase/supabase-js";
 import { isWebRecoveryHash, clearWebRecoveryHash } from "@/lib/auth-redirect";
 import {
@@ -155,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userId = sessionRef.current?.user?.id ?? null;
     try {
       await stopPresenceTracking(true, "auth-signOut", userId);
+      resetMessagingRealtimeState();
       await supabaseSignOut();
       setSession(null);
       setProfile(null);

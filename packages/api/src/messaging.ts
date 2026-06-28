@@ -4,6 +4,10 @@ import { enrichMessagesWithReactions } from "./reactions";
 import { formatSupabaseError } from "./profile-utils";
 import { getBlockedIds } from "./moderation";
 import { getSupabase } from "./supabase";
+import {
+  subscribePostgresChanges,
+  type RealtimeSubscription,
+} from "./realtime-utils";
 
 const typingChannels = new Map<string, RealtimeChannel>();
 
@@ -219,39 +223,70 @@ export async function uploadMessageMedia(userId: string, uri: string, mimeType: 
   return data.publicUrl;
 }
 
+export type MessagesRealtimeSubscription = RealtimeSubscription & {
+  ok: boolean;
+};
+
 export function subscribeToMessages(
   conversationId: string,
   onMessage: (message: Message) => void
-) {
-  return getSupabase()
-    .channel(`messages:${conversationId}`)
-    .on(
-      "postgres_changes",
+): MessagesRealtimeSubscription {
+  const subscription = subscribePostgresChanges(
+    "messages",
+    conversationId,
+    [
       {
-        event: "INSERT",
-        schema: "public",
-        table: "messages",
-        filter: `conversation_id=eq.${conversationId}`,
+        config: {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        callback: (payload) => onMessage((payload as { new: Message }).new),
       },
-      (payload) => onMessage(payload.new as Message)
-    )
-    .subscribe();
+    ]
+  );
+
+  return {
+    ...subscription,
+    ok: subscription.channel != null,
+  };
 }
 
 export function subscribeToTyping(
   conversationId: string,
   currentUserId: string,
   onTyping: (typingUserId: string) => void
-) {
-  return getSupabase()
-    .channel(`typing:${conversationId}`)
-    .on("broadcast", { event: "typing" }, ({ payload }) => {
-      const typingUserId = (payload as { userId?: string }).userId;
-      if (typingUserId && typingUserId !== currentUserId) {
-        onTyping(typingUserId);
+): RealtimeChannel | null {
+  try {
+    const topic = `typing:${conversationId}`;
+    const supabase = getSupabase();
+    const existing = supabase
+      .getChannels()
+      .find((channel) => channel.topic === `realtime:${topic}`);
+
+    if (existing) {
+      void supabase.removeChannel(existing);
+      if (typingChannels.get(conversationId) === existing) {
+        typingChannels.delete(conversationId);
       }
-    })
-    .subscribe();
+    }
+
+    const channel = supabase
+      .channel(topic)
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const typingUserId = (payload as { userId?: string }).userId;
+        if (typingUserId && typingUserId !== currentUserId) {
+          onTyping(typingUserId);
+        }
+      })
+      .subscribe();
+
+    return channel;
+  } catch (error) {
+    console.warn("[messaging] typing subscription failed", error);
+    return null;
+  }
 }
 
 export async function broadcastTyping(conversationId: string, userId: string) {
@@ -267,4 +302,26 @@ export async function broadcastTyping(conversationId: string, userId: string) {
     event: "typing",
     payload: { userId },
   });
+}
+
+export function teardownTypingChannel(
+  conversationId: string,
+  channel: RealtimeChannel | null | undefined
+): void {
+  if (channel) {
+    try {
+      channel.unsubscribe();
+    } catch (error) {
+      console.warn("[messaging] typing unsubscribe failed", error);
+    }
+    void getSupabase().removeChannel(channel);
+  }
+  if (typingChannels.get(conversationId) === channel) {
+    typingChannels.delete(conversationId);
+  }
+}
+
+/** Clears module-level typing caches on sign-out (component effects also teardown channels). */
+export function resetMessagingRealtimeState(): void {
+  typingChannels.clear();
 }

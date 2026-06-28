@@ -20,6 +20,7 @@ import {
   subscribeToMessages,
   subscribeToMessageReactions,
   subscribeToTyping,
+  teardownTypingChannel,
 } from "@frennix/api";
 import type { Conversation, Message, Profile, TrainerVerificationLevel } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -94,6 +95,7 @@ export default function ChatScreen() {
   const chatReady = !loading && !!conversationId && !!userId;
   const [otherTyping, setOtherTyping] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [realtimeDegraded, setRealtimeDegraded] = useState(false);
   const queryClient = useQueryClient();
   const hideTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerRef = useRef<ChatComposerHandle>(null);
@@ -138,7 +140,10 @@ export default function ChatScreen() {
     enabled: !!otherUserId,
   });
 
-  useProfilesPresence(userId, otherProfile?.id ? [otherProfile.id] : []);
+  const { realtimeUnavailable: presenceUnavailable } = useProfilesPresence(
+    userId,
+    otherProfile?.id ? [otherProfile.id] : []
+  );
 
   useEffect(() => {
     if (
@@ -185,28 +190,42 @@ export default function ChatScreen() {
 
     markRead();
 
-    const channel = subscribeToMessages(conversationId!, (message) => {
-      queryClient.setQueryData<Message[]>(["messages", conversationId], (old = []) => {
-        if (old.some((m) => m.id === message.id)) return old;
-        return [...old, message];
+    let messagesSub: ReturnType<typeof subscribeToMessages> | null = null;
+    let typingChannel: ReturnType<typeof subscribeToTyping> | null = null;
+    let reactionsSub: ReturnType<typeof subscribeToMessageReactions> | null = null;
+    let degraded = false;
+
+    try {
+      messagesSub = subscribeToMessages(conversationId!, (message) => {
+        queryClient.setQueryData<Message[]>(["messages", conversationId], (old = []) => {
+          if (old.some((m) => m.id === message.id)) return old;
+          return [...old, message];
+        });
+        markRead();
       });
-      markRead();
-    });
 
-    const typingChannel = subscribeToTyping(conversationId!, userId, () => {
-      setOtherTyping(true);
-      if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
-      hideTypingRef.current = setTimeout(() => setOtherTyping(false), TYPING_HIDE_MS);
-    });
+      typingChannel = subscribeToTyping(conversationId!, userId, () => {
+        setOtherTyping(true);
+        if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
+        hideTypingRef.current = setTimeout(() => setOtherTyping(false), TYPING_HIDE_MS);
+      });
 
-    const reactionsChannel = subscribeToMessageReactions(() => {
-      void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-    });
+      reactionsSub = subscribeToMessageReactions(conversationId!, () => {
+        void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      });
+
+      degraded = !messagesSub.ok || !typingChannel || !reactionsSub.ok;
+    } catch (error) {
+      console.warn("[chat] realtime subscription failed", error);
+      degraded = true;
+    }
+
+    setRealtimeDegraded(degraded);
 
     return () => {
-      channel.unsubscribe();
-      typingChannel.unsubscribe();
-      reactionsChannel.unsubscribe();
+      messagesSub?.unsubscribe();
+      teardownTypingChannel(conversationId!, typingChannel);
+      reactionsSub?.unsubscribe();
       if (hideTypingRef.current) clearTimeout(hideTypingRef.current);
     };
   }, [chatReady, isFocused, conversationId, userId, queryClient, markRead]);
@@ -277,6 +296,13 @@ export default function ChatScreen() {
         }}
       />
       <ImageLightbox uri={previewUri} onClose={() => setPreviewUri(null)} />
+      {realtimeDegraded || presenceUnavailable ? (
+        <View style={styles.realtimeBanner}>
+          <Text style={styles.realtimeBannerText}>
+            Live updates are temporarily unavailable. You can still read and send messages.
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.listWrap}>
         <ChatMessageList
           messages={messages}
@@ -322,5 +348,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontStyle: "italic",
     paddingVertical: spacing.xs,
+  },
+  realtimeBanner: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  realtimeBannerText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 });
