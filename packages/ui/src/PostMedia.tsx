@@ -1,7 +1,6 @@
 import { createElement, useState } from "react";
 import {
   Platform,
-  Pressable,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -10,7 +9,9 @@ import {
 } from "react-native";
 import type { PostType } from "@frennix/types";
 import { inferPostMediaKind } from "@frennix/types";
+import { FeedVideoPlayer } from "./FeedVideoPlayer";
 import { MediaAspectFrame } from "./MediaAspectFrame";
+import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { VideoPreview } from "./VideoPreview";
 import { VideoPosterFallback } from "./VideoPosterFallback";
@@ -26,8 +27,13 @@ interface PostMediaProps {
   style?: ViewStyle;
   layout?: MediaLayout;
   onImagePress?: () => void;
+  onVideoPress?: () => void;
   pressDelayMs?: number;
   maxHeight?: number;
+  /** Active carousel slide — controls feed video autoplay. */
+  slideActive?: boolean;
+  /** Post row is near viewport — gates lazy load and autoplay. */
+  mediaVisible?: boolean;
 }
 
 function isVideoMedia(postType?: PostType, uri?: string) {
@@ -104,8 +110,11 @@ export function PostMedia({
   style,
   layout = "inline",
   onImagePress,
+  onVideoPress,
   pressDelayMs,
   maxHeight,
+  slideActive = true,
+  mediaVisible = true,
 }: PostMediaProps) {
   const isVideo = isVideoMedia(postType, uri);
   const [playing, setPlaying] = useState(false);
@@ -113,6 +122,20 @@ export function PostMedia({
   const dimensionsUri = isVideo
     ? posterState.posterUri ?? thumbnailUrl ?? undefined
     : uri;
+
+  if (isVideo && layout === "feed") {
+    const shouldPlay = Boolean(mediaVisible && slideActive);
+    return (
+      <FeedVideoPlayer
+        uri={uri}
+        thumbnailUrl={thumbnailUrl}
+        posterState={posterState}
+        shouldPlay={shouldPlay}
+        style={style}
+        onOpenFullscreen={onVideoPress}
+      />
+    );
+  }
 
   if (isVideo && !playing) {
     return (
@@ -122,7 +145,10 @@ export function PostMedia({
         thumbnailUrl={thumbnailUrl}
         style={style}
         layout={layout}
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          if (onVideoPress) onVideoPress();
+          else setPlaying(true);
+        }}
       />
     );
   }
@@ -179,6 +205,7 @@ function FeedImage({
   maxHeight?: number;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const content = (
     <MediaAspectFrame
@@ -190,9 +217,17 @@ function FeedImage({
       {() => (
         <>
           {imageFailed ? (
-            <VideoPosterFallback label="Photo unavailable" style={styles.imageFallback} />
+            <MediaLoadError
+              label="Photo unavailable"
+              style={styles.imageFallback}
+              onRetry={() => {
+                setImageFailed(false);
+                setRetryKey((key) => key + 1);
+              }}
+            />
           ) : (
             <ProgressiveImage
+              key={retryKey}
               uri={uri}
               placeholderUri={thumbnailUrl}
               style={styles.image}
@@ -207,7 +242,7 @@ function FeedImage({
   );
 
   if (onImagePress) {
-    const pressable = (
+    return (
       <TouchableOpacity
         activeOpacity={0.95}
         delayPressIn={pressDelayMs ?? 0}
@@ -218,7 +253,6 @@ function FeedImage({
         {content}
       </TouchableOpacity>
     );
-    return pressable;
   }
 
   return content;

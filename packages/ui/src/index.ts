@@ -48,5 +48,9 @@ export {
 } from "./CachedImage";
 export { ScalePressable } from "./ScalePressable";
 export { ProgressiveImage } from "./ProgressiveImage";
+export { MediaLoadError } from "./MediaLoadError";
+export { FeedVideoPlayer } from "./FeedVideoPlayer";
+export { FullscreenVideoSlide } from "./FullscreenVideoSlide";
+export { useMediaVisibility, MEDIA_AUTOPLAY_VISIBILITY_THRESHOLD } from "./useMediaVisibility";
 export { QueryErrorState } from "./QueryErrorState";
 export * from "./ReactionPicker";

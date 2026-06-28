@@ -86,6 +86,7 @@ export function FeedMediaSlot({
       onMediaPress={onMediaPress}
       pageIndex={pageIndex}
       onPageIndexChange={onPageIndexChange}
+      mediaVisible={visible && active}
     />
   );
 }

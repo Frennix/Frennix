@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { CachedImage } from "./CachedImage";
+import { MediaLoadError } from "./MediaLoadError";
 import { Skeleton } from "./Skeleton";
 import { colors } from "./theme";
 
 type ProgressiveImageProps = {
   uri: string;
-  /** Low-res thumbnail shown while the full image loads. */
   placeholderUri?: string | null;
   style?: StyleProp<ViewStyle>;
   contentFit?: "cover" | "contain";
@@ -14,7 +14,6 @@ type ProgressiveImageProps = {
   onLoad?: () => void;
   onError?: () => void;
   recyclingKey?: string;
-  /** Fade-in duration after decode (ms). */
   fadeDuration?: number;
 };
 
@@ -34,6 +33,7 @@ export function ProgressiveImage({
 }: ProgressiveImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const opacity = useRef(new Animated.Value(0)).current;
   const revealedRef = useRef(false);
 
@@ -42,7 +42,7 @@ export function ProgressiveImage({
     setFailed(false);
     revealedRef.current = false;
     opacity.setValue(0);
-  }, [uri, opacity]);
+  }, [uri, retryKey, opacity]);
 
   const reveal = () => {
     if (revealedRef.current) return;
@@ -56,15 +56,26 @@ export function ProgressiveImage({
     }).start();
   };
 
+  const handleRetry = () => {
+    setFailed(false);
+    revealedRef.current = false;
+    opacity.setValue(0);
+    setLoaded(false);
+    setRetryKey((key) => key + 1);
+  };
+
   if (failed) {
-    return <View style={[styles.fallback, style]} accessibilityLabel={accessibilityLabel} />;
+    return (
+      <MediaLoadError label="Photo unavailable" onRetry={handleRetry} style={style} />
+    );
   }
 
   return (
-    <View style={[styles.wrap, style]}>
+    <View style={[styles.wrap, style]} accessibilityLabel={accessibilityLabel}>
       {!loaded ? <Skeleton style={StyleSheet.absoluteFillObject} /> : null}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
         <CachedImage
+          key={retryKey}
           uri={uri}
           placeholderUri={placeholderUri}
           contentFit={contentFit}
@@ -86,9 +97,6 @@ export function ProgressiveImage({
 const styles = StyleSheet.create({
   wrap: {
     overflow: "hidden",
-    backgroundColor: colors.surfaceElevated,
-  },
-  fallback: {
     backgroundColor: colors.surfaceElevated,
   },
 });

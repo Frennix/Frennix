@@ -8,7 +8,6 @@ import {
   toggleCommentLike,
 } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
-import { galleryPlaceholderUris } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePostActions } from "@/lib/usePostActions";
 import { useCommentActions } from "@/lib/useCommentActions";
@@ -217,10 +216,8 @@ export default function PostDetailScreen() {
             const displayPost = post.shared_post ?? post;
             setMediaPageIndex(index);
             openGallery(displayPost.media_urls ?? [uri], index, setMediaPageIndex, {
-              placeholderUris: galleryPlaceholderUris(
-                displayPost.media_urls ?? [uri],
-                displayPost.thumbnail_url
-              ),
+              postType: displayPost.post_type,
+              thumbnailUrl: displayPost.thumbnail_url,
             });
           }}
           mediaPageIndex={mediaPageIndex}

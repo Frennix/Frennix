@@ -23,6 +23,8 @@ interface PostMediaCarouselProps {
   onMediaPress?: (uri: string, index: number) => void;
   pageIndex?: number;
   onPageIndexChange?: (index: number) => void;
+  /** Post row is near viewport — gates lazy load and video autoplay. */
+  mediaVisible?: boolean;
 }
 
 export function PostMediaCarousel({
@@ -33,6 +35,7 @@ export function PostMediaCarousel({
   onMediaPress,
   pageIndex,
   onPageIndexChange,
+  mediaVisible = true,
 }: PostMediaCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -103,7 +106,18 @@ export function PostMediaCarousel({
           thumbnailUrl={item.thumbnailUrl}
           style={styles.media}
           layout="feed"
-          onImagePress={onMediaPress ? () => onMediaPress(item.url, 0) : undefined}
+          slideActive
+          mediaVisible={mediaVisible}
+          onImagePress={
+            item.kind === "image" && onMediaPress
+              ? () => onMediaPress(item.url, 0)
+              : undefined
+          }
+          onVideoPress={
+            item.kind === "video" && onMediaPress
+              ? () => onMediaPress(item.url, 0)
+              : undefined
+          }
         />
       </View>
     );
@@ -151,7 +165,18 @@ export function PostMediaCarousel({
                 style={styles.media}
                 layout="feed"
                 pressDelayMs={200}
-                onImagePress={onMediaPress ? () => onMediaPress(item.url, itemIndex) : undefined}
+                slideActive={itemIndex === activeIndex}
+                mediaVisible={mediaVisible}
+                onImagePress={
+                  item.kind === "image" && onMediaPress
+                    ? () => onMediaPress(item.url, itemIndex)
+                    : undefined
+                }
+                onVideoPress={
+                  item.kind === "video" && onMediaPress
+                    ? () => onMediaPress(item.url, itemIndex)
+                    : undefined
+                }
               />
             </View>
           )}
@@ -164,7 +189,18 @@ export function PostMediaCarousel({
           style={styles.media}
           layout="feed"
           pressDelayMs={200}
-          onImagePress={onMediaPress ? () => onMediaPress(mediaItems[0].url, 0) : undefined}
+          slideActive
+          mediaVisible={mediaVisible}
+          onImagePress={
+            mediaItems[0].kind === "image" && onMediaPress
+              ? () => onMediaPress(mediaItems[0].url, 0)
+              : undefined
+          }
+          onVideoPress={
+            mediaItems[0].kind === "video" && onMediaPress
+              ? () => onMediaPress(mediaItems[0].url, 0)
+              : undefined
+          }
         />
       )}
 
@@ -172,7 +208,11 @@ export function PostMediaCarousel({
         {mediaItems.map((item, dotIndex) => (
           <View
             key={`${item.url}-${dotIndex}`}
-            style={[styles.dot, dotIndex === activeIndex && styles.dotActive]}
+            style={[
+              styles.dot,
+              dotIndex === activeIndex && styles.dotActive,
+              item.kind === "video" && styles.dotVideo,
+            ]}
           />
         ))}
       </View>
@@ -216,6 +256,10 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: colors.accent,
     width: 8,
+  },
+  dotVideo: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.65)",
   },
   counter: {
     position: "absolute",

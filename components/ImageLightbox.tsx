@@ -11,8 +11,11 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { prefetchCachedImages } from "../packages/ui/src/CachedImage";
+import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
 import { ProgressiveImage } from "../packages/ui/src/ProgressiveImage";
 import { colors, spacing, typography } from "../packages/ui/src/theme";
+import type { PostMediaItem } from "@frennix/types";
+import { galleryNeighborImageUris } from "@frennix/types";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -20,15 +23,35 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+/** @deprecated Use MediaGalleryState with typed items. */
 export interface ImageGalleryState {
   images: string[];
   index: number;
-  /** Optional per-slide thumbnails reused from feed cache. */
   placeholderUris?: Array<string | null>;
 }
 
+export interface MediaGalleryState {
+  items: PostMediaItem[];
+  index: number;
+}
+
+export type GalleryState = ImageGalleryState | MediaGalleryState;
+
+function isMediaGalleryState(state: GalleryState): state is MediaGalleryState {
+  return "items" in state;
+}
+
+function resolveGalleryItems(state: GalleryState): PostMediaItem[] {
+  if (isMediaGalleryState(state)) return state.items;
+  return state.images.map((url, index) => ({
+    url,
+    kind: "image" as const,
+    thumbnailUrl: state.placeholderUris?.[index] ?? null,
+  }));
+}
+
 interface ImageLightboxProps {
-  gallery: ImageGalleryState | null;
+  gallery: GalleryState | null;
   onClose: (index: number) => void;
 }
 
@@ -300,11 +323,10 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [pageWidth, setPageWidth] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
-  const listRef = useRef<FlatList<string>>(null);
+  const listRef = useRef<FlatList<PostMediaItem>>(null);
 
-  const images = gallery?.images ?? [];
-  const placeholderUris = gallery?.placeholderUris;
-  const visible = Boolean(gallery?.images.length);
+  const items = gallery ? resolveGalleryItems(gallery) : [];
+  const visible = items.length > 0;
   const stageWidth = pageWidth;
   const stageHeight = Math.max(pageHeight - topInset, 0);
 
@@ -318,19 +340,23 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
   }, [gallery, pageWidth]);
 
   useEffect(() => {
-    if (!images.length) return;
-    const neighbors = [images[index + 1], images[index - 1]].filter(Boolean) as string[];
+    if (items[index]?.kind === "video") setScrollEnabled(true);
+  }, [index, items]);
+
+  useEffect(() => {
+    if (!items.length) return;
+    const neighbors = galleryNeighborImageUris(items, index);
     if (neighbors.length) void prefetchCachedImages(neighbors);
-  }, [images, index]);
+  }, [items, index]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!pageWidth) return;
       const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
-      const clamped = Math.min(Math.max(nextIndex, 0), images.length - 1);
+      const clamped = Math.min(Math.max(nextIndex, 0), items.length - 1);
       setIndex((current) => (current === clamped ? current : clamped));
     },
-    [pageWidth, images.length]
+    [pageWidth, items.length]
   );
 
   const handleZoomChange = useCallback((zoomed: boolean) => {
@@ -364,10 +390,10 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
             <Text style={styles.closeText}>✕</Text>
           </Pressable>
 
-          {images.length > 1 ? (
+          {items.length > 1 ? (
             <View style={styles.galleryCounter} pointerEvents="none">
               <Text style={styles.galleryCounterText}>
-                {index + 1}/{images.length}
+                {index + 1}/{items.length}
               </Text>
             </View>
           ) : null}
@@ -375,13 +401,13 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
           {pageWidth > 0 && stageHeight > 0 ? (
             <FlatList
               ref={listRef}
-              data={images}
+              data={items}
               horizontal
               pagingEnabled
               nestedScrollEnabled
               scrollEnabled={scrollEnabled}
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(uri, itemIndex) => `${uri}-${itemIndex}`}
+              keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
               getItemLayout={(_, itemIndex) => ({
                 length: pageWidth,
                 offset: pageWidth * itemIndex,
@@ -390,24 +416,32 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
               onScroll={handleScroll}
               scrollEventThrottle={16}
               onMomentumScrollEnd={handleScroll}
-              initialNumToRender={Math.min(3, images.length)}
+              initialNumToRender={Math.min(3, items.length)}
               maxToRenderPerBatch={2}
               windowSize={3}
               style={styles.galleryList}
               renderItem={({ item, index: itemIndex }) => (
                 <View style={[styles.galleryPage, { width: pageWidth, height: stageHeight }]}>
-                  {Platform.OS === "web" ? (
+                  {item.kind === "video" ? (
+                    <FullscreenVideoSlide
+                      uri={item.url}
+                      thumbnailUrl={item.thumbnailUrl}
+                      stageWidth={stageWidth}
+                      stageHeight={stageHeight}
+                      isActive={itemIndex === index}
+                    />
+                  ) : Platform.OS === "web" ? (
                     <WebZoomableImage
-                      uri={item}
-                      placeholderUri={placeholderUris?.[itemIndex]}
+                      uri={item.url}
+                      placeholderUri={item.thumbnailUrl}
                       stageWidth={stageWidth}
                       stageHeight={stageHeight}
                       onZoomChange={handleZoomChange}
                     />
                   ) : (
                     <NativeZoomableImage
-                      uri={item}
-                      placeholderUri={placeholderUris?.[itemIndex]}
+                      uri={item.url}
+                      placeholderUri={item.thumbnailUrl}
                       stageWidth={stageWidth}
                       stageHeight={stageHeight}
                       isActive={itemIndex === index}

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { getFeed, getFeedStories, getSuggestedAthletes, getErrorMessage } from "@frennix/api";
 import type { FeedStory, Post } from "@frennix/types";
-import { galleryPlaceholderUris } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
@@ -231,10 +230,8 @@ export default function HomeScreen() {
       openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
         setCarouselIndex(post.id, finalIndex);
       }, {
-        placeholderUris: galleryPlaceholderUris(
-          displayPost.media_urls ?? [],
-          displayPost.thumbnail_url
-        ),
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
       });
     },
   };

@@ -107,8 +107,8 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Gallery index restore preserved after media polish",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
-      if (!feed.includes("galleryPlaceholderUris")) {
-        throw new Error("Feed must pass gallery placeholders when opening lightbox");
+      if (!feed.includes("postType: displayPost.post_type")) {
+        throw new Error("Feed must pass post type when opening gallery");
       }
       if (!feed.includes("setCarouselIndex(post.id, finalIndex)")) {
         throw new Error("Feed must restore carousel index on gallery close");

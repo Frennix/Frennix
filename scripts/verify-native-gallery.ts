@@ -13,7 +13,7 @@ function read(relativePath: string) {
 }
 
 const lightbox = read("components/ImageLightbox.tsx");
-const hook = read("lib/useImageLightbox.tsx");
+const hook = read("lib/useMediaGallery.tsx");
 const feed = read("app/(tabs)/index.tsx");
 
 const checks: Array<{ name: string; run: () => void }> = [
@@ -75,7 +75,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Image counter stays visible in multi-photo gallery",
     run: () => {
       if (!lightbox.includes("galleryCounter")) throw new Error("Counter UI missing");
-      if (!lightbox.includes("{index + 1}/{images.length}")) {
+      if (!lightbox.includes("{index + 1}/{items.length}")) {
         throw new Error("Counter must show current/total");
       }
     },
@@ -94,7 +94,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Closing gallery returns feed to same carousel index",
     run: () => {
       if (!hook.includes("handleClose") || !hook.includes("finalIndex")) {
-        throw new Error("Lightbox must pass final index on close");
+        throw new Error("Gallery must pass final index on close");
       }
       if (!feed.includes("openGallery(displayPost.media_urls ?? [], index, (finalIndex)")) {
         throw new Error("Feed must restore carousel index on gallery close");

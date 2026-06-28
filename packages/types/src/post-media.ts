@@ -48,15 +48,41 @@ export function normalizePostMediaItems(
     }));
 }
 
+/** Unified gallery state for mixed photo/video posts. */
+export interface MediaGalleryState {
+  items: PostMediaItem[];
+  index: number;
+}
+
+/** Build gallery state from legacy post fields. */
+export function buildMediaGalleryState(
+  mediaUrls: string[],
+  options?: { postType?: PostType; thumbnailUrl?: string | null; index?: number }
+): MediaGalleryState {
+  const items = normalizePostMediaItems(mediaUrls, options);
+  const clampedIndex = Math.min(
+    Math.max(options?.index ?? 0, 0),
+    Math.max(items.length - 1, 0)
+  );
+  return { items, index: clampedIndex };
+}
+
+/** Per-item placeholder URIs for gallery cache reuse. */
+export function galleryPlaceholderUris(
+  items: PostMediaItem[]
+): Array<string | null> {
+  return items.map((item) => item.thumbnailUrl ?? null);
+}
+
 /** Image URLs safe for expo-image prefetch/cache. Skips video files. */
 export function filterImagePrefetchUris(uris: Array<string | null | undefined>): string[] {
   return uris.filter((uri): uri is string => isImageMediaUri(uri));
 }
 
-/** Placeholder URIs aligned to media_urls for lightbox cache reuse. */
-export function galleryPlaceholderUris(
-  mediaUrls: string[],
-  thumbnailUrl?: string | null
-): Array<string | null> {
-  return mediaUrls.map((_, index) => (index === 0 ? thumbnailUrl ?? null : null));
+/** Prefetch URIs for adjacent gallery slides (images only). */
+export function galleryNeighborImageUris(items: PostMediaItem[], index: number): string[] {
+  return filterImagePrefetchUris([
+    items[index + 1]?.kind === "image" ? items[index + 1]?.url : null,
+    items[index - 1]?.kind === "image" ? items[index - 1]?.url : null,
+  ]);
 }
