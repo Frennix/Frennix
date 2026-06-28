@@ -110,6 +110,25 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "Story auto-advance pauses while reply composer is open",
+    run: () => {
+      const viewer = read("components/WorkoutStoryViewer.tsx");
+      const dock = read("components/story/StoryActionDock.tsx");
+      if (!viewer.includes("replyLocked") || !viewer.includes("autoAdvancePaused")) {
+        throw new Error("Story viewer must pause auto-advance while reply is active");
+      }
+      if (!viewer.includes("onReplyLockChange")) {
+        throw new Error("Story viewer must wire reply lock from action dock");
+      }
+      if (!dock.includes("onReplyLockChange")) {
+        throw new Error("Story action dock must report reply lock state");
+      }
+      if (!dock.includes("setShowReply(false)")) {
+        throw new Error("Reply composer must close after send to resume auto-advance");
+      }
+    },
+  },
+  {
     name: "Story auto-advance with pause on press/hold",
     run: () => {
       const src = read("components/WorkoutStoryViewer.tsx");
@@ -147,11 +166,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Feed scrolls while story viewer is closed",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
-      if (!feed.includes("scrollEnabled={!storyVisible}")) {
-        throw new Error("Feed scrolling must be disabled while story is open");
+      if (!feed.includes("scrollEnabled={!feedScrollLocked}")) {
+        throw new Error("Feed scrolling must be disabled while story or interaction sheet is open");
       }
-      if (!feed.includes("feedList: { flex: 1 }")) {
-        throw new Error("Feed FlatList must use flex:1 for vertical scroll");
+      if (!feed.includes("feedList:") || !feed.includes("flexFill")) {
+        throw new Error("Feed scroll list must use flexFill for vertical scroll");
       }
       if (!feed.includes("nestedScrollEnabled")) {
         throw new Error("Feed FlatList must enable nestedScrollEnabled for story row");

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   STORY_CHALLENGE_RESPONSES,
@@ -14,6 +14,8 @@ interface StoryActionDockProps {
   isFollowing: boolean;
   followLoading?: boolean;
   inviteLoading?: boolean;
+  resetKey?: string;
+  onReplyLockChange?: (locked: boolean) => void;
   onReact: (emoji: StoryQuickReactionEmoji) => void | Promise<void>;
   onChallenge: (key: StoryChallengeKey) => void | Promise<void>;
   onReply: (text: string) => void | Promise<void>;
@@ -28,6 +30,8 @@ export function StoryActionDock({
   isFollowing,
   followLoading,
   inviteLoading,
+  resetKey,
+  onReplyLockChange,
   onReact,
   onChallenge,
   onReply,
@@ -38,8 +42,27 @@ export function StoryActionDock({
   const [sentReaction, setSentReaction] = useState<string | null>(null);
   const [sentChallenge, setSentChallenge] = useState<StoryChallengeKey | null>(null);
   const [showReply, setShowReply] = useState(false);
+  const [replyFocused, setReplyFocused] = useState(false);
 
   const challengeItems = useMemo(() => STORY_CHALLENGE_RESPONSES, []);
+
+  useEffect(() => {
+    setShowReply(false);
+    setReplyFocused(false);
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (!showReply) setReplyFocused(false);
+  }, [showReply]);
+
+  useEffect(() => {
+    onReplyLockChange?.(showReply || replyFocused);
+  }, [showReply, replyFocused, onReplyLockChange]);
+
+  async function handleSendReply(text: string) {
+    await onReply(text);
+    setShowReply(false);
+  }
 
   return (
     <View style={styles.wrap}>
@@ -113,7 +136,11 @@ export function StoryActionDock({
       </View>
 
       {showReply ? (
-        <StoryReplyBar disabled={disabled} onSend={(text) => onReply(text)} />
+        <StoryReplyBar
+          disabled={disabled}
+          onFocusChange={setReplyFocused}
+          onSend={(text) => handleSendReply(text)}
+        />
       ) : null}
     </View>
   );

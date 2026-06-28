@@ -5,9 +5,10 @@ import { colors, overlays, spacing, typography } from "@frennix/ui";
 interface StoryReplyBarProps {
   disabled?: boolean;
   onSend: (text: string) => void | Promise<void>;
+  onFocusChange?: (focused: boolean) => void;
 }
 
-export function StoryReplyBar({ disabled, onSend }: StoryReplyBarProps) {
+export function StoryReplyBar({ disabled, onSend, onFocusChange }: StoryReplyBarProps) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -34,6 +35,8 @@ export function StoryReplyBar({ disabled, onSend }: StoryReplyBarProps) {
         editable={!disabled && !sending}
         returnKeyType="send"
         onSubmitEditing={() => void handleSend()}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
         accessibilityLabel="Story reply"
       />
       <Pressable

@@ -185,6 +185,7 @@ export function WorkoutStoryViewer({
   const [storyIndex, setStoryIndex] = useState(initialStoryIndex);
   const [slideIndex, setSlideIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [replyLocked, setReplyLocked] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -198,6 +199,7 @@ export function WorkoutStoryViewer({
   const activeSlide = slides[slideIndex] ?? slides[0];
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
+  const autoAdvancePaused = paused || replyLocked;
   const spotlightMilestone = primaryStoryMilestone(lastWorkout?.milestones ?? []);
 
   useEffect(() => {
@@ -205,6 +207,7 @@ export function WorkoutStoryViewer({
     setStoryIndex(initialStoryIndex);
     setSlideIndex(0);
     setPaused(false);
+    setReplyLocked(false);
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
@@ -290,6 +293,10 @@ export function WorkoutStoryViewer({
   }, [timerKey, progress]);
 
   useEffect(() => {
+    setReplyLocked(false);
+  }, [timerKey]);
+
+  useEffect(() => {
     if (!visible || !story) {
       stopTimer();
       progress.setValue(0);
@@ -297,7 +304,7 @@ export function WorkoutStoryViewer({
       return;
     }
 
-    if (paused) {
+    if (autoAdvancePaused) {
       stopTimer();
       progress.stopAnimation((value) => {
         elapsedMsRef.current = value * STORY_SLIDE_DURATION_MS;
@@ -307,7 +314,7 @@ export function WorkoutStoryViewer({
 
     startTimer(elapsedMsRef.current);
     return stopTimer;
-  }, [timerKey, visible, story, paused, startTimer, stopTimer, progress]);
+  }, [timerKey, visible, story, autoAdvancePaused, startTimer, stopTimer, progress]);
 
   useEffect(() => {
     prefetchStorySlide(slides[slideIndex + 1]);
@@ -387,7 +394,7 @@ export function WorkoutStoryViewer({
           <View style={styles.mediaStage} pointerEvents="none">
             <StorySlideContent
               slide={activeSlide}
-              shouldPlayVideo={visible && isVideoSlide && !paused}
+              shouldPlayVideo={visible && isVideoSlide && !autoAdvancePaused}
               width={width}
               height={height}
             />
@@ -460,6 +467,8 @@ export function WorkoutStoryViewer({
             {canEngage ? (
               <StoryActionDock
                 disabled={paused}
+                resetKey={timerKey}
+                onReplyLockChange={setReplyLocked}
                 isFollowing={story.viewer_follows}
                 followLoading={followLoading}
                 inviteLoading={inviteLoading}
@@ -480,7 +489,7 @@ export function WorkoutStoryViewer({
             <Pressable
               style={styles.tapZoneLeft}
               onPress={() => {
-                if (!didHoldRef.current) goPrev();
+                if (!didHoldRef.current && !replyLocked) goPrev();
               }}
               onPressIn={beginHold}
               onPressOut={endHold}
@@ -490,7 +499,7 @@ export function WorkoutStoryViewer({
             <Pressable
               style={styles.tapZoneRight}
               onPress={() => {
-                if (!didHoldRef.current) goNext();
+                if (!didHoldRef.current && !replyLocked) goNext();
               }}
               onPressIn={beginHold}
               onPressOut={endHold}
