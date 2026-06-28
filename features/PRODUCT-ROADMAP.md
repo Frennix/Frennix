@@ -3,14 +3,14 @@
 **Status:** Official — approved direction, pending per-milestone start approval  
 **Last updated:** June 2025  
 **Owner:** Founder  
-**Source of truth:** [`PRODUCT-VISION.md`](./PRODUCT-VISION.md) — all features must align  
+**Source of truth:** [`PRODUCT_VISION.md`](./PRODUCT_VISION.md) — all features must align  
 **Long-term goal:** Build Frennix into a world-class fitness social platform that scales from beta to millions of users.
 
 ---
 
 ## How to use this document
 
-1. **Product Vision first** — Every feature must align with [`PRODUCT-VISION.md`](./PRODUCT-VISION.md). Misaligned proposals are questioned before development.
+1. **Product Vision first** — Every feature must align with [`PRODUCT_VISION.md`](./PRODUCT_VISION.md). Misaligned proposals are questioned before development.
 2. **No milestone begins without explicit founder approval** (reply e.g. *“Approved — begin P1”*).
 2. **No commits, release tags, pushes, or production deployments** without separate explicit approval per [Release Workflow](./releases/RELEASE-WORKFLOW.md).
 3. Each phase ends with a **Review Checkpoint** (like M7.1–M7.3) before the next phase starts.

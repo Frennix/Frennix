@@ -1,7 +1,7 @@
 # Frennix Milestone Framework
 
 **Applies to:** Every production milestone P1–P10  
-**Source of truth:** [`PRODUCT-VISION.md`](./PRODUCT-VISION.md)  
+**Source of truth:** [`PRODUCT_VISION.md`](./PRODUCT_VISION.md)  
 **Companion docs:** [`PRODUCT-ROADMAP.md`](./PRODUCT-ROADMAP.md) · [`MILESTONE-PERSPECTIVES.md`](./MILESTONE-PERSPECTIVES.md) · [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md) · [`PROJECT-PROGRESS.md`](./PROJECT-PROGRESS.md)
 
 Every milestone must be evaluated through **four perspectives** before it is considered production-ready.

@@ -1,10 +1,15 @@
 # Frennix Release Checklist (All Milestones)
 
 **Applies to:** P1–P10 and all semver releases  
-**Source of truth:** [`PRODUCT-VISION.md`](./PRODUCT-VISION.md) — features must align before release  
+**Official process:** [`releases/RELEASE_PROCESS.md`](./releases/RELEASE_PROCESS.md) — seven-phase SOP (mandatory)  
+**Source of truth:** [`PRODUCT_VISION.md`](./PRODUCT_VISION.md) — features must align before release  
 **Rule:** A milestone is **not finished** until every applicable item is checked and documented.
 
 Copy this checklist into each milestone folder (e.g. `features/matching/P1-RELEASE-CHECKLIST.md`) and track status there. Link from [`PRODUCT-ROADMAP.md`](./PRODUCT-ROADMAP.md).
+
+**Reusable phase checklists:** [`releases/checklists/`](./releases/checklists/)  
+**Gate validator:** `npx tsx scripts/verify-release-gates.ts`  
+**Release history:** [`releases/RELEASE-HISTORY.md`](./releases/RELEASE-HISTORY.md)
 
 ---
 
@@ -17,7 +22,8 @@ Copy this checklist into each milestone folder (e.g. `features/matching/P1-RELEA
 | 3 | **Performance tested** — Screen load, list scroll, RPC latency within targets | Engineering | ⬜ |
 | 4 | **Security review** — RLS, RPC auth, input validation, abuse paths documented | Engineering | ⬜ |
 | 5 | **Database migration reviewed** — Migrations applied/tested; rollback SQL documented | Engineering | ⬜ |
-| 6 | **Manual QA completed** — iOS, Android, Web sign-off matrix | QA / Founder | ⬜ |
+| 5a | **Staging deploy verified** — Full checklist on staging before production | Engineering / Founder | ⬜ |
+| 6 | **Manual QA completed** — iOS Safari, iOS app, Android, Web sign-off matrix | QA / Founder | ⬜ |
 | 7 | **Automated tests passing** — Verification scripts green in CI/local | Engineering | ⬜ |
 | 8 | **Accessibility review** — Labels, roles, focus order, screen reader smoke test | Engineering | ⬜ |
 | 9 | **Analytics events verified** — Events fire in staging; founder metrics updated if applicable | Engineering | ⬜ |
@@ -25,7 +31,7 @@ Copy this checklist into each milestone folder (e.g. `features/matching/P1-RELEA
 | 11 | **Production deployment checklist** — Migrations, Edge Functions, env vars, cron jobs | Engineering | ⬜ |
 | 12 | **Rollback plan documented** — Feature flags, revert steps, data safety notes | Engineering | ⬜ |
 | 13 | **Release notes written** — `CHANGELOG.md` + `features/releases/RELEASE-vX.Y.Z.md` | Engineering | ⬜ |
-| 14 | **Founder approval** — Explicit approval to commit, tag, push, deploy | Founder | ⬜ |
+| 14 | **Founder approval** — Explicit approval to commit, tag, push, deploy (separate steps) | Founder | ⬜ |
 | 15 | **Version tag assigned** — Git tag `vX.Y.Z` on approved commit | Engineering | ⬜ |
 | 16 | **Production deployment** — Deploy to production; verify bundle/deployment ID | Engineering | ⬜ |
 | 17 | **Post-release monitoring (24–48h)** — Sentry, founder platform health, user reports | Engineering / Founder | ⬜ |
@@ -56,4 +62,4 @@ Copy this checklist into each milestone folder (e.g. `features/matching/P1-RELEA
 2. Milestone **finish** — All checklist items complete + founder sign-off on release.  
 3. **Commit / tag / push / deploy** — Separate explicit founder approval for each step.
 
-See [`releases/RELEASE-WORKFLOW.md`](./releases/RELEASE-WORKFLOW.md).
+See [`releases/RELEASE_PROCESS.md`](./releases/RELEASE_PROCESS.md) and [`releases/RELEASE-WORKFLOW.md`](./releases/RELEASE-WORKFLOW.md).

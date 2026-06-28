@@ -9,7 +9,7 @@
 
 Master template: [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md)  
 Framework: [`../MILESTONE-FRAMEWORK.md`](../MILESTONE-FRAMEWORK.md)  
-Vision: [`../PRODUCT-VISION.md`](../PRODUCT-VISION.md)
+Vision: [`../PRODUCT_VISION.md`](../PRODUCT_VISION.md)
 
 ---
 

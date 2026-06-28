@@ -1,6 +1,6 @@
 # Frennix Project Progress Dashboard
 
-**Last updated:** 2025-06-25  
+**Last updated:** 2026-06-28  
 **Maintained by:** Engineering — **update after every milestone start and completion**
 
 > Living document for founder review. See also [`MILESTONE-PERSPECTIVES.md`](./MILESTONE-PERSPECTIVES.md) for four-perspective status across P1–P10.
@@ -12,11 +12,11 @@
 | Field | Value |
 |-------|-------|
 | **Current milestone** | **P1 — Matchmaking (Production Ready)** |
-| **P1 completion** | **~95%** — Beta Feedback source-of-truth complete; migration + human QA pending |
+| **P1 completion** | **~95%** — v1.0.0 rolled back; v1.0.1 hotfix pending via new release process |
 | **Overall project completion** | **~40%** (weighted across P1–P10) |
-| **Mode** | **Execution** — ship polished features; no new planning docs unless requested |
-| **Current production version** | v0.8.0 (Messaging stability — `c2cb3f9`) |
-| **Next release target** | **v1.0.0** (P1 Matchmaking GA) |
+| **Mode** | **Execution** — production-grade release process enforced |
+| **Current production version** | **v0.8.0** (`c2cb3f9`) — stable after v1.0.0 rollback |
+| **Next release target** | **v1.0.1** (P1 hotfix — Safari tab layout) |
 | **Estimated P1 completion** | QA + deploy approval (~1–2 weeks) |
 | **Estimated P1–P7 completion** | ~9–12 months |
 | **Estimated full roadmap (P1–P10)** | ~14–18 months |
@@ -27,10 +27,12 @@
 
 | Doc | Purpose |
 |-----|---------|
-| [`PRODUCT-VISION.md`](./PRODUCT-VISION.md) | **Source of truth** — mission, principles, alignment gate |
+| [`PRODUCT_VISION.md`](./PRODUCT_VISION.md) | **Source of truth** — mission, principles, alignment gate |
 | [`MILESTONE-FRAMEWORK.md`](./MILESTONE-FRAMEWORK.md) | Four perspectives + required metadata |
 | [`MILESTONE-PERSPECTIVES.md`](./MILESTONE-PERSPECTIVES.md) | UX / Growth / Founder Ops / Scale per P1–P10 |
 | [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md) | 18-item finish gate |
+| [`releases/RELEASE_PROCESS.md`](./releases/RELEASE_PROCESS.md) | **Official seven-phase release SOP** |
+| [`releases/RELEASE-HISTORY.md`](./releases/RELEASE-HISTORY.md) | Version history + approval audit trail |
 | [`PRODUCT-ROADMAP.md`](./PRODUCT-ROADMAP.md) | Official priority order P1–P10 |
 
 ---
@@ -39,7 +41,7 @@
 
 | Phase | Name | Completion | Status | Version | Four perspectives |
 |-------|------|------------|--------|---------|-------------------|
-| P1 | Matchmaking | **90%** | **In progress** | v1.0.0 | [Detail](./matching/P1-MILESTONE.md) |
+| P1 | Matchmaking | **95%** | **Hotfix pending** | v1.0.1 | [Detail](./matching/P1-MILESTONE.md) |
 | P2 | Messaging | 78% | Planned | v1.1.0 | [Summary](./MILESTONE-PERSPECTIVES.md#p2--messaging) |
 | P3 | Groups | 35% | Planned | v1.2.0 | [Summary](./MILESTONE-PERSPECTIVES.md#p3--groups--communities) |
 | P4 | Challenges | 62% | Planned | v1.3.0 | [Summary](./MILESTONE-PERSPECTIVES.md#p4--challenges) |
@@ -84,9 +86,11 @@ See [`matching/P1-RELEASE-CHECKLIST.md`](./matching/P1-RELEASE-CHECKLIST.md)
 
 | Date | Item |
 |------|------|
+| 2026-06-28 | **Release Management SOP** — `RELEASE_PROCESS.md` + checklists + gate validator (post v1.0.0 incident) |
+| 2026-06-28 | **v1.0.0 rolled back** — production restored to v0.8.0; iPhone verified stable |
 | 2025-06-25 | **Beta Feedback source of truth** — status workflow, filters, GitHub links, screenshots, analytics at `/founder/support` |
 | 2025-06-25 | **Beta Feedback Dashboard** — `/founder/support` command center + migration applied |
-| 2025-06-25 | **Product Vision** established as source of truth (`PRODUCT-VISION.md`) |
+| 2025-06-25 | **Product Vision** established as source of truth (`PRODUCT_VISION.md`) |
 | 2025-06-25 | **Four-perspective milestone framework** (MILESTONE-FRAMEWORK, MILESTONE-PERSPECTIVES, P1-MILESTONE) |
 | 2025-06-25 | **P1 code complete** — analytics, flag, safety, compatibility UI, a11y |
 | 2025-06-25 | Release checklist framework + PROJECT-PROGRESS dashboard |
@@ -129,6 +133,8 @@ See [`matching/P1-RELEASE-CHECKLIST.md`](./matching/P1-RELEASE-CHECKLIST.md)
 
 | Date | Change |
 |------|--------|
+| 2026-06-28 | `PRODUCT_VISION.md` established as permanent source of truth; hyphen file redirects |
+| 2026-06-28 | Official seven-phase release process adopted; production v0.8.0 after v1.0.0 rollback |
 | 2025-06-25 | Execution mode; P1 matchmaking analytics shipped in code |
 | 2025-06-25 | Product Vision doc created; alignment gate for all features |
 | 2025-06-25 | Four-perspective framework; P1 at 90%; living doc policy |

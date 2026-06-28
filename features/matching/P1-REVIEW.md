@@ -11,7 +11,7 @@
 ## Delivered in this sprint
 
 ### Framework
-- [`../PRODUCT-VISION.md`](../PRODUCT-VISION.md) — source of truth for all features
+- [`../PRODUCT_VISION.md`](../PRODUCT_VISION.md) — source of truth for all features
 - [`../MILESTONE-FRAMEWORK.md`](../MILESTONE-FRAMEWORK.md) — four perspectives (UX, Growth, Founder Ops, Scale)
 - [`../MILESTONE-PERSPECTIVES.md`](../MILESTONE-PERSPECTIVES.md) — P1–P10 perspective summaries
 - [`P1-MILESTONE.md`](./P1-MILESTONE.md) — full P1 four-perspective detail

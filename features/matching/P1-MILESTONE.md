@@ -5,7 +5,7 @@
 **Duration:** 3–4 weeks  
 **Release notes:** [`../releases/RELEASE-v1.0.0.md`](../releases/RELEASE-v1.0.0.md)  
 **Framework:** [`../MILESTONE-FRAMEWORK.md`](../MILESTONE-FRAMEWORK.md)  
-**Vision alignment:** [`../PRODUCT-VISION.md`](../PRODUCT-VISION.md)
+**Vision alignment:** [`../PRODUCT_VISION.md`](../PRODUCT_VISION.md)
 
 ---
 

@@ -1,82 +1,109 @@
-# Frennix Release Workflow
+# Frennix Release Workflow (Quick Reference)
 
-Official versioning begins with **v0.8.0**. Every production release follows this sequence.
+> **Official process:** [`RELEASE_PROCESS.md`](./RELEASE_PROCESS.md) — the full seven-phase SOP.  
+> This file is a command cheat sheet only.
 
-## Process
+---
 
-| Step | Action | Gate |
-|------|--------|------|
-| 1 | Complete development | — |
-| 2 | Complete manual QA | — |
-| 3 | Generate release notes (plain text for review) | — |
-| 4 | **Wait for founder approval** | Required |
-| 5 | Commit (code + `dist/` for web + release doc) | Approved |
-| 6 | Create Git tag (`vX.Y.Z`) | Approved |
-| 7 | Push commit and tag to GitHub | Approved |
-| 8 | Deploy to production | Approved |
-| 9 | Verify production health | Automated + spot-check |
-| 10 | Record release in release history | Post-deploy |
+## Seven phases (summary)
 
-**No step after approval #4 runs automatically.** Each of commit, tag, push, and deploy requires explicit founder sign-off.
+1. **Development branch** — feature branch → PR → merge (no direct `main` commits)
+2. **Internal testing** — [`checklists/INTERNAL-TESTING.md`](./checklists/INTERNAL-TESTING.md)
+3. **Human QA** — [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) — iPhone, Android, Web
+4. **Staging** — [`checklists/STAGING-DEPLOYMENT.md`](./checklists/STAGING-DEPLOYMENT.md) — Founder approval required
+5. **Production** — [`checklists/PRODUCTION-DEPLOYMENT.md`](./checklists/PRODUCTION-DEPLOYMENT.md) — separate commit/tag/push/deploy approvals
+6. **Monitoring** — [`checklists/POST-RELEASE-MONITORING.md`](./checklists/POST-RELEASE-MONITORING.md) — 24–48h
+7. **Completion** — [`checklists/RELEASE-COMPLETION.md`](./checklists/RELEASE-COMPLETION.md)
 
-## Release artifact checklist
+---
 
-Every release must document:
+## Gate validator (run before staging/production deploy)
 
-- Version number
-- Release date
-- Commit hash
-- Git tag
-- Deployment URL
-- Deployment ID
-- Features added
-- Bugs fixed
-- Known issues
-- QA checklist completed
-- Rollback plan
-- Release notes
+```bash
+cd apps/mobile
+npx tsx scripts/verify-release-gates.ts --release features/releases/RELEASE-vX.Y.Z.md --phase staging
+npx tsx scripts/verify-release-gates.ts --release features/releases/RELEASE-vX.Y.Z.md --phase production
+```
 
-## File conventions
+Exit code **1** = deploy blocked.
 
-| File | Purpose |
-|------|---------|
-| `features/releases/RELEASE-vX.Y.Z.md` | Detailed release notes + sign-off log |
-| `CHANGELOG.md` | Append-only summary (one section per version) |
-| `dist/` | Pre-built web export (committed for Vercel deploy) |
+---
 
-## Semantic versioning
+## New release setup
 
-- **Major (X)**: Breaking changes, large platform shifts
-- **Minor (Y)**: Features, milestones, significant polish
-- **Patch (Z)**: Bug fixes, hotfixes
+```bash
+cp features/releases/templates/RELEASE-vX.Y.Z-TEMPLATE.md features/releases/RELEASE-vX.Y.Z.md
+# Fill in scope, track checklists, record approvals
+```
 
-## Deploy commands (web)
+---
+
+## Staging deploy
 
 ```bash
 cd apps/mobile
 npx expo export -p web && node scripts/patch-web-html.js
-# After commit + tag + push:
+npx vercel --yes --project frennix-staging
+# https://staging.frennix.vercel.app
+```
+
+---
+
+## Production deploy (after all approvals)
+
+```bash
+cd apps/mobile
+npx tsx scripts/verify-release-gates.ts --release features/releases/RELEASE-vX.Y.Z.md --phase production
+npx supabase db push
+npx expo export -p web && node scripts/patch-web-html.js
 npx vercel --prod --yes --project frennix
 ```
 
-## Post-deploy verification
+---
+
+## Post-deploy smoke
 
 ```bash
 curl -sS -o /dev/null -w "HTTP %{http_code}\n" https://frennix.vercel.app/
-# Confirm dist/index.html bundle hash matches commit
-# Confirm GitHub main SHA matches deployed commit
+# Verify bundle hash in index.html
+# iPhone Safari: login → feed (no black screen)
 ```
 
-Record results in `RELEASE-vX.Y.Z.md` sign-off table and `app_releases` (Founder Dashboard, Milestone 1).
-
-## Milestone releases
-
-Product milestones (M1–M10) are documented in [PRODUCT-OPERATIONS.md](../founder-dashboard/PRODUCT-OPERATIONS.md). Each semver release should set `app_releases.milestone_code` and link roadmap features via `roadmap_feature_releases`.
-
-When Founder Dashboard M7.4 ships, release recording moves from manual markdown to dashboard UI + database — until then, use `features/releases/RELEASE-vX.Y.Z.md` and `CHANGELOG.md`.
+---
 
 ## Rollback
 
-1. Redeploy previous known-good Vercel deployment or checkout prior `dist/` from Git tag.
-2. Update `app_releases.status` to `rolled_back` when Founder Dashboard is live.
-3. No DB rollback unless migration was part of release.
+```bash
+npx vercel promote <previous-deployment-url> --yes
+# Or: git checkout vX.Y.Z-previous -- dist/ && npx vercel --prod --yes --project frennix
+```
+
+Document in [`RELEASE-HISTORY.md`](./RELEASE-HISTORY.md).
+
+---
+
+## File map
+
+| File | Purpose |
+|------|---------|
+| [`RELEASE_PROCESS.md`](./RELEASE_PROCESS.md) | **Official SOP** |
+| [`RELEASE-HISTORY.md`](./RELEASE-HISTORY.md) | Version history + approvals |
+| [`templates/RELEASE-vX.Y.Z-TEMPLATE.md`](./templates/RELEASE-vX.Y.Z-TEMPLATE.md) | Per-release copy |
+| [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md) | Milestone item matrix |
+| [`../../CHANGELOG.md`](../../CHANGELOG.md) | Public changelog |
+
+---
+
+## Founder approval phrases
+
+| Step | Phrase |
+|------|--------|
+| Human QA → staging | `Human QA passed — approved for staging` |
+| Staging → production prep | `Approved — staging verified for vX.Y.Z` |
+| Commit | `Approved — commit vX.Y.Z` |
+| Tag | `Approved — tag vX.Y.Z` |
+| Push | `Approved — push vX.Y.Z` |
+| Deploy | `Approved — deploy vX.Y.Z` |
+| Complete | `Approved — vX.Y.Z complete` |
+
+**Never combine commit, tag, push, or deploy.**
