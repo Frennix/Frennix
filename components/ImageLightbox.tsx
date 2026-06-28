@@ -10,7 +10,8 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { CachedImage, prefetchCachedImages } from "../packages/ui/src/CachedImage";
+import { prefetchCachedImages } from "../packages/ui/src/CachedImage";
+import { ProgressiveImage } from "../packages/ui/src/ProgressiveImage";
 import { colors, spacing, typography } from "../packages/ui/src/theme";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -22,6 +23,8 @@ import Animated, {
 export interface ImageGalleryState {
   images: string[];
   index: number;
+  /** Optional per-slide thumbnails reused from feed cache. */
+  placeholderUris?: Array<string | null>;
 }
 
 interface ImageLightboxProps {
@@ -35,12 +38,14 @@ function clampScale(value: number) {
 
 function NativeZoomableImage({
   uri,
+  placeholderUri,
   stageWidth,
   stageHeight,
   isActive,
   onZoomChange,
 }: {
   uri: string;
+  placeholderUri?: string | null;
   stageWidth: number;
   stageHeight: number;
   isActive: boolean;
@@ -133,8 +138,9 @@ function NativeZoomableImage({
             animatedStyle,
           ]}
         >
-          <CachedImage
+          <ProgressiveImage
             uri={uri}
+            placeholderUri={placeholderUri}
             style={{ width: stageWidth, height: stageHeight }}
             contentFit="contain"
             recyclingKey={`lightbox-${uri}`}
@@ -147,11 +153,13 @@ function NativeZoomableImage({
 
 function WebZoomableImage({
   uri,
+  placeholderUri,
   stageWidth,
   stageHeight,
   onZoomChange,
 }: {
   uri: string;
+  placeholderUri?: string | null;
   stageWidth: number;
   stageHeight: number;
   onZoomChange: (zoomed: boolean) => void;
@@ -273,8 +281,9 @@ function WebZoomableImage({
           },
         ]}
       >
-        <CachedImage
+        <ProgressiveImage
           uri={uri}
+          placeholderUri={placeholderUri}
           style={{ width: stageWidth, height: stageHeight }}
           contentFit="contain"
           recyclingKey={`lightbox-web-${uri}`}
@@ -294,6 +303,7 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
   const listRef = useRef<FlatList<string>>(null);
 
   const images = gallery?.images ?? [];
+  const placeholderUris = gallery?.placeholderUris;
   const visible = Boolean(gallery?.images.length);
   const stageWidth = pageWidth;
   const stageHeight = Math.max(pageHeight - topInset, 0);
@@ -389,6 +399,7 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
                   {Platform.OS === "web" ? (
                     <WebZoomableImage
                       uri={item}
+                      placeholderUri={placeholderUris?.[itemIndex]}
                       stageWidth={stageWidth}
                       stageHeight={stageHeight}
                       onZoomChange={handleZoomChange}
@@ -396,6 +407,7 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
                   ) : (
                     <NativeZoomableImage
                       uri={item}
+                      placeholderUri={placeholderUris?.[itemIndex]}
                       stageWidth={stageWidth}
                       stageHeight={stageHeight}
                       isActive={itemIndex === index}

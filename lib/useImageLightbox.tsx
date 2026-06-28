@@ -3,22 +3,39 @@ import { ImageLightbox, type ImageGalleryState } from "@/components/ImageLightbo
 
 export type GalleryCloseHandler = (index: number) => void;
 
+export type OpenGalleryOptions = {
+  placeholderUris?: Array<string | null>;
+};
+
 export function useImageLightbox() {
   const [gallery, setGallery] = useState<ImageGalleryState | null>(null);
   const closeHandlerRef = useRef<GalleryCloseHandler | null>(null);
 
-  const openImage = useCallback((uri: string) => {
+  const openImage = useCallback((uri: string, placeholderUri?: string | null) => {
     closeHandlerRef.current = null;
-    setGallery({ images: [uri], index: 0 });
+    setGallery({
+      images: [uri],
+      index: 0,
+      placeholderUris: placeholderUri ? [placeholderUri] : undefined,
+    });
   }, []);
 
   const openGallery = useCallback(
-    (images: string[], index = 0, onClosed?: GalleryCloseHandler) => {
+    (
+      images: string[],
+      index = 0,
+      onClosed?: GalleryCloseHandler,
+      options?: OpenGalleryOptions
+    ) => {
       const filtered = images.filter(Boolean);
       if (!filtered.length) return;
       const clampedIndex = Math.min(Math.max(index, 0), filtered.length - 1);
       closeHandlerRef.current = onClosed ?? null;
-      setGallery({ images: filtered, index: clampedIndex });
+      setGallery({
+        images: filtered,
+        index: clampedIndex,
+        placeholderUris: options?.placeholderUris,
+      });
     },
     []
   );

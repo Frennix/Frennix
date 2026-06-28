@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   NativeScrollEvent,
@@ -9,7 +9,8 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import type { PostType } from "@frennix/types";
+import type { PostType, PostMediaItem } from "@frennix/types";
+import { normalizePostMediaItems } from "@frennix/types";
 import { prefetchCachedImages } from "./CachedImage";
 import { PostMedia } from "./PostMedia";
 import { colors, spacing, typography } from "./theme";
@@ -35,8 +36,13 @@ export function PostMediaCarousel({
 }: PostMediaCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  const listRef = useRef<FlatList<string>>(null);
+  const listRef = useRef<FlatList<PostMediaItem>>(null);
   const activeIndex = pageIndex ?? internalIndex;
+
+  const mediaItems = useMemo(
+    () => normalizePostMediaItems(mediaUrls, { postType, thumbnailUrl }),
+    [mediaUrls, postType, thumbnailUrl]
+  );
 
   const handleLayout = useCallback((width: number) => {
     if (width > 0) setContainerWidth(width);
@@ -44,11 +50,11 @@ export function PostMediaCarousel({
 
   const commitIndex = useCallback(
     (nextIndex: number) => {
-      const clamped = Math.min(Math.max(nextIndex, 0), Math.max(mediaUrls.length - 1, 0));
+      const clamped = Math.min(Math.max(nextIndex, 0), Math.max(mediaItems.length - 1, 0));
       if (pageIndex === undefined) setInternalIndex(clamped);
       onPageIndexChange?.(clamped);
     },
-    [mediaUrls.length, onPageIndexChange, pageIndex]
+    [mediaItems.length, onPageIndexChange, pageIndex]
   );
 
   const updateIndexFromOffset = useCallback(
@@ -74,26 +80,30 @@ export function PostMediaCarousel({
   }, [pageIndex, containerWidth, internalIndex]);
 
   useEffect(() => {
-    if (!containerWidth || mediaUrls.length <= 1) return;
-    const neighbors = [mediaUrls[activeIndex + 1], mediaUrls[activeIndex - 1]].filter(Boolean) as string[];
+    if (!containerWidth || mediaItems.length <= 1) return;
+    const neighbors = [
+      mediaItems[activeIndex + 1]?.url,
+      mediaItems[activeIndex - 1]?.url,
+    ].filter(Boolean) as string[];
     if (neighbors.length) void prefetchCachedImages(neighbors);
-  }, [activeIndex, mediaUrls, containerWidth]);
+  }, [activeIndex, mediaItems, containerWidth]);
 
-  if (!mediaUrls.length) return null;
+  if (!mediaItems.length) return null;
 
-  if (mediaUrls.length === 1) {
+  if (mediaItems.length === 1) {
+    const item = mediaItems[0];
     return (
       <View
         style={[styles.wrapper, style]}
         onLayout={(event) => handleLayout(event.nativeEvent.layout.width)}
       >
         <PostMedia
-          uri={mediaUrls[0]}
-          postType={postType}
-          thumbnailUrl={thumbnailUrl}
+          uri={item.url}
+          postType={item.kind === "video" ? "video" : "photo"}
+          thumbnailUrl={item.thumbnailUrl}
           style={styles.media}
           layout="feed"
-          onImagePress={onMediaPress ? () => onMediaPress(mediaUrls[0], 0) : undefined}
+          onImagePress={onMediaPress ? () => onMediaPress(item.url, 0) : undefined}
         />
       </View>
     );
@@ -113,13 +123,13 @@ export function PostMediaCarousel({
       {containerWidth > 0 ? (
         <FlatList
           ref={listRef}
-          data={mediaUrls}
+          data={mediaItems}
           horizontal
           pagingEnabled
           nestedScrollEnabled
           directionalLockEnabled={Platform.OS === "ios"}
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(uri, itemIndex) => `${uri}-${itemIndex}`}
+          keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
           getItemLayout={getItemLayout}
           snapToInterval={containerWidth}
           snapToAlignment="start"
@@ -135,33 +145,33 @@ export function PostMediaCarousel({
           renderItem={({ item, index: itemIndex }) => (
             <View style={{ width: containerWidth }}>
               <PostMedia
-                uri={item}
-                postType={itemIndex === 0 ? postType : "photo"}
-                thumbnailUrl={itemIndex === 0 ? thumbnailUrl : null}
+                uri={item.url}
+                postType={item.kind === "video" ? "video" : "photo"}
+                thumbnailUrl={item.thumbnailUrl}
                 style={styles.media}
                 layout="feed"
                 pressDelayMs={200}
-                onImagePress={onMediaPress ? () => onMediaPress(item, itemIndex) : undefined}
+                onImagePress={onMediaPress ? () => onMediaPress(item.url, itemIndex) : undefined}
               />
             </View>
           )}
         />
       ) : (
         <PostMedia
-          uri={mediaUrls[0]}
-          postType={postType}
-          thumbnailUrl={thumbnailUrl}
+          uri={mediaItems[0].url}
+          postType={mediaItems[0].kind === "video" ? "video" : "photo"}
+          thumbnailUrl={mediaItems[0].thumbnailUrl}
           style={styles.media}
           layout="feed"
           pressDelayMs={200}
-          onImagePress={onMediaPress ? () => onMediaPress(mediaUrls[0], 0) : undefined}
+          onImagePress={onMediaPress ? () => onMediaPress(mediaItems[0].url, 0) : undefined}
         />
       )}
 
       <View style={styles.dots} pointerEvents="none">
-        {mediaUrls.map((uri, dotIndex) => (
+        {mediaItems.map((item, dotIndex) => (
           <View
-            key={`${uri}-${dotIndex}`}
+            key={`${item.url}-${dotIndex}`}
             style={[styles.dot, dotIndex === activeIndex && styles.dotActive]}
           />
         ))}
@@ -169,7 +179,7 @@ export function PostMediaCarousel({
 
       <View style={styles.counter} pointerEvents="none">
         <Text style={styles.counterText}>
-          {activeIndex + 1}/{mediaUrls.length}
+          {activeIndex + 1}/{mediaItems.length}
         </Text>
       </View>
     </View>

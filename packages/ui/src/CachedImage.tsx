@@ -1,5 +1,6 @@
 import { Image, type ImageProps } from "expo-image";
 import { type StyleProp, type ImageStyle } from "react-native";
+import { filterImagePrefetchUris, isImageMediaUri } from "@frennix/types";
 
 export type CachedImageProps = {
   uri: string;
@@ -14,6 +15,8 @@ export type CachedImageProps = {
   onLoadEnd?: () => void;
   onError?: () => void;
 };
+
+export { isImageMediaUri, filterImagePrefetchUris };
 
 /** Remote image with memory+disk cache and optional thumbnail crossfade. */
 export function CachedImage({
@@ -71,9 +74,12 @@ export function CachedAssetImage({
 }
 
 export function prefetchCachedImage(uri: string) {
+  if (!isImageMediaUri(uri)) return Promise.resolve(false);
   return Image.prefetch(uri, "memory-disk");
 }
 
 export function prefetchCachedImages(uris: string[]) {
-  return Image.prefetch(uris, "memory-disk");
+  const imageUris = filterImagePrefetchUris(uris);
+  if (!imageUris.length) return Promise.resolve(false);
+  return Image.prefetch(imageUris, "memory-disk");
 }

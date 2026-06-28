@@ -9,6 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { PostType } from "@frennix/types";
+import { inferPostMediaKind } from "@frennix/types";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { VideoPreview } from "./VideoPreview";
@@ -30,9 +31,7 @@ interface PostMediaProps {
 }
 
 function isVideoMedia(postType?: PostType, uri?: string) {
-  if (postType === "video") return true;
-  if (!uri) return false;
-  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(uri);
+  return inferPostMediaKind(uri ?? "", { postType, index: 0 }) === "video";
 }
 
 function VideoPlayer({

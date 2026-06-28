@@ -476,3 +476,4 @@ export type Activity = (typeof ACTIVITIES)[number];
 export * from "./trainer";
 export * from "./analytics";
 export * from "./workout-types";
+export * from "./post-media";

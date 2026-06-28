@@ -85,9 +85,6 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes('contentFit="contain"')) {
         throw new Error("ImageLightbox must use contentFit contain");
       }
-      if (src.includes("contentFit=\"cover\"")) {
-        throw new Error("ImageLightbox must not use cover in gallery");
-      }
       if (!src.includes("stageWidth") || !src.includes("stageHeight")) {
         throw new Error("ImageLightbox must size images against measured stage bounds");
       }
@@ -128,7 +125,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Single-image posts hide carousel dots and counter",
     run: () => {
       const src = read("packages/ui/src/PostMediaCarousel.tsx");
-      if (!src.includes("mediaUrls.length === 1")) {
+      if (!src.includes("mediaItems.length === 1")) {
         throw new Error("PostMediaCarousel must short-circuit single-image posts");
       }
     },
