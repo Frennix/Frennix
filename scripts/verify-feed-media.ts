@@ -79,9 +79,18 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Image lightbox supports multi-image gallery swipe",
+    name: "Full-screen gallery uses contain fit without cropping",
     run: () => {
       const src = read("components/ImageLightbox.tsx");
+      if (!src.includes('contentFit="contain"')) {
+        throw new Error("ImageLightbox must use contentFit contain");
+      }
+      if (src.includes("contentFit=\"cover\"")) {
+        throw new Error("ImageLightbox must not use cover in gallery");
+      }
+      if (!src.includes("stageWidth") || !src.includes("stageHeight")) {
+        throw new Error("ImageLightbox must size images against measured stage bounds");
+      }
       if (!src.includes("scrollEnabled={scrollEnabled}")) {
         throw new Error("ImageLightbox must disable gallery scroll while zoomed");
       }

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -36,14 +35,14 @@ function clampScale(value: number) {
 
 function NativeZoomableImage({
   uri,
-  maxWidth,
-  maxHeight,
+  stageWidth,
+  stageHeight,
   isActive,
   onZoomChange,
 }: {
   uri: string;
-  maxWidth: number;
-  maxHeight: number;
+  stageWidth: number;
+  stageHeight: number;
   isActive: boolean;
   onZoomChange: (zoomed: boolean) => void;
 }) {
@@ -125,10 +124,21 @@ function NativeZoomableImage({
   }));
 
   return (
-    <View style={[styles.imageFrame, { width: maxWidth, height: maxHeight }]}>
+    <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
-        <Animated.View style={[styles.image, animatedStyle]}>
-          <CachedImage uri={uri} style={styles.imageFill} contentFit="contain" recyclingKey={`lightbox-${uri}`} />
+        <Animated.View
+          style={[
+            styles.zoomLayer,
+            { width: stageWidth, height: stageHeight },
+            animatedStyle,
+          ]}
+        >
+          <CachedImage
+            uri={uri}
+            style={{ width: stageWidth, height: stageHeight }}
+            contentFit="contain"
+            recyclingKey={`lightbox-${uri}`}
+          />
         </Animated.View>
       </GestureDetector>
     </View>
@@ -137,13 +147,13 @@ function NativeZoomableImage({
 
 function WebZoomableImage({
   uri,
-  maxWidth,
-  maxHeight,
+  stageWidth,
+  stageHeight,
   onZoomChange,
 }: {
   uri: string;
-  maxWidth: number;
-  maxHeight: number;
+  stageWidth: number;
+  stageHeight: number;
   onZoomChange: (zoomed: boolean) => void;
 }) {
   const [scale, setScale] = useState(1);
@@ -201,7 +211,7 @@ function WebZoomableImage({
 
   return (
     <View
-      style={[styles.imageFrame, { width: maxWidth, height: maxHeight }]}
+      style={[styles.stage, { width: stageWidth, height: stageHeight }]}
       collapsable={false}
       onTouchStart={(event) => {
         const touches = event.nativeEvent.touches;
@@ -241,38 +251,52 @@ function WebZoomableImage({
       onTouchEnd={() => {
         dragStart.current = null;
         pinchStart.current = null;
+        setScale((current) => {
+          if (current <= 1.01) {
+            setPan({ x: 0, y: 0 });
+            onZoomChange(false);
+            return 1;
+          }
+          return current;
+        });
       }}
       // @ts-expect-error web double-click zoom
       onDoubleClick={handleDoubleTap}
     >
-      <CachedImage
-        uri={uri}
+      <View
         style={[
-          styles.image,
-          styles.imageFill,
+          styles.zoomLayer,
           {
+            width: stageWidth,
+            height: stageHeight,
             transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale }],
           },
         ]}
-        contentFit="contain"
-        recyclingKey={`lightbox-web-${uri}`}
-        accessibilityLabel="Full size image"
-      />
+      >
+        <CachedImage
+          uri={uri}
+          style={{ width: stageWidth, height: stageHeight }}
+          contentFit="contain"
+          recyclingKey={`lightbox-web-${uri}`}
+          accessibilityLabel="Full size image"
+        />
+      </View>
     </View>
   );
 }
 
 export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
-  const { width, height } = useWindowDimensions();
-  const imageMaxWidth = width;
-  const imageMaxHeight = height - spacing.xxl * 2;
+  const topInset = Platform.OS === "web" ? spacing.lg + 40 : spacing.xxl + 40;
   const [index, setIndex] = useState(0);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [pageWidth, setPageWidth] = useState(0);
+  const [pageHeight, setPageHeight] = useState(0);
   const listRef = useRef<FlatList<string>>(null);
 
   const images = gallery?.images ?? [];
   const visible = Boolean(gallery?.images.length);
+  const stageWidth = pageWidth;
+  const stageHeight = Math.max(pageHeight - topInset, 0);
 
   useEffect(() => {
     if (!gallery || !pageWidth) return;
@@ -311,7 +335,13 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={dismiss} statusBarTranslucent>
-      <View style={styles.backdrop} onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}>
+      <View
+        style={styles.backdrop}
+        onLayout={(event) => {
+          setPageWidth(event.nativeEvent.layout.width);
+          setPageHeight(event.nativeEvent.layout.height);
+        }}
+      >
         <Pressable style={styles.dismissArea} onPress={dismiss} accessibilityLabel="Dismiss image preview" />
 
         <View style={styles.content} pointerEvents="box-none">
@@ -332,7 +362,7 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
             </View>
           ) : null}
 
-          {pageWidth > 0 ? (
+          {pageWidth > 0 && stageHeight > 0 ? (
             <FlatList
               ref={listRef}
               data={images}
@@ -355,19 +385,19 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
               windowSize={3}
               style={styles.galleryList}
               renderItem={({ item, index: itemIndex }) => (
-                <View style={[styles.galleryPage, { width: pageWidth }]}>
+                <View style={[styles.galleryPage, { width: pageWidth, height: stageHeight }]}>
                   {Platform.OS === "web" ? (
                     <WebZoomableImage
                       uri={item}
-                      maxWidth={imageMaxWidth - spacing.xl * 2}
-                      maxHeight={imageMaxHeight}
+                      stageWidth={stageWidth}
+                      stageHeight={stageHeight}
                       onZoomChange={handleZoomChange}
                     />
                   ) : (
                     <NativeZoomableImage
                       uri={item}
-                      maxWidth={imageMaxWidth - spacing.xl * 2}
-                      maxHeight={imageMaxHeight}
+                      stageWidth={stageWidth}
+                      stageHeight={stageHeight}
                       isActive={itemIndex === index}
                       onZoomChange={handleZoomChange}
                     />
@@ -399,11 +429,22 @@ const styles = StyleSheet.create({
   galleryList: {
     flex: 1,
     width: "100%",
+    ...(Platform.OS === "web" ? { overflow: "visible" as const } : null),
   },
   galleryPage: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "visible",
+  },
+  stage: {
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "visible",
+  },
+  zoomLayer: {
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "visible",
   },
   closeButton: {
     position: "absolute",
@@ -440,18 +481,5 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.text,
     fontWeight: "700",
-  },
-  imageFrame: {
-    zIndex: 1,
-    alignSelf: "center",
-    overflow: "visible",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-  },
-  imageFill: {
-    width: "100%",
-    height: "100%",
   },
 });
