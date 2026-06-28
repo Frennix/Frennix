@@ -117,6 +117,20 @@ const checks: Array<{ name: string; run: () => void }> = [
       assertIncludes("lib/haptics.ts", 'require("expo-haptics")', "haptics must lazy-load on native");
     },
   },
+  {
+    name: "Feed stories query declared before story handlers",
+    run: () => {
+      const feed = read("app/(tabs)/index.tsx");
+      const storiesDecl = feed.indexOf("data: stories = []");
+      const firstStoriesDep = feed.indexOf("[userId, stories]");
+      if (storiesDecl < 0 || firstStoriesDep < 0) {
+        throw new Error("feed story hooks missing");
+      }
+      if (storiesDecl > firstStoriesDep) {
+        throw new Error("stories is referenced before useQuery declaration (login crash)");
+      }
+    },
+  },
 ];
 
 let failed = 0;

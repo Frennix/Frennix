@@ -81,6 +81,17 @@ export default function HomeScreen() {
     [queryClient, userId]
   );
 
+  const {
+    data: stories = [],
+    refetch: refetchStories,
+    isRefetching: isStoriesRefetching,
+  } = useQuery({
+    queryKey: ["feed-stories", userId],
+    queryFn: () => getFeedStories(userId),
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
+
   const handleStoryReact = useCallback(
     async (storyUserId: string, postId: string, emoji: StoryQuickReactionEmoji) => {
       if (!userId) return;
@@ -163,17 +174,6 @@ export default function HomeScreen() {
     enabled: !!userId,
     staleTime: 60_000,
     placeholderData: (previousData) => previousData,
-  });
-
-  const {
-    data: stories = [],
-    refetch: refetchStories,
-    isRefetching: isStoriesRefetching,
-  } = useQuery({
-    queryKey: ["feed-stories", userId],
-    queryFn: () => getFeedStories(userId),
-    enabled: !!userId,
-    staleTime: 60_000,
   });
 
   const {
