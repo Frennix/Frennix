@@ -4,6 +4,7 @@ import { FeedPostCard } from "@frennix/ui";
 
 export type FeedListItemActions = {
   onPress: (post: Post) => void;
+  onInteractPress: (post: Post, mediaIndex?: number) => void;
   onAuthorPress: (post: Post) => void;
   onCommentAuthorPress: (username: string) => void;
   onLike: (post: Post) => void;
@@ -20,6 +21,7 @@ type FeedListItemProps = {
   post: Post;
   userId: string;
   actions: FeedListItemActions;
+  interactionActive?: boolean;
   /** When true, mount feed media (images/videos). Deferred until row is near viewport. */
   mediaActive?: boolean;
   mediaPageIndex?: number;
@@ -30,6 +32,7 @@ function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
   if (prev.userId !== next.userId) return false;
   if (prev.mediaActive !== next.mediaActive) return false;
   if (prev.mediaPageIndex !== next.mediaPageIndex) return false;
+  if (prev.interactionActive !== next.interactionActive) return false;
   if (prev.onMediaPageIndexChange !== next.onMediaPageIndexChange) return false;
   if (prev.post.id !== next.post.id) return false;
 
@@ -54,6 +57,7 @@ export const FeedListItem = memo(function FeedListItem({
   post,
   userId,
   actions,
+  interactionActive = false,
   mediaActive = true,
   mediaPageIndex,
   onMediaPageIndexChange,
@@ -61,6 +65,7 @@ export const FeedListItem = memo(function FeedListItem({
   const handlers = useMemo(
     () => ({
       onPress: () => actions.onPress(post),
+      onInteractPress: (mediaIndex?: number) => actions.onInteractPress(post, mediaIndex),
       onAuthorPress: () => actions.onAuthorPress(post),
       onCommentAuthorPress: actions.onCommentAuthorPress,
       onLike: () => actions.onLike(post),
@@ -79,7 +84,9 @@ export const FeedListItem = memo(function FeedListItem({
     <FeedPostCard
       post={post}
       isOwn={post.author_id === userId}
+      interactionActive={interactionActive}
       onPress={handlers.onPress}
+      onInteractPress={handlers.onInteractPress}
       onAuthorPress={handlers.onAuthorPress}
       onCommentAuthorPress={handlers.onCommentAuthorPress}
       onLike={handlers.onLike}

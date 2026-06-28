@@ -12,6 +12,7 @@ type AnimatedFeedListItemProps = {
   post: Post;
   userId: string;
   actions: FeedListItemActions;
+  interactionActive?: boolean;
   mediaActive?: boolean;
   mediaPageIndex?: number;
   onMediaPageIndexChange?: (index: number) => void;

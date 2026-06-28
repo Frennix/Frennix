@@ -26,6 +26,13 @@ export function hapticLight(): void {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 }
 
+/** Stronger tap — fitness invites, challenge responses, navigation actions. */
+export function hapticMedium(): void {
+  const Haptics = getHaptics();
+  if (!Haptics?.impactAsync) return;
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+}
+
 /** Stronger pulse — mutual match, major confirmations. */
 export function hapticSuccess(): void {
   const Haptics = getHaptics();

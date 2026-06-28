@@ -17,7 +17,7 @@ import { usePostReaction } from "@/lib/usePostReaction";
 import { useFeedLike } from "@/lib/useFeedLike";
 import { hapticLight } from "@/lib/haptics";
 import { DetailLoading } from "@/components/DetailLoading";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import {
   PostCard,
@@ -32,8 +32,13 @@ import {
 } from "@frennix/ui";
 
 export default function PostDetailScreen() {
-  const { id, comment: commentParam } = useLocalSearchParams<{ id: string; comment?: string }>();
+  const { id, comment: commentParam, draft: draftParam } = useLocalSearchParams<{
+    id: string;
+    comment?: string;
+    draft?: string;
+  }>();
   const highlightCommentId = Array.isArray(commentParam) ? commentParam[0] : commentParam;
+  const draftText = Array.isArray(draftParam) ? draftParam[0] : draftParam;
   const { session, profile } = useAuth();
   const userId = session?.user.id ?? "";
   const [commentText, setCommentText] = useState("");
@@ -86,6 +91,11 @@ export default function PostDetailScreen() {
 
   const { openGallery, lightbox } = useImageLightbox();
   const [mediaPageIndex, setMediaPageIndex] = useState(0);
+
+  useEffect(() => {
+    if (!draftText) return;
+    setCommentText(draftText);
+  }, [draftText]);
 
   type CommentMutationVars = {
     text: string;

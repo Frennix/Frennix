@@ -2,6 +2,7 @@ import { useCallback, type ReactElement, type ReactNode, type RefObject } from "
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -61,7 +62,12 @@ export function WebFeedScrollList({
       ref={scrollRef}
       nativeID={nativeID}
       pointerEvents="auto"
-      style={[styles.list, style, webScrollSurface]}
+      style={[
+        styles.list,
+        style,
+        webScrollSurface,
+        !scrollEnabled && styles.scrollLocked,
+      ]}
       contentContainerStyle={contentContainerStyle}
       scrollEnabled={scrollEnabled}
       nestedScrollEnabled
@@ -88,4 +94,5 @@ export function WebFeedScrollList({
 
 const styles = StyleSheet.create({
   list: { ...flexFill },
+  scrollLocked: Platform.OS === "web" ? ({ overflow: "hidden", touchAction: "none" } as const) : {},
 });

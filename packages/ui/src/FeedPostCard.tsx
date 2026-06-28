@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
@@ -14,7 +14,6 @@ import { normalizeWorkoutTypes } from "@frennix/types";
 import { PostMediaCarousel } from "./PostMediaCarousel";
 import { FeedMediaSlot } from "./FeedMediaSlot";
 import { ReactionBar } from "./ReactionBar";
-import { ReactionPicker } from "./ReactionPicker";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
 import { MenuIconButton } from "./MenuIconButton";
 import { colors, spacing, typography } from "./theme";
@@ -22,6 +21,8 @@ import { colors, spacing, typography } from "./theme";
 interface FeedPostCardProps {
   post: Post & { author?: Profile };
   onPress?: () => void;
+  onInteractPress?: (mediaIndex?: number) => void;
+  interactionActive?: boolean;
   onLike?: () => void;
   onComment?: () => void;
   onShare?: () => void;
@@ -42,10 +43,9 @@ interface FeedPostCardProps {
 export const FeedPostCard = memo(function FeedPostCard({
   post,
   onPress,
-  onLike,
+  onInteractPress,
+  interactionActive = false,
   onComment,
-  onShare,
-  onSave,
   onReaction,
   onModerationPress,
   onAuthorPress,
@@ -57,7 +57,6 @@ export const FeedPostCard = memo(function FeedPostCard({
   mediaPageIndex,
   onMediaPageIndexChange,
 }: FeedPostCardProps) {
-  const [pickerOpen, setPickerOpen] = useState(false);
   const author = post.author;
   const sharedPost = post.shared_post;
   const isShared = Boolean(sharedPost ?? post.shared_post_id);
@@ -71,9 +70,17 @@ export const FeedPostCard = memo(function FeedPostCard({
   const reactionSummary = useMemo(() => formatReactionSummary(post.reactions), [post.reactions]);
   const hasMedia = Boolean(displayPost.media_urls?.length);
   const showCaption = Boolean(post.content) && !isShared;
+  const openInteraction = onInteractPress;
+
+  const handleMediaPress = useMemo(() => {
+    if (!openInteraction) return onMediaPress;
+    return (_uri: string, index: number) => {
+      openInteraction(index);
+    };
+  }, [onMediaPress, openInteraction]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, interactionActive && styles.containerActive]}>
       <View style={styles.headerRow}>
         <ScalePressable containerStyle={styles.header} onPress={onAuthorPress} disabled={!onAuthorPress}>
           <Avatar uri={author?.avatar_url} name={author?.display_name} size={44} />
@@ -94,80 +101,53 @@ export const FeedPostCard = memo(function FeedPostCard({
         ) : null}
       </View>
 
-      {showCaption ? <Text style={styles.caption}>{post.content}</Text> : null}
+      {showCaption ? (
+        <Pressable
+          onPress={() => (openInteraction ? openInteraction() : onPress?.())}
+          disabled={!openInteraction && !onPress}
+          accessibilityRole="button"
+          accessibilityLabel="Open post actions"
+        >
+          <Text style={styles.caption}>{post.content}</Text>
+        </Pressable>
+      ) : null}
 
       {isShared && sharedPost ? (
-        <SharedPostPreview post={sharedPost} onPress={onPress} onMediaPress={onMediaPress} />
+        <SharedPostPreview
+          post={sharedPost}
+          onPress={() => (openInteraction ? openInteraction() : onPress?.())}
+          onMediaPress={handleMediaPress}
+        />
       ) : hasMedia ? (
         <FeedMediaSlot
           mediaUrls={displayPost.media_urls ?? []}
           postType={displayPost.post_type}
           thumbnailUrl={displayPost.thumbnail_url}
           style={styles.media}
-          onMediaPress={onMediaPress}
+          onMediaPress={handleMediaPress}
           pageIndex={mediaPageIndex}
           onPageIndexChange={onMediaPageIndexChange}
           visible={mediaActive}
         />
       ) : !showCaption && post.content ? (
         <Pressable
-          onPress={onPress}
-          onLongPress={onReaction ? () => setPickerOpen(true) : undefined}
-          delayLongPress={350}
-          disabled={!onPress && !onReaction}
+          onPress={() => (openInteraction ? openInteraction() : onPress?.())}
+          disabled={!openInteraction && !onPress}
+          accessibilityRole="button"
+          accessibilityLabel="Open post actions"
         >
           <Text style={styles.textOnlyBody}>{post.content}</Text>
         </Pressable>
       ) : null}
 
       <View style={styles.footer}>
-        <View style={styles.actions}>
-          <Pressable onPress={onLike} hitSlop={8} style={styles.actionButton}>
-            <Text style={[styles.action, post.liked_by_me && styles.liked]}>
-              {post.liked_by_me ? "♥" : "♡"} Like
-            </Text>
-          </Pressable>
-          {onReaction ? (
-            <Pressable
-              onPress={() => setPickerOpen(true)}
-              hitSlop={8}
-              style={styles.actionButton}
-              accessibilityLabel="React"
-            >
-              <Text style={[styles.action, post.my_reaction && styles.reacted]}>
-                {post.my_reaction ?? "😊"} React
-              </Text>
-            </Pressable>
-          ) : null}
-          <Pressable onPress={onComment} hitSlop={8} style={styles.actionButton}>
-            <Text style={styles.action}>💬 Comment</Text>
-          </Pressable>
-          {onShare ? (
-            <Pressable onPress={onShare} hitSlop={8} style={styles.actionButton}>
-              <Text style={styles.action}>↗ Share</Text>
-            </Pressable>
-          ) : null}
-          {onSave ? (
-            <Pressable
-              onPress={onSave}
-              hitSlop={8}
-              style={styles.actionButton}
-              accessibilityLabel={post.saved_by_me ? "Remove from saved" : "Save post"}
-            >
-              <Text style={[styles.action, post.saved_by_me && styles.saved]}>
-                {post.saved_by_me ? "🔖 Saved" : "🔖 Save"}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-
         {engagement ? <Text style={styles.engagement}>{engagement}</Text> : null}
         {reactionSummary ? <Text style={styles.reactionSummary}>{reactionSummary}</Text> : null}
 
         <ReactionBar
           reactions={post.reactions}
           onReactionPress={onReaction}
-          onAddReaction={onReaction ? () => setPickerOpen(true) : undefined}
+          onAddReaction={openInteraction ? () => openInteraction() : undefined}
         />
 
         <FeedCommentPreview
@@ -178,17 +158,6 @@ export const FeedPostCard = memo(function FeedPostCard({
           onAuthorPress={onCommentAuthorPress}
         />
       </View>
-
-      {onReaction && pickerOpen ? (
-        <ReactionPicker
-          visible={pickerOpen}
-          onClose={() => setPickerOpen(false)}
-          onSelect={(emoji) => {
-            setPickerOpen(false);
-            onReaction(emoji);
-          }}
-        />
-      ) : null}
     </View>
   );
 });
@@ -201,6 +170,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingBottom: spacing.md,
+  },
+  containerActive: {
+    backgroundColor: colors.surfaceElevated,
+    borderBottomColor: colors.accent,
   },
   headerRow: {
     flexDirection: "row",
@@ -249,15 +222,4 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "700",
   },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-    paddingTop: spacing.xs,
-  },
-  actionButton: { paddingVertical: 2 },
-  action: { ...typography.bodySmall, color: colors.textSecondary, fontWeight: "600" },
-  liked: { color: colors.accent },
-  reacted: { color: colors.accent },
-  saved: { color: colors.accent },
 });

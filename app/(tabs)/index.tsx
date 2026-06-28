@@ -42,6 +42,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
+import { usePostInteraction, postReplyHref } from "@/lib/usePostInteraction";
 import { handleTabRetap, scrollFlatListToTop, scrollScrollViewToTop } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
@@ -95,6 +96,42 @@ export default function HomeScreen() {
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
   }, []);
+
+  const {
+    activePost,
+    interactionVisible,
+    openInteraction,
+    interactionSheet,
+  } = usePostInteraction({
+    userId,
+    onLike: (post) => toggleLikePost(post.id),
+    onReaction: (post, emoji) => {
+      postReaction.mutate({
+        postId: post.id,
+        emoji,
+        currentEmoji: post.my_reaction,
+      });
+    },
+    onReply: (post, draft) => {
+      pushScreen(postReplyHref(post, draft));
+    },
+    onShare: (post) => openShare(post.shared_post ?? post),
+    onSave: (post) => toggleSavePost(post.id, !!post.saved_by_me),
+    onViewProfile: (post) => {
+      if (post.author?.username) pushScreen(`/user/${post.author.username}`);
+    },
+    onViewMedia: (post, mediaIndex) => {
+      const displayPost = post.shared_post ?? post;
+      setCarouselIndex(post.id, mediaIndex);
+      openGallery(displayPost.media_urls ?? [], mediaIndex, (finalIndex) => {
+        setCarouselIndex(post.id, finalIndex);
+      }, {
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
+      });
+    },
+  });
+  markFeedHook("post-interaction");
 
   const markStoryViewedOptimistic = useCallback(
     (storyUserId: string, postId: string | null) => {
@@ -249,6 +286,7 @@ export default function HomeScreen() {
 
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
+  const feedScrollLocked = storyVisible || interactionVisible;
 
   const {
     enabled: feedDebugEnabled,
@@ -257,7 +295,7 @@ export default function HomeScreen() {
     reportScroll: reportFeedDebugScroll,
   } = useFeedScrollDebug({
     listRef: useWebScroll ? webScrollRef : listRef,
-    scrollEnabled: !storyVisible,
+    scrollEnabled: !feedScrollLocked,
     storyVisible,
     shareSheetVisible: shareVisible,
     lightboxVisible,
@@ -338,6 +376,7 @@ export default function HomeScreen() {
 
   const feedActionsRef = useRef<FeedListItemActions>({
     onPress: () => undefined,
+    onInteractPress: () => undefined,
     onAuthorPress: () => undefined,
     onCommentAuthorPress: () => undefined,
     onLike: () => undefined,
@@ -353,6 +392,9 @@ export default function HomeScreen() {
   feedActionsRef.current = {
     onPress: (post: Post) => {
       pushScreen(`/post/${getSharedPostTargetId(post)}`);
+    },
+    onInteractPress: (post: Post, mediaIndex = 0) => {
+      openInteraction(post, mediaIndex);
     },
     onAuthorPress: (post: Post) => {
       if (post.author?.username) pushScreen(`/user/${post.author.username}`);
@@ -386,20 +428,15 @@ export default function HomeScreen() {
       openPostActions(post);
     },
     onMediaPress: (post: Post, _uri: string, index: number) => {
-      const displayPost = post.shared_post ?? post;
-      setCarouselIndex(post.id, index);
-      openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
-        setCarouselIndex(post.id, finalIndex);
-      }, {
-        postType: displayPost.post_type,
-        thumbnailUrl: displayPost.thumbnail_url,
-      });
+      openInteraction(post, index);
     },
   };
 
   const feedActions = useMemo<FeedListItemActions>(
     () => ({
       onPress: (post) => feedActionsRef.current.onPress(post),
+      onInteractPress: (post, mediaIndex) =>
+        feedActionsRef.current.onInteractPress(post, mediaIndex),
       onAuthorPress: (post) => feedActionsRef.current.onAuthorPress(post),
       onCommentAuthorPress: (username) => feedActionsRef.current.onCommentAuthorPress(username),
       onLike: (post) => feedActionsRef.current.onLike(post),
@@ -427,13 +464,14 @@ export default function HomeScreen() {
           post={item.post}
           userId={userId}
           actions={feedActions}
+          interactionActive={activePost?.id === item.post.id}
           mediaActive={visiblePostIds.has(item.post.id)}
           mediaPageIndex={carouselIndices[item.post.id] ?? 0}
           onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
         />
       );
     },
-    [feedActions, userId, visiblePostIds, carouselIndices, setCarouselIndex]
+    [feedActions, userId, visiblePostIds, carouselIndices, setCarouselIndex, activePost?.id]
   );
 
   const listHeader = useMemo(
@@ -584,7 +622,7 @@ export default function HomeScreen() {
             nativeID="feed-scroll-list"
             style={[styles.feedList, webHeightStyle]}
             contentContainerStyle={styles.list}
-            scrollEnabled={!storyVisible}
+            scrollEnabled={!feedScrollLocked}
             data={listRows}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
@@ -633,7 +671,7 @@ export default function HomeScreen() {
             data={listRows}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
-            scrollEnabled={!storyVisible}
+            scrollEnabled={!feedScrollLocked}
             nestedScrollEnabled
             initialNumToRender={10}
             maxToRenderPerBatch={10}
@@ -691,6 +729,7 @@ export default function HomeScreen() {
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
       ) : null}
       <FeedRenderTraceProbe id="feed:ui:post-action-sheets">{postActionSheets}</FeedRenderTraceProbe>
+      <FeedRenderTraceProbe id="feed:ui:post-interaction-sheet">{interactionSheet}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:share-sheet">{shareSheet}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:lightbox">{lightbox}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:story-viewer">
