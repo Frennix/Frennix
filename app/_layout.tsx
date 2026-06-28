@@ -15,6 +15,7 @@ import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
+import { FeedScrollDebugRoot } from "@/components/FeedScrollDebugRoot";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
@@ -150,6 +151,7 @@ export default function RootLayout() {
             <Stack.Screen name="admin-trainer-review" options={backScreen("Trainer review")} />
             <Stack.Screen name="admin-analytics" options={backScreen("Analytics")} />
               </Stack>
+              <FeedScrollDebugRoot />
             </AppErrorBoundary>
             </TabBadgeRoot>
           </AuthProvider>

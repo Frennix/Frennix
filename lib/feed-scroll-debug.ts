@@ -1,15 +1,68 @@
 import { Platform } from "react-native";
 
+const STORAGE_KEY = "frennix:feedDebug";
 const LOG_PREFIX = "[feed-scroll-debug]";
+
+/** Persist debug flag on first URL hit — survives login redirects that strip query params. */
+export function bootstrapFeedScrollDebug(): void {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("feedDebug")) {
+      window.localStorage.setItem(STORAGE_KEY, "1");
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
+if (Platform.OS === "web") {
+  bootstrapFeedScrollDebug();
+}
 
 export function isFeedScrollDebugEnabled(): boolean {
   if (Platform.OS !== "web" || typeof window === "undefined") return false;
+  bootstrapFeedScrollDebug();
   try {
     const params = new URLSearchParams(window.location.search);
     if (params.has("feedDebug")) return true;
-    return window.localStorage.getItem("frennix:feedDebug") === "1";
+    return window.localStorage.getItem(STORAGE_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+/** When feedDebug is on, use dummy ScrollView unless feedScrollTest=0. */
+export function isFeedScrollTestMode(): boolean {
+  if (!isFeedScrollDebugEnabled() || typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("feedScrollTest") === "0") return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export function getFeedDebugStatusLine(): string {
+  if (Platform.OS !== "web" || typeof window === "undefined") return "web only";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const urlFlag = params.has("feedDebug") ? "url=yes" : "url=no";
+    const stored = window.localStorage.getItem(STORAGE_KEY) === "1" ? "ls=yes" : "ls=no";
+    const testMode = isFeedScrollTestMode() ? "scrollTest=yes" : "scrollTest=no";
+    return `${urlFlag} ${stored} ${testMode}`;
+  } catch {
+    return "status unavailable";
+  }
+}
+
+export function clearFeedScrollDebug(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
   }
 }
 
@@ -47,38 +100,6 @@ export function logFeedScrollEvent(offsetY: number, contentHeight: number, layou
     contentHeight: Math.round(contentHeight),
     layoutHeight: Math.round(layoutHeight),
   });
-}
-
-let touchDebugInstalled = false;
-
-/** Log which DOM node receives the first touch (overlay / pointer-events diagnosis). */
-export function installFeedScrollTouchDebug() {
-  if (!isFeedScrollDebugEnabled() || touchDebugInstalled || typeof document === "undefined") return;
-  touchDebugInstalled = true;
-
-  const describeTarget = (target: EventTarget | null) => {
-    if (!(target instanceof Element)) return { tag: "unknown" };
-    const style = getComputedStyle(target);
-    return {
-      tag: target.tagName.toLowerCase(),
-      id: target.id || undefined,
-      className: target.className?.toString?.().slice(0, 120) || undefined,
-      pointerEvents: style.pointerEvents,
-      position: style.position,
-      overflowY: style.overflowY,
-      zIndex: style.zIndex,
-    };
-  };
-
-  document.addEventListener(
-    "touchstart",
-    (event) => {
-      console.info(LOG_PREFIX, "touchstart target", describeTarget(event.target));
-    },
-    { capture: true, passive: true }
-  );
-
-  console.info(LOG_PREFIX, "touch listener installed — add ?feedDebug=1 to URL");
 }
 
 export function inspectFeedScrollContainer(listRef: { getNativeScrollRef?: () => unknown } | null) {

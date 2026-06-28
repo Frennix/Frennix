@@ -79,6 +79,7 @@ function scanDomOverlays() {
     return { mountedOverlays: [] as string[], blockingOverlay: null as string | null, gestureHandlerSuspect: null as string | null };
   }
 
+  try {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const mountedOverlays: string[] = [];
@@ -87,7 +88,11 @@ function scanDomOverlays() {
 
   const nodes = document.querySelectorAll("body *");
   nodes.forEach((el) => {
-    if (el.closest("[data-feed-scroll-debug]")) return;
+    try {
+      if (typeof el.closest === "function" && el.closest("[data-feed-scroll-debug]")) return;
+    } catch {
+      // ignore closest failures on exotic nodes
+    }
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden") return;
     const opacity = parseFloat(style.opacity);
@@ -124,6 +129,13 @@ function scanDomOverlays() {
     blockingOverlay,
     gestureHandlerSuspect,
   };
+  } catch (error) {
+    return {
+      mountedOverlays: [`scan error: ${error instanceof Error ? error.message : "unknown"}`],
+      blockingOverlay: null,
+      gestureHandlerSuspect: null,
+    };
+  }
 }
 
 function readScrollContainer(listRef: { getNativeScrollRef?: () => unknown } | null): string {

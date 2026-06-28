@@ -150,7 +150,9 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Feed scroll debug overlay for ?feedDebug=1",
     run: () => {
       assertIncludes("components/FeedScrollDebugOverlay.tsx", "FeedScrollDebugOverlay", "debug overlay required");
-      assertIncludes("lib/useFeedScrollDebug.ts", "useFeedScrollDebug", "debug hook required");
+      assertIncludes("components/FeedScrollDebugRoot.tsx", "FeedScrollDebugRoot", "root debug banner required");
+      assertIncludes("lib/feed-scroll-debug.ts", "bootstrapFeedScrollDebug", "debug must persist through login");
+      assertIncludes("app/_layout.tsx", "FeedScrollDebugRoot", "root layout must mount debug banner");
       assertIncludes("app/(tabs)/index.tsx", "FeedScrollDebugOverlay", "feed must render debug overlay");
     },
   },

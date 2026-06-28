@@ -53,8 +53,10 @@ import { trackFeedLoad } from "@/lib/product-analytics";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import { NewPostsBanner } from "@/components/NewPostsBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
+import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webVerticalScrollStyle } from "@/lib/flex-layout";
+import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
 import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
 
 export default function HomeScreen() {
@@ -222,6 +224,7 @@ export default function HomeScreen() {
     onScrollBase: onScroll,
   });
 
+  const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
 
   const {
@@ -463,6 +466,24 @@ export default function HomeScreen() {
     reportFeedDebugMetrics(listLayoutHeightRef.current, contentHeightRef.current);
   }, [feedDebugEnabled, isFeedReady, listRows.length, reportFeedDebugMetrics]);
 
+  if (feedScrollTestMode) {
+    return (
+      <View style={styles.container}>
+        <FeedScrollTestView onScroll={(y) => reportFeedDebugScroll(y)} />
+        {feedDebugEnabled ? (
+          <FeedScrollDebugOverlay
+            snapshot={{
+              ...feedDebugSnapshot,
+              scrollEventsFiring: feedDebugSnapshot.lastScrollAt != null && Date.now() - feedDebugSnapshot.lastScrollAt < 3000,
+            }}
+            collapsed={feedDebugCollapsed}
+            onToggleCollapsed={() => setFeedDebugCollapsed((value) => !value)}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
   if (isError && posts.length === 0) {
     return (
       <View style={styles.container}>
@@ -590,7 +611,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { ...flexFill, backgroundColor: colors.background },
-  feedScrollShell: { ...flexFill, ...(Platform.OS === "web" ? { overflow: "hidden" } : null) },
+  feedScrollShell: { ...flexFill },
   feedList: { ...flexFill, ...webVerticalScrollStyle },
   list: { flexGrow: 1, paddingBottom: spacing.xl },
   emptyWrap: { padding: spacing.lg },
