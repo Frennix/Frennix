@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
+import { normalizeWorkoutTypes } from "@frennix/types";
 import { Avatar } from "./Avatar";
-import { formatPostSubtitle, formatRelativeTime } from "./formatRelativeTime";
+import { formatRelativeTime } from "./formatRelativeTime";
+import { WorkoutTypeChips } from "./WorkoutTypeChips";
 import { PostMedia } from "./PostMedia";
 import { ReactionBar } from "./ReactionBar";
 import { ReactionPicker } from "./ReactionPicker";
@@ -45,7 +47,8 @@ export function PostCard({
   const displayPost = sharedPost ?? post;
   const subtitle = isShared
     ? `Shared a post · ${formatRelativeTime(post.created_at)}`
-    : formatPostSubtitle(post.workout_type, post.created_at);
+    : formatRelativeTime(post.created_at);
+  const workoutTypes = isShared ? [] : normalizeWorkoutTypes(displayPost);
   const hasMedia = Boolean(displayPost.media_urls?.[0]);
 
   return (
@@ -75,6 +78,9 @@ export function PostCard({
         <View style={styles.headerText}>
           <Text style={styles.name}>{author?.display_name ?? "Unknown"}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
+          {workoutTypes.length ? (
+            <WorkoutTypeChips types={workoutTypes} size="compact" style={styles.workoutChips} />
+          ) : null}
         </View>
       </Pressable>
 
@@ -185,6 +191,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 2 },
   name: { ...typography.body, fontWeight: "600", color: colors.text },
   subtitle: { ...typography.caption, color: colors.textMuted },
+  workoutChips: { marginTop: 4 },
   content: { ...typography.body, lineHeight: 22, color: colors.text },
   actions: { flexDirection: "row", gap: spacing.lg, paddingTop: spacing.xs },
   action: { ...typography.bodySmall, color: colors.textSecondary },

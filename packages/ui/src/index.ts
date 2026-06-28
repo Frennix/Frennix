@@ -4,6 +4,7 @@ export * from "./Input";
 export * from "./Avatar";
 export * from "./EditableAvatar";
 export * from "./Chip";
+export * from "./WorkoutTypeChips";
 export * from "./Card";
 export * from "./EmptyState";
 export * from "./PostCard";

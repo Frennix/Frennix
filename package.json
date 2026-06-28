@@ -16,6 +16,7 @@
     "verify:ui-barrel": "npx tsx scripts/verify-ui-barrel.ts",
     "verify:feed-media": "npx tsx scripts/verify-feed-media.ts",
     "verify:online-status-privacy": "npx tsx scripts/verify-online-status-privacy.ts",
+    "verify:post-workout-types": "npx tsx scripts/verify-post-workout-types.ts",
     "build:web": "expo export -p web"
   },
   "dependencies": {

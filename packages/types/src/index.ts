@@ -170,7 +170,9 @@ export interface Post {
   media_urls: string[];
   thumbnail_url?: string | null;
   post_type: PostType;
+  /** @deprecated Use workout_types. Kept for legacy rows and first-type display. */
   workout_type: string | null;
+  workout_types: string[];
   group_id: string | null;
   challenge_id?: string | null;
   event_id?: string | null;
@@ -203,6 +205,7 @@ export interface FeedStoryLastWorkout {
   post_id: string;
   post_type: PostType;
   workout_type: string | null;
+  workout_types: string[];
   media_urls: string[];
   thumbnail_url?: string | null;
   content: string | null;
@@ -472,3 +475,4 @@ export type Activity = (typeof ACTIVITIES)[number];
 
 export * from "./trainer";
 export * from "./analytics";
+export * from "./workout-types";

@@ -6,9 +6,11 @@ import { ScalePressable } from "./ScalePressable";
 import { FeedCommentPreview } from "./FeedCommentPreview";
 import {
   formatEngagementSummary,
-  formatFeedPostMeta,
+  formatFeedPostHeaderMeta,
   formatReactionSummary,
 } from "./formatRelativeTime";
+import { WorkoutTypeChips } from "./WorkoutTypeChips";
+import { normalizeWorkoutTypes } from "@frennix/types";
 import { PostMediaCarousel } from "./PostMediaCarousel";
 import { FeedMediaSlot } from "./FeedMediaSlot";
 import { ReactionBar } from "./ReactionBar";
@@ -55,7 +57,11 @@ export const FeedPostCard = memo(function FeedPostCard({
   const sharedPost = post.shared_post;
   const isShared = Boolean(sharedPost ?? post.shared_post_id);
   const displayPost = sharedPost ?? post;
-  const meta = useMemo(() => formatFeedPostMeta(post, isShared), [post, isShared]);
+  const meta = useMemo(() => formatFeedPostHeaderMeta(post, isShared), [post, isShared]);
+  const workoutTypes = useMemo(
+    () => (isShared ? [] : normalizeWorkoutTypes(displayPost)),
+    [displayPost, isShared]
+  );
   const engagement = useMemo(() => formatEngagementSummary(post), [post]);
   const reactionSummary = useMemo(() => formatReactionSummary(post.reactions), [post.reactions]);
   const hasMedia = Boolean(displayPost.media_urls?.length);
@@ -70,6 +76,9 @@ export const FeedPostCard = memo(function FeedPostCard({
             <Text style={styles.name}>{author?.display_name ?? "Unknown"}</Text>
             {author?.username ? <Text style={styles.username}>@{author.username}</Text> : null}
             <Text style={styles.meta}>{meta}</Text>
+            {workoutTypes.length ? (
+              <WorkoutTypeChips types={workoutTypes} maxVisible={3} size="compact" style={styles.workoutChips} />
+            ) : null}
           </View>
         </ScalePressable>
 
@@ -212,6 +221,7 @@ const styles = StyleSheet.create({
   name: { ...typography.body, fontWeight: "700", color: colors.text },
   username: { ...typography.caption, color: colors.accent },
   meta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  workoutChips: { marginTop: 4 },
   menuButton: {
     width: 32,
     height: 32,

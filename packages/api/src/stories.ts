@@ -1,4 +1,5 @@
 import type { FeedStory, FeedStoryLastWorkout, Post, Profile } from "@frennix/types";
+import { normalizePostWorkoutFields } from "@frennix/types";
 import { getFollowing } from "./follows";
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
@@ -7,14 +8,16 @@ const WORKOUT_POST_TYPES = ["workout_update", "photo", "video"] as const;
 const RECENT_WORKOUT_MS = 24 * 60 * 60 * 1000;
 
 function toLastWorkout(post: Post): FeedStoryLastWorkout {
+  const normalized = normalizePostWorkoutFields(post);
   return {
-    post_id: post.id,
-    post_type: post.post_type,
-    workout_type: post.workout_type ?? null,
-    media_urls: post.media_urls ?? [],
-    thumbnail_url: post.thumbnail_url ?? null,
-    content: post.content,
-    created_at: post.created_at,
+    post_id: normalized.id,
+    post_type: normalized.post_type,
+    workout_type: normalized.workout_type,
+    workout_types: normalized.workout_types,
+    media_urls: normalized.media_urls ?? [],
+    thumbnail_url: normalized.thumbnail_url ?? null,
+    content: normalized.content,
+    created_at: normalized.created_at,
   };
 }
 
@@ -83,7 +86,7 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
 
   for (const post of (latestPosts ?? []) as Post[]) {
     if (!latestByUser.has(post.author_id)) {
-      latestByUser.set(post.author_id, post);
+      latestByUser.set(post.author_id, normalizePostWorkoutFields(post));
     }
   }
 

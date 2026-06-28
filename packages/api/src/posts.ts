@@ -1,4 +1,5 @@
 import type { Comment, FeedPage, Post, PostType } from "@frennix/types";
+import { normalizePostWorkoutFields } from "@frennix/types";
 import { formatSupabaseError } from "./profile-utils";
 import { normalizeMediaExt, isVideoMime } from "./media-utils";
 import {
@@ -30,7 +31,9 @@ async function attachSharedPosts(posts: Post[]): Promise<Post[]> {
 
   if (error) throw error;
 
-  const byId = new Map((data ?? []).map((p) => [p.id, p as Post]));
+  const byId = new Map(
+    (data ?? []).map((p) => [p.id, normalizePostWorkoutFields(p as Post)])
+  );
   return posts.map((p) => ({
     ...p,
     shared_post: p.shared_post_id ? byId.get(p.shared_post_id) : undefined,
@@ -171,15 +174,14 @@ async function enrichPosts(posts: Post[], userId: string): Promise<Post[]> {
 
   const withInteractions = posts.map((p) => {
     const stats = statsByPost.get(p.id);
-    return {
+    return normalizePostWorkoutFields({
       ...p,
-      workout_type: p.workout_type ?? null,
       like_count: Number(stats?.like_count ?? 0),
       comment_count: Number(stats?.comment_count ?? 0),
       liked_by_me: stats?.liked_by_me ?? false,
       saved_by_me: stats?.saved_by_me ?? false,
       preview_comments: previewByPost.get(p.id) ?? [],
-    };
+    });
   });
 
   const [withShared, withReactions] = await Promise.all([
@@ -285,20 +287,31 @@ export async function createPost(input: {
   media_urls?: string[];
   thumbnail_url?: string | null;
   post_type: PostType;
+  workout_types?: string[];
+  /** @deprecated Prefer workout_types */
   workout_type?: string | null;
   group_id?: string | null;
   challenge_id?: string | null;
   event_id?: string | null;
   shared_post_id?: string | null;
 }) {
+  const workout_types =
+    input.workout_types?.length
+      ? input.workout_types
+      : input.workout_type
+        ? [input.workout_type]
+        : [];
+
+  const { workout_type: _legacy, workout_types: _ignored, ...rest } = input;
+
   const { data, error } = await getSupabase()
     .from("posts")
-    .insert(input)
+    .insert({ ...rest, workout_types })
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
     .single();
   if (error) throw formatSupabaseError(error, "Failed to create post");
   if (!data) throw new Error("Post created but no data returned");
-  return data as Post;
+  return normalizePostWorkoutFields(data as Post);
 }
 
 export async function uploadPostMedia(
@@ -378,14 +391,13 @@ export async function getPost(postId: string, userId: string): Promise<Post | nu
     ]);
 
   const enriched = await attachSharedPosts([
-    {
+    normalizePostWorkoutFields({
       ...(data as Post),
-      workout_type: (data as Post).workout_type ?? null,
       like_count: likeCount ?? 0,
       comment_count: commentCount ?? 0,
       liked_by_me: !!like,
       saved_by_me: !!save,
-    },
+    }),
   ]);
 
   const withReactions = await enrichPostsWithReactions(enriched, userId);
@@ -406,6 +418,8 @@ export function extractPostsStoragePath(publicUrl: string): string | null {
 
 export type UpdatePostPatch = {
   content?: string | null;
+  workout_types?: string[];
+  /** @deprecated Prefer workout_types */
   workout_type?: string | null;
   media_urls?: string[];
   thumbnail_url?: string | null;
@@ -436,9 +450,22 @@ export async function updatePost(
     await removePostsStorageFiles(storageUrls);
   }
 
+  const workout_types =
+    patch.workout_types !== undefined
+      ? patch.workout_types
+      : patch.workout_type !== undefined
+        ? patch.workout_type
+          ? [patch.workout_type]
+          : []
+        : undefined;
+
+  const { workout_type: _legacy, workout_types: _ignored, ...rest } = patch;
+  const updatePayload =
+    workout_types !== undefined ? { ...rest, workout_types } : rest;
+
   const { data, error } = await getSupabase()
     .from("posts")
-    .update(patch)
+    .update(updatePayload)
     .eq("id", postId)
     .eq("author_id", userId)
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
@@ -446,7 +473,7 @@ export async function updatePost(
 
   if (error) throw formatSupabaseError(error, "Failed to update post");
   if (!data) throw new Error("Post update did not return a row");
-  return data as Post;
+  return normalizePostWorkoutFields(data as Post);
 }
 
 export async function deletePost(postId: string, userId: string) {

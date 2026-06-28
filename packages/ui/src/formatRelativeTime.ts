@@ -28,12 +28,27 @@ export function workoutTypeEmoji(workoutType: string) {
   return ACTIVITY_EMOJIS[workoutType] ?? "🏅";
 }
 
-export function formatPostSubtitle(workoutType: string | null | undefined, createdAt: string) {
+export function formatWorkoutTypesInline(workoutTypes: string[] | null | undefined) {
+  const types = workoutTypes?.filter(Boolean) ?? [];
+  if (!types.length) return null;
+  return types
+    .map((type) => `${workoutTypeEmoji(type)} ${formatWorkoutTypeLabel(type)}`)
+    .join(" · ");
+}
+
+export function formatPostSubtitle(
+  workoutType: string | string[] | null | undefined,
+  createdAt: string
+) {
   const time = formatRelativeTime(createdAt);
-  if (!workoutType) return time;
-  const emoji = workoutTypeEmoji(workoutType);
-  const label = formatWorkoutTypeLabel(workoutType);
-  return `${emoji} ${label} • ${time}`;
+  const types = Array.isArray(workoutType)
+    ? workoutType
+    : workoutType
+      ? [workoutType]
+      : [];
+  const inline = formatWorkoutTypesInline(types);
+  if (!inline) return time;
+  return `${inline} • ${time}`;
 }
 
 const POST_KIND_LABELS: Record<string, string> = {
@@ -47,15 +62,13 @@ export function formatPostKindLabel(postType: string) {
   return POST_KIND_LABELS[postType] ?? "Post";
 }
 
-export function formatFeedPostMeta(
+export function formatFeedPostHeaderMeta(
   post: {
     post_type: string;
-    workout_type?: string | null;
     created_at: string;
     challenge_id?: string | null;
     group_id?: string | null;
     event_id?: string | null;
-    shared_post_id?: string | null;
   },
   isShared?: boolean
 ) {
@@ -64,16 +77,41 @@ export function formatFeedPostMeta(
   const time = formatRelativeTime(post.created_at);
   const kind = post.challenge_id ? "Achievement" : formatPostKindLabel(post.post_type);
 
-  if (post.workout_type) {
-    const emoji = workoutTypeEmoji(post.workout_type);
-    const label = formatWorkoutTypeLabel(post.workout_type);
-    return `${kind} · ${emoji} ${label} · ${time}`;
-  }
-
   if (post.group_id) return `${kind} · Group · ${time}`;
   if (post.event_id) return `${kind} · Event · ${time}`;
 
   return `${kind} · ${time}`;
+}
+
+/** @deprecated Prefer formatFeedPostHeaderMeta + WorkoutTypeChips */
+export function formatFeedPostMeta(
+  post: {
+    post_type: string;
+    workout_type?: string | null;
+    workout_types?: string[] | null;
+    created_at: string;
+    challenge_id?: string | null;
+    group_id?: string | null;
+    event_id?: string | null;
+    shared_post_id?: string | null;
+  },
+  isShared?: boolean
+) {
+  const header = formatFeedPostHeaderMeta(post, isShared);
+  if (isShared) return header;
+
+  const workoutTypes =
+    post.workout_types?.length
+      ? post.workout_types
+      : post.workout_type
+        ? [post.workout_type]
+        : [];
+  const inline = formatWorkoutTypesInline(workoutTypes);
+  if (!inline) return header;
+
+  const time = formatRelativeTime(post.created_at);
+  const kind = post.challenge_id ? "Achievement" : formatPostKindLabel(post.post_type);
+  return `${kind} · ${inline} · ${time}`;
 }
 
 export function formatEngagementSummary(post: {
@@ -114,17 +152,21 @@ export function formatLastWorkoutLabel(
   lastWorkout: {
     created_at: string;
     workout_type?: string | null;
+    workout_types?: string[] | null;
     post_type: string;
   } | null
 ) {
   if (!lastWorkout) return "No workout posted yet";
 
   const time = formatRelativeTime(lastWorkout.created_at);
-  if (lastWorkout.workout_type) {
-    const emoji = workoutTypeEmoji(lastWorkout.workout_type);
-    const label = formatWorkoutTypeLabel(lastWorkout.workout_type);
-    return `${emoji} ${label} · ${time}`;
-  }
+  const workoutTypes =
+    lastWorkout.workout_types?.length
+      ? lastWorkout.workout_types
+      : lastWorkout.workout_type
+        ? [lastWorkout.workout_type]
+        : [];
+  const inline = formatWorkoutTypesInline(workoutTypes);
+  if (inline) return `${inline} · ${time}`;
 
   if (lastWorkout.post_type === "video") return `Workout video · ${time}`;
   if (lastWorkout.post_type === "photo") return `Workout photo · ${time}`;

@@ -1,9 +1,11 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import type { Post } from "@frennix/types";
+import { normalizeWorkoutTypes } from "@frennix/types";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { ScalePressable } from "./ScalePressable";
 import { isVideoMedia } from "./PostMedia";
 import { VideoPreview } from "./VideoPreview";
+import { WorkoutTypeChips } from "./WorkoutTypeChips";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface PostGridProps {
@@ -42,6 +44,7 @@ export function PostGrid({
       {posts.map((post) => {
         const isOwn = Boolean(currentUserId && post.author_id === currentUserId);
         const hasMedia = Boolean(post.media_urls?.[0]);
+        const workoutTypes = normalizeWorkoutTypes(post);
 
         return (
         <ScalePressable
@@ -54,7 +57,7 @@ export function PostGrid({
           delayLongPress={400}
         >
           {post.media_urls?.[0] ? (
-            <>
+            <View style={styles.mediaCell}>
               {isVideoMedia(post.post_type, post.media_urls[0]) ? (
                 <VideoPreview
                   videoUri={post.media_urls[0]}
@@ -70,12 +73,24 @@ export function PostGrid({
                   recyclingKey={`grid-${post.id}`}
                 />
               )}
-            </>
+              {workoutTypes.length ? (
+                <View style={styles.mediaChipOverlay} pointerEvents="none">
+                  <WorkoutTypeChips types={workoutTypes} maxVisible={2} size="compact" overlay />
+                </View>
+              ) : null}
+            </View>
           ) : (
             <View style={styles.placeholder}>
-              <Text style={styles.placeholderText} numberOfLines={4}>
-                {post.content ?? post.workout_type ?? "Post"}
-              </Text>
+              {post.content ? (
+                <Text style={styles.placeholderText} numberOfLines={3}>
+                  {post.content}
+                </Text>
+              ) : null}
+              {workoutTypes.length ? (
+                <WorkoutTypeChips types={workoutTypes} maxVisible={3} size="compact" />
+              ) : (
+                !post.content ? <Text style={styles.placeholderText}>Post</Text> : null
+              )}
             </View>
           )}
         </ScalePressable>
@@ -96,6 +111,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.surfaceElevated,
   },
+  mediaCell: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+  mediaChipOverlay: {
+    position: "absolute",
+    left: spacing.xs,
+    right: spacing.xs,
+    bottom: spacing.xs,
+  },
   image: { width: "100%", height: "100%" },
   placeholder: {
     flex: 1,
@@ -103,6 +129,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.surface,
+    gap: spacing.xs,
   },
   placeholderText: { ...typography.caption, textAlign: "center", fontSize: 11 },
   empty: { padding: spacing.xl, alignItems: "center" },

@@ -145,8 +145,8 @@ export default function CreatePostScreen() {
     hydrated,
     content,
     setContent,
-    workoutType,
-    setWorkoutType,
+    workoutTypes,
+    setWorkoutTypes,
     groupId,
     challengeId,
     eventId,
@@ -307,7 +307,7 @@ export default function CreatePostScreen() {
       showAlert("Create post", message);
       return;
     }
-    if (!content && !selectedMedia.length && !workoutType) {
+    if (!content && !selectedMedia.length && !workoutTypes.length) {
       setError("Add a caption, workout type, or photo/video");
       return;
     }
@@ -378,7 +378,7 @@ export default function CreatePostScreen() {
           });
           throw uploadError;
         }
-      } else if (workoutType || content) {
+      } else if (workoutTypes.length || content) {
         postType = "workout_update";
       }
 
@@ -392,7 +392,7 @@ export default function CreatePostScreen() {
             media_urls: mediaUrls,
             thumbnail_url: thumbnailUrl,
             post_type: postType,
-            workout_type: workoutType,
+            workout_types: workoutTypes,
             group_id: groupId ?? null,
             challenge_id: challengeId ?? null,
             event_id: eventId ?? null,
@@ -478,16 +478,22 @@ export default function CreatePostScreen() {
     <>
       <Stack.Screen options={screenOptions} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.sectionLabel}>Workout type</Text>
+        <Text style={styles.sectionLabel}>Workout types</Text>
         <View style={styles.chips}>
           {ACTIVITIES.map((activity) => (
             <Pressable
               key={activity}
-              style={[styles.chip, workoutType === activity && styles.chipActive]}
-              onPress={() => setWorkoutType(workoutType === activity ? null : activity)}
+              style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
+              onPress={() =>
+                setWorkoutTypes((current) =>
+                  current.includes(activity)
+                    ? current.filter((item) => item !== activity)
+                    : [...current, activity]
+                )
+              }
               disabled={isFormLocked}
             >
-              <Text style={[styles.chipText, workoutType === activity && styles.chipTextActive]}>
+              <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
                 {formatActivity(activity)}
               </Text>
             </Pressable>

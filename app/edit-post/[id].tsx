@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { ACTIVITIES } from "@frennix/types";
+import { ACTIVITIES, normalizeWorkoutTypes } from "@frennix/types";
 import {
   getErrorMessage,
   getPost,
@@ -81,7 +81,7 @@ export default function EditPostScreen() {
   const originalThumbnailRef = useRef<string | null>(null);
 
   const [content, setContent] = useState("");
-  const [workoutType, setWorkoutType] = useState<string | null>(null);
+  const [workoutTypes, setWorkoutTypes] = useState<string[]>([]);
   const [mediaItems, setMediaItems] = useState<EditMediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -100,7 +100,7 @@ export default function EditPostScreen() {
       return;
     }
     setContent(post.content ?? "");
-    setWorkoutType(post.workout_type ?? null);
+    setWorkoutTypes(normalizeWorkoutTypes(post));
     setMediaItems(mediaItemsFromPost(post));
     originalMediaRef.current = post.media_urls ?? [];
     originalThumbnailRef.current = post.thumbnail_url ?? null;
@@ -201,7 +201,7 @@ export default function EditPostScreen() {
 
   async function submit() {
     if (!id || !userId || !post) return;
-    if (!content.trim() && !workoutType && !mediaItems.length) {
+    if (!content.trim() && !workoutTypes.length && !mediaItems.length) {
       setError("Add a caption, workout type, or media");
       return;
     }
@@ -247,7 +247,7 @@ export default function EditPostScreen() {
           postType = "photo";
           if (!hasVideo) thumbnailUrl = null;
         }
-      } else if (workoutType || content.trim()) {
+      } else if (workoutTypes.length || content.trim()) {
         postType = "workout_update";
         thumbnailUrl = null;
       }
@@ -265,7 +265,7 @@ export default function EditPostScreen() {
         userId,
         {
           content: content.trim() || null,
-          workout_type: workoutType,
+          workout_types: workoutTypes,
           media_urls: finalMediaUrls,
           thumbnail_url: thumbnailUrl,
           post_type: postType,
@@ -301,16 +301,22 @@ export default function EditPostScreen() {
     <>
       <Stack.Screen options={stackBackOptions("Edit workout", { presentation: "modal" })} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.sectionLabel}>Workout type</Text>
+        <Text style={styles.sectionLabel}>Workout types</Text>
         <View style={styles.chips}>
           {ACTIVITIES.map((activity) => (
             <Pressable
               key={activity}
-              style={[styles.chip, workoutType === activity && styles.chipActive]}
-              onPress={() => setWorkoutType(workoutType === activity ? null : activity)}
+              style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
+              onPress={() =>
+                setWorkoutTypes((current) =>
+                  current.includes(activity)
+                    ? current.filter((item) => item !== activity)
+                    : [...current, activity]
+                )
+              }
               disabled={isFormLocked}
             >
-              <Text style={[styles.chipText, workoutType === activity && styles.chipTextActive]}>
+              <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
                 {formatActivity(activity)}
               </Text>
             </Pressable>

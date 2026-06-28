@@ -4,7 +4,7 @@ import { readImageBytes } from "@frennix/api";
 
 export type CreatePostDraft = {
   content: string;
-  workoutType: string | null;
+  workoutTypes: string[];
   groupId: string | null;
   challengeId: string | null;
   eventId: string | null;
@@ -43,7 +43,7 @@ export function clearMemoryDraft(userId: string) {
   memoryDrafts.delete(userId);
 }
 
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const DB_NAME = "frennix-create-post-media";
 const DB_STORE = "media";
 
@@ -58,7 +58,7 @@ function mediaKey(userId: string) {
 export function emptyCreatePostDraft(): CreatePostDraft {
   return {
     content: "",
-    workoutType: null,
+    workoutTypes: [],
     groupId: null,
     challengeId: null,
     eventId: null,
@@ -231,8 +231,17 @@ export async function restoreCreatePostDraft(userId: string): Promise<RestoredCr
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as CreatePostDraft;
-    const draft: RestoredCreatePostDraft = { ...emptyCreatePostDraft(), ...parsed };
+    const parsed = JSON.parse(raw) as CreatePostDraft & { workoutType?: string | null };
+    const draft: RestoredCreatePostDraft = {
+      ...emptyCreatePostDraft(),
+      ...parsed,
+      workoutTypes:
+        parsed.workoutTypes?.length
+          ? parsed.workoutTypes
+          : parsed.workoutType
+            ? [parsed.workoutType]
+            : [],
+    };
 
     if (draft.hasStoredMedia) {
       const media = await loadMediaBlob(userId);

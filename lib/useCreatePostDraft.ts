@@ -24,7 +24,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
 
   const [hydrated, setHydrated] = useState(() => Boolean(memorySeed));
   const [content, setContent] = useState(() => memorySeed?.draft.content ?? "");
-  const [workoutType, setWorkoutType] = useState<string | null>(() => memorySeed?.draft.workoutType ?? null);
+  const [workoutTypes, setWorkoutTypes] = useState<string[]>(() => memorySeed?.draft.workoutTypes ?? []);
   const [groupId, setGroupId] = useState<string | null>(() => memorySeed?.draft.groupId ?? null);
   const [challengeId, setChallengeId] = useState<string | null>(() => memorySeed?.draft.challengeId ?? null);
   const [eventId, setEventId] = useState<string | null>(() => memorySeed?.draft.eventId ?? null);
@@ -44,7 +44,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
   const buildDraft = useCallback((): CreatePostDraft => {
     return {
       content,
-      workoutType,
+      workoutTypes,
       groupId,
       challengeId,
       eventId,
@@ -53,7 +53,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
       mediaUri,
       hasStoredMedia: Boolean(mediaBytesRef.current) || Boolean(mediaUri),
     };
-  }, [content, workoutType, groupId, challengeId, eventId, mimeType, videoDurationSeconds, mediaUri]);
+  }, [content, workoutTypes, groupId, challengeId, eventId, mimeType, videoDurationSeconds, mediaUri]);
 
   const syncMemoryDraft = useCallback(() => {
     if (!userId) return;
@@ -90,7 +90,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
   const applyDraftState = useCallback(
     (draft: CreatePostDraft, restoredPickedFile?: File, mediaBytes?: ArrayBuffer | null) => {
       setContent(draft.content);
-      setWorkoutType(draft.workoutType);
+      setWorkoutTypes(draft.workoutTypes);
       setGroupId(draft.groupId);
       setChallengeId(draft.challengeId);
       setEventId(draft.eventId);
@@ -167,7 +167,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     schedulePersist();
   }, [
     content,
-    workoutType,
+    workoutTypes,
     groupId,
     challengeId,
     eventId,
@@ -219,7 +219,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
 
       const draft: CreatePostDraft = {
         content,
-        workoutType,
+        workoutTypes,
         groupId,
         challengeId,
         eventId,
@@ -235,7 +235,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
         logCreatePostError("draft", error, { action: "save_media" });
       }
     },
-    [userId, hydrated, content, workoutType, groupId, challengeId, eventId, videoDurationSeconds]
+    [userId, hydrated, content, workoutTypes, groupId, challengeId, eventId, videoDurationSeconds]
   );
 
   const clearMedia = useCallback(async () => {
@@ -249,7 +249,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
 
     const draft: CreatePostDraft = {
       content,
-      workoutType,
+      workoutTypes,
       groupId,
       challengeId,
       eventId,
@@ -264,7 +264,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     } catch (error) {
       logCreatePostError("draft", error, { action: "clear_media" });
     }
-  }, [userId, hydrated, content, workoutType, groupId, challengeId, eventId]);
+  }, [userId, hydrated, content, workoutTypes, groupId, challengeId, eventId]);
 
   const clearDraft = useCallback(async () => {
     skipPersistRef.current = true;
@@ -279,7 +279,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
       }
     }
     setContent("");
-    setWorkoutType(null);
+    setWorkoutTypes([]);
     setGroupId(null);
     setChallengeId(null);
     setEventId(null);
@@ -294,8 +294,8 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     hydrated,
     content,
     setContent,
-    workoutType,
-    setWorkoutType,
+    workoutTypes,
+    setWorkoutTypes,
     groupId,
     setGroupId,
     challengeId,

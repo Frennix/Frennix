@@ -61,6 +61,7 @@ function mockPost() {
     thumbnail_url: null,
     post_type: "photo",
     workout_type: null,
+    workout_types: [],
     group_id: null,
     challenge_id: null,
     event_id: null,
