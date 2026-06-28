@@ -10,6 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FeedStory } from "@frennix/types";
 import type { StoryChallengeKey, StoryQuickReactionEmoji } from "@frennix/types";
 import type { StoryInsights } from "@frennix/types";
@@ -17,14 +18,21 @@ import {
   Avatar,
   FeedVideoPlayer,
   ProgressiveImage,
+  WorkoutTypeChips,
   colors,
   formatRelativeTime,
   formatStreakBadgeLabel,
   spacing,
+  touchTarget,
   typography,
 } from "@frennix/ui";
+import {
+  formatStoryDuration,
+  formatStoryCompletedTime,
+} from "@/lib/story-format";
 import { primaryStoryMilestone } from "@frennix/api";
 import { StoryActionDock } from "./story/StoryActionDock";
+import { StoryFooterGradient } from "./story/StoryFooterGradient";
 import { StoryDailyMotivation } from "./story/StoryDailyMotivation";
 import { StoryAchievementMoment } from "./story/StoryAchievementMoment";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
@@ -36,7 +44,6 @@ import {
 } from "../lib/story-utils";
 
 const STORY_SLIDE_DURATION_MS = 5500;
-const TOP_INSET = Platform.OS === "web" ? spacing.lg : spacing.xxl;
 const HOLD_THRESHOLD_MS = 220;
 
 function StoryProgressBars({
@@ -181,11 +188,12 @@ export function WorkoutStoryViewer({
   followLoading,
   inviteLoading,
 }: WorkoutStoryViewerProps) {
+  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [storyIndex, setStoryIndex] = useState(initialStoryIndex);
   const [slideIndex, setSlideIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [replyLocked, setReplyLocked] = useState(false);
+  const [interactionLocked, setInteractionLocked] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -199,7 +207,7 @@ export function WorkoutStoryViewer({
   const activeSlide = slides[slideIndex] ?? slides[0];
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
-  const autoAdvancePaused = paused || replyLocked;
+  const autoAdvancePaused = paused || interactionLocked;
   const spotlightMilestone = primaryStoryMilestone(lastWorkout?.milestones ?? []);
 
   useEffect(() => {
@@ -207,7 +215,7 @@ export function WorkoutStoryViewer({
     setStoryIndex(initialStoryIndex);
     setSlideIndex(0);
     setPaused(false);
-    setReplyLocked(false);
+    setInteractionLocked(false);
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
@@ -293,7 +301,7 @@ export function WorkoutStoryViewer({
   }, [timerKey, progress]);
 
   useEffect(() => {
-    setReplyLocked(false);
+    setInteractionLocked(false);
   }, [timerKey]);
 
   useEffect(() => {
@@ -377,6 +385,9 @@ export function WorkoutStoryViewer({
     (lastWorkout?.metrics?.extra?.ai_summary as string | undefined) ??
     null;
 
+  const headerTopPad = Math.max(insets.top, Platform.OS === "web" ? spacing.md : spacing.lg);
+  const footerBottomPad = Math.max(insets.bottom, spacing.md, Platform.OS === "web" ? 12 : 0);
+
   return (
     <Modal
       visible={visible}
@@ -401,9 +412,9 @@ export function WorkoutStoryViewer({
           </View>
 
           <View style={styles.scrimTop} pointerEvents="none" />
-          <View style={styles.scrimBottom} pointerEvents="none" />
+          <StoryFooterGradient />
 
-          <View style={[styles.header, { paddingTop: TOP_INSET }]}>
+          <View style={[styles.header, { paddingTop: headerTopPad }]}>
             <StoryProgressBars total={slides.length} activeIndex={slideIndex} progress={progress} />
 
             <View style={styles.headerRow}>
@@ -432,6 +443,7 @@ export function WorkoutStoryViewer({
                 hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="Close story"
+                accessibilityHint="Dismisses the story viewer. You can also swipe down."
               >
                 <Text style={styles.closeIcon}>✕</Text>
               </Pressable>
@@ -444,8 +456,8 @@ export function WorkoutStoryViewer({
             {story.is_self && storyInsights ? <StoryInsightsStrip insights={storyInsights} /> : null}
           </View>
 
-          <View style={styles.footer} pointerEvents="box-none">
-            {lastWorkout ? (
+          <View style={[styles.footer, { paddingBottom: footerBottomPad }]} pointerEvents="box-none">
+            {!canEngage && lastWorkout ? (
               <WorkoutCompletionCard
                 lastWorkout={lastWorkout}
                 streak={story.workout_streak}
@@ -458,7 +470,25 @@ export function WorkoutStoryViewer({
               />
             ) : null}
 
-            {showCaption ? <Text style={styles.captionText}>{caption}</Text> : null}
+            {canEngage && lastWorkout ? (
+              <View style={styles.compactWorkoutMeta} pointerEvents="none">
+                <WorkoutTypeChips types={lastWorkout} maxVisible={2} size="compact" overlay />
+                <Text style={styles.compactWorkoutText} numberOfLines={1}>
+                  {[
+                    formatStoryDuration(lastWorkout.metrics?.duration_seconds),
+                    formatStoryCompletedTime(lastWorkout.created_at),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </View>
+            ) : null}
+
+            {showCaption ? (
+              <Text style={styles.captionText} numberOfLines={2}>
+                {caption}
+              </Text>
+            ) : null}
 
             {showEmptySelfCta ? (
               <StoryDailyMotivation onShareWorkout={onShareWorkout} seed={story.user_id} />
@@ -468,7 +498,7 @@ export function WorkoutStoryViewer({
               <StoryActionDock
                 disabled={paused}
                 resetKey={timerKey}
-                onReplyLockChange={setReplyLocked}
+                onInteractionLockChange={setInteractionLocked}
                 isFollowing={story.viewer_follows}
                 followLoading={followLoading}
                 inviteLoading={inviteLoading}
@@ -489,7 +519,7 @@ export function WorkoutStoryViewer({
             <Pressable
               style={styles.tapZoneLeft}
               onPress={() => {
-                if (!didHoldRef.current && !replyLocked) goPrev();
+                if (!didHoldRef.current && !interactionLocked) goPrev();
               }}
               onPressIn={beginHold}
               onPressOut={endHold}
@@ -499,7 +529,7 @@ export function WorkoutStoryViewer({
             <Pressable
               style={styles.tapZoneRight}
               onPress={() => {
-                if (!didHoldRef.current && !replyLocked) goNext();
+                if (!didHoldRef.current && !interactionLocked) goNext();
               }}
               onPressIn={beginHold}
               onPressOut={endHold}
@@ -534,17 +564,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 200,
-    backgroundColor: "rgba(10, 10, 11, 0.72)",
-    zIndex: 1,
-  },
-  scrimBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 320,
-    backgroundColor: "rgba(10, 10, 11, 0.78)",
+    height: 180,
+    backgroundColor: "rgba(10, 10, 11, 0.55)",
     zIndex: 1,
   },
   header: {
@@ -553,16 +574,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: spacing.md,
-    zIndex: 4,
+    zIndex: 5,
   },
   footer: {
     position: "absolute",
     left: spacing.md,
     right: spacing.md,
-    bottom: spacing.lg,
+    bottom: 0,
     zIndex: 4,
-    gap: spacing.sm,
-    maxHeight: "42%",
+    gap: spacing.xs,
   },
   progressRow: {
     flexDirection: "row",
@@ -616,20 +636,31 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: touchTarget,
+    height: touchTarget,
+    borderRadius: touchTarget / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(10, 10, 11, 0.55)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(10, 10, 11, 0.82)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.88)",
+    ...(Platform.OS === "web"
+      ? ({ boxShadow: "0 2px 12px rgba(0,0,0,0.45)" } as object)
+      : null),
   },
   closeIcon: {
     color: colors.text,
-    fontSize: 18,
-    lineHeight: 20,
-    fontWeight: "700",
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: "800",
+  },
+  compactWorkoutMeta: {
+    gap: 4,
+  },
+  compactWorkoutText: {
+    ...typography.caption,
+    color: "rgba(255,255,255,0.82)",
+    fontWeight: "600",
   },
   captionText: {
     ...typography.body,
@@ -664,7 +695,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 280,
+    bottom: 180,
     flexDirection: "row",
     zIndex: 3,
   },

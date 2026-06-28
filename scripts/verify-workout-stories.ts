@@ -114,17 +114,65 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const viewer = read("components/WorkoutStoryViewer.tsx");
       const dock = read("components/story/StoryActionDock.tsx");
-      if (!viewer.includes("replyLocked") || !viewer.includes("autoAdvancePaused")) {
-        throw new Error("Story viewer must pause auto-advance while reply is active");
+      if (!viewer.includes("interactionLocked") || !viewer.includes("autoAdvancePaused")) {
+        throw new Error("Story viewer must pause auto-advance while interactions are active");
       }
-      if (!viewer.includes("onReplyLockChange")) {
-        throw new Error("Story viewer must wire reply lock from action dock");
+      if (!viewer.includes("onInteractionLockChange")) {
+        throw new Error("Story viewer must wire interaction lock from action dock");
       }
-      if (!dock.includes("onReplyLockChange")) {
-        throw new Error("Story action dock must report reply lock state");
+      if (!dock.includes("onInteractionLockChange")) {
+        throw new Error("Story action dock must report interaction lock state");
       }
       if (!dock.includes("setShowReply(false)")) {
         throw new Error("Reply composer must close after send to resume auto-advance");
+      }
+    },
+  },
+  {
+    name: "Story actions are compact with four primary buttons",
+    run: () => {
+      const dock = read("components/story/StoryActionDock.tsx");
+      for (const label of ["Like", "Strong Work", "Reply", "More"]) {
+        if (!dock.includes(label)) throw new Error(`Missing primary action ${label}`);
+      }
+      if (!dock.includes("morePanel")) {
+        throw new Error("Secondary story actions must live under More");
+      }
+      if (dock.includes("STORY_QUICK_REACTIONS.map((reaction)")) {
+        throw new Error("All quick reactions must not render in the primary row");
+      }
+    },
+  },
+  {
+    name: "Story viewer has prominent close control and safe areas",
+    run: () => {
+      const viewer = read("components/WorkoutStoryViewer.tsx");
+      if (!viewer.includes("useSafeAreaInsets")) {
+        throw new Error("Story viewer must respect safe area insets");
+      }
+      if (!viewer.includes("touchTarget")) {
+        throw new Error("Close button must meet touch target size");
+      }
+      if (!viewer.includes("accessibilityHint")) {
+        throw new Error("Close button must describe swipe-down dismiss");
+      }
+      if (!viewer.includes("StoryFooterGradient")) {
+        throw new Error("Story footer must use readable caption gradient");
+      }
+    },
+  },
+  {
+    name: "Story actions animate and remember last reaction",
+    run: () => {
+      const dock = read("components/story/StoryActionDock.tsx");
+      if (!dock.includes("Animated.spring")) {
+        throw new Error("Story action dock must animate open and close");
+      }
+      if (!dock.includes("readLastStoryReaction")) {
+        throw new Error("Story actions must restore last reaction preference");
+      }
+      if (!dock.includes("keyboardVisible")) {
+        throw new Error("Story must pause while keyboard is open");
       }
     },
   },
