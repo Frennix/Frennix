@@ -9,6 +9,12 @@ import { useAuth } from "@/providers/AuthProvider";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { getDefaultBioForEdit } from "@/lib/profile";
 import { mergeProfileActivities, splitProfileActivities } from "@/lib/profile-interests";
+import {
+  buildLifestyleProfilePatch,
+  lifestyleFieldsFromProfile,
+  LIFESTYLE_BRAND,
+} from "@/lib/lifestyle-matching";
+import { LifestyleProfileSection } from "@/components/LifestyleProfileSection";
 import { avatarDisplayUri } from "@/lib/avatar";
 import { useAvatarUpload } from "@/lib/useAvatarUpload";
 import { showAlert } from "@/lib/alerts";
@@ -48,6 +54,9 @@ export default function EditProfileScreen() {
   const [goals, setGoals] = useState<string[]>(profile?.fitness_goals ?? []);
   const [sports, setSports] = useState<string[]>([]);
   const [workoutInterests, setWorkoutInterests] = useState<string[]>([]);
+  const [lifestyle, setLifestyle] = useState<LifestyleProfileFields>(
+    lifestyleFieldsFromProfile(profile)
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -64,6 +73,7 @@ export default function EditProfileScreen() {
     setGoals(profile.fitness_goals ?? []);
     setSports(profileSports);
     setWorkoutInterests(profileWorkoutInterests);
+    setLifestyle(lifestyleFieldsFromProfile(profile));
   }, [profile?.id, profile?.updated_at]);
 
   function toggleItem(list: string[], value: string, setter: (next: string[]) => void) {
@@ -93,12 +103,15 @@ export default function EditProfileScreen() {
         city: city.trim() || null,
         fitness_goals: goals,
         activities: mergeProfileActivities(sports, workoutInterests),
+        ...buildLifestyleProfilePatch(lifestyle),
       });
 
       await refreshProfile(updated);
       queryClient.setQueryData(["profile", updated.username], updated);
       queryClient.invalidateQueries({ queryKey: ["profile-stats", session.user.id] });
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["discover-suggestions"] });
+      queryClient.invalidateQueries({ queryKey: ["discover-lifestyle"] });
       router.back();
     } catch (e) {
       const message = getErrorMessage(e);
@@ -181,6 +194,10 @@ export default function EditProfileScreen() {
         ))}
       </ChipSection>
 
+      <Text style={styles.sectionHeading}>{LIFESTYLE_BRAND.profileSection}</Text>
+      <Text style={styles.lifestyleHint}>{LIFESTYLE_BRAND.profileHintShort}</Text>
+      <LifestyleProfileSection value={lifestyle} onChange={setLifestyle} compact />
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button title="Save changes" onPress={save} loading={loading} />
     </ScrollView>
@@ -198,6 +215,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.sm,
   },
+  lifestyleHint: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   section: { gap: spacing.sm },
   label: { ...typography.body, fontWeight: "600" },
   hint: { ...typography.caption, color: colors.textMuted },

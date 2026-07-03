@@ -1,17 +1,15 @@
-import { useContext } from "react";
-import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 import { Platform, useWindowDimensions, type ViewStyle } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-/** Stack header content height inside tab scenes (excludes status/safe-area inset). */
-const WEB_TAB_HEADER_CONTENT_PX = 56;
-
-function useTabBarChromeHeight(): number {
-  const tabBarHeight = useContext(BottomTabBarHeightContext);
-  const insets = useSafeAreaInsets();
-  if (tabBarHeight != null) return tabBarHeight;
-  return insets.bottom;
-}
+/**
+ * Tab header + bottom tab bar (conservative for iPhone Safari).
+ *
+ * Do NOT derive this from BottomTabBarHeightContext or useSafeAreaInsets on web.
+ * v1.0.0 tried dynamic chrome (56 + insets.top + tabBarHeight) and caused a
+ * post-login black screen on iPhone Safari: context can be 0 or missing while
+ * the fallback used only insets.bottom (~34px), under-counting tab bar chrome
+ * and collapsing the feed flex chain under overflow:hidden parents.
+ */
+const WEB_TAB_CHROME_PX = 140;
 
 /**
  * Explicit tab-scene height for RN Web / Safari.
@@ -19,14 +17,8 @@ function useTabBarChromeHeight(): number {
  */
 export function useWebTabSceneHeight(): number | undefined {
   const { height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const tabBarHeight = useTabBarChromeHeight();
-
   if (Platform.OS !== "web" || height <= 0) return undefined;
-
-  const headerHeight = WEB_TAB_HEADER_CONTENT_PX + insets.top;
-  const chrome = headerHeight + tabBarHeight;
-  return Math.max(Math.round(height - chrome), 240);
+  return Math.max(Math.round(height - WEB_TAB_CHROME_PX), 240);
 }
 
 export function webTabSceneHeightStyle(height: number | undefined): ViewStyle {

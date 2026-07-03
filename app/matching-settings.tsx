@@ -17,6 +17,7 @@ import {
   TRAINING_ENVIRONMENT_OPTIONS,
   TRAINING_SCHEDULE_OPTIONS,
 } from "@/lib/matching-compatibility-options";
+import { FRENIX_MATCH_BRAND } from "@frennix/matching";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
 import { formatActivity, formatGoal } from "@/lib/labels";
@@ -268,10 +269,10 @@ export default function MatchingSettingsScreen() {
         </View>
       ))}
 
-      <Text style={styles.sectionLabel}>Training compatibility (optional)</Text>
+      <Text style={styles.sectionLabel}>Training preferences (optional)</Text>
       <Text style={styles.filterHint}>
-        Improves match quality and &quot;Why we matched you&quot; reasons. Shown on your public
-        profile where relevant.
+        Along with your Lifestyle and fitness profile, these details help calculate your Frennix
+        Match and power &quot;{FRENIX_MATCH_BRAND.sections.why}&quot; explanations.
       </Text>
 
       <Text style={styles.fieldLabel}>Experience level</Text>

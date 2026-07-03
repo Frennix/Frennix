@@ -22,7 +22,13 @@ export type MatchReasonCode =
   | "same_gym"
   | "shared_environment"
   | "workout_streak"
-  | "discovery_active";
+  | "discovery_active"
+  | "shared_preferred_times"
+  | "both_parents"
+  | "shared_child_ages"
+  | "kid_friendly_match"
+  | "parent_partner_intent"
+  | "shared_lifestyle_tags";
 
 /** Human-readable explanation shown on match cards. */
 export interface MatchReason {

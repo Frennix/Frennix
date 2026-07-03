@@ -45,6 +45,9 @@ function normalizeMatchableProfile(row: unknown): MatchableProfile {
     fitness_goals: coerceStringArray(profile.fitness_goals),
     activities: coerceStringArray(profile.activities),
     training_schedules: coerceStringArray(profile.training_schedules),
+    children_age_groups: coerceStringArray(profile.children_age_groups),
+    preferred_workout_times: coerceStringArray(profile.preferred_workout_times),
+    lifestyle_tags: coerceStringArray(profile.lifestyle_tags),
   };
 }
 

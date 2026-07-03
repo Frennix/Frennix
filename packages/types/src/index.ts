@@ -2,6 +2,13 @@ export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "💪"] as con
 
 import type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 import type { SkillLevel, TrainingEnvironment, TrainingScheduleSlot } from "./matching";
+import type {
+  ChildrenAgeGroup,
+  LifestyleProfileFields,
+  ParentStatus,
+  ParentType,
+  PreferredWorkoutTime,
+} from "./lifestyle";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
@@ -172,6 +179,15 @@ export interface Profile {
   discovery_radius_miles?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** Lifestyle Matching — optional parent / schedule fields. */
+  parent_status?: ParentStatus | null;
+  parent_type?: ParentType | null;
+  children_age_groups?: ChildrenAgeGroup[];
+  preferred_workout_times?: PreferredWorkoutTime[];
+  kid_friendly_workouts?: boolean | null;
+  looking_for_parent_partner?: boolean | null;
+  /** Extensible lifestyle tags — see LIFESTYLE_TAG_CATALOG. */
+  lifestyle_tags?: import("./lifestyle").LifestyleTagId[];
   created_at: string;
   updated_at: string;
 }
@@ -249,7 +265,11 @@ export interface FeedStory {
 
 export interface SuggestedAthlete {
   profile: Profile;
+  /** Sort key — same as compatibility_score when engine is used. */
   score: number;
+  /** Unified fitness + lifestyle compatibility (0–100). */
+  compatibility_score: number;
+  match_reasons: MatchReason[];
   reason: string;
   mutual_count: number;
   shared_activities: string[];
@@ -525,3 +545,4 @@ export * from "./post-media";
 export * from "./story-engagement";
 export * from "./workout-story";
 export * from "./matching";
+export * from "./lifestyle";

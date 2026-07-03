@@ -4,12 +4,30 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
+import { DiscoverCompatibilityFilters } from "@/components/DiscoverLifestyleFilters";
+import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
+import { FrennixMatchExplainerModal } from "@/components/FrennixMatchExplainerModal";
 import { AppIcon } from "@/components/AppIcon";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
-import { getErrorMessage, getChallenges, getGroups, getSuggestedAthletes, searchProfiles } from "@frennix/api";
-import type { SuggestedAthlete } from "@frennix/types";
+import {
+  getErrorMessage,
+  getChallenges,
+  getGroups,
+  getSuggestedAthletes,
+  searchProfiles,
+  discoverProfiles,
+  scoreProfileCompatibility,
+} from "@frennix/api";
+import type { DiscoverCompatibilityFilters, Profile, SuggestedAthlete } from "@frennix/types";
+import { FRENIX_MATCH_BRAND } from "@frennix/matching";
+import {
+  getLifestyleBadges,
+  hasActiveDiscoverFilters,
+  LIFESTYLE_BRAND,
+  matchesDiscoverFilters,
+} from "@/lib/lifestyle-matching";
 import { useAuth } from "@/providers/AuthProvider";
 import { DiscoverChallengeRow } from "@/components/DiscoverChallengeRow";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
@@ -39,15 +57,27 @@ function profileInterestLabels(activities: string[] | undefined, limit = 4) {
   return (activities ?? []).slice(0, limit).map(formatActivity);
 }
 
+function scoreProfilesForDiscover(viewer: Profile, profiles: Profile[]): SuggestedAthlete[] {
+  return profiles
+    .map((profile) => scoreProfileCompatibility(viewer, profile))
+    .sort((a, b) => b.compatibility_score - a.compatibility_score);
+}
+
 export default function DiscoverScreen() {
-  const { session } = useAuth();
+  const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
   const webHeightStyle = useTabScreenWebHeightStyle();
   const [tab, setTab] = useState<Tab>("people");
   const [peopleSearch, setPeopleSearch] = useState("");
   const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
+  const [discoverFilters, setDiscoverFilters] = useState<DiscoverCompatibilityFilters>({});
   const [groupQuery, setGroupQuery] = useState("");
+  const [frennixMatchExplainerVisible, setFrennixMatchExplainerVisible] = useState(false);
   const { isFollowing, toggleFollow, followMutation } = useSuggestedFollow(userId);
+
+  const openFrennixMatchExplainer = useCallback(() => {
+    setFrennixMatchExplainerVisible(true);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedPeopleSearch(peopleSearch.trim()), 300);
@@ -55,6 +85,7 @@ export default function DiscoverScreen() {
   }, [peopleSearch]);
 
   const isSearchingPeople = debouncedPeopleSearch.length > 0;
+  const lifestyleFiltersActive = hasActiveDiscoverFilters(discoverFilters);
 
   const {
     data: searchResults = [],
@@ -81,7 +112,22 @@ export default function DiscoverScreen() {
   } = useQuery({
     queryKey: ["discover-suggestions", userId],
     queryFn: () => getSuggestedAthletes(userId, 20),
-    enabled: tab === "people" && !isSearchingPeople && !!userId,
+    enabled: tab === "people" && !isSearchingPeople && !lifestyleFiltersActive && !!userId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const {
+    data: lifestyleResults = [],
+    isFetching: lifestyleLoading,
+    isError: lifestyleError,
+    error: lifestyleQueryError,
+    refetch: refetchLifestyle,
+    isRefetching: lifestyleRefetching,
+  } = useQuery({
+    queryKey: ["discover-lifestyle", userId, discoverFilters],
+    queryFn: () => discoverProfiles({ lifestyle: discoverFilters }, userId),
+    enabled: tab === "people" && !isSearchingPeople && lifestyleFiltersActive && !!userId,
     staleTime: 120_000,
     placeholderData: (previousData) => previousData,
   });
@@ -125,8 +171,9 @@ export default function DiscoverScreen() {
   const onRefreshPeople = useGuardedRefresh(
     useCallback(async () => {
       if (isSearchingPeople) await refetchSearch();
+      else if (lifestyleFiltersActive) await refetchLifestyle();
       else await refetchSuggestions();
-    }, [isSearchingPeople, refetchSearch, refetchSuggestions]),
+    }, [isSearchingPeople, lifestyleFiltersActive, refetchSearch, refetchLifestyle, refetchSuggestions]),
     { errorTitle: "Could not refresh people", haptic: true }
   );
 
@@ -140,21 +187,87 @@ export default function DiscoverScreen() {
     { errorTitle: "Could not refresh challenges" }
   );
 
-  const peopleData: SuggestedAthlete[] = isSearchingPeople
-    ? searchResults.map((profile) => ({
-        profile,
-        score: 0,
-        reason: "",
-        mutual_count: 0,
-        shared_activities: profile.activities ?? [],
-        shared_goals: profile.fitness_goals ?? [],
-      }))
-    : suggestions;
+  const filteredSearchResults =
+    isSearchingPeople && viewerProfile
+      ? scoreProfilesForDiscover(viewerProfile, searchResults).filter((item) =>
+          matchesDiscoverFilters(
+            item.profile,
+            discoverFilters,
+            viewerProfile,
+            item.compatibility_score
+          )
+        )
+      : isSearchingPeople && lifestyleFiltersActive
+        ? searchResults.filter((profile) =>
+            matchesDiscoverFilters(profile, discoverFilters, viewerProfile ?? undefined)
+          )
+        : searchResults;
 
-  const peopleLoading = isSearchingPeople ? searchLoading : suggestionsLoading;
-  const peopleError = isSearchingPeople ? searchError : suggestionsError;
-  const peopleQueryError = isSearchingPeople ? searchQueryError : suggestionsQueryError;
-  const peopleRefetching = isSearchingPeople ? searchRefetching : suggestionsRefetching;
+  const lifestyleScored =
+    lifestyleFiltersActive && viewerProfile
+      ? scoreProfilesForDiscover(viewerProfile, lifestyleResults).filter((item) =>
+          matchesDiscoverFilters(
+            item.profile,
+            discoverFilters,
+            viewerProfile,
+            item.compatibility_score
+          )
+        )
+      : lifestyleResults.map((profile) => ({
+          profile,
+          score: 0,
+          compatibility_score: 0,
+          match_reasons: [],
+          mutual_count: 0,
+          shared_activities: profile.activities ?? [],
+          shared_goals: profile.fitness_goals ?? [],
+          reason: "Matches your filters",
+        }));
+
+  const peopleData: SuggestedAthlete[] = isSearchingPeople
+    ? filteredSearchResults.map((entry) => {
+        if ("profile" in entry && "compatibility_score" in entry) {
+          return entry as SuggestedAthlete;
+        }
+        if (viewerProfile) {
+          return scoreProfileCompatibility(viewerProfile, entry as Profile);
+        }
+        const profile = entry as Profile;
+        return {
+          profile,
+          score: 0,
+          compatibility_score: 0,
+          match_reasons: [],
+          mutual_count: 0,
+          shared_activities: profile.activities ?? [],
+          shared_goals: profile.fitness_goals ?? [],
+          reason: "",
+        };
+      })
+    : lifestyleFiltersActive
+      ? lifestyleScored
+      : suggestions;
+
+  const peopleLoading = isSearchingPeople
+    ? searchLoading
+    : lifestyleFiltersActive
+      ? lifestyleLoading
+      : suggestionsLoading;
+  const peopleError = isSearchingPeople
+    ? searchError
+    : lifestyleFiltersActive
+      ? lifestyleError
+      : suggestionsError;
+  const peopleQueryError = isSearchingPeople
+    ? searchQueryError
+    : lifestyleFiltersActive
+      ? lifestyleQueryError
+      : suggestionsQueryError;
+  const peopleRefetching = isSearchingPeople
+    ? searchRefetching
+    : lifestyleFiltersActive
+      ? lifestyleRefetching
+      : suggestionsRefetching;
 
   const peopleListRef = useRef<FlatList<SuggestedAthlete>>(null);
   const groupsListRef = useRef<FlatList<(typeof groups)[number]>>(null);
@@ -188,7 +301,7 @@ export default function DiscoverScreen() {
         <QueryErrorState
           title="Could not load people"
           message={getErrorMessage(peopleQueryError)}
-          onRetry={() => void (isSearchingPeople ? refetchSearch() : refetchSuggestions())}
+          onRetry={() => void (isSearchingPeople ? refetchSearch() : lifestyleFiltersActive ? refetchLifestyle() : refetchSuggestions())}
         />
       </View>
     );
@@ -263,6 +376,7 @@ export default function DiscoverScreen() {
           <Text style={styles.searchHint}>
             Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio
           </Text>
+          <DiscoverCompatibilityFilters filters={discoverFilters} onChange={setDiscoverFilters} />
         </View>
       ) : tab === "groups" ? (
         <Input placeholder="Search groups..." value={groupQuery} onChangeText={setGroupQuery} />
@@ -300,9 +414,15 @@ export default function DiscoverScreen() {
           ListHeaderComponent={
             !isSearchingPeople ? (
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Suggested athletes</Text>
+                <Text style={styles.sectionTitle}>
+                  {lifestyleFiltersActive
+                    ? LIFESTYLE_BRAND.discoverFilteredHeading
+                    : FRENIX_MATCH_BRAND.sections.discoverSuggested}
+                </Text>
                 <Text style={styles.sectionBody}>
-                  Based on shared sports, workout interests, location, mutual connections, and activity.
+                  {lifestyleFiltersActive
+                    ? LIFESTYLE_BRAND.discoverFilteredBody
+                    : FRENIX_MATCH_BRAND.sections.discoverSuggestedBody}
                 </Text>
               </View>
             ) : null
@@ -312,11 +432,13 @@ export default function DiscoverScreen() {
               <DiscoverPeopleSkeleton />
             ) : (
               <EmptyState
-                title={isSearchingPeople ? "No people found" : "No suggestions yet"}
+                title={isSearchingPeople ? "No people found" : lifestyleFiltersActive ? LIFESTYLE_BRAND.emptyFilteredTitle : "No suggestions yet"}
                 description={
                   isSearchingPeople
                     ? "Try a different name, fitness interest, workout type, or bio keyword."
-                    : "Complete your profile with activities and city to get better athlete recommendations."
+                    : lifestyleFiltersActive
+                      ? LIFESTYLE_BRAND.emptyFilteredDescription
+                      : "Complete your profile with activities and city to get better athlete recommendations."
                 }
               />
             )
@@ -328,6 +450,16 @@ export default function DiscoverScreen() {
               <DiscoverProfileCard
                 profile={profile}
                 interestLabels={profileInterestLabels(profile.activities)}
+                lifestyleBadges={getLifestyleBadges(profile)}
+                matchDisplay={
+                  item.compatibility_score > 0 ? (
+                    <FrennixMatchDisplay
+                      score={item.compatibility_score}
+                      variant="compact"
+                      onLearnMore={openFrennixMatchExplainer}
+                    />
+                  ) : null
+                }
                 reason={item.reason || undefined}
                 onViewProfile={() => router.push(`/user/${profile.username}`)}
                 followLabel={following ? "Following" : "Follow"}
@@ -416,6 +548,11 @@ export default function DiscoverScreen() {
           renderItem={({ item }) => <DiscoverChallengeRow challenge={item} userId={userId} />}
         />
       ) : null}
+
+      <FrennixMatchExplainerModal
+        visible={frennixMatchExplainerVisible}
+        onClose={() => setFrennixMatchExplainerVisible(false)}
+      />
     </View>
   );
 }

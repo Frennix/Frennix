@@ -1,4 +1,5 @@
 import type { SkillLevel, TrainingEnvironment, TrainingScheduleSlot } from "@frennix/types";
+import { FRENIX_MATCH_BRAND } from "@frennix/matching";
 
 export const SKILL_LEVEL_OPTIONS: { value: SkillLevel; label: string }[] = [
   { value: "beginner", label: "Beginner" },
@@ -20,5 +21,6 @@ export const TRAINING_ENVIRONMENT_OPTIONS: { value: TrainingEnvironment; label: 
 ];
 
 export function formatMatchScore(score: number): string {
-  return `${Math.round(Math.max(0, Math.min(100, score)))}% match`;
+  const rounded = Math.round(Math.max(0, Math.min(100, score)));
+  return `⭐ ${rounded}% ${FRENIX_MATCH_BRAND.name}`;
 }

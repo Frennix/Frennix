@@ -3,9 +3,6 @@ import {
   formatMatchActivity,
   formatMatchEnvironment,
   formatMatchGoal,
-  formatMatchSchedule,
-  formatMatchSkill,
-  joinNaturalList,
 } from "./labels";
 import {
   citiesMatch,
@@ -34,16 +31,12 @@ export function buildMatchReasons(
   const sharedGoals = getSharedValues(viewer.fitness_goals, candidate.fitness_goals);
   if (sharedGoals.length) {
     const labels = sharedGoals.map(formatMatchGoal);
-    const hasAccountability = sharedGoals.some(
-      (g) => g === "accountability_partner" || g === "find_training_partner"
-    );
+    const wantsAccountability = sharedGoals.some((g) => g === "accountability_partner");
     reasons.push({
       code: "shared_goals",
-      label: hasAccountability
-        ? "Both looking for an accountability partner"
-        : sharedGoals.length === 1
-          ? `You both want to ${labels[0]}`
-          : `You share ${sharedGoals.length} training goals`,
+      label: wantsAccountability
+        ? "Both want accountability partners"
+        : "Similar fitness goals",
       weight: weights.sharedGoals,
       details: labels,
     });
@@ -52,12 +45,16 @@ export function buildMatchReasons(
   const sharedActivities = getSharedValues(viewer.activities, candidate.activities);
   if (sharedActivities.length) {
     const labels = sharedActivities.map(formatMatchActivity);
+    const strengthLike = sharedActivities.some((a) =>
+      ["weightlifting", "crossfit", "martial_arts"].includes(a)
+    );
     reasons.push({
       code: "shared_activities",
-      label:
-        sharedActivities.length === 1
-          ? `You both enjoy ${labels[0]}`
-          : `You both enjoy ${joinNaturalList(labels.slice(0, 3))}`,
+      label: strengthLike
+        ? "Both enjoy strength training"
+        : sharedActivities.length === 1
+          ? `Both enjoy ${labels[0]}`
+          : "Similar workout interests",
       weight: weights.sharedActivities,
       details: labels,
     });
@@ -65,9 +62,10 @@ export function buildMatchReasons(
 
   const distanceMiles = distanceMilesBetween(viewer, candidate);
   if (distanceMiles != null && withinDiscoveryRadius(viewer, candidate, distanceMiles)) {
+    const miles = Math.max(1, Math.round(distanceMiles));
     reasons.push({
       code: "nearby_distance",
-      label: `You're only ${distanceMiles.toFixed(1)} miles apart`,
+      label: `Live within ${miles} mile${miles === 1 ? "" : "s"}`,
       weight: weights.nearbyDistance,
     });
   } else if (citiesMatch(viewer, candidate)) {
@@ -80,26 +78,18 @@ export function buildMatchReasons(
 
   const sharedSchedules = getSharedValues(viewer.training_schedules, candidate.training_schedules);
   if (sharedSchedules.length) {
-    const slot = formatMatchSchedule(sharedSchedules[0]!);
     reasons.push({
       code: "shared_schedule",
-      label:
-        sharedSchedules.length === 1
-          ? `You both train ${slot}`
-          : `You both train ${joinNaturalList(sharedSchedules.map(formatMatchSchedule))}`,
+      label: "Similar workout schedule",
       weight: weights.sharedSchedule,
       details: sharedSchedules,
     });
   }
 
   if (isSkillCompatible(viewer, candidate)) {
-    const level = candidate.skill_level ? formatMatchSkill(candidate.skill_level) : "similar";
     reasons.push({
       code: "skill_compatible",
-      label:
-        viewer.skill_level === candidate.skill_level
-          ? `You're both ${level} athletes`
-          : "Your skill levels are a good fit",
+      label: "Similar experience level",
       weight: weights.skillCompatible,
     });
   }

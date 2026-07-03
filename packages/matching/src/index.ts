@@ -1,10 +1,36 @@
 export {
-  buildMatchReasons,
+  buildCompatibilityReasons,
+  buildCompatibilitySummary,
+  scoreCompatibility,
   scoreFromReasons,
+  DEFAULT_COMPATIBILITY_WEIGHTS,
+  DEFAULT_LIFESTYLE_WEIGHTS,
+  type CompatibilityWeights,
+  type LifestyleWeights,
+} from "./compatibility";
+export {
+  FRENIX_MATCH_BRAND,
+  FRENIX_MATCH_FUTURE_FACTORS,
+  FRENIX_MATCH_LEVELS,
+  FRENIX_MATCH_FILTER_THRESHOLDS,
+  formatCompatibilityBadge,
+  formatFrennixMatchDisplay,
+  getFrennixMatchLevel,
+  getFrennixMatchWhyTitle,
+  roundFrennixMatchScore,
+  type CompatibilityBadge,
+  type FrennixMatchDisplay,
+  type FrennixMatchFutureFactor,
+  type FrennixMatchLevel,
+  type FrennixMatchLevelId,
+} from "./frennix-match";
+export {
+  buildMatchReasons,
   scoreMatch,
   type MatchContext,
 } from "./engine";
 export {
+  formatLifestyleTime,
   formatMatchActivity,
   formatMatchEnvironment,
   formatMatchGoal,

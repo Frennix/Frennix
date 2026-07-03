@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, router } from "expo-router";
 import { View, StyleSheet } from "react-native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   getErrorMessage,
   getOrCreateConversation,
@@ -9,6 +9,7 @@ import {
   getProfileStats,
   getPostsByUser,
   isFollowing,
+  scoreProfileCompatibility,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
@@ -21,7 +22,7 @@ import { EmptyState, colors } from "@frennix/ui";
 
 export default function UserProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
-  const { session } = useAuth();
+  const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
   const [messaging, setMessaging] = useState(false);
   const { openPostActions, postActionSheets } = usePostActions({ userId });
@@ -56,6 +57,11 @@ export default function UserProfileScreen() {
   });
 
   const followMutation = useFollowUser(userId);
+
+  const compatibility = useMemo(() => {
+    if (!profile || profile.id === userId || !viewerProfile) return null;
+    return scoreProfileCompatibility(viewerProfile, profile);
+  }, [profile, userId, viewerProfile]);
 
   async function messageUser() {
     if (!profile) return;
@@ -97,6 +103,8 @@ export default function UserProfileScreen() {
       stats={stats ?? { posts: 0, followers: 0, following: 0, eventsJoined: 0, workoutStreak: 0 }}
       posts={postsPage?.posts ?? []}
       isOwn={isOwn}
+      matchReasons={compatibility?.match_reasons}
+      frennixMatchScore={compatibility?.compatibility_score ?? null}
       following={following}
       onFollow={() => {
         if (!userId) {

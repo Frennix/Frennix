@@ -1,4 +1,5 @@
 import type { Profile, ProfileStats } from "@frennix/types";
+import type { DiscoverCompatibilityFilters } from "@frennix/types";
 import { getFollowCounts } from "./follows";
 import { getBlockedIds } from "./moderation";
 import {
@@ -119,21 +120,47 @@ export async function searchProfiles(query: string, limit = 30, viewerId?: strin
   return profiles;
 }
 
-export async function discoverProfiles(filters?: {
-  activity?: string;
-  goal?: string;
-  city?: string;
-}, viewerId?: string): Promise<Profile[]> {
+export async function discoverProfiles(
+  filters?: {
+    activity?: string;
+    goal?: string;
+    city?: string;
+    lifestyle?: DiscoverCompatibilityFilters;
+  },
+  viewerId?: string
+): Promise<Profile[]> {
   let q = getSupabase()
     .from(PROFILES_READ)
     .select("*")
     .eq("onboarding_complete", true)
     .eq("visibility", "public")
-    .limit(30);
+    .limit(60);
+
+  const lifestyle = filters?.lifestyle;
+  const goal = filters?.goal ?? lifestyle?.goal;
+  const activity = filters?.activity ?? lifestyle?.activity;
 
   if (filters?.city) q = q.ilike("city", `%${filters.city}%`);
-  if (filters?.activity) q = q.contains("activities", [filters.activity]);
-  if (filters?.goal) q = q.contains("fitness_goals", [filters.goal]);
+  if (activity) q = q.contains("activities", [activity]);
+  if (goal) q = q.contains("fitness_goals", [goal]);
+
+  if (lifestyle?.parentsOnly || lifestyle?.parentStatus === "parent") {
+    q = q.eq("parent_status", "parent");
+  } else if (lifestyle?.parentStatus) {
+    q = q.eq("parent_status", lifestyle.parentStatus);
+  }
+  if (lifestyle?.parentType) q = q.eq("parent_type", lifestyle.parentType);
+  if (lifestyle?.kidFriendlyWorkouts) q = q.eq("kid_friendly_workouts", true);
+  if (lifestyle?.lookingForParentPartner) q = q.eq("looking_for_parent_partner", true);
+  if (lifestyle?.childrenAgeGroup) {
+    q = q.contains("children_age_groups", [lifestyle.childrenAgeGroup]);
+  }
+  if (lifestyle?.preferredWorkoutTime) {
+    q = q.contains("preferred_workout_times", [lifestyle.preferredWorkoutTime]);
+  }
+  if (lifestyle?.lifestyleTag) {
+    q = q.contains("lifestyle_tags", [lifestyle.lifestyleTag]);
+  }
 
   const { data, error } = await q;
   if (error) throw error;

@@ -17,6 +17,12 @@ import {
 import { SubmitStatusBanner } from "@/components/SubmitStatusBanner";
 import { claimPendingReferral } from "@/lib/referral-storage";
 import { pickAdjustedAvatar } from "@/lib/pick-adjusted-avatar";
+import { LifestyleProfileSection } from "@/components/LifestyleProfileSection";
+import {
+  buildLifestyleProfilePatch,
+  EMPTY_LIFESTYLE_FIELDS,
+} from "@/lib/lifestyle-matching";
+import type { LifestyleProfileFields } from "@frennix/types";
 import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 const SUCCESS_NAV_DELAY_MS = 2000;
@@ -48,6 +54,7 @@ export default function OnboardingScreen() {
   const [submitError, setSubmitError] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [lifestyle, setLifestyle] = useState<LifestyleProfileFields>(EMPTY_LIFESTYLE_FIELDS);
   const submittingRef = useRef(false);
   const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -130,6 +137,7 @@ export default function OnboardingScreen() {
         avatar_url: null as string | null,
         onboarding_complete: true,
         visibility: "public" as const,
+        ...buildLifestyleProfilePatch(lifestyle),
       };
 
       let avatarUrl: string | null = null;
@@ -177,10 +185,19 @@ export default function OnboardingScreen() {
     } else if (step === 2) {
       const ok = await trigger(["goals"]);
       if (ok) setStep(3);
+    } else if (step === 3) {
+      const ok = await trigger(["activities"]);
+      if (ok) setStep(4);
     }
   }
 
-  const stepTitles = ["Your profile", "About you", "Your goals", "Your activities"];
+  const stepTitles = [
+    "Your profile",
+    "About you",
+    "Your goals",
+    "Your activities",
+    "Lifestyle (optional)",
+  ];
 
   useEffect(() => {
     return () => {
@@ -343,6 +360,12 @@ export default function OnboardingScreen() {
         </View>
       ) : null}
 
+      {step === 4 ? (
+        <View style={styles.stepPanel}>
+          <LifestyleProfileSection value={lifestyle} onChange={setLifestyle} compact />
+        </View>
+      ) : null}
+
       {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
 
       <SubmitStatusBanner
@@ -356,16 +379,24 @@ export default function OnboardingScreen() {
         {step > 0 ? (
           <Button title="Back" variant="secondary" onPress={prevStep} disabled={isSubmitting || submitSuccess} />
         ) : null}
-        {step < 3 ? (
+        {step < 4 ? (
           <Button title="Continue" onPress={nextStep} />
         ) : (
-          <Button
-            title={submitSuccess ? "Profile saved!" : "Start training together"}
-            loadingTitle="Saving…"
-            onPress={handleSubmit(onSubmit, onInvalid)}
-            loading={isSubmitting || uploadingAvatar}
-            disabled={submitSuccess}
-          />
+          <>
+            <Button
+              title="Skip for now"
+              variant="secondary"
+              onPress={handleSubmit(onSubmit, onInvalid)}
+              disabled={isSubmitting || submitSuccess}
+            />
+            <Button
+              title={submitSuccess ? "Profile saved!" : "Finish setup"}
+              loadingTitle="Saving…"
+              onPress={handleSubmit(onSubmit, onInvalid)}
+              loading={isSubmitting || uploadingAvatar}
+              disabled={submitSuccess}
+            />
+          </>
         )}
       </View>
     </ScrollView>

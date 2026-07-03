@@ -1,4 +1,11 @@
 import type { Profile, SuggestedAthlete } from "@frennix/types";
+import {
+  buildCompatibilityReasons,
+  buildCompatibilitySummary,
+  scoreCompatibility,
+  getSharedValues,
+  coerceStringArray,
+} from "@frennix/matching";
 import { getFollowingIds } from "./follows";
 import { getBlockedIds } from "./moderation";
 import { getProfile } from "./profiles";
@@ -6,85 +13,59 @@ import { getSupabase } from "./supabase";
 
 const WORKOUT_POST_TYPES = ["workout_update", "photo", "video"] as const;
 const RECENT_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const CANDIDATE_POOL = 120;
 
-function normalizeCity(city: string) {
-  return city.trim().toLowerCase();
+function normalizeProfile(row: Profile): Profile {
+  return {
+    ...row,
+    fitness_goals: coerceStringArray(row.fitness_goals),
+    activities: coerceStringArray(row.activities),
+    children_age_groups: coerceStringArray(row.children_age_groups),
+    preferred_workout_times: coerceStringArray(row.preferred_workout_times),
+    lifestyle_tags: coerceStringArray(row.lifestyle_tags),
+  };
 }
 
-function intersect(a: string[] = [], b: string[] = []) {
-  const setB = new Set(b);
-  return a.filter((value) => setB.has(value));
-}
+function rankCandidate(
+  viewer: Profile,
+  profile: Profile,
+  mutualCount: number,
+  recentWorkouts: number
+): SuggestedAthlete {
+  const sharedActivities = getSharedValues(viewer.activities, profile.activities);
+  const sharedGoals = getSharedValues(viewer.fitness_goals, profile.fitness_goals);
+  const context = { candidateStreak: 0, viewerStreak: 0 };
+  const match_reasons = buildCompatibilityReasons(viewer, profile, undefined, context);
+  const compatibility_score = scoreCompatibility(viewer, profile, undefined, context);
+  let score = compatibility_score;
 
-function formatActivityLabel(activity: string) {
-  return activity.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
+  if (mutualCount > 0) score = Math.min(100, score + Math.min(mutualCount * 3, 12));
+  if (recentWorkouts >= 3) score = Math.min(100, score + 4);
 
-function buildReason(input: {
-  mutualCount: number;
-  sharedActivities: string[];
-  sharedGoals: string[];
-  sameCity: boolean;
-  postCount: number;
-  recentWorkouts: number;
-}): string {
-  const parts: string[] = [];
-
-  if (input.mutualCount > 0) {
-    parts.push(
-      input.mutualCount === 1
-        ? "1 mutual connection"
-        : `${input.mutualCount} mutual connections`
-    );
-  }
-
-  if (input.sharedActivities.length) {
-    parts.push(
-      input.sharedActivities.slice(0, 2).map(formatActivityLabel).join(" · ")
-    );
-  } else if (input.sharedGoals.length) {
-    parts.push(input.sharedGoals.slice(0, 2).map(formatActivityLabel).join(" · "));
-  }
-
-  if (input.sameCity) parts.push("Near you");
-
-  if (input.recentWorkouts >= 3) parts.push("Very active");
-  else if (input.postCount >= 5) parts.push("Active athlete");
-
-  if (!parts.length) return "Suggested for you";
-  return parts.join(" · ");
-}
-
-function scoreCandidate(input: {
-  sharedActivities: string[];
-  sharedGoals: string[];
-  sameCity: boolean;
-  mutualCount: number;
-  postCount: number;
-  recentWorkouts: number;
-}) {
-  let score = 0;
-  score += input.sharedActivities.length * 18;
-  score += input.sharedGoals.length * 12;
-  if (input.sameCity) score += 28;
-  score += Math.min(input.mutualCount * 10, 50);
-  score += Math.min(input.postCount, 25) * 1.5;
-  if (input.recentWorkouts >= 3) score += 15;
-  else if (input.recentWorkouts >= 1) score += 8;
-  return score;
+  return {
+    profile,
+    score,
+    compatibility_score,
+    match_reasons,
+    mutual_count: mutualCount,
+    shared_activities: sharedActivities,
+    shared_goals: sharedGoals,
+    reason: buildCompatibilitySummary(match_reasons, score),
+  };
 }
 
 export async function getSuggestedAthletes(
   viewerId: string,
   limit = 12
 ): Promise<SuggestedAthlete[]> {
-  const [viewer, followingIds, blockedIds] = await Promise.all([
+  const [viewerRow, followingIds, blockedIds] = await Promise.all([
     getProfile(viewerId),
     getFollowingIds(viewerId),
     getBlockedIds(viewerId),
   ]);
 
-  if (!viewer) return [];
+  if (!viewerRow) return [];
+  const viewer = normalizeProfile(viewerRow);
 
   const excludeIds = new Set([viewerId, ...followingIds, ...blockedIds]);
 
@@ -93,11 +74,14 @@ export async function getSuggestedAthletes(
     .select("*")
     .eq("onboarding_complete", true)
     .eq("visibility", "public")
-    .limit(120);
+    .limit(CANDIDATE_POOL);
 
   if (error) throw error;
 
-  const profiles = ((candidates ?? []) as Profile[]).filter((profile) => !excludeIds.has(profile.id));
+  const profiles = ((candidates ?? []) as Profile[])
+    .map(normalizeProfile)
+    .filter((profile) => !excludeIds.has(profile.id));
+
   if (!profiles.length) return [];
 
   const candidateIds = profiles.map((profile) => profile.id);
@@ -125,55 +109,24 @@ export async function getSuggestedAthletes(
     mutualCounts.set(id, (mutualCounts.get(id) ?? 0) + 1);
   }
 
-  const postCounts = new Map<string, number>();
   const recentWorkouts = new Map<string, number>();
   for (const row of posts ?? []) {
     const authorId = row.author_id as string;
-    postCounts.set(authorId, (postCounts.get(authorId) ?? 0) + 1);
     if ((row.created_at as string) >= recentCutoff) {
       recentWorkouts.set(authorId, (recentWorkouts.get(authorId) ?? 0) + 1);
     }
   }
 
-  const viewerCity = viewer.city ? normalizeCity(viewer.city) : null;
-
   const ranked = profiles
-    .map((profile) => {
-      const sharedActivities = intersect(viewer.activities, profile.activities);
-      const sharedGoals = intersect(viewer.fitness_goals, profile.fitness_goals);
-      const sameCity = Boolean(
-        viewerCity && profile.city && normalizeCity(profile.city) === viewerCity
-      );
-      const mutualCount = mutualCounts.get(profile.id) ?? 0;
-      const postCount = postCounts.get(profile.id) ?? 0;
-      const recentCount = recentWorkouts.get(profile.id) ?? 0;
-
-      const score = scoreCandidate({
-        sharedActivities,
-        sharedGoals,
-        sameCity,
-        mutualCount,
-        postCount,
-        recentWorkouts: recentCount,
-      });
-
-      return {
+    .map((profile) =>
+      rankCandidate(
+        viewer,
         profile,
-        score,
-        mutual_count: mutualCount,
-        shared_activities: sharedActivities,
-        shared_goals: sharedGoals,
-        reason: buildReason({
-          mutualCount,
-          sharedActivities,
-          sharedGoals,
-          sameCity,
-          postCount,
-          recentWorkouts: recentCount,
-        }),
-      } satisfies SuggestedAthlete;
-    })
-    .filter((item) => item.score > 0)
+        mutualCounts.get(profile.id) ?? 0,
+        recentWorkouts.get(profile.id) ?? 0
+      )
+    )
+    .filter((item) => item.compatibility_score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
@@ -182,14 +135,23 @@ export async function getSuggestedAthletes(
   const fallback = profiles
     .filter((profile) => !ranked.some((item) => item.profile.id === profile.id))
     .slice(0, limit - ranked.length)
-    .map((profile) => ({
-      profile,
-      score: 1,
-      mutual_count: mutualCounts.get(profile.id) ?? 0,
-      shared_activities: intersect(viewer.activities, profile.activities),
-      shared_goals: intersect(viewer.fitness_goals, profile.fitness_goals),
-      reason: "Suggested athlete",
-    }));
+    .map((profile) => {
+      const item = rankCandidate(viewer, profile, mutualCounts.get(profile.id) ?? 0, 0);
+      return {
+        ...item,
+        score: Math.max(item.score, 1),
+        compatibility_score: Math.max(item.compatibility_score, 1),
+        reason: item.reason || "Suggested athlete",
+      };
+    });
 
   return [...ranked, ...fallback].slice(0, limit);
+}
+
+/** Score a single profile pair client-side (profiles, Discover detail). */
+export function scoreProfileCompatibility(viewer: Profile, candidate: Profile): SuggestedAthlete {
+  const v = normalizeProfile(viewer);
+  const c = normalizeProfile(candidate);
+  const item = rankCandidate(v, c, 0, 0);
+  return item;
 }

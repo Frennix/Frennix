@@ -1,8 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { MatchCandidate, MatchableProfile } from "@frennix/types";
 import { MatchReasonsList } from "@/components/MatchReasonsList";
+import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
 import { pushScreen } from "@/lib/press-utils";
-import { formatMatchScore } from "@/lib/matching-compatibility-options";
+import { getFrennixMatchWhyTitle } from "@frennix/matching";
 import {
   formatCandidateActivities,
   formatCandidateGoals,
@@ -70,9 +71,7 @@ export function TrainingPartnerCard({
       accessible={Boolean(accessibilityLabel)}
     >
       {matchScore != null && matchScore > 0 ? (
-        <View style={styles.scoreBadge} accessibilityLabel={formatMatchScore(matchScore)}>
-          <Text style={styles.scoreText}>{formatMatchScore(matchScore)}</Text>
-        </View>
+        <FrennixMatchDisplay score={matchScore} variant="compact" />
       ) : null}
       <View style={styles.hero}>
         <View style={styles.avatarWrap}>
@@ -101,7 +100,12 @@ export function TrainingPartnerCard({
         </View>
       </View>
 
-      {reasons.length ? <MatchReasonsList reasons={reasons} /> : null}
+      {reasons.length ? (
+        <MatchReasonsList
+          reasons={reasons}
+          title={getFrennixMatchWhyTitle(matchScore ?? 0)}
+        />
+      ) : null}
 
       {sharedGoals.length || sharedActivities.length ? (
         <View style={styles.section}>

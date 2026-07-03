@@ -11,11 +11,15 @@ import {
   type NativeSyntheticEvent,
   type ViewStyle,
 } from "react-native";
-import type { Post, Profile, ProfileStats } from "@frennix/types";
+import type { MatchReason, Post, Profile, ProfileStats } from "@frennix/types";
+import { MatchReasonsList } from "@/components/MatchReasonsList";
+import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
+import { getFrennixMatchWhyTitle } from "@frennix/matching";
 import { computeProfileAchievements } from "@frennix/api";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { getProfileBio } from "@/lib/profile";
 import { splitProfileActivities } from "@/lib/profile-interests";
+import { getLifestyleBadges, LIFESTYLE_BRAND } from "@/lib/lifestyle-matching";
 import { avatarDisplayUri } from "@/lib/avatar";
 import {
   tabScreenContainer,
@@ -67,6 +71,9 @@ interface ProfileScreenContentProps {
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   /** Safari web tab scene height (pass from tab screens only). */
   webShellStyle?: ViewStyle;
+  /** Frennix Match reasons (other users' profiles). */
+  matchReasons?: MatchReason[];
+  frennixMatchScore?: number | null;
 }
 
 const COVER_HEIGHT = 200;
@@ -114,6 +121,8 @@ export function ProfileScreenContent({
   scrollViewRef,
   onScroll,
   webShellStyle,
+  matchReasons,
+  frennixMatchScore,
 }: ProfileScreenContentProps) {
   const [activeTab, setActiveTab] = useState<ProfileContentTab>("posts");
   const bio = getProfileBio(profile);
@@ -275,6 +284,32 @@ export function ProfileScreenContent({
 
       <WorkoutStreakBadge streak={stats.workoutStreak} />
 
+      {!isOwn && frennixMatchScore && frennixMatchScore > 0 ? (
+        <View style={styles.matchSection}>
+          <FrennixMatchDisplay score={frennixMatchScore} variant="full" />
+        </View>
+      ) : null}
+
+      {!isOwn && matchReasons?.length ? (
+        <View style={styles.matchSection}>
+          <MatchReasonsList
+            reasons={matchReasons}
+            title={getFrennixMatchWhyTitle(frennixMatchScore ?? 0)}
+            maxItems={6}
+          />
+        </View>
+      ) : null}
+
+      {getLifestyleBadges(profile).length ? (
+        <ProfileSection title={LIFESTYLE_BRAND.profileSection}>
+          <View style={styles.chips}>
+            {getLifestyleBadges(profile).map((label) => (
+              <Chip key={label} label={label} selected />
+            ))}
+          </View>
+        </ProfileSection>
+      ) : null}
+
       {bio ? (
         <ProfileSection title="About">
           <Text style={styles.aboutText}>{bio}</Text>
@@ -423,6 +458,10 @@ const styles = StyleSheet.create({
   nameBlock: { marginTop: spacing.xs, gap: spacing.xs },
   nameRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
   nameTextBlock: { flex: 1 },
+  matchSection: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
   name: { ...typography.screenTitle },
   username: { ...typography.caption, color: colors.accent, marginTop: 2 },
   presence: { ...typography.caption, color: colors.textMuted, marginTop: 4 },

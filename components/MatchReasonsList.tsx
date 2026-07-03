@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { MatchReason } from "@frennix/types";
+import { FRENIX_MATCH_BRAND } from "@frennix/matching";
 import { colors, radius, spacing, typography } from "@frennix/ui";
 
 type MatchReasonsListProps = {
@@ -8,10 +9,10 @@ type MatchReasonsListProps = {
   maxItems?: number;
 };
 
-/** "Why we matched you" — every recommendation explains itself. */
+/** Frennix Match explanation — every recommendation explains itself. */
 export function MatchReasonsList({
   reasons,
-  title = "Why we matched you",
+  title = FRENIX_MATCH_BRAND.sections.why,
   maxItems = 4,
 }: MatchReasonsListProps) {
   const visible = reasons.slice(0, maxItems);

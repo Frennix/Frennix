@@ -72,3 +72,17 @@ export function joinNaturalList(items: string[]): string {
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
+
+const lifestyleTimeLabels: Record<string, string> = {
+  early_morning: "early morning",
+  mid_morning: "mid morning",
+  lunch: "lunchtime",
+  afternoon: "afternoon",
+  evening: "evening",
+  after_kids_bedtime: "after kids' bedtime",
+  weekends: "weekend",
+};
+
+export function formatLifestyleTime(slot: string): string {
+  return lifestyleTimeLabels[slot] ?? slot.replace(/_/g, " ");
+}

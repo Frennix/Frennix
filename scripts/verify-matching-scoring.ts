@@ -138,7 +138,7 @@ const checks: Array<{ name: string; test: () => boolean }> = [
     name: "MatchReasonsList component exists",
     test: () => {
       const ui = readFileSync(join(ROOT, "components/MatchReasonsList.tsx"), "utf8");
-      return ui.includes("Why we matched you");
+      return ui.includes("Frennix Match") || ui.includes("Why You're a Frennix Match");
     },
   },
 ];
