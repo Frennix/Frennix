@@ -4,6 +4,8 @@
 **Owner:** Founder / QA  
 **Blocks:** Staging deployment (Phase 4)
 
+**Prerequisite (Phase 2.5):** Review [`RELEASE-vX.Y.Z-READINESS.md`](../RELEASE-vX.Y.Z-READINESS.md). Human QA begins only when the report recommends **Ready for Human QA** and the Founder replies e.g. *"Approved — begin Human QA vX.Y.Z"*.
+
 Test on **all three platforms** unless release scope explicitly excludes one (document exception in release file).
 
 **Legend:** ✅ Pass · ❌ Fail · ⬜ Not tested · N/A Not in scope

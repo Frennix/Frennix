@@ -42,6 +42,19 @@ Fixes the iPhone Safari post-login black screen introduced in v1.0.0 by restorin
 
 ---
 
+## Phase 2.5 — Release Readiness Report
+
+**Report:** [`RELEASE-v1.0.1-READINESS.md`](./RELEASE-v1.0.1-READINESS.md)
+
+| Gate | Status | Date |
+|------|--------|------|
+| Readiness report complete | ✅ | 2026-06-28 |
+| Recommendation documented (Ready / Not Ready) | ✅ Ready for Human QA | 2026-06-28 |
+| **Release readiness report delivered** | ⬜ | |
+| Founder approved Human QA | ⬜ | |
+
+---
+
 ## Phase 3 — Human QA
 
 **Checklist:** [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md)

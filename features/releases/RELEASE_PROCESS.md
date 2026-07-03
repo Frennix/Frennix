@@ -18,7 +18,8 @@
 |-------|-----------|------|
 | 1. Development branch | — | Feature PR merged to `main` only after local testing |
 | 2. Internal testing | [`checklists/INTERNAL-TESTING.md`](./checklists/INTERNAL-TESTING.md) | All automated checks green |
-| 3. Human QA | [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) | Founder QA sign-off |
+| **2.5. Release Readiness Report** | [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md) | Founder reviews report **before** Human QA |
+| 3. Human QA | [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) | Founder QA sign-off (requires readiness report) |
 | 4. Staging deployment | [`checklists/STAGING-DEPLOYMENT.md`](./checklists/STAGING-DEPLOYMENT.md) | Founder staging approval |
 | 5. Production deployment | [`checklists/PRODUCTION-DEPLOYMENT.md`](./checklists/PRODUCTION-DEPLOYMENT.md) | Separate approvals: commit → tag → push → deploy |
 | 6. Monitoring (24–48h) | [`checklists/POST-RELEASE-MONITORING.md`](./checklists/POST-RELEASE-MONITORING.md) | No P0/P1 regressions |
@@ -34,6 +35,8 @@ npx tsx scripts/verify-release-gates.ts --release features/releases/RELEASE-vX.Y
 
 **Release file per version:** Copy [`templates/RELEASE-vX.Y.Z-TEMPLATE.md`](./templates/RELEASE-vX.Y.Z-TEMPLATE.md) → `features/releases/RELEASE-vX.Y.Z.md`
 
+**Readiness report per version:** Copy [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md) → `features/releases/RELEASE-vX.Y.Z-READINESS.md` (required before Human QA)
+
 **History & approvals:** [`RELEASE-HISTORY.md`](./RELEASE-HISTORY.md)
 
 ---
@@ -47,6 +50,7 @@ npx tsx scripts/verify-release-gates.ts --release features/releases/RELEASE-vX.Y
 5. **Rollback plan required.** Every release documents how to revert (feature flag, Vercel promote, or prior tag).
 6. **No deploy with incomplete checklists.** Run `verify-release-gates.ts` — exit code 1 blocks deploy.
 7. **24–48h monitoring.** A release is not complete until post-deploy monitoring passes.
+8. **Release Readiness Report before Human QA.** Engineering delivers `RELEASE-vX.Y.Z-READINESS.md` after Phase 2. Founder must review it and approve Phase 3 explicitly. Human QA does not start on "Not Ready" recommendations.
 
 ---
 
@@ -98,9 +102,48 @@ Record results in the release file **Internal Testing** section.
 
 ---
 
+## Phase 2.5 — Release Readiness Report
+
+**Required for every release.** Delivered to the Founder **after Phase 2** and **before Phase 3 (Human QA)**.
+
+### Template
+
+Copy [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md) → `features/releases/RELEASE-vX.Y.Z-READINESS.md`
+
+### Required sections
+
+| Section | Content |
+|---------|---------|
+| Tests executed | Every script/command run |
+| Tests passed | With counts and notes |
+| Tests failed | With blocking vs non-blocking assessment |
+| Code coverage | Available metrics or explicit N/A |
+| Build status | Web, native, TypeScript |
+| Migration status | New files, remote sync, RLS review |
+| Performance summary | Bundle size, build time, perf scripts |
+| Security concerns | RLS, secrets, route gating |
+| Known issues | Carry-forward + newly found |
+| Risks | Likelihood, impact, mitigation |
+| Recommendation | **Ready for Human QA** or **Not Ready for Human QA** (exactly one) |
+
+### Process
+
+1. Engineering completes Phase 2 automated testing.
+2. Engineering fills the readiness report with honest results (including failures and pre-existing debt).
+3. Engineering marks **`Release readiness report delivered`** ✅ in the release file and links the report.
+4. Founder reviews the report.
+5. If recommendation is **Ready for Human QA**, Founder replies e.g. *"Approved — begin Human QA vX.Y.Z"*.
+6. If **Not Ready**, return to Phase 2 — do not start manual QA.
+
+> **No Human QA without a readiness report.** The Founder approval for Phase 3 is informed by this document.
+
+---
+
 ## Phase 3 — Human QA
 
 Use [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md).
+
+**Prerequisite:** [`RELEASE-vX.Y.Z-READINESS.md`](./RELEASE-vX.Y.Z-READINESS.md) reviewed; recommendation must be **Ready for Human QA**; Founder must explicitly approve Phase 3.
 
 Founder (or designated QA) completes manual testing on **all three platforms**:
 
@@ -270,9 +313,11 @@ Use [`checklists/RELEASE-COMPLETION.md`](./checklists/RELEASE-COMPLETION.md).
 |------|---------|
 | `features/releases/RELEASE_PROCESS.md` | **This document** — official SOP |
 | `features/releases/RELEASE-vX.Y.Z.md` | Per-release notes, checklists, approvals |
+| `features/releases/RELEASE-vX.Y.Z-READINESS.md` | **Release Readiness Report** — required before Human QA |
 | `features/releases/RELEASE-HISTORY.md` | Version history + approval audit trail |
 | `features/releases/checklists/*.md` | Reusable phase checklists |
 | `features/releases/templates/RELEASE-vX.Y.Z-TEMPLATE.md` | Copy for each new release |
+| `features/releases/templates/RELEASE-READINESS-REPORT-TEMPLATE.md` | Copy for each readiness report |
 | `CHANGELOG.md` | Public-facing release summary |
 | `scripts/verify-release-gates.ts` | Blocks deploy if gates incomplete |
 

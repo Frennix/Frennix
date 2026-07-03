@@ -384,6 +384,7 @@ Frennix ships like a production-grade software company. Every release follows th
 | Belief | Practice |
 |--------|----------|
 | **Quality over speed** | Staging deploy + human QA on iPhone, Android, Web before production |
+| **Readiness report before QA** | Engineering delivers `RELEASE-vX.Y.Z-READINESS.md` after internal testing; Founder reviews before approving Human QA |
 | **Separate approval gates** | Commit → tag → push → deploy are distinct Founder approvals |
 | **Rollback ready** | Feature flags + prior Vercel deployment documented before every ship |
 | **Migrations first** | Database changes applied and verified before matching client deploy |

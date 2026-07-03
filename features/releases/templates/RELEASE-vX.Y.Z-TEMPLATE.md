@@ -42,6 +42,20 @@
 
 ---
 
+## Phase 2.5 — Release Readiness Report
+
+**Report:** [`RELEASE-vX.Y.Z-READINESS.md`](./RELEASE-vX.Y.Z-READINESS.md)  
+**Template:** [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md)
+
+| Gate | Status | Date |
+|------|--------|------|
+| Readiness report complete | ⬜ | |
+| Recommendation documented (Ready / Not Ready) | ⬜ | |
+| **Release readiness report delivered** | ⬜ | |
+| Founder approved Human QA | ⬜ | |
+
+---
+
 ## Phase 3 — Human QA
 
 **Checklist:** [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md)

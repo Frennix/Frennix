@@ -29,6 +29,13 @@ const GATE_CHECKS: Record<Phase, Array<{ label: string; patterns: RegExp[] }>> =
       patterns: [/Internal testing complete\s*\|\s*✅/i, /\*\*Internal testing complete\*\*\s*\|\s*✅/i],
     },
     {
+      label: "Release readiness report delivered",
+      patterns: [
+        /Release readiness report delivered\s*\|\s*✅/i,
+        /\*\*Release readiness report delivered\*\*\s*\|\s*✅/i,
+      ],
+    },
+    {
       label: "Human QA approved",
       patterns: [/Human QA approved\s*\|\s*✅/i, /\*\*Human QA approved\*\*\s*\|\s*✅/i],
     },
@@ -41,6 +48,13 @@ const GATE_CHECKS: Record<Phase, Array<{ label: string; patterns: RegExp[] }>> =
     {
       label: "Internal testing complete",
       patterns: [/Internal testing complete\s*\|\s*✅/i, /\*\*Internal testing complete\*\*\s*\|\s*✅/i],
+    },
+    {
+      label: "Release readiness report delivered",
+      patterns: [
+        /Release readiness report delivered\s*\|\s*✅/i,
+        /\*\*Release readiness report delivered\*\*\s*\|\s*✅/i,
+      ],
     },
     {
       label: "Human QA approved",

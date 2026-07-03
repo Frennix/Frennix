@@ -9,6 +9,7 @@
 
 1. **Development branch** — feature branch → PR → merge (no direct `main` commits)
 2. **Internal testing** — [`checklists/INTERNAL-TESTING.md`](./checklists/INTERNAL-TESTING.md)
+2.5. **Release Readiness Report** — [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md) — Founder reviews **before** Human QA
 3. **Human QA** — [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) — iPhone, Android, Web
 4. **Staging** — [`checklists/STAGING-DEPLOYMENT.md`](./checklists/STAGING-DEPLOYMENT.md) — Founder approval required
 5. **Production** — [`checklists/PRODUCTION-DEPLOYMENT.md`](./checklists/PRODUCTION-DEPLOYMENT.md) — separate commit/tag/push/deploy approvals
@@ -33,7 +34,8 @@ Exit code **1** = deploy blocked.
 
 ```bash
 cp features/releases/templates/RELEASE-vX.Y.Z-TEMPLATE.md features/releases/RELEASE-vX.Y.Z.md
-# Fill in scope, track checklists, record approvals
+cp features/releases/templates/RELEASE-READINESS-REPORT-TEMPLATE.md features/releases/RELEASE-vX.Y.Z-READINESS.md
+# Fill in scope, run Phase 2 tests, complete readiness report, then request Human QA
 ```
 
 ---

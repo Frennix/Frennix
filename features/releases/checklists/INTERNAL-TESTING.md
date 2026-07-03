@@ -20,6 +20,8 @@ Copy applicable rows into `features/releases/RELEASE-vX.Y.Z.md` and mark each it
 | 6 | Web build | `npx expo export -p web && node scripts/patch-web-html.js` | ⬜ | Zero errors |
 | 7 | Release gate — internal | `npx tsx scripts/verify-release-gates.ts --release <file> --phase internal` | ⬜ | Exit 0 |
 
+After all applicable rows pass, produce the **Release Readiness Report** (Phase 2.5) before requesting Human QA.
+
 ---
 
 ## Database & migrations
@@ -81,4 +83,15 @@ Copy applicable rows into `features/releases/RELEASE-vX.Y.Z.md` and mark each it
 |------|------|------|----------|
 | Engineering | | | ⬜ |
 
-**All rows must be ✅ before proceeding to Human QA.**
+**All rows must be ✅ before producing the Release Readiness Report.**
+
+### Phase 2.5 deliverable — Release Readiness Report
+
+| # | Task | Done |
+|---|------|------|
+| 26 | Copy [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](../templates/RELEASE-READINESS-REPORT-TEMPLATE.md) → `RELEASE-vX.Y.Z-READINESS.md` | ⬜ |
+| 27 | Fill all sections: tests, build, migrations, perf, security, risks, recommendation | ⬜ |
+| 28 | Link report from release file; mark **Release readiness report delivered** ✅ | ⬜ |
+| 29 | Deliver report to Founder for review **before** Human QA | ⬜ |
+
+**Human QA (Phase 3) must not begin until the Founder reviews the readiness report and approves Phase 3.**
