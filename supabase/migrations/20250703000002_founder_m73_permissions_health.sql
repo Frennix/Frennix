@@ -1,6 +1,19 @@
--- M7.3: Secure staff onboarding, expanded roles, audit trail,
--- Community Health + Platform Health dashboards.
--- Depends on: 20250703000001_founder_m73_staff_role_enum_expand.sql
+-- M7.3 / Migration B: Staff permissions, bootstrap, health dashboards.
+-- Depends on Migration A: 20250703000001_founder_m73_staff_role_enum_expand.sql
+-- (enum values must be committed in a prior migration before INSERTs below)
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'staff_role' AND e.enumlabel = 'owner'
+  ) THEN
+    RAISE EXCEPTION
+      'staff_role enum is missing value "owner". Apply migration 20250703000001 first.';
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- Role → capability matrix (scalable permission model)
