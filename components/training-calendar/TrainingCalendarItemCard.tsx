@@ -46,7 +46,7 @@ export function TrainingCalendarItemCard({ item, onPress }: TrainingCalendarItem
         </Text>
         {linked ? <Text style={styles.linked}>{linked}</Text> : null}
       </View>
-      <Text style={[styles.status, { color: statusColor(item.status) }]}>
+      <Text style={[styles.status, { color: statusColor(item.status) }]} numberOfLines={1}>
         {item.is_virtual ? "joined" : item.status}
       </Text>
     </Pressable>
@@ -64,6 +64,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderLeftWidth: 4,
+    width: "100%",
+    maxWidth: "100%",
   },
   icon: {
     fontSize: 22,
@@ -73,6 +75,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   title: {
@@ -93,5 +96,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: "700",
     textTransform: "capitalize",
+    flexShrink: 0,
+    maxWidth: 72,
   },
 });

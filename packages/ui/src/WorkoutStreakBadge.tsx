@@ -1,15 +1,16 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface WorkoutStreakBadgeProps {
   streak: number;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function WorkoutStreakBadge({ streak }: WorkoutStreakBadgeProps) {
+export function WorkoutStreakBadge({ streak, style }: WorkoutStreakBadgeProps) {
   const active = streak > 0;
 
   return (
-    <View style={[styles.badge, active ? styles.badgeActive : styles.badgeInactive]}>
+    <View style={[styles.badge, active ? styles.badgeActive : styles.badgeInactive, style]}>
       <Text style={styles.icon}>{active ? "🔥" : "💤"}</Text>
       <View style={styles.textBlock}>
         <Text style={[styles.count, active && styles.countActive]}>

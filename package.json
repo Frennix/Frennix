@@ -13,6 +13,7 @@
     "verify:expo-image": "npx tsx scripts/verify-expo-image.ts",
     "verify:auth-resume": "npx tsx scripts/verify-auth-resume.ts",
     "verify:post-login": "npx tsx scripts/verify-post-login.ts",
+    "audit:post-login-shell": "npx tsx scripts/audit-post-login-shell.ts",
     "verify:ui-barrel": "npx tsx scripts/verify-ui-barrel.ts",
     "verify:feed-media": "npx tsx scripts/verify-feed-media.ts",
     "verify:native-gallery": "npx tsx scripts/verify-native-gallery.ts",

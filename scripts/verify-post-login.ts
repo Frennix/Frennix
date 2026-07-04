@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { auditPostLoginShell } from "./audit-post-login-shell";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -158,6 +159,41 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       assertIncludes("components/PostLoginShellErrorBoundary.tsx", "Post-login shell error", "shell boundary required");
       assertIncludes("app/(tabs)/_layout.tsx", "PostLoginShellErrorBoundary", "tabs must use shell boundary");
+    },
+  },
+  {
+    name: "ReportIssueLink is imported wherever it is rendered",
+    run: () => {
+      const scanDirs = ["app", "components"];
+      for (const dir of scanDirs) {
+        const absolute = join(ROOT, dir);
+        const walk = (folder: string) => {
+          for (const entry of readdirSync(folder)) {
+            const full = join(folder, entry);
+            if (statSync(full).isDirectory()) {
+              walk(full);
+              continue;
+            }
+            if (!entry.endsWith(".tsx")) continue;
+            const relative = full.slice(ROOT.length + 1);
+            const source = read(relative);
+            if (!source.includes("<ReportIssueLink")) continue;
+            if (!source.includes('from "@/components/ReportIssueLink"')) {
+              throw new Error(`${relative} renders ReportIssueLink without importing it`);
+            }
+          }
+        };
+        walk(absolute);
+      }
+    },
+  },
+  {
+    name: "Post-login shell has no undefined variables (TS2304 / missing imports)",
+    run: () => {
+      const result = auditPostLoginShell();
+      if (!result.ok) {
+        throw new Error(result.messages.join("\n"));
+      }
     },
   },
   {

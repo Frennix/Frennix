@@ -44,6 +44,8 @@ export function TrainingCalendarWeekList({ days, onItemPress }: TrainingCalendar
 const styles = StyleSheet.create({
   wrap: {
     gap: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
   },
   daySection: {
     gap: spacing.sm,

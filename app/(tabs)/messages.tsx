@@ -43,6 +43,7 @@ import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
 import { confirmDeleteConversation, confirmHideConversation, showAlert } from "@/lib/alerts";
 import type { EntityActionId } from "@/lib/entity-actions";
 import { MessagesListSkeleton } from "@/components/MessagesListSkeleton";
+import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { EmptyState, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
 
 const SafeConversationRow = memo(function SafeConversationRow({

@@ -38,6 +38,7 @@ export * from "./story-fitness";
 export * from "./story-highlights";
 export * from "./training-calendar";
 export * from "./calendar-view";
+export * from "./partners-training-today";
 export * from "./workout-activity";
 export * from "./training-session-invites";
 export * from "./platform-activity";

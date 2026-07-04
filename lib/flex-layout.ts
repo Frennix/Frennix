@@ -43,10 +43,12 @@ export const webScrollSurface: ViewStyle | undefined =
     ? ({
         flex: 1,
         width: "100%",
+        maxWidth: "100%",
         height: "100%",
         minHeight: 0,
         flexBasis: 0,
-        overflow: "auto",
+        overflowX: "hidden",
+        overflowY: "auto",
         WebkitOverflowScrolling: "touch",
         touchAction: "pan-y",
         backgroundColor: "#0A0A0B",

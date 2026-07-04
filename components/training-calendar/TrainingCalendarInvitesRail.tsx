@@ -71,6 +71,8 @@ export function TrainingCalendarInvitesRail({
 const styles = StyleSheet.create({
   wrap: {
     gap: spacing.sm,
+    width: "100%",
+    maxWidth: "100%",
   },
   heading: {
     ...typography.body,
@@ -84,9 +86,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.accent,
+    width: "100%",
+    maxWidth: "100%",
   },
   meta: {
     gap: 2,
+    minWidth: 0,
+    flex: 1,
   },
   title: {
     ...typography.body,

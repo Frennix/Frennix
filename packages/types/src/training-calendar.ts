@@ -137,6 +137,26 @@ export interface CalendarView {
     completed: number;
     missed: number;
   };
+  /** v1.1+: privacy-filtered partner workouts scheduled for the focus day. */
+  partners_training_today?: PartnerTrainingTodayEntry[];
+}
+
+/** Visible partner/match workout on the user's focus day (Training Together Today). */
+export interface PartnerTrainingTodayEntry {
+  user_id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string | null;
+  session_id: string;
+  session_title: string;
+  /** Display line e.g. "Leg Day • 6:00 PM" */
+  session_subline: string;
+  starts_at: string;
+  privacy: TrainingCalendarPrivacy;
+  relationship: "favorite_partner" | "match";
+  /** True when session is an open session the viewer can join directly. */
+  can_join: boolean;
+  conversation_id?: string | null;
 }
 
 export interface TrainingCalendarExternalLink {

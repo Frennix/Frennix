@@ -107,6 +107,40 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("app/(tabs)/events.tsx", "TrainingCalendarMonthGrid", "calendar tab"),
   },
   {
+    name: "ui:calendar responsive layout (no horizontal overflow)",
+    run: () => {
+      mustInclude("app/(tabs)/events.tsx", "useCalendarWideLayout", "calendar tab");
+      mustInclude("app/(tabs)/events.tsx", "communityCard", "calendar tab");
+      mustInclude("app/(tabs)/events.tsx", "TrainingCalendarViewControls", "calendar tab");
+      mustInclude("app/(tabs)/events.tsx", "TrainingCalendarCreateFab", "calendar tab");
+      mustInclude("app/(tabs)/events.tsx", "TrainingCalendarTodaysFocus", "calendar tab");
+      mustInclude("app/(tabs)/events.tsx", "getPartnersTrainingToday", "calendar tab");
+      mustInclude("components/training-calendar/TrainingTogetherTodaySection.tsx", "Training Together Today", "ui");
+      mustInclude("lib/training-calendar-focus.ts", "buildTodaysFocus", "focus helper");
+      mustInclude("packages/types/src/training-calendar.ts", "PartnerTrainingTodayEntry", "types");
+      mustInclude("components/training-calendar/TrainingCalendarMonthGrid.tsx", "weekRow", "month grid");
+      mustInclude("lib/flex-layout.ts", "overflowX", "web scroll surface");
+    },
+  },
+  {
+    name: "docs:calendar roadmap defers Training Together Today",
+    run: () => {
+      mustInclude("features/training-calendar/ROADMAP.md", "Training Together Today", "roadmap");
+      mustInclude("features/training-calendar/ROADMAP.md", "Need a Training Partner Today", "roadmap");
+      mustInclude("features/training-calendar/ROADMAP.md", "Smart Partner Recommendations", "roadmap");
+      mustInclude("features/training-calendar/ROADMAP.md", "Fitness Circles", "roadmap");
+      mustInclude("features/training-calendar/ROADMAP.md", "Fitness Seasons", "roadmap");
+      mustInclude("features/training-calendar/ROADMAP.md", "Frennix Journey", "roadmap");
+      mustInclude("features/training-calendar/ROADMAP.md", "Not in scope for v1", "roadmap");
+      mustInclude("features/training-calendar/DAILY-FITNESS-DASHBOARD.md", "daily fitness dashboard", "dashboard spec");
+      mustInclude("features/training-calendar/DAILY-FITNESS-DASHBOARD.md", "Need a Training Partner Today", "dashboard spec");
+      mustInclude("features/training-calendar/DAILY-FITNESS-DASHBOARD.md", "Smart Partner Recommendations", "dashboard spec");
+      mustInclude("features/training-calendar/DAILY-FITNESS-DASHBOARD.md", "Fitness Circles", "dashboard spec");
+      mustInclude("features/training-calendar/DAILY-FITNESS-DASHBOARD.md", "Fitness Seasons", "dashboard spec");
+      mustInclude("features/training-calendar/DAILY-FITNESS-DASHBOARD.md", "Frennix Journey", "dashboard spec");
+    },
+  },
+  {
     name: "ui:create screen",
     run: () =>
       mustInclude("app/training-calendar/create.tsx", "createTrainingCalendarItem", "create screen"),

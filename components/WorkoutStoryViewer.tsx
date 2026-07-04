@@ -36,6 +36,7 @@ import { StoryCountdownCard } from "./story/StoryCountdownCard";
 import { StoryQuestionCard } from "./story/StoryQuestionCard";
 import { StoryChallengeAccepts } from "./story/StoryChallengeAccepts";
 import { StoryCompletionBadge } from "./story/StoryCompletionBadge";
+import { StoryFooterGradient } from "./story/StoryFooterGradient";
 import { StoryQuestionAnswersModal } from "./story/StoryQuestionAnswersModal";
 import {
   getStoryPoll,
@@ -252,6 +253,7 @@ export function WorkoutStoryViewer({
   const [interactionLocked, setInteractionLocked] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [questionAnswersVisible, setQuestionAnswersVisible] = useState(false);
+  const [showReply, setShowReply] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const slideOpacity = useRef(new Animated.Value(1)).current;
@@ -286,6 +288,7 @@ export function WorkoutStoryViewer({
     setPaused(false);
     setInteractionLocked(false);
     setCaptionExpanded(false);
+    setShowReply(false);
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);

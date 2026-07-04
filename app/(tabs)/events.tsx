@@ -2,16 +2,22 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getCalendarView,
   getErrorMessage,
+  getPartnersTrainingToday,
   respondTrainingSessionInvite,
 } from "@frennix/api";
 import type { CalendarViewItem, TrainingSessionInvite } from "@frennix/types";
@@ -26,6 +32,13 @@ import { TrainingCalendarMonthGrid } from "@/components/training-calendar/Traini
 import { TrainingCalendarWeekList } from "@/components/training-calendar/TrainingCalendarWeekList";
 import { TrainingCalendarItemCard } from "@/components/training-calendar/TrainingCalendarItemCard";
 import { TrainingCalendarInvitesRail } from "@/components/training-calendar/TrainingCalendarInvitesRail";
+import { TrainingCalendarTodaysFocus } from "@/components/training-calendar/TrainingCalendarTodaysFocus";
+import {
+  TrainingCalendarViewControls,
+  trainingCalendarStickyControlsStyle,
+  type CalendarViewMode,
+} from "@/components/training-calendar/TrainingCalendarViewControls";
+import { TrainingCalendarCreateFab } from "@/components/training-calendar/TrainingCalendarCreateFab";
 import {
   addDays,
   addMonths,
@@ -48,22 +61,56 @@ import {
   useTabScreenWebHeightStyle,
 } from "@/lib/screen-shell";
 import { showAlert } from "@/lib/alerts";
-import { EmptyState, WorkoutStreakBadge, colors, spacing, typography } from "@frennix/ui";
+import { buildTodaysFocus } from "@/lib/training-calendar-focus";
+import { useCalendarWideLayout } from "@/lib/responsive";
+import { EmptyState, colors, spacing, typography } from "@frennix/ui";
 
-type CalendarViewMode = "month" | "week";
+/** Scroll child index for native sticky Month/Week controls (see ScrollView child order). */
+const STICKY_CONTROLS_INDEX = 3;
 
 export default function TrainingCalendarTabScreen() {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const webHeightStyle = useTabScreenWebHeightStyle();
+  const isWideLayout = useCalendarWideLayout();
   const scrollRef = useRef<ScrollView>(null);
-  const { onScroll, isAtTop } = useScrollAtTop();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const { onScroll: onScrollAtTop, isAtTop } = useScrollAtTop();
   const [inviteLoading, setInviteLoading] = useState(false);
 
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month");
+
+  const fabBottom = Platform.OS === "web" ? 80 : Math.max(insets.bottom, spacing.md) + 56;
+
+  const [fabInteractive, setFabInteractive] = useState(false);
+
+  const headerAddOpacity = scrollY.interpolate({
+    inputRange: [0, 48, 88],
+    outputRange: [1, 0.35, 0],
+    extrapolate: "clamp",
+  });
+
+  const headerAddScale = scrollY.interpolate({
+    inputRange: [0, 88],
+    outputRange: [1, 0.85],
+    extrapolate: "clamp",
+  });
+
+  const onScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+        listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+          onScrollAtTop(event);
+          setFabInteractive(event.nativeEvent.contentOffset.y >= 72);
+        },
+      }),
+    [onScrollAtTop, scrollY]
+  );
 
   const rangeStart = useMemo(() => {
     const start = startOfMonth(anchorDate);
@@ -92,6 +139,19 @@ export default function TrainingCalendarTabScreen() {
   const streak = calendarView?.streak ?? 0;
   const pendingInvites = calendarView?.pending_invites ?? [];
   const weekly = calendarView?.weekly_consistency;
+  const todayKey = toDateKey(new Date());
+
+  const { data: partnersTrainingToday = [] } = useQuery({
+    queryKey: ["partners-training-today", userId, todayKey],
+    queryFn: () => getPartnersTrainingToday(userId, todayKey),
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+  });
+
+  const todaysFocus = useMemo(
+    () => buildTodaysFocus(items, streak, weekly, partnersTrainingToday),
+    [items, streak, weekly, partnersTrainingToday]
+  );
 
   const monthDays = useMemo(
     () => buildMonthGrid(anchorDate, items, activityDateKeys),
@@ -105,6 +165,8 @@ export default function TrainingCalendarTabScreen() {
     () => items.filter((item) => item.scheduled_date.slice(0, 10) === selectedDateKey),
     [items, selectedDateKey]
   );
+
+  const periodLabel = viewMode === "month" ? monthLabel(anchorDate) : weekLabel(anchorDate);
 
   const onRefresh = useGuardedRefresh(
     useCallback(() => refetch(), [refetch]),
@@ -160,6 +222,58 @@ export default function TrainingCalendarTabScreen() {
     );
   }
 
+  function renderCommunityCard() {
+    return (
+      <View style={styles.communityCard}>
+        <Text style={styles.communityTitle}>Community events</Text>
+        <Text style={styles.communityBody}>
+          Group workouts and public training events — separate from your personal schedule.
+        </Text>
+        <Pressable style={styles.communityButton} onPress={() => openCommunityEventsBrowse()}>
+          <Text style={styles.communityButtonText}>Browse events</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  function renderCalendarBody() {
+    if (viewMode === "month") {
+      return (
+        <>
+          <TrainingCalendarMonthGrid
+            days={monthDays}
+            selectedDateKey={selectedDateKey}
+            onSelectDate={setSelectedDateKey}
+          />
+          <View style={styles.selectedDaySection}>
+            <Text style={styles.selectedDayTitle}>
+              {new Date(`${selectedDateKey}T12:00:00`).toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}
+            </Text>
+            {selectedDayItems.length ? (
+              selectedDayItems.map((item) => (
+                <TrainingCalendarItemCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => handleItemPress(item)}
+                />
+              ))
+            ) : (
+              <Text style={styles.empty}>
+                {isLoading ? "Loading sessions…" : "No sessions scheduled"}
+              </Text>
+            )}
+          </View>
+        </>
+      );
+    }
+
+    return <TrainingCalendarWeekList days={weekDays} onItemPress={handleItemPress} />;
+  }
+
   if (!userId) {
     return (
       <View style={[styles.centered, webHeightStyle]}>
@@ -175,12 +289,13 @@ export default function TrainingCalendarTabScreen() {
 
   return (
     <View style={[styles.container, webHeightStyle]}>
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         style={[tabScreenScrollSurface, webHeightStyle]}
         contentContainerStyle={styles.content}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        stickyHeaderIndices={Platform.OS === "web" ? undefined : [STICKY_CONTROLS_INDEX]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -191,106 +306,66 @@ export default function TrainingCalendarTabScreen() {
           />
         }
       >
-        <View style={styles.headerRow}>
-          <View>
+        <TrainingCalendarTodaysFocus focus={todaysFocus} />
+
+        <View style={styles.pageHeader}>
+          <View style={styles.headerCopy}>
             <Text style={styles.title}>Training Calendar</Text>
-            <Text style={styles.subtitle}>Your hub for workouts, events, and challenges</Text>
+            <Text style={styles.subtitle}>Your personal training schedule</Text>
           </View>
-          <Pressable style={styles.addButton} onPress={() => openTrainingCalendarCreate()}>
-            <Text style={styles.addButtonText}>+ Add</Text>
-          </Pressable>
+          <Animated.View
+            pointerEvents={fabInteractive ? "none" : "auto"}
+            style={{
+              opacity: headerAddOpacity,
+              transform: [{ scale: headerAddScale }],
+            }}
+          >
+            <Pressable style={styles.addButton} onPress={() => openTrainingCalendarCreate()}>
+              <Text style={styles.addButtonText}>+ Add</Text>
+            </Pressable>
+          </Animated.View>
         </View>
 
-        <View style={styles.streakRow}>
-          <WorkoutStreakBadge streak={streak} />
-          <Pressable onPress={() => openCommunityEventsBrowse()}>
-            <Text style={styles.link}>Community events</Text>
-          </Pressable>
+        <View style={styles.sectionSlot}>
+          <TrainingCalendarInvitesRail
+            invites={pendingInvites}
+            loading={inviteLoading}
+            onAccept={(invite) => void handleInviteResponse(invite, "accepted")}
+            onDecline={(invite) => void handleInviteResponse(invite, "declined")}
+            onMaybeLater={(invite) => void handleInviteResponse(invite, "maybe_later")}
+            onOpen={(invite) => openTrainingCalendarDetail(invite.calendar_item_id)}
+          />
         </View>
 
-        {weekly && weekly.scheduled > 0 ? (
-          <View style={styles.consistencyCard}>
-            <Text style={styles.consistencyTitle}>This week</Text>
-            <Text style={styles.consistencyText}>
-              {weekly.completed} completed · {weekly.missed} missed · {weekly.scheduled} scheduled
-            </Text>
+        <View style={trainingCalendarStickyControlsStyle}>
+          <TrainingCalendarViewControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            periodLabel={periodLabel}
+            onShiftPeriod={shiftPeriod}
+          />
+        </View>
+
+        <View style={[styles.body, isWideLayout && styles.bodyWide]}>
+          <View style={styles.primaryColumn}>
+            <View style={styles.calendarBody}>{renderCalendarBody()}</View>
+            {!isWideLayout ? renderCommunityCard() : null}
           </View>
-        ) : null}
 
-        <TrainingCalendarInvitesRail
-          invites={pendingInvites}
-          loading={inviteLoading}
-          onAccept={(invite) => void handleInviteResponse(invite, "accepted")}
-          onDecline={(invite) => void handleInviteResponse(invite, "declined")}
-          onMaybeLater={(invite) => void handleInviteResponse(invite, "maybe_later")}
-          onOpen={(invite) => openTrainingCalendarDetail(invite.calendar_item_id)}
-        />
-
-        <View style={styles.toggleRow}>
-          <Pressable
-            style={[styles.toggleChip, viewMode === "month" && styles.toggleChipActive]}
-            onPress={() => setViewMode("month")}
-          >
-            <Text style={[styles.toggleText, viewMode === "month" && styles.toggleTextActive]}>
-              Month
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.toggleChip, viewMode === "week" && styles.toggleChipActive]}
-            onPress={() => setViewMode("week")}
-          >
-            <Text style={[styles.toggleText, viewMode === "week" && styles.toggleTextActive]}>
-              Week
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.periodRow}>
-          <Pressable onPress={() => shiftPeriod(-1)} hitSlop={8}>
-            <Text style={styles.nav}>‹</Text>
-          </Pressable>
-          <Text style={styles.periodLabel}>
-            {viewMode === "month" ? monthLabel(anchorDate) : weekLabel(anchorDate)}
-          </Text>
-          <Pressable onPress={() => shiftPeriod(1)} hitSlop={8}>
-            <Text style={styles.nav}>›</Text>
-          </Pressable>
-        </View>
-
-        {viewMode === "month" ? (
-          <>
-            <TrainingCalendarMonthGrid
-              days={monthDays}
-              selectedDateKey={selectedDateKey}
-              onSelectDate={setSelectedDateKey}
-            />
-            <View style={styles.selectedDaySection}>
-              <Text style={styles.selectedDayTitle}>
-                {new Date(`${selectedDateKey}T12:00:00`).toLocaleDateString(undefined, {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </Text>
-              {selectedDayItems.length ? (
-                selectedDayItems.map((item) => (
-                  <TrainingCalendarItemCard
-                    key={item.id}
-                    item={item}
-                    onPress={() => handleItemPress(item)}
-                  />
-                ))
-              ) : (
-                <Text style={styles.empty}>
-                  {isLoading ? "Loading sessions…" : "No sessions scheduled"}
-                </Text>
-              )}
+          {isWideLayout ? (
+            <View style={[styles.secondaryColumn, styles.secondaryColumnWide]}>
+              {renderCommunityCard()}
             </View>
-          </>
-        ) : (
-          <TrainingCalendarWeekList days={weekDays} onItemPress={handleItemPress} />
-        )}
-      </ScrollView>
+          ) : null}
+        </View>
+      </Animated.ScrollView>
+
+      <TrainingCalendarCreateFab
+        scrollY={scrollY}
+        bottom={fabBottom}
+        interactive={fabInteractive}
+        onPress={() => openTrainingCalendarCreate()}
+      />
     </View>
   );
 }
@@ -306,13 +381,90 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + 72,
+    width: "100%",
+    maxWidth: "100%",
   },
-  headerRow: {
+  pageHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  sectionSlot: {
+    width: "100%",
+    maxWidth: "100%",
+  },
+  body: {
+    width: "100%",
+    maxWidth: "100%",
+    gap: spacing.md,
+  },
+  bodyWide: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.lg,
+  },
+  primaryColumn: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.md,
+    width: "100%",
+  },
+  calendarBody: {
+    width: "100%",
+    maxWidth: "100%",
+    gap: spacing.md,
+  },
+  secondaryColumn: {
+    width: "100%",
+    maxWidth: "100%",
+  },
+  secondaryColumnWide: {
+    width: 280,
+    maxWidth: 300,
+    flexShrink: 0,
+  },
+  communityCard: {
+    width: "100%",
+    maxWidth: "100%",
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  communityTitle: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: "800",
+  },
+  communityBody: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+  },
+  communityButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.accentMuted,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  communityButtonText: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "800",
   },
   title: {
     ...typography.heading,
@@ -334,79 +486,10 @@ const styles = StyleSheet.create({
     color: colors.black,
     fontWeight: "800",
   },
-  streakRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  consistencyCard: {
-    padding: spacing.md,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 4,
-  },
-  consistencyTitle: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  consistencyText: {
-    ...typography.bodySmall,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  link: {
-    ...typography.bodySmall,
-    color: colors.accent,
-    fontWeight: "700",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  toggleChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  toggleChipActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentMuted,
-  },
-  toggleText: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontWeight: "700",
-  },
-  toggleTextActive: {
-    color: colors.accent,
-  },
-  periodRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  periodLabel: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: "700",
-  },
-  nav: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: colors.accent,
-    fontWeight: "700",
-    paddingHorizontal: spacing.sm,
-  },
   selectedDaySection: {
     gap: spacing.sm,
+    width: "100%",
+    maxWidth: "100%",
   },
   selectedDayTitle: {
     ...typography.body,
