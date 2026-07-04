@@ -9,27 +9,51 @@
 
 ## How to access the test build
 
-### Option A — Vercel preview (recommended for web / iPhone Safari)
+### Option A — iPhone with Expo Go (recommended for native app testing)
+
+Best way to test the **native** app on your iPhone **right now** without waiting for a TestFlight/EAS build.
+
+1. Install **[Expo Go](https://apps.apple.com/app/expo-go/id982107779)** from the App Store (if not already installed).
+2. On your Mac, from the repo:
+
+   ```bash
+   cd apps/mobile
+   git checkout hotfix/v1.0.1-safari-tab-layout
+   git pull
+   npx expo start --tunnel
+   ```
+
+3. Scan the **QR code** with your iPhone Camera → opens in Expo Go.
+4. Sign in to Frennix → tap the **Calendar** tab (third tab).
+
+Uses the same Supabase backend as production. Includes all Training Calendar commits on this branch.
+
+### Option B — iPhone Safari (web preview, no App Store install)
 
 | Field | Value |
 |-------|--------|
+| **Preview URL** | https://frennix-k6wqtr28h-frennix-s-projects.vercel.app |
 | **Branch** | `hotfix/v1.0.1-safari-tab-layout` |
-| **Commit** | `795639d` (Messages invite fix + QA guide) |
-| **Preview URL (latest)** | https://frennix-jsyx66a5g-frennix-s-projects.vercel.app |
-| **Preview URL (CLI)** | https://mobile-gawl60tfi-frennix-s-projects.vercel.app |
+| **Commit** | `8349f84` |
 
-**Note:** Preview URLs may require **Vercel team SSO** login on first visit. After authenticating, the app loads normally.
+1. Open the URL in **Safari** on your iPhone.
+2. Complete **Vercel team SSO** if prompted.
+3. Sign in to Frennix → **Calendar** tab.
 
-**Production is NOT updated:** https://frennix.vercel.app still shows the old **Events** tab until you approve release.
+Optional: Safari → Share → **Add to Home Screen** for an app-like shortcut.
 
-### Option B — Local dev (recommended for native Expo)
+**Production is NOT updated:** https://frennix.vercel.app still shows the old **Events** tab.
+
+### Option C — Installable EAS preview build (requires one-time setup)
+
+For a standalone `.ipa` install link (no Expo Go), run **interactively on your Mac** (first-time Apple credentials required):
 
 ```bash
 cd apps/mobile
-npx expo start --tunnel
+eas build --profile preview --platform ios
 ```
 
-Scan the QR code on your phone. Uses the same Supabase backend as production.
+When the build finishes, EAS provides an **install link** for registered test devices. This cannot be triggered non-interactively until iOS credentials are configured in EAS.
 
 ---
 
@@ -87,7 +111,37 @@ Scan the QR code on your phone. Uses the same Supabase backend as production.
 
 ---
 
-## Important testing notes
+## Feature status (what works vs. what’s not in this release)
+
+### Fully working in this preview
+
+| Feature | Notes |
+|---------|--------|
+| **Calendar tab** | Month + week views, activity dots, weekly consistency card |
+| **Create / edit / delete** sessions | Owner-only edit/delete |
+| **Mark Completed / Missed / Rescheduled** | Only for **past** scheduled sessions (end time in past) |
+| **Partner workout invites** | Via Messages 🤝 or Story 🤝 → `training_session_invites` |
+| **Accept / Decline / Maybe later** | Invites rail + session detail |
+| **Invite & accept notifications** | Deep link to `/training-calendar/[id]` |
+| **Workout streak** | Calendar tab badge + Profile |
+| **Upcoming sessions** | Native items + virtual event/challenge projections |
+| **Community events browse** | Link from Calendar tab |
+| **Platform activity events** | Status changes recorded (achievements/reputation backend) |
+
+### Incomplete or not in this release (do not expect these to work)
+
+| Feature | Status |
+|---------|--------|
+| **Session reminder push notifications** | Type + deep link exist; **no scheduler** sends reminders yet |
+| **Reminder picker on create form** | `reminder_minutes_before` column exists; **no UI** |
+| **Profile “upcoming sessions” widget** | Planned; not built |
+| **External calendar sync** | Schema only (`training_calendar_external_links`) |
+| **Schedule workout from chat composer** | Messages opens create form via favorites; **not** inline in chat |
+| **Reputation / trust UI** | Backend only, hidden |
+| **AI workout suggestions** | Schema stub only |
+| **Legacy `story_train_invites`** | Deprecated; some feed post paths may still reference old API |
+
+---
 
 ### Status buttons (Completed / Missed / Rescheduled)
 
