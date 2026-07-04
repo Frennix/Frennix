@@ -54,6 +54,12 @@ export function notificationActorId(notification: Notification): string | null {
       return (payload.mentioner_id as string) ?? null;
     case "story_challenge_join":
       return (payload.joiner_id as string) ?? null;
+    case "training_session_invite":
+      return (payload.inviter_id as string) ?? null;
+    case "training_session_accepted":
+      return (payload.invitee_id as string) ?? null;
+    case "training_session_reminder":
+      return null;
     default:
       return null;
   }
@@ -194,6 +200,31 @@ export function buildNotificationDisplay(
         headline: "Challenge joined",
         detail: `${actorName} joined your Story challenge.`,
       };
+    case "training_session_invite": {
+      const title = payload.session_title as string | undefined;
+      return {
+        headline: "Training invite",
+        detail: title
+          ? `${actorName} invited you to "${title}"`
+          : `${actorName} invited you to train.`,
+      };
+    }
+    case "training_session_accepted": {
+      const title = payload.session_title as string | undefined;
+      return {
+        headline: "Invite accepted",
+        detail: title
+          ? `${actorName} accepted "${title}"`
+          : `${actorName} accepted your training invite.`,
+      };
+    }
+    case "training_session_reminder": {
+      const title = payload.session_title as string | undefined;
+      return {
+        headline: "Training reminder",
+        detail: title ? `Upcoming: ${title}` : "You have a workout coming up.",
+      };
+    }
     default:
       return { headline: "Frennix", detail: "New activity on Frennix" };
   }

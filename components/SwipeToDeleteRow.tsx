@@ -7,12 +7,14 @@ type SwipeToDeleteRowProps = {
   children: ReactNode;
   onDelete: () => void;
   enabled?: boolean;
+  actionLabel?: string;
 };
 
 export function SwipeToDeleteRow({
   children,
   onDelete,
   enabled = true,
+  actionLabel = "Delete",
 }: SwipeToDeleteRowProps) {
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -27,12 +29,12 @@ export function SwipeToDeleteRow({
         style={styles.deleteAction}
         onPress={handleDeletePress}
         accessibilityRole="button"
-        accessibilityLabel="Delete"
+        accessibilityLabel={actionLabel}
       >
-        <Text style={styles.deleteLabel}>Delete</Text>
+        <Text style={styles.deleteLabel}>{actionLabel}</Text>
       </Pressable>
     );
-  }, [handleDeletePress]);
+  }, [actionLabel, handleDeletePress]);
 
   if (!enabled || Platform.OS === "web") {
     return <View style={styles.container}>{children}</View>;

@@ -4,12 +4,23 @@ import { enrichMessagesWithReactions } from "./reactions";
 import { formatSupabaseError } from "./profile-utils";
 import { getBlockedIds } from "./moderation";
 import { getSupabase } from "./supabase";
+import { publishPlatformActivity } from "./platform-activity-engine";
 import {
   subscribePostgresChanges,
   type RealtimeSubscription,
 } from "./realtime-utils";
 
 const typingChannels = new Map<string, RealtimeChannel>();
+const MAX_PINNED_CONVERSATIONS = 3;
+export const MAX_FAVORITE_TRAINING_PARTNERS = 5;
+
+type ConversationPreferencesRow = {
+  conversation_id: string;
+  pinned_at: string | null;
+  favorited_at: string | null;
+  muted_at: string | null;
+  marked_unread_at: string | null;
+};
 
 function formatMessagingError(error: unknown, context: string): Error {
   return formatSupabaseError(error, context);
@@ -26,6 +37,95 @@ async function getDeletedMessageIds(userId: string, messageIds: string[]): Promi
 
   if (error) throw error;
   return new Set((data ?? []).map((row) => row.message_id as string));
+}
+
+async function getHiddenConversationAt(
+  userId: string,
+  conversationIds: string[]
+): Promise<Map<string, string>> {
+  if (!conversationIds.length) return new Map();
+
+  const { data, error } = await getSupabase()
+    .from("conversation_user_hides")
+    .select("conversation_id, hidden_at")
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) throw error;
+
+  return new Map(
+    (data ?? []).map((row) => [
+      row.conversation_id as string,
+      row.hidden_at as string,
+    ])
+  );
+}
+
+function isConversationHidden(
+  hiddenAt: string | undefined,
+  lastMessageAt: string | undefined,
+  conversationUpdatedAt: string
+): boolean {
+  if (!hiddenAt) return false;
+  const activityAt = lastMessageAt ?? conversationUpdatedAt;
+  return new Date(activityAt).getTime() <= new Date(hiddenAt).getTime();
+}
+
+async function getDeletedConversationIds(
+  userId: string,
+  conversationIds: string[]
+): Promise<Set<string>> {
+  if (!conversationIds.length) return new Set();
+
+  const { data, error } = await getSupabase()
+    .from("conversation_user_deletions")
+    .select("conversation_id")
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.conversation_id as string));
+}
+
+async function getConversationPreferencesMap(
+  userId: string,
+  conversationIds: string[]
+): Promise<Map<string, ConversationPreferencesRow>> {
+  if (!conversationIds.length) return new Map();
+
+  const { data, error } = await getSupabase()
+    .from("conversation_user_preferences")
+    .select("conversation_id, pinned_at, favorited_at, muted_at, marked_unread_at")
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) throw error;
+
+  return new Map(
+    (data ?? []).map((row) => [
+      row.conversation_id as string,
+      row as ConversationPreferencesRow,
+    ])
+  );
+}
+
+async function clearConversationInboxState(conversationId: string, userId: string) {
+  await Promise.all([
+    getSupabase()
+      .from("conversation_user_hides")
+      .delete()
+      .eq("conversation_id", conversationId)
+      .eq("user_id", userId),
+    getSupabase()
+      .from("conversation_user_deletions")
+      .delete()
+      .eq("conversation_id", conversationId)
+      .eq("user_id", userId),
+  ]);
+}
+
+function conversationActivityAt(conversation: Conversation): number {
+  return new Date(conversation.last_message?.created_at ?? conversation.updated_at).getTime();
 }
 
 async function getVisibleLastMessage(
@@ -64,9 +164,13 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
   const convIds = (memberships ?? []).map((m) => m.conversation_id);
   if (!convIds.length) return [];
 
+  const hiddenAtByConversation = await getHiddenConversationAt(userId, convIds);
+  const deletedConversationIds = await getDeletedConversationIds(userId, convIds);
+  const preferencesByConversation = await getConversationPreferencesMap(userId, convIds);
   const conversations: Conversation[] = [];
 
   for (const convId of convIds) {
+    if (deletedConversationIds.has(convId)) continue;
     const { data: conv } = await getSupabase()
       .from("conversations")
       .select("*")
@@ -94,23 +198,61 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
     const unreadIds = (unreadMessages ?? []).map((row) => row.id as string);
     const deletedUnreadIds = await getDeletedMessageIds(userId, unreadIds);
-    const unreadCount = unreadIds.filter((id) => !deletedUnreadIds.has(id)).length;
+    let unreadCount = unreadIds.filter((id) => !deletedUnreadIds.has(id)).length;
+
+    const conversation = conv as Conversation;
+    const hiddenAt = hiddenAtByConversation.get(convId);
+    if (
+      isConversationHidden(
+        hiddenAt,
+        lastMsg?.created_at,
+        conversation.updated_at
+      )
+    ) {
+      continue;
+    }
+
+    const prefs = preferencesByConversation.get(convId);
+    const markedUnread = Boolean(prefs?.marked_unread_at);
+    if (markedUnread && unreadCount === 0) {
+      unreadCount = 1;
+    }
 
     conversations.push({
-      ...(conv as Conversation),
+      ...conversation,
       last_message: lastMsg,
       other_participant: other,
       unread_count: unreadCount,
+      is_pinned: Boolean(prefs?.pinned_at),
+      pinned_at: prefs?.pinned_at ?? null,
+      is_favorite: Boolean(prefs?.favorited_at),
+      favorited_at: prefs?.favorited_at ?? null,
+      is_muted: Boolean(prefs?.muted_at),
+      marked_unread: markedUnread,
     });
   }
 
   return conversations
     .filter((conv) => !conv.other_participant || !blockedIds.has(conv.other_participant.id))
-    .sort(
-      (a, b) =>
-        new Date(b.last_message?.created_at ?? b.updated_at).getTime() -
-        new Date(a.last_message?.created_at ?? a.updated_at).getTime()
-    );
+    .sort((a, b) => {
+      const aFavorite = a.is_favorite ? 1 : 0;
+      const bFavorite = b.is_favorite ? 1 : 0;
+      if (aFavorite !== bFavorite) return bFavorite - aFavorite;
+      if (a.is_favorite && b.is_favorite && a.favorited_at && b.favorited_at) {
+        const favoriteDelta =
+          new Date(b.favorited_at).getTime() - new Date(a.favorited_at).getTime();
+        if (favoriteDelta !== 0) return favoriteDelta;
+      }
+
+      const aPinned = a.is_pinned ? 1 : 0;
+      const bPinned = b.is_pinned ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      if (a.is_pinned && b.is_pinned && a.pinned_at && b.pinned_at) {
+        const pinDelta = new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime();
+        if (pinDelta !== 0) return pinDelta;
+      }
+      return conversationActivityAt(b) - conversationActivityAt(a);
+    });
 }
 
 export async function getUnreadMessageCount(userId: string): Promise<number> {
@@ -138,6 +280,20 @@ export async function markMessagesAsRead(conversationId: string, userId: string)
     .is("read_at", null);
 
   if (error) throw error;
+
+  const { error: prefsError } = await getSupabase()
+    .from("conversation_user_preferences")
+    .upsert(
+      {
+        conversation_id: conversationId,
+        user_id: userId,
+        marked_unread_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "conversation_id,user_id" }
+    );
+
+  if (prefsError) throw prefsError;
 }
 
 export async function getOrCreateConversation(userId: string, otherUserId: string): Promise<string> {
@@ -166,6 +322,7 @@ export async function getOrCreateConversation(userId: string, otherUserId: strin
     throw new Error("Conversation could not be created");
   }
 
+  await clearConversationInboxState(data as string, userId);
   return data as string;
 }
 
@@ -223,6 +380,37 @@ export async function getMessages(conversationId: string, viewerId?: string): Pr
     }));
   }
 
+  const replyIds = messages
+    .map((message) => message.reply_to_message_id)
+    .filter((id): id is string => Boolean(id));
+
+  if (replyIds.length) {
+    const { data: replyRows, error: replyError } = await getSupabase()
+      .from("messages")
+      .select("id, content, sender_id, media_url")
+      .in("id", [...new Set(replyIds)]);
+
+    if (replyError) throw replyError;
+
+    const replyById = new Map((replyRows ?? []).map((row) => [row.id as string, row]));
+    messages = messages.map((message) => {
+      const replyId = message.reply_to_message_id;
+      if (!replyId) return message;
+      const reply = replyById.get(replyId);
+      return reply
+        ? {
+            ...message,
+            reply_to: {
+              id: reply.id as string,
+              content: reply.content as string,
+              sender_id: reply.sender_id as string,
+              media_url: (reply.media_url as string | null) ?? null,
+            },
+          }
+        : message;
+    });
+  }
+
   if (!viewerId) return messages;
   return enrichMessagesWithReactions(messages, viewerId);
 }
@@ -232,7 +420,9 @@ export async function sendMessage(
   senderId: string,
   content: string,
   mediaUrl?: string | null,
-  postId?: string | null
+  postId?: string | null,
+  replyToMessageId?: string | null,
+  storyReplyId?: string | null
 ) {
   const body =
     postId ? "Shared a post" : content.trim() || (mediaUrl ? "📷 Photo" : "");
@@ -245,10 +435,35 @@ export async function sendMessage(
       content: body,
       media_url: mediaUrl ?? null,
       post_id: postId ?? null,
+      reply_to_message_id: replyToMessageId ?? null,
+      story_reply_id: storyReplyId ?? null,
     })
     .select()
     .single();
   if (error) throw error;
+
+  await publishPlatformActivity({
+    userId: senderId,
+    activityType: "message_sent",
+    sourceType: "messages",
+    sourceId: data.id as string,
+    metadata: {
+      conversation_id: conversationId,
+      has_story_reply: Boolean(storyReplyId),
+    },
+  }).catch(() => undefined);
+
+  if (storyReplyId) {
+    await publishPlatformActivity({
+      userId: senderId,
+      activityType: "story_replied",
+      sourceType: "messages",
+      sourceId: data.id as string,
+      metadata: { story_reply_id: storyReplyId },
+    }).catch(() => undefined);
+  }
+
+  await clearConversationInboxState(conversationId, senderId);
 
   await getSupabase()
     .from("conversations")
@@ -256,6 +471,165 @@ export async function sendMessage(
     .eq("id", conversationId);
 
   return data as Message;
+}
+
+/** Hide a conversation from the current user's inbox (reappears on newer messages). */
+export async function hideConversationForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_hides").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      hidden_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to hide conversation");
+}
+
+/** Permanently remove a conversation from the current user's inbox (delete for me). */
+export async function deleteConversationForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_deletions").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      deleted_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to delete conversation");
+}
+
+/** Pin a training partner conversation (max 3). */
+export async function pinConversationForUser(conversationId: string, userId: string) {
+  const { count, error: countError } = await getSupabase()
+    .from("conversation_user_preferences")
+    .select("conversation_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .not("pinned_at", "is", null);
+
+  if (countError) throw countError;
+  if ((count ?? 0) >= MAX_PINNED_CONVERSATIONS) {
+    throw new Error(`You can pin up to ${MAX_PINNED_CONVERSATIONS} conversations`);
+  }
+
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      pinned_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to pin conversation");
+}
+
+export async function unpinConversationForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      pinned_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to unpin conversation");
+}
+
+/** Favorite a training partner (max 5) — separate from pinned conversations. */
+export async function favoriteConversationForUser(conversationId: string, userId: string) {
+  const { count, error: countError } = await getSupabase()
+    .from("conversation_user_preferences")
+    .select("conversation_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .not("favorited_at", "is", null);
+
+  if (countError) throw countError;
+  if ((count ?? 0) >= MAX_FAVORITE_TRAINING_PARTNERS) {
+    throw new Error(
+      `You can favorite up to ${MAX_FAVORITE_TRAINING_PARTNERS} training partners`
+    );
+  }
+
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      favorited_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to favorite training partner");
+
+  await publishPlatformActivity({
+    userId,
+    activityType: "training_partner_favorited",
+    sourceType: "conversations",
+    sourceId: conversationId,
+  }).catch(() => undefined);
+}
+
+export async function unfavoriteConversationForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      favorited_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to unfavorite training partner");
+}
+
+export async function muteConversationForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      muted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to mute conversation");
+}
+
+export async function unmuteConversationForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      muted_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to unmute conversation");
+}
+
+export async function markConversationUnreadForUser(conversationId: string, userId: string) {
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    {
+      conversation_id: conversationId,
+      user_id: userId,
+      marked_unread_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to mark conversation unread");
 }
 
 /** Soft-delete a message for the current user only (delete for me). */

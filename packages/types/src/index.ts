@@ -12,6 +12,10 @@ import type {
 } from "./lifestyle";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 export * from "./dedicated-story";
+export * from "./training-calendar";
+export * from "./achievements";
+export * from "./reputation";
+export * from "./platform-activity";
 
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
@@ -64,7 +68,10 @@ export type NotificationType =
   | "story_reaction"
   | "story_reply"
   | "story_mention"
-  | "story_challenge_join";
+  | "story_challenge_join"
+  | "training_session_invite"
+  | "training_session_accepted"
+  | "training_session_reminder";
 
 export type ChallengeInvitationStatus = "pending" | "declined";
 
@@ -375,6 +382,16 @@ export interface Conversation {
   last_message?: Message;
   other_participant?: Profile;
   unread_count?: number;
+  /** Pinned conversation — stays below favorites in inbox (max 3). */
+  is_pinned?: boolean;
+  pinned_at?: string | null;
+  /** Favorite training partner — top Messages section (max 5). */
+  is_favorite?: boolean;
+  favorited_at?: string | null;
+  /** Muted conversations skip push notifications. */
+  is_muted?: boolean;
+  /** User-marked unread indicator independent of message read state. */
+  marked_unread?: boolean;
 }
 
 export interface Message {
@@ -384,11 +401,15 @@ export interface Message {
   content: string;
   media_url: string | null;
   post_id?: string | null;
+  story_reply_id?: string | null;
+  reply_to_message_id?: string | null;
+  reply_to?: Pick<Message, "id" | "content" | "sender_id" | "media_url" | "sender"> | null;
   created_at: string;
   read_at: string | null;
   shared_post?: Post;
   reactions?: ReactionSummary[];
   my_reaction?: string | null;
+  sender?: Profile;
 }
 
 export interface Notification {

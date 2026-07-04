@@ -58,7 +58,7 @@ function buildWorkoutSlideData(
   };
 }
 
-async function uploadMediaAssets(userId: string, media: WorkoutShareMedia[]) {
+async function uploadFeedMediaAssets(userId: string, media: WorkoutShareMedia[]) {
   const mediaUrls: string[] = [];
   let thumbnailUrl: string | null = null;
   let postType: PostType = "text";
@@ -86,34 +86,36 @@ async function uploadMediaAssets(userId: string, media: WorkoutShareMedia[]) {
     postType = "workout_update";
   }
 
-  return { mediaUrls, thumbnailUrl, postType, hasVideo };
+  return { mediaUrls, thumbnailUrl, postType };
 }
 
-async function buildStorySlides(
-  userId: string,
+async function uploadStoryMediaAssets(userId: string, media: WorkoutShareMedia[]) {
+  const mediaUrls: string[] = [];
+
+  for (const item of media) {
+    const url = await uploadStoryMedia(userId, item.uri, item.mimeType, item.file);
+    mediaUrls.push(url);
+  }
+
+  return mediaUrls;
+}
+
+function buildStorySlidesFromInput(
   input: WorkoutShareInput,
-  mediaUrls: string[],
-  postId?: string | null
+  mediaUrls: string[]
 ) {
   const workoutData = buildWorkoutSlideData(input.metrics, input.gym, input.locationName);
   const primaryType = input.workoutTypes[0] ?? "Workout";
 
   if (input.media.length) {
-    return Promise.all(
-      input.media.map(async (item, index) => {
-        const mediaUrl =
-          mediaUrls[index] ??
-          (await uploadStoryMedia(userId, item.uri, item.mimeType, item.file));
-        return {
-          media_url: mediaUrl,
-          media_type: isVideoMime(item.mimeType) ? ("video" as const) : ("photo" as const),
-          caption: index === 0 ? input.content ?? null : null,
-          workout_type: primaryType,
-          workout_data: workoutData,
-          sort_order: index,
-        };
-      })
-    );
+    return input.media.map((item, index) => ({
+      media_url: mediaUrls[index] ?? null,
+      media_type: isVideoMime(item.mimeType) ? ("video" as const) : ("photo" as const),
+      caption: index === 0 ? input.content ?? null : null,
+      workout_type: primaryType,
+      workout_data: workoutData,
+      sort_order: index,
+    }));
   }
 
   return [
@@ -137,11 +139,11 @@ export async function shareWorkout(
   const shouldFeed = mode === "feed" || mode === "both";
   const shouldStory = mode === "story" || mode === "both";
 
-  const { mediaUrls, thumbnailUrl, postType } = await uploadMediaAssets(input.userId, input.media);
-
   let createdPost: Awaited<ReturnType<typeof createPost>> | null = null;
+  let storyId: string | null = null;
 
   if (shouldFeed) {
+    const { mediaUrls, thumbnailUrl, postType } = await uploadFeedMediaAssets(input.userId, input.media);
     createdPost = await withTimeout(
       createPost({
         author_id: input.userId,
@@ -158,16 +160,29 @@ export async function shareWorkout(
       POST_CREATE_TIMEOUT_MS,
       "Creating post"
     );
-  }
 
-  let storyId: string | null = null;
-
-  if (shouldStory) {
-    const slides = await buildStorySlides(input.userId, input, mediaUrls, createdPost?.id ?? null);
+    if (shouldStory) {
+      const slides = buildStorySlidesFromInput(input, mediaUrls);
+      const story = await publishStory({
+        user_id: input.userId,
+        privacy: input.storyPrivacy ?? "followers",
+        post_id: createdPost.id,
+        workout_tag: input.workoutTypes[0] ?? null,
+        location_name: input.locationName ?? input.gym ?? null,
+        location_type: (input.locationType as import("@frennix/types").StoryLocationType) ?? null,
+        slides,
+      });
+      storyId = story.id;
+    }
+  } else if (shouldStory) {
+    const storyMediaUrls = input.media.length
+      ? await uploadStoryMediaAssets(input.userId, input.media)
+      : [];
+    const slides = buildStorySlidesFromInput(input, storyMediaUrls);
     const story = await publishStory({
       user_id: input.userId,
       privacy: input.storyPrivacy ?? "followers",
-      post_id: createdPost?.id ?? null,
+      post_id: null,
       workout_tag: input.workoutTypes[0] ?? null,
       location_name: input.locationName ?? input.gym ?? null,
       location_type: (input.locationType as import("@frennix/types").StoryLocationType) ?? null,

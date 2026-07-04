@@ -1,11 +1,10 @@
 import { router } from "expo-router";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { Platform, Pressable, StyleSheet } from "react-native";
 import type { Message, Profile } from "@frennix/types";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
 import { MessageActionsMenu } from "@/components/MessageActionsMenu";
 import { SwipeToDeleteRow } from "@/components/SwipeToDeleteRow";
-import { usePrefersCoarsePointer } from "@/lib/usePrefersCoarsePointer";
 import { MessageBubble } from "@frennix/ui";
 
 type ChatMessageRowProps = {
@@ -13,6 +12,7 @@ type ChatMessageRowProps = {
   userId: string;
   myProfile?: Profile;
   sender?: Profile;
+  participantProfiles?: Record<string, Pick<Profile, "display_name">>;
   dismissing?: boolean;
   onMediaPress: (uri: string) => void;
   onReaction: (messageId: string, emoji: string, currentEmoji?: string | null) => void;
@@ -41,7 +41,10 @@ function rowPropsEqual(prev: ChatMessageRowProps, next: ChatMessageRowProps) {
     a.my_reaction === b.my_reaction &&
     a.created_at === b.created_at &&
     reactionsEqual(a.reactions, b.reactions) &&
-    a.shared_post?.id === b.shared_post?.id
+    a.shared_post?.id === b.shared_post?.id &&
+    a.reply_to_message_id === b.reply_to_message_id &&
+    a.story_reply_id === b.story_reply_id &&
+    a.reply_to?.content === b.reply_to?.content
   );
 }
 
@@ -50,6 +53,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   userId,
   myProfile,
   sender,
+  participantProfiles,
   dismissing = false,
   onMediaPress,
   onReaction,
@@ -83,49 +87,47 @@ export const ChatMessageRow = memo(function ChatMessageRow({
 
   const handleDelete = useCallback(() => onDelete(message), [message, onDelete]);
 
-  const [hovered, setHovered] = useState(false);
-  const [tapped, setTapped] = useState(false);
-  const prefersCoarsePointer = usePrefersCoarsePointer();
   const isWeb = Platform.OS === "web";
-
-  const showActionsMenu =
-    isOwn &&
-    (isWeb
-      ? prefersCoarsePointer || hovered || tapped
-      : true);
-
-  const handleOwnMessagePress = useCallback(() => {
-    if (!isOwn || !isWeb || prefersCoarsePointer) return;
-    setTapped((value) => !value);
-  }, [isOwn, isWeb, prefersCoarsePointer]);
-
-  const handleOpenMenu = useCallback(() => {
-    setTapped(false);
-    handleLongPressMenu();
-  }, [handleLongPressMenu]);
+  const replyToPreview = useMemo(() => {
+    if (!message.reply_to) return null;
+    const replySenderId = message.reply_to.sender_id;
+    const replySenderName =
+      replySenderId === userId
+        ? myProfile?.display_name ?? "You"
+        : participantProfiles?.[replySenderId]?.display_name ?? sender?.display_name ?? "Partner";
+    return {
+      content: message.reply_to.content,
+      senderName: replySenderName,
+    };
+  }, [
+    message.reply_to,
+    myProfile?.display_name,
+    participantProfiles,
+    sender?.display_name,
+    userId,
+  ]);
 
   const rowContent = (
     <Pressable
       style={[styles.row, isOwn && styles.rowOwn]}
-      onPress={handleOwnMessagePress}
-      onHoverIn={isWeb && isOwn ? () => setHovered(true) : undefined}
-      onHoverOut={isWeb && isOwn ? () => setHovered(false) : undefined}
       {...(isWeb && isOwn
         ? ({
             onContextMenu: (event: { preventDefault?: () => void }) => {
               event.preventDefault?.();
-              handleOpenMenu();
+              handleLongPressMenu();
             },
           } as object)
         : null)}
     >
-      {isOwn ? <MessageActionsMenu visible={showActionsMenu} onPress={handleOpenMenu} /> : null}
+      {isOwn ? <MessageActionsMenu onPress={handleLongPressMenu} /> : null}
       <MessageBubble
         content={message.content}
         isOwn={isOwn}
         timestamp={time}
         mediaUrl={message.media_url}
         sharedPost={message.shared_post}
+        storyReply={Boolean(message.story_reply_id)}
+        replyTo={replyToPreview}
         onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
         onMediaPress={message.media_url ? handleMediaPress : undefined}
         reactions={message.reactions}
@@ -139,7 +141,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
 
   return (
     <AnimatedDismissRow dismissing={dismissing}>
-      <SwipeToDeleteRow enabled={isOwn} onDelete={handleDelete}>
+      <SwipeToDeleteRow enabled={isOwn} onDelete={handleDelete} actionLabel="Delete">
         {rowContent}
       </SwipeToDeleteRow>
     </AnimatedDismissRow>

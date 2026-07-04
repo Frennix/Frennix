@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
-import { DiscoverCompatibilityFilters } from "@/components/DiscoverLifestyleFilters";
+import { DiscoverLifestyleFilters } from "@/components/DiscoverLifestyleFilters";
 import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
 import { FrennixMatchExplainerModal } from "@/components/FrennixMatchExplainerModal";
 import { AppIcon } from "@/components/AppIcon";
@@ -376,7 +376,7 @@ export default function DiscoverScreen() {
           <Text style={styles.searchHint}>
             Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio
           </Text>
-          <DiscoverCompatibilityFilters filters={discoverFilters} onChange={setDiscoverFilters} />
+          <DiscoverLifestyleFilters filters={discoverFilters} onChange={setDiscoverFilters} />
         </View>
       ) : tab === "groups" ? (
         <Input placeholder="Search groups..." value={groupQuery} onChangeText={setGroupQuery} />

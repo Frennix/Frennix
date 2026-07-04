@@ -8,10 +8,24 @@ type StoryAnalyticsModalProps = {
   analytics: StoryAnalytics | StoryInsights | null;
   onClose: () => void;
   onOpenViewers?: () => void;
+  onOpenReactions?: () => void;
 };
 
-function metricValue(analytics: StoryAnalytics | StoryInsights, key: "views" | "reactions" | "replies") {
+function metricValue(
+  analytics: StoryAnalytics | StoryInsights,
+  key: "views" | "reactions" | "replies"
+) {
   return analytics[key] ?? 0;
+}
+
+function challengeJoins(analytics: StoryAnalytics | StoryInsights) {
+  if ("challenge_joins" in analytics) return analytics.challenge_joins;
+  return analytics.challenges ?? 0;
+}
+
+function profileVisits(analytics: StoryAnalytics | StoryInsights) {
+  if ("profile_visits" in analytics) return analytics.profile_visits ?? 0;
+  return 0;
 }
 
 export const StoryAnalyticsModal = memo(function StoryAnalyticsModal({
@@ -19,8 +33,17 @@ export const StoryAnalyticsModal = memo(function StoryAnalyticsModal({
   analytics,
   onClose,
   onOpenViewers,
+  onOpenReactions,
 }: StoryAnalyticsModalProps) {
   if (!analytics) return null;
+
+  const metrics = [
+    { label: "Views", value: metricValue(analytics, "views"), onPress: onOpenViewers },
+    { label: "Reactions", value: metricValue(analytics, "reactions"), onPress: onOpenReactions },
+    { label: "Replies", value: metricValue(analytics, "replies") },
+    { label: "Challenge joins", value: challengeJoins(analytics) },
+    { label: "Profile visits", value: profileVisits(analytics) },
+  ];
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -28,26 +51,20 @@ export const StoryAnalyticsModal = memo(function StoryAnalyticsModal({
         <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
           <Text style={styles.title}>Story Analytics</Text>
           <View style={styles.grid}>
-            <Pressable style={styles.metric} onPress={onOpenViewers}>
-              <Text style={styles.metricValue}>{metricValue(analytics, "views")}</Text>
-              <Text style={styles.metricLabel}>Views</Text>
-            </Pressable>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{metricValue(analytics, "reactions")}</Text>
-              <Text style={styles.metricLabel}>Reactions</Text>
-            </View>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{metricValue(analytics, "replies")}</Text>
-              <Text style={styles.metricLabel}>Replies</Text>
-            </View>
+            {metrics.map((metric) => {
+              const Tile = metric.onPress ? Pressable : View;
+              return (
+                <Tile
+                  key={metric.label}
+                  style={styles.metric}
+                  {...(metric.onPress ? { onPress: metric.onPress } : {})}
+                >
+                  <Text style={styles.metricValue}>{metric.value}</Text>
+                  <Text style={styles.metricLabel}>{metric.label}</Text>
+                </Tile>
+              );
+            })}
           </View>
-          {"challenge_joins" in analytics ? (
-            <Text style={styles.extra}>
-              {analytics.challenge_joins} challenge joins
-            </Text>
-          ) : analytics.challenges > 0 ? (
-            <Text style={styles.extra}>{analytics.challenges} challenge responses</Text>
-          ) : null}
           {onOpenViewers ? (
             <Pressable style={styles.cta} onPress={onOpenViewers}>
               <Text style={styles.ctaText}>See who viewed</Text>
@@ -79,10 +96,12 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
   },
   metric: {
-    flex: 1,
+    width: "30%",
+    flexGrow: 1,
     alignItems: "center",
     padding: spacing.md,
     borderRadius: 12,
@@ -98,10 +117,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     fontWeight: "700",
-  },
-  extra: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
+    textAlign: "center",
   },
   cta: {
     alignItems: "center",

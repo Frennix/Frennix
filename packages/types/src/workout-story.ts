@@ -53,12 +53,15 @@ export interface WorkoutStorySlideMeta {
   aiSummary?: string | null;
 }
 
+/** Story reactions — never open chat unless the viewer chooses Reply. */
 export const STORY_QUICK_REACTIONS = [
-  { emoji: "❤️", label: "Love" },
-  { emoji: "🔥", label: "Fire" },
   { emoji: "💪", label: "Strong" },
+  { emoji: "🔥", label: "Fire" },
   { emoji: "👏", label: "Clap" },
+  { emoji: "❤️", label: "Love" },
+  { emoji: "👀", label: "Watching" },
   { emoji: "😂", label: "Laugh" },
+  { emoji: "🤝", label: "Train together" },
 ] as const;
 
 export type StoryQuickReactionEmoji = (typeof STORY_QUICK_REACTIONS)[number]["emoji"];
@@ -96,25 +99,23 @@ export interface StoryInsights {
 }
 
 export type StoryHighlightCategory =
+  | "personal_records"
   | "running"
   | "gym"
-  | "basketball"
-  | "hiking"
-  | "personal_records"
-  | "race_day"
-  | "transformations"
   | "challenges"
+  | "nutrition"
+  | "recovery"
+  | "race_day"
   | "custom";
 
 export const STORY_HIGHLIGHT_PRESETS: Array<{ category: StoryHighlightCategory; title: string }> = [
-  { category: "running", title: "Running" },
-  { category: "gym", title: "Gym" },
-  { category: "basketball", title: "Basketball" },
-  { category: "hiking", title: "Hiking" },
-  { category: "personal_records", title: "Personal Records" },
-  { category: "race_day", title: "Race Day" },
-  { category: "transformations", title: "Transformations" },
+  { category: "personal_records", title: "PRs" },
+  { category: "running", title: "Runs" },
+  { category: "gym", title: "Gym Sessions" },
   { category: "challenges", title: "Challenges" },
+  { category: "nutrition", title: "Nutrition" },
+  { category: "recovery", title: "Recovery" },
+  { category: "race_day", title: "Events" },
 ];
 
 export const STORY_DAILY_MOTIVATIONS = [

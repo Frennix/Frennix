@@ -3,11 +3,16 @@ import { confirmDismiss } from "@/lib/alerts";
 
 const DISMISS_ANIMATION_MS = 280;
 
+type ConfirmFn = (onConfirm: () => void) => void;
+
 /**
  * Confirm → animate row out → remove from list.
  * Keeps confirmation while avoiding abrupt FlatList jumps.
  */
-export function useDismissWithAnimation(onDismiss: (id: string) => void) {
+export function useDismissWithAnimation(
+  onDismiss: (id: string) => void,
+  confirm: ConfirmFn = confirmDismiss
+) {
   const [dismissingIds, setDismissingIds] = useState<Set<string>>(() => new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -21,7 +26,7 @@ export function useDismissWithAnimation(onDismiss: (id: string) => void) {
 
   const requestDismiss = useCallback(
     (id: string) => {
-      confirmDismiss(() => {
+      confirm(() => {
         setDismissingIds((current) => {
           const next = new Set(current);
           next.add(id);
@@ -44,7 +49,7 @@ export function useDismissWithAnimation(onDismiss: (id: string) => void) {
         timersRef.current.set(id, timer);
       });
     },
-    [onDismiss]
+    [confirm, onDismiss]
   );
 
   const isDismissing = useCallback((id: string) => dismissingIds.has(id), [dismissingIds]);

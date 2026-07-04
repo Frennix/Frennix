@@ -8,7 +8,7 @@ import {
   normalizeImageExt,
   readImageBytes,
 } from "./profile-utils";
-import { computeWorkoutStreakFromDates } from "./streaks";
+import { getWorkoutStreak } from "./workout-activity";
 import { getSupabase } from "./supabase";
 
 /** PostgREST view that masks presence fields for other users. Writes use `profiles`. */
@@ -62,7 +62,7 @@ export async function upsertProfile(profile: Partial<Profile> & { id: string }) 
 export async function getProfileStats(userId: string): Promise<ProfileStats> {
   const { followers, following } = await getFollowCounts(userId);
 
-  const [postsRes, eventsRes, workoutPostsRes] = await Promise.all([
+  const [postsRes, eventsRes, workoutStreak] = await Promise.all([
     getSupabase()
       .from("posts")
       .select("id", { count: "exact", head: true })
@@ -71,11 +71,7 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
       .from("event_attendees")
       .select("user_id", { count: "exact", head: true })
       .eq("user_id", userId),
-    getSupabase()
-      .from("posts")
-      .select("created_at")
-      .eq("author_id", userId)
-      .in("post_type", ["workout_update", "photo", "video"]),
+    getWorkoutStreak(userId),
   ]);
 
   if (postsRes.error) {
@@ -84,20 +80,13 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
   if (eventsRes.error) {
     logProfileError("getProfileStats events count failed", eventsRes.error, { userId });
   }
-  if (workoutPostsRes.error) {
-    logProfileError("getProfileStats workout posts failed", workoutPostsRes.error, { userId });
-  }
-
-  const workoutDates = workoutPostsRes.error
-    ? []
-    : (workoutPostsRes.data ?? []).map((post) => post.created_at as string);
 
   return {
     posts: postsRes.error ? 0 : postsRes.count ?? 0,
     followers,
     following,
     eventsJoined: eventsRes.error ? 0 : eventsRes.count ?? 0,
-    workoutStreak: computeWorkoutStreakFromDates(workoutDates),
+    workoutStreak,
   };
 }
 

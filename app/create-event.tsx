@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ACTIVITIES } from "@frennix/types";
 import { createWorkoutEvent, getErrorMessage } from "@frennix/api";
@@ -12,10 +12,23 @@ import { useSuccessSubmit } from "@/lib/useSuccessSubmit";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 export default function CreateEventScreen() {
+  const params = useLocalSearchParams<{
+    partnerId?: string;
+    partnerUsername?: string;
+    workoutType?: string;
+    storyId?: string;
+    fromStory?: string;
+  }>();
+  const fromStory = params.fromStory === "1";
+  const partnerUsername = typeof params.partnerUsername === "string" ? params.partnerUsername : "";
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const [title, setTitle] = useState("");
-  const [workoutType, setWorkoutType] = useState<string | null>(null);
+  const [title, setTitle] = useState(
+    fromStory && partnerUsername ? `Workout with @${partnerUsername}` : ""
+  );
+  const [workoutType, setWorkoutType] = useState<string | null>(
+    typeof params.workoutType === "string" && params.workoutType ? params.workoutType : null
+  );
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(defaultEventDate());
   const [time, setTime] = useState("09:00");
@@ -66,8 +79,16 @@ export default function CreateEventScreen() {
     }
   }
 
+  const storyHint = useMemo(() => {
+    if (!fromStory) return null;
+    return partnerUsername
+      ? `Scheduling from a story with @${partnerUsername}. This adds to your Training Calendar.`
+      : "Scheduling from a story. This adds to your Training Calendar.";
+  }, [fromStory, partnerUsername]);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {storyHint ? <Text style={styles.storyHint}>{storyHint}</Text> : null}
       <Input
         label="Title"
         value={title}
@@ -167,4 +188,14 @@ const styles = StyleSheet.create({
   chipText: { ...typography.bodySmall, color: colors.textSecondary },
   chipTextActive: { color: colors.accent, fontWeight: "600" },
   error: { ...typography.bodySmall, color: colors.danger },
+  storyHint: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "600",
+    padding: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 });

@@ -1,7 +1,7 @@
 # Frennix Product Vision
 
 **Status:** Permanent source of truth — read before writing code  
-**Last updated:** 2026-06-28  
+**Last updated:** 2026-07-04  
 **Owner:** Founder  
 **Applies to:** Every engineer, designer, founder, contractor, and AI agent working on Frennix
 
@@ -9,7 +9,48 @@
 
 **For developers & AI agents:** Read this document fully before implementing any feature. Validate every request against the [Vision alignment checklist](#vision-alignment-checklist). If alignment is unclear, stop and ask the founder.
 
-**Companion docs:** [`PRODUCT-ROADMAP.md`](./PRODUCT-ROADMAP.md) · [`releases/RELEASE_PROCESS.md`](./releases/RELEASE_PROCESS.md) · [`MILESTONE-FRAMEWORK.md`](./MILESTONE-FRAMEWORK.md) · [`PROJECT-PROGRESS.md`](./PROJECT-PROGRESS.md)
+**Companion docs:** [`PRODUCT-ROADMAP.md`](./PRODUCT-ROADMAP.md) · [`../docs/SYSTEM_ARCHITECTURE.md`](../docs/SYSTEM_ARCHITECTURE.md) · [`../docs/PLATFORM_CAPABILITIES.md`](../docs/PLATFORM_CAPABILITIES.md) · [`releases/RELEASE_PROCESS.md`](./releases/RELEASE_PROCESS.md) · [`MILESTONE-FRAMEWORK.md`](./MILESTONE-FRAMEWORK.md) · [`PROJECT-PROGRESS.md`](./PROJECT-PROGRESS.md)
+
+---
+
+## Product building mode (approved 2026-07-04)
+
+**Founder approval:** Architecture is mature enough. Frennix has officially transitioned from **platform building** to **product building**.
+
+The primary objective is delivering an **exceptional user experience**. Every feature should feel polished, intuitive, fast, reliable, and enjoyable to use. The architecture serves the product — it is not the product. Success is measured by how much users enjoy Frennix and how effectively it helps them stay consistent with their fitness journey.
+
+**We will not pause product development for additional architecture** unless we discover a **real limitation** — a concrete case where an existing capability cannot support the feature. When that happens, document the limitation, extend what exists first, and only then add infrastructure.
+
+**Competitive advantage:** Execution, polish, and delivering a **best-in-class fitness experience** — not more platform layers.
+
+### Development principles
+
+- **Extend** existing systems before creating new ones
+- **Reuse** existing APIs, tables, services, and platform capabilities whenever possible
+- **Avoid** duplicate functionality or parallel systems
+- **Prioritize** user experience, performance, stability, accessibility, and polish over additional infrastructure
+- **Introduce** new architecture only when an existing capability cannot reasonably support a new feature
+
+See [`SYSTEM_ARCHITECTURE.md`](../docs/SYSTEM_ARCHITECTURE.md) (Architecture Freeze Rule) and [`PLATFORM_CAPABILITIES.md`](../docs/PLATFORM_CAPABILITIES.md) (capability registry).
+
+### Product philosophy
+
+Every feature must answer one question:
+
+> **"Does this make it easier or more motivating for someone to stay consistent with their fitness journey?"**
+
+If yes — it belongs in Frennix. If it does not improve **motivation**, **accountability**, **connection**, or **consistency**, carefully evaluate whether it belongs before building.
+
+Frennix is **not** trying to become another social media platform. Our mission is to become the **daily home** for people pursuing healthier lives through fitness, accountability, and meaningful connections. Every feature should reinforce that mission.
+
+### Current product priorities
+
+1. Polish the **Training Calendar**
+2. Make **Stories** the most engaging fitness-first story experience
+3. Refine **Workout Invites** and **Favorite Training Partners**
+4. Continue improving **Challenges** and **Events**
+5. Eliminate lag, improve performance, and create smooth, polished interactions throughout the app
+6. Build features users will love to use every day while preserving the architectural foundation
 
 ---
 
@@ -18,6 +59,8 @@
 **Help people build lasting fitness habits through real human connection.**
 
 Frennix exists because most fitness apps optimize for content consumption or solo tracking. Lasting change happens when people train together — with accountability, shared goals, and partners who show up. Frennix is the social layer for fitness: find training partners, stay connected, and grow stronger as a community.
+
+Frennix is the **daily home** for people pursuing healthier lives — not another social media feed.
 
 ---
 
@@ -460,16 +503,19 @@ Permanent record of major decisions. Add new rows when Founder approves signific
 
 | # | Question |
 |---|----------|
+| 0 | **Does this make it easier or more motivating for someone to stay consistent with their fitness journey?** |
 | 1 | Does this strengthen **human fitness connection**? |
-| 2 | Is the language and UX **fitness-native** (not dating)? |
-| 3 | Does it support **retention, referrals, or DAU**? |
-| 4 | Is there a path to **revenue** (even if deferred)? |
-| 5 | Are **safety and moderation** considered? |
-| 6 | Does it **scale** to 10k+ users without redesign? |
-| 7 | Does it have **analytics + rollback plan**? |
-| 8 | Does it fit the **official roadmap priority**? |
-| 9 | Has it been validated against **this Product Vision** document? |
-| 10 | Will it pass **staging + iPhone Safari QA** before production? |
+| 2 | Is the language and UX **fitness-native** (not dating or generic social media)? |
+| 3 | Does it improve **motivation, accountability, connection, or consistency**? |
+| 4 | Does it support **retention, referrals, or DAU**? |
+| 5 | Is there a path to **revenue** (even if deferred)? |
+| 6 | Are **safety and moderation** considered? |
+| 7 | Does it **extend existing capabilities** rather than creating parallel systems? |
+| 8 | Does it **scale** to 10k+ users without redesign? |
+| 9 | Does it have **analytics + rollback plan**? |
+| 10 | Does it fit the **official roadmap priority** or current product priorities? |
+| 11 | Has it been validated against **this Product Vision** document? |
+| 12 | Will it pass **staging + iPhone Safari QA** before production? |
 
 **If any answer is "no":** Document the exception and obtain **Founder approval before build**.
 
@@ -480,6 +526,8 @@ Permanent record of major decisions. Add new rows when Founder approves signific
 ```
 PRODUCT_VISION.md          ← Source of truth (this document)
     ├── PRODUCT-ROADMAP.md   ← What we build, in what order
+    ├── docs/SYSTEM_ARCHITECTURE.md ← Frozen architectural baseline
+    ├── docs/PLATFORM_CAPABILITIES.md ← Capability registry
     ├── releases/RELEASE_PROCESS.md ← How we ship
     ├── MILESTONE-FRAMEWORK.md ← How we evaluate milestones
     ├── PROJECT-PROGRESS.md  ← Where we are now
@@ -497,3 +545,4 @@ When documents conflict: **Product Vision → Roadmap → Release Process → Mi
 | 2025-06 | Product Vision established as source of truth | Founder |
 | 2026-06-28 | PRODUCT_VISION.md expanded as permanent SOP for all contributors and AI agents | Founder |
 | 2026-06-28 | Release Management process (7 phases) adopted | Founder |
+| 2026-07-04 | **Product building mode approved** — architecture frozen; UX-first development | Founder |

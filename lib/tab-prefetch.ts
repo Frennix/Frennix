@@ -7,6 +7,7 @@ import {
   getPostsByUser,
   getProfileStats,
   getSuggestedAthletes,
+  getCalendarView,
   getWorkoutEvents,
 } from "@frennix/api";
 
@@ -37,6 +38,21 @@ export async function prefetchTabData(queryClient: QueryClient, userId: string) 
     queryClient.prefetchQuery({
       queryKey: ["workout-events", userId],
       queryFn: () => getWorkoutEvents(userId),
+      staleTime: TAB_STALE_MS,
+      gcTime: TAB_GC_MS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["calendar-view", userId],
+      queryFn: () => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const padStart = new Date(start);
+        padStart.setDate(padStart.getDate() - 7);
+        const padEnd = new Date(end);
+        padEnd.setDate(padEnd.getDate() + 7);
+        return getCalendarView(userId, padStart.toISOString(), padEnd.toISOString());
+      },
       staleTime: TAB_STALE_MS,
       gcTime: TAB_GC_MS,
     }),

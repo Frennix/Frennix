@@ -12,7 +12,7 @@ interface FeedStoriesRowProps {
 
 function storyLabel(item: FeedStory): string {
   const latest = item.active_stories.at(-1);
-  if (!latest) return item.is_self ? "Add your story" : "No story yet";
+  if (!latest) return item.is_self ? "Your Story" : "No story yet";
   const time = formatRelativeTime(latest.created_at);
   if (latest.workout_tag) return `${latest.workout_tag} · ${time}`;
   const slideCount = latest.slides.length;
@@ -81,17 +81,23 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
           return (
             <Pressable
               style={styles.item}
-              onPress={() =>
-                isSelf && !hasActiveStory ? onAddStoryPress?.() : onStoryPress?.(item)
-              }
+              onPress={() => {
+                if (isSelf && !hasActiveStory) {
+                  onAddStoryPress?.();
+                  return;
+                }
+                if (hasActiveStory) onStoryPress?.(item);
+              }}
               accessibilityRole="button"
               accessibilityLabel={
-                isSelf ? `Your story, ${streakLabel}, ${label}` : `${item.profile.username} story, ${label}`
+                isSelf
+                  ? `Your story, ${streakLabel}, ${label}`
+                  : `${item.profile.username} story, ${label}`
               }
             >
               <StoryAvatar story={item} onAddStoryPress={onAddStoryPress} />
               <Text style={styles.username} numberOfLines={1}>
-                {isSelf ? "You" : item.profile.username}
+                {isSelf ? "Your Story" : item.profile.username}
               </Text>
               <Text style={[styles.meta, item.workout_streak > 0 && styles.metaActive]} numberOfLines={1}>
                 {streakLabel}

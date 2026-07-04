@@ -20,6 +20,12 @@ const DEFAULT_PREFERENCES = {
   challenge_join: true,
   challenge_invite: true,
   post_share: true,
+  story_reaction: true,
+  story_reply: true,
+  story_challenge_join: true,
+  training_session_invite: true,
+  training_session_accepted: true,
+  training_session_reminder: true,
 };
 
 type PreferenceKey = keyof typeof DEFAULT_PREFERENCES;
@@ -52,6 +58,16 @@ function actorIdFromPayload(type: string, payload: Record<string, unknown>): str
       return (payload.inviter_id as string) ?? null;
     case "post_share":
       return (payload.sharer_id as string) ?? null;
+    case "story_reaction":
+      return (payload.reactor_id as string) ?? null;
+    case "story_reply":
+      return (payload.replier_id as string) ?? null;
+    case "story_challenge_join":
+      return (payload.joiner_id as string) ?? null;
+    case "training_session_invite":
+      return (payload.inviter_id as string) ?? null;
+    case "training_session_accepted":
+      return (payload.invitee_id as string) ?? null;
     default:
       return null;
   }
@@ -91,6 +107,18 @@ function pushTitle(type: string, payload: Record<string, unknown>): string {
       return "Challenge invitation";
     case "post_share":
       return "Post shared";
+    case "story_reaction":
+      return "Story reaction";
+    case "story_reply":
+      return "Story reply";
+    case "story_challenge_join":
+      return "Challenge join";
+    case "training_session_invite":
+      return "Training invite";
+    case "training_session_accepted":
+      return "Invite accepted";
+    case "training_session_reminder":
+      return "Training reminder";
     default:
       return "Frennix";
   }
@@ -167,6 +195,34 @@ function pushBody(
       if (destName) return `${actorName} shared your post in ${destName}`;
       return `${actorName} shared your post`;
     }
+    case "story_reaction": {
+      const emoji = (payload.reaction as string) ?? "❤️";
+      return `${actorName} reacted ${emoji} to your story`;
+    }
+    case "story_reply": {
+      const preview = payload.preview as string | undefined;
+      return preview
+        ? `${actorName} replied to your story: ${preview}`
+        : `${actorName} replied to your story`;
+    }
+    case "story_challenge_join":
+      return `${actorName} joined your story challenge`;
+    case "training_session_invite": {
+      const title = payload.session_title as string | undefined;
+      return title
+        ? `${actorName} invited you to "${title}"`
+        : `${actorName} invited you to train`;
+    }
+    case "training_session_accepted": {
+      const title = payload.session_title as string | undefined;
+      return title
+        ? `${actorName} accepted "${title}"`
+        : `${actorName} accepted your training invite`;
+    }
+    case "training_session_reminder": {
+      const title = payload.session_title as string | undefined;
+      return title ? `Upcoming workout: ${title}` : "You have a workout coming up";
+    }
     default:
       return "You have a new notification";
   }
@@ -204,6 +260,24 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: "disabled" }), { status: 200 });
     }
 
+    const payload = (record.payload ?? {}) as Record<string, unknown>;
+
+    if (record.type === "message") {
+      const conversationId = payload.conversation_id as string | undefined;
+      if (conversationId) {
+        const { data: mutedPref } = await supabase
+          .from("conversation_user_preferences")
+          .select("muted_at")
+          .eq("user_id", record.user_id)
+          .eq("conversation_id", conversationId)
+          .maybeSingle();
+
+        if (mutedPref?.muted_at) {
+          return new Response(JSON.stringify({ ok: true, skipped: "muted" }), { status: 200 });
+        }
+      }
+    }
+
     const { data: tokens } = await supabase
       .from("push_tokens")
       .select("expo_token, platform")
@@ -220,7 +294,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, no_token: true }), { status: 200 });
     }
 
-    const payload = (record.payload ?? {}) as Record<string, unknown>;
     const actorId = actorIdFromPayload(record.type, payload);
     let actorName = "Someone";
     let actorUsername: string | null = null;

@@ -14,6 +14,11 @@ interface MessageBubbleProps {
   timestamp?: string;
   mediaUrl?: string | null;
   sharedPost?: (Post & { author?: Profile }) | null;
+  storyReply?: boolean;
+  replyTo?: {
+    content: string;
+    senderName?: string;
+  } | null;
   reactions?: Post["reactions"];
   onMediaPress?: () => void;
   onSharedPostPress?: () => void;
@@ -30,6 +35,8 @@ export function MessageBubble({
   timestamp,
   mediaUrl,
   sharedPost,
+  storyReply,
+  replyTo,
   reactions,
   onMediaPress,
   onSharedPostPress,
@@ -60,6 +67,23 @@ export function MessageBubble({
           delayLongPress={350}
         >
           <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+            {storyReply ? (
+              <View style={[styles.replyQuote, isOwn && styles.replyQuoteOwn]}>
+                <Text style={[styles.replyQuoteLabel, isOwn && styles.replyQuoteLabelOwn]} numberOfLines={1}>
+                  Replied to your story
+                </Text>
+              </View>
+            ) : null}
+            {replyTo ? (
+              <View style={[styles.replyQuote, isOwn && styles.replyQuoteOwn]}>
+                <Text style={[styles.replyQuoteLabel, isOwn && styles.replyQuoteLabelOwn]} numberOfLines={1}>
+                  {replyTo.senderName ? `Reply to ${replyTo.senderName}` : "Reply"}
+                </Text>
+                <Text style={[styles.replyQuoteText, isOwn && styles.replyQuoteTextOwn]} numberOfLines={2}>
+                  {replyTo.content}
+                </Text>
+              </View>
+            ) : null}
             {sharedPost ? (
               <SharedPostPreview post={sharedPost} onPress={onSharedPostPress} compact />
             ) : null}
@@ -129,6 +153,28 @@ const styles = StyleSheet.create({
   },
   bubbleOwn: { backgroundColor: colors.accent },
   bubbleOther: { backgroundColor: colors.surfaceElevated },
+  replyQuote: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    paddingLeft: spacing.sm,
+    marginBottom: spacing.xs,
+    opacity: 0.9,
+  },
+  replyQuoteOwn: {
+    borderLeftColor: colors.black,
+  },
+  replyQuoteLabel: {
+    ...typography.caption,
+    color: colors.accent,
+    fontWeight: "700",
+  },
+  replyQuoteLabelOwn: { color: colors.black },
+  replyQuoteText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  replyQuoteTextOwn: { color: "rgba(0,0,0,0.72)" },
   text: { ...typography.body, color: colors.text },
   textOwn: { color: colors.black },
   textWithMedia: { marginTop: spacing.xs },

@@ -73,6 +73,9 @@ export const FeedHeader = memo(function FeedHeader({
           <Pressable style={styles.chip} onPress={openCreatePost}>
             <Text style={styles.chipText}>Share workout</Text>
           </Pressable>
+          <Pressable style={styles.chip} onPress={() => pushScreen("/stories/explore")}>
+            <Text style={styles.chipText}>Explore Stories</Text>
+          </Pressable>
           <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/discover")}>
             <Text style={styles.chipText}>Find athletes</Text>
           </Pressable>

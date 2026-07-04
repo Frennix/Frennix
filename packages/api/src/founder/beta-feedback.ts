@@ -6,7 +6,7 @@ import type {
   BetaFeedbackUpdateInput,
   FounderPaginatedResult,
 } from "@frennix/types";
-import { formatSupabaseError, normalizeImageExt, readImageBytes } from "../profile-utils";
+import { formatSupabaseError } from "../profile-utils";
 import { getSupabase } from "../supabase";
 
 export async function getBetaFeedbackDashboard(days = 30): Promise<BetaFeedbackDashboard> {
@@ -74,31 +74,4 @@ export async function getBetaFeedbackFilterOptions(): Promise<BetaFeedbackFilter
   const { data, error } = await getSupabase().rpc("get_beta_feedback_filter_options");
   if (error) throw formatSupabaseError(error, "Failed to load filter options");
   return data as BetaFeedbackFilterOptions;
-}
-
-export async function uploadFeedbackScreenshot(
-  userId: string,
-  uri: string,
-  mimeType: string,
-  file?: File | null
-): Promise<string> {
-  const ext = normalizeImageExt(mimeType);
-  const path = `${userId}/${Date.now()}.${ext}`;
-  const bytes = await readImageBytes(uri, file);
-  const contentType = mimeType.startsWith("image/") ? mimeType : "image/jpeg";
-
-  const { error: uploadError } = await getSupabase().storage
-    .from("feedback-attachments")
-    .upload(path, bytes, { contentType, upsert: false });
-
-  if (uploadError) {
-    throw formatSupabaseError(uploadError, "Screenshot upload failed");
-  }
-
-  const { data: urlData } = getSupabase().storage.from("feedback-attachments").getPublicUrl(path);
-  if (!urlData.publicUrl) {
-    throw new Error("Screenshot uploaded but public URL was not returned");
-  }
-
-  return urlData.publicUrl;
 }

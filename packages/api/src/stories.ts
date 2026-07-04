@@ -206,7 +206,108 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
-  return feedStories;
+  // Stories row: only users with active dedicated stories, plus self for the add entry point.
+  return feedStories.filter((story) => story.is_self || story.active_stories.length > 0);
+}
+
+/** Build feed story cards for favorite training partners (Messages favorites row). */
+export async function getFeedStoriesForPartners(
+  viewerId: string,
+  partners: Profile[]
+): Promise<FeedStory[]> {
+  if (!partners.length) return [];
+
+  const userIds = partners.map((profile) => profile.id);
+  const following = await getFollowing(viewerId);
+  const followingIds = new Set(following.map((profile) => profile.id));
+  const now = new Date();
+
+  const { data: followersOfViewer } = await getSupabase()
+    .from("follows")
+    .select("follower_id")
+    .eq("following_id", viewerId);
+
+  const mutualFriendIds = new Set<string>();
+  for (const row of followersOfViewer ?? []) {
+    const followerId = row.follower_id as string;
+    if (followingIds.has(followerId)) mutualFriendIds.add(followerId);
+  }
+
+  const [{ data: workoutPosts }, activeStories] = await Promise.all([
+    getSupabase()
+      .from("posts")
+      .select("author_id, created_at")
+      .in("author_id", userIds)
+      .in("post_type", [...WORKOUT_POST_TYPES]),
+    fetchActiveStoriesForUsers(userIds),
+  ]);
+
+  if (workoutPosts.error) throw workoutPosts.error;
+
+  const datesByUser = new Map<string, string[]>();
+  const countByUser = new Map<string, number>();
+
+  for (const row of workoutPosts ?? []) {
+    const authorId = row.author_id as string;
+    const dates = datesByUser.get(authorId) ?? [];
+    dates.push(row.created_at as string);
+    datesByUser.set(authorId, dates);
+    countByUser.set(authorId, (countByUser.get(authorId) ?? 0) + 1);
+  }
+
+  const storiesByUser = new Map<string, FrennixStory[]>();
+  for (const story of activeStories) {
+    if (
+      !canViewerSeeStoryPrivacy(
+        story.privacy,
+        story.user_id,
+        viewerId,
+        followingIds,
+        mutualFriendIds
+      )
+    ) {
+      continue;
+    }
+    const list = storiesByUser.get(story.user_id) ?? [];
+    list.push(story);
+    storiesByUser.set(story.user_id, list);
+  }
+
+  const viewedByUser = await getStoryViewStatus(viewerId, storiesByUser);
+
+  return partners.map((profile) => {
+    const userStories = storiesByUser.get(profile.id) ?? [];
+    const streak = computeWorkoutStreakFromDates(datesByUser.get(profile.id) ?? [], now);
+    const hasActiveStory = userStories.length > 0;
+
+    return {
+      user_id: profile.id,
+      profile,
+      workout_streak: streak,
+      workout_count: countByUser.get(profile.id) ?? 0,
+      has_recent_workout: hasActiveStory,
+      active_stories: userStories,
+      last_workout: null,
+      is_self: false,
+      viewer_follows: followingIds.has(profile.id),
+      viewed: viewedByUser.get(profile.id) ?? true,
+    };
+  });
+}
+
+/** User IDs with at least one non-expired workout story (for inbox story rings). */
+export async function getActiveStoryUserIds(userIds: string[]): Promise<Set<string>> {
+  if (!userIds.length) return new Set();
+
+  const now = new Date().toISOString();
+  const { data, error } = await getSupabase()
+    .from("stories")
+    .select("user_id")
+    .in("user_id", userIds)
+    .gt("expires_at", now);
+
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.user_id as string));
 }
 
 /** Flatten all active stories for a feed user into viewer segments. */

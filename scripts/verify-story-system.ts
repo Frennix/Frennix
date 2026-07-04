@@ -85,13 +85,21 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => mustInclude("components/story/StoryAnalyticsModal.tsx", "Story Analytics", "ui"),
   },
   {
-    name: "ui:5 story reactions",
+    name: "ui:7 story reactions",
     run: () => {
       const src = read("packages/types/src/workout-story.ts");
-      if (!src.includes("Laugh")) throw new Error("Laugh reaction missing");
+      if (!src.includes("Watching")) throw new Error("Watching reaction missing");
       const count = (src.match(/emoji:/g) ?? []).length;
-      if (count < 5) throw new Error("Expected 5 story reactions");
+      if (count < 7) throw new Error(`Expected 7 story reactions, found ${count}`);
     },
+  },
+  {
+    name: "fitness:templates",
+    run: () => mustInclude("lib/story-templates.ts", "Just Finished Workout", "ui"),
+  },
+  {
+    name: "fitness:story-fitness api",
+    run: () => mustInclude("packages/api/src/story-fitness.ts", "createStoryTrainingChallenge", "api"),
   },
   {
     name: "ui:viewer uses dedicated slides",
@@ -106,8 +114,65 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => mustInclude("packages/types/src/index.ts", "active_stories", "types"),
   },
   {
-    name: "ui:workout saved sheet",
-    run: () => mustInclude("components/WorkoutSavedSheet.tsx", "Workout Saved", "ui"),
+    name: "api:getFeedStories filters story-only row",
+    run: () => mustInclude("packages/api/src/stories.ts", "active_stories.length > 0", "api"),
+  },
+  {
+    name: "api:share-workout story-only uses uploadStoryMedia",
+    run: () => mustInclude("lib/share-workout.ts", "uploadStoryMedia", "share"),
+  },
+  {
+    name: "api:share-workout feed-only uses uploadPostMedia",
+    run: () => mustInclude("lib/share-workout.ts", "uploadPostMedia", "share"),
+  },
+  {
+    name: "ui:viewer has no post fallback slides",
+    run: () => {
+      const src = read("components/WorkoutStoryViewer.tsx");
+      if (src.includes("buildStorySlides")) {
+        throw new Error("WorkoutStoryViewer must not fall back to post-derived slides");
+      }
+    },
+  },
+  {
+    name: "ui:workout saved sheet labels",
+    run: () => {
+      mustInclude("components/WorkoutSavedSheet.tsx", "Post to Feed", "ui");
+      mustInclude("components/WorkoutSavedSheet.tsx", "Share to Story", "ui");
+      mustInclude("components/WorkoutSavedSheet.tsx", "Share to Both", "ui");
+    },
+  },
+  {
+    name: "phase3:story polls migration",
+    run: () => mustInclude("supabase/migrations/20250714000001_story_phase3_engagement.sql", "story_polls", "migration"),
+  },
+  {
+    name: "phase3:story reply dm reference",
+    run: () => mustInclude("supabase/migrations/20250714000001_story_phase3_engagement.sql", "story_reply_id", "migration"),
+  },
+  {
+    name: "phase3:realtime viewers",
+    run: () => mustInclude("packages/api/src/story-engagement.ts", "subscribeStoryViewers", "api"),
+  },
+  {
+    name: "phase3:story discovery lanes",
+    run: () => mustInclude("packages/api/src/story-discovery.ts", "getStoryDiscoveryLanes", "api"),
+  },
+  {
+    name: "phase3:story explore screen",
+    run: () => mustInclude("app/stories/explore.tsx", "getStoryDiscoveryLanes", "ui"),
+  },
+  {
+    name: "phase3:story templates",
+    run: () => mustInclude("lib/story-templates.ts", "Recovery Day", "ui"),
+  },
+  {
+    name: "phase3:instagram story reply bubble",
+    run: () => mustInclude("packages/ui/src/MessageBubble.tsx", "Replied to your story", "ui"),
+  },
+  {
+    name: "ui:your story entry point",
+    run: () => mustInclude("packages/ui/src/FeedStoriesRow.tsx", "Your Story", "ui"),
   },
   {
     name: "ui:story quick actions",

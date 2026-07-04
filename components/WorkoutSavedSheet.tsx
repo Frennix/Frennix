@@ -3,9 +3,9 @@ import type { StoryShareMode } from "@frennix/types";
 import { colors, spacing, typography } from "@frennix/ui";
 
 const OPTIONS: Array<{ mode: StoryShareMode | "done"; label: string; hint: string; emoji: string }> = [
-  { mode: "feed", label: "Share to Feed", hint: "Post on your home feed", emoji: "📰" },
+  { mode: "feed", label: "Post to Feed", hint: "Share on your home feed", emoji: "📰" },
   { mode: "story", label: "Share to Story", hint: "24-hour story only", emoji: "⭕" },
-  { mode: "both", label: "Feed + Story", hint: "Share to both places", emoji: "✨" },
+  { mode: "both", label: "Share to Both", hint: "Feed post and story", emoji: "✨" },
   { mode: "done", label: "Done", hint: "Save without sharing", emoji: "✓" },
 ];
 

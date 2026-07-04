@@ -5,14 +5,20 @@ import { colors, overlays, spacing, typography } from "@frennix/ui";
 interface StoryInsightsStripProps {
   insights: StoryInsights;
   onViewsPress?: () => void;
+  onReactionsPress?: () => void;
   onPress?: () => void;
 }
 
 /** Compact creator insights — tap views for viewer list. */
-export function StoryInsightsStrip({ insights, onViewsPress, onPress }: StoryInsightsStripProps) {
+export function StoryInsightsStrip({
+  insights,
+  onViewsPress,
+  onReactionsPress,
+  onPress,
+}: StoryInsightsStripProps) {
   const items = [
     { label: "Views", value: insights.views, onPress: onViewsPress ?? onPress },
-    { label: "Reactions", value: insights.reactions, onPress },
+    { label: "Reactions", value: insights.reactions, onPress: onReactionsPress ?? onPress },
     { label: "Replies", value: insights.replies, onPress },
   ].filter((item) => item.value > 0 || item.label === "Views");
 

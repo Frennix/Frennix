@@ -72,7 +72,7 @@ export function StoryQuickActionsBar({
     { key: "workout", emoji: "🤝", label: "Invite to Workout", onPress: onInviteWorkout, loading: inviteLoading },
     { key: "event", emoji: "📅", label: "Invite to Event", onPress: onInviteEvent },
     ...(hasChallenge && onJoinChallenge
-      ? [{ key: "challenge", emoji: "🎯", label: "Join Challenge", onPress: onJoinChallenge }]
+      ? [{ key: "challenge", emoji: "🎯", label: "I'm In", onPress: onJoinChallenge }]
       : []),
     { key: "profile", emoji: "👤", label: "View Profile", onPress: onViewProfile },
   ];

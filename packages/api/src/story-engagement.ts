@@ -8,7 +8,9 @@ import { createNotification } from "./notifications";
 import { getOrCreateConversation, sendMessage } from "./messaging";
 import { trackStoryEngagementEvent } from "./story-insights";
 import { sendStoryTrainInvite } from "./story-train-invites";
+import { getFollowingIds } from "./follows";
 import { getProfilesByIds } from "./profiles";
+import { subscribePostgresChanges } from "./realtime-utils";
 import { getSupabase } from "./supabase";
 
 export * from "./story-insights";
@@ -183,11 +185,7 @@ export async function sendDedicatedStoryReply(
   if (viewerId === storyOwnerId) throw new Error("You cannot reply to your own story");
 
   const conversationId = await getOrCreateConversation(viewerId, storyOwnerId);
-  const message = await sendMessage(
-    conversationId,
-    viewerId,
-    `Replied to your Story: ${trimmed}`
-  );
+  const message = await sendMessage(conversationId, viewerId, trimmed, null, null, null, storyId);
 
   await trackStoryEngagementEvent({
     viewerId,
@@ -248,13 +246,15 @@ export async function joinStoryChallenge(
   viewerId: string,
   storyOwnerId: string,
   storyId: string,
-  challengeId: string
+  challengeId?: string | null,
+  trainingChallengeId?: string | null
 ) {
   if (viewerId === storyOwnerId) return;
 
   const { error } = await getSupabase().from("story_challenge_joins").insert({
     story_id: storyId,
-    challenge_id: challengeId,
+    challenge_id: challengeId ?? null,
+    story_training_challenge_id: trainingChallengeId ?? null,
     user_id: viewerId,
   });
 
@@ -383,20 +383,33 @@ export async function getStoryViewers(
   if (!data?.length) return [];
 
   const viewerIds = data.map((row) => row.viewer_id as string);
-  const profiles = await getProfilesByIds(viewerIds);
+
+  const [profiles, followingIds, { data: followerRows }] = await Promise.all([
+    getProfilesByIds(viewerIds),
+    getFollowingIds(storyOwnerId),
+    getSupabase().from("follows").select("follower_id").eq("following_id", storyOwnerId),
+  ]);
+
+  const followingSet = new Set(followingIds);
+  const followsYouSet = new Set((followerRows ?? []).map((row) => row.follower_id as string));
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
   return data.map((row) => {
-    const profile = profileById.get(row.viewer_id as string);
+    const viewerId = row.viewer_id as string;
+    const profile = profileById.get(viewerId);
     return {
-      viewer_id: row.viewer_id as string,
+      viewer_id: viewerId,
       profile: {
-        id: profile?.id ?? (row.viewer_id as string),
+        id: profile?.id ?? viewerId,
         username: profile?.username ?? "athlete",
         display_name: profile?.display_name ?? "Athlete",
         avatar_url: profile?.avatar_url ?? null,
+        is_online: profile?.is_online ?? null,
+        last_seen_at: profile?.last_seen_at ?? null,
       },
       viewed_at: row.viewed_at as string,
+      is_following: followingSet.has(viewerId),
+      follows_you: followsYouSet.has(viewerId),
     };
   });
 }
@@ -435,7 +448,8 @@ export async function getStoryReactions(
 }
 
 export async function getDedicatedStoryAnalytics(storyId: string): Promise<StoryAnalytics> {
-  const [viewsResult, reactionsResult, repliesResult, joinsResult] = await Promise.all([
+  const [viewsResult, reactionsResult, repliesResult, joinsResult, profileVisitsResult] =
+    await Promise.all([
     getSupabase()
       .from("story_item_views")
       .select("*", { count: "exact", head: true })
@@ -453,6 +467,11 @@ export async function getDedicatedStoryAnalytics(storyId: string): Promise<Story
       .from("story_challenge_joins")
       .select("*", { count: "exact", head: true })
       .eq("story_id", storyId),
+    getSupabase()
+      .from("story_engagement_events")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", storyId)
+      .eq("event_type", "profile_visit"),
   ]);
 
   return {
@@ -461,5 +480,26 @@ export async function getDedicatedStoryAnalytics(storyId: string): Promise<Story
     reactions: reactionsResult.count ?? 0,
     replies: repliesResult.count ?? 0,
     challenge_joins: joinsResult.count ?? 0,
+    profile_visits: profileVisitsResult.count ?? 0,
   };
+}
+
+/** Live viewer list updates for story owners. */
+export function subscribeStoryViewers(
+  storyId: string,
+  onChange: () => void
+): { unsubscribe: () => void } {
+  const subscription = subscribePostgresChanges("story-viewers", storyId, [
+    {
+      config: {
+        event: "*",
+        schema: "public",
+        table: "story_item_views",
+        filter: `story_id=eq.${storyId}`,
+      },
+      callback: () => onChange(),
+    },
+  ]);
+
+  return { unsubscribe: subscription.unsubscribe };
 }

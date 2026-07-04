@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Animated,
   Modal,
@@ -26,22 +27,33 @@ import {
   touchTarget,
   typography,
 } from "@frennix/ui";
-import {
-  formatStoryDuration,
-  formatStoryCompletedTime,
-  formatStoryCalories,
-} from "@/lib/story-format";
-import { primaryStoryMilestone } from "@frennix/api";
 import { StoryWorkoutSlideCard } from "./story/StoryWorkoutSlideCard";
 import { StoryQuickActionsBar } from "./story/StoryQuickActionsBar";
 import { StoryReplyBar } from "./story/StoryReplyBar";
-import { StoryFooterGradient } from "./story/StoryFooterGradient";
-import { StoryDailyMotivation } from "./story/StoryDailyMotivation";
-import { StoryAchievementMoment } from "./story/StoryAchievementMoment";
+import { StoryReactionRow } from "./story/StoryReactionRow";
+import { StoryPollVoteCard } from "./story/StoryPollVoteCard";
+import { StoryCountdownCard } from "./story/StoryCountdownCard";
+import { StoryQuestionCard } from "./story/StoryQuestionCard";
+import { StoryChallengeAccepts } from "./story/StoryChallengeAccepts";
+import { StoryCompletionBadge } from "./story/StoryCompletionBadge";
+import { StoryQuestionAnswersModal } from "./story/StoryQuestionAnswersModal";
+import {
+  getStoryPoll,
+  voteStoryPoll,
+  getStoryTrainingChallenge,
+  getStoryChallengeJoins,
+  getStoryCountdown,
+  subscribeStoryCountdown,
+  getStoryQuestion,
+  answerStoryQuestion,
+  getStoryWorkoutCommitment,
+  getStoryQuestionAnswersForOwner,
+  shareStoryQuestionAnswer,
+} from "@frennix/api";
+import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
 import {
   buildDedicatedStorySlides,
-  buildStorySlides,
   prefetchStorySlide,
   resolveSlideContext,
   type WorkoutStorySlide,
@@ -185,15 +197,21 @@ export interface WorkoutStoryViewerProps {
   ) => void | Promise<void>;
   onChallenge?: (storyUserId: string, key: StoryChallengeKey) => void | Promise<void>;
   onReply?: (storyUserId: string, text: string, storyId?: string | null) => void | Promise<void>;
-  onJoinChallenge?: (storyUserId: string, storyId: string, challengeId: string) => void | Promise<void>;
+  onJoinChallenge?: (
+    storyUserId: string,
+    storyId: string,
+    options: { challengeId?: string | null; trainingChallengeId?: string | null }
+  ) => void | Promise<void>;
   onOpenViewers?: () => void;
   onOpenAnalytics?: () => void;
+  onOpenReactions?: () => void;
   onFollow?: (storyUserId: string, isFollowing: boolean) => void | Promise<void>;
   onInviteToTrain?: (storyUserId: string, postId: string | null) => void | Promise<void>;
   onInviteToEvent?: (storyUserId: string, storyId: string) => void | Promise<void>;
   onDiscoverTag?: (tag: string) => void;
   onDiscoverLocation?: (location: string) => void;
   onViewProfileFromStory?: (storyUserId: string, username: string) => void;
+  onMarkCommitmentComplete?: () => void | Promise<void>;
   storyInsights?: StoryInsights | null;
   followLoading?: boolean;
   inviteLoading?: boolean;
@@ -214,12 +232,14 @@ export function WorkoutStoryViewer({
   onJoinChallenge,
   onOpenViewers,
   onOpenAnalytics,
+  onOpenReactions,
   onFollow,
   onInviteToTrain,
   onInviteToEvent,
   onDiscoverTag,
   onDiscoverLocation,
   onViewProfileFromStory,
+  onMarkCommitmentComplete,
   storyInsights,
   followLoading,
   inviteLoading,
@@ -231,7 +251,7 @@ export function WorkoutStoryViewer({
   const [paused, setPaused] = useState(false);
   const [interactionLocked, setInteractionLocked] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
-  const [showReply, setShowReply] = useState(false);
+  const [questionAnswersVisible, setQuestionAnswersVisible] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const slideOpacity = useRef(new Animated.Value(1)).current;
@@ -242,13 +262,9 @@ export function WorkoutStoryViewer({
 
   const story = stories[storyIndex] ?? null;
   const activeStories = story?.active_stories ?? [];
-  const lastWorkout = story?.last_workout ?? null;
   const slides = useMemo(
-    () =>
-      activeStories.length
-        ? buildDedicatedStorySlides(activeStories)
-        : buildStorySlides(lastWorkout),
-    [activeStories, lastWorkout]
+    () => buildDedicatedStorySlides(activeStories),
+    [activeStories]
   );
   const activeSlide = slides[slideIndex] ?? slides[0];
   const slideContext = useMemo(
@@ -262,7 +278,6 @@ export function WorkoutStoryViewer({
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
   const autoAdvancePaused = paused || interactionLocked || showReply;
-  const spotlightMilestone = primaryStoryMilestone(lastWorkout?.milestones ?? []);
 
   useEffect(() => {
     if (!visible) return;
@@ -331,9 +346,7 @@ export function WorkoutStoryViewer({
     }
     if (storyIndex > 0) {
       const prevStory = stories[storyIndex - 1];
-      const prevSlides = prevStory?.active_stories?.length
-        ? buildDedicatedStorySlides(prevStory.active_stories)
-        : buildStorySlides(prevStory?.last_workout ?? null);
+      const prevSlides = buildDedicatedStorySlides(prevStory?.active_stories ?? []);
       setStoryIndex((current) => current - 1);
       setSlideIndex(Math.max(prevSlides.length - 1, 0));
     }
@@ -406,9 +419,7 @@ export function WorkoutStoryViewer({
     prefetchStorySlide(slides[slideIndex + 1]);
     const nextStory = stories[storyIndex + 1];
     if (slideIndex >= slides.length - 1 && nextStory) {
-      const firstSlide = nextStory.active_stories?.length
-        ? buildDedicatedStorySlides(nextStory.active_stories)[0]
-        : buildStorySlides(nextStory.last_workout)[0];
+      const firstSlide = buildDedicatedStorySlides(nextStory.active_stories ?? [])[0];
       prefetchStorySlide(firstSlide);
     }
   }, [slideIndex, slides, storyIndex, stories]);
@@ -453,23 +464,111 @@ export function WorkoutStoryViewer({
     [beginHold, dismissY, endHold, onClose]
   );
 
-  if (!visible || !story) return null;
+  const pollStoryId = slideContext?.storyId ?? activeStories.at(-1)?.id ?? null;
+  const { session } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: storyPoll } = useQuery({
+    queryKey: ["story-poll", pollStoryId, session?.user.id],
+    queryFn: () => getStoryPoll(pollStoryId!, session?.user.id),
+    enabled: Boolean(visible && pollStoryId),
+    staleTime: 10_000,
+  });
+
+  const { data: trainingChallenge } = useQuery({
+    queryKey: ["story-training-challenge", pollStoryId],
+    queryFn: () => getStoryTrainingChallenge(pollStoryId!),
+    enabled: Boolean(visible && pollStoryId),
+  });
+
+  const { data: challengeJoins = [] } = useQuery({
+    queryKey: ["story-challenge-joins", pollStoryId],
+    queryFn: () => getStoryChallengeJoins(pollStoryId!),
+    enabled: Boolean(visible && pollStoryId),
+    staleTime: 10_000,
+  });
+
+  const { data: storyCountdown } = useQuery({
+    queryKey: ["story-countdown", pollStoryId, session?.user.id],
+    queryFn: () => getStoryCountdown(pollStoryId!, session?.user.id),
+    enabled: Boolean(visible && pollStoryId),
+  });
+
+  const { data: storyQuestion } = useQuery({
+    queryKey: ["story-question", pollStoryId, session?.user.id],
+    queryFn: () => getStoryQuestion(pollStoryId!, session?.user.id),
+    enabled: Boolean(visible && pollStoryId),
+  });
+
+  const { data: workoutCommitment } = useQuery({
+    queryKey: ["story-commitment", pollStoryId],
+    queryFn: () => getStoryWorkoutCommitment(pollStoryId!),
+    enabled: Boolean(visible && pollStoryId),
+  });
+
+  const { data: questionAnswers = [], isLoading: questionAnswersLoading } = useQuery({
+    queryKey: ["story-question-answers", storyQuestion?.id],
+    queryFn: () => getStoryQuestionAnswersForOwner(storyQuestion!.id),
+    enabled: Boolean(visible && story?.is_self && storyQuestion?.id && questionAnswersVisible),
+  });
+
+  const handleShareQuestionAnswer = useCallback(
+    async (answerId: string) => {
+      if (!session?.user.id) return;
+      await shareStoryQuestionAnswer(answerId, session.user.id);
+      await queryClient.invalidateQueries({ queryKey: ["story-question-answers", storyQuestion?.id] });
+    },
+    [queryClient, session?.user.id, storyQuestion?.id]
+  );
+
+  const handlePollVote = useCallback(
+    async (optionId: string) => {
+      if (!storyPoll || !session?.user.id) return;
+      await voteStoryPoll(storyPoll.id, optionId, session.user.id);
+      await queryClient.invalidateQueries({ queryKey: ["story-poll", pollStoryId] });
+    },
+    [pollStoryId, queryClient, session?.user.id, storyPoll]
+  );
+
+  const handleCountdownSubscribe = useCallback(async () => {
+    if (!storyCountdown || !session?.user.id) return;
+    await subscribeStoryCountdown(storyCountdown.id, session.user.id);
+    await queryClient.invalidateQueries({ queryKey: ["story-countdown", pollStoryId] });
+  }, [pollStoryId, queryClient, session?.user.id, storyCountdown]);
+
+  const handleQuestionAnswer = useCallback(
+    async (answer: string) => {
+      if (!storyQuestion || !session?.user.id) return;
+      await answerStoryQuestion(storyQuestion.id, session.user.id, answer);
+      await queryClient.invalidateQueries({ queryKey: ["story-question", pollStoryId] });
+    },
+    [pollStoryId, queryClient, session?.user.id, storyQuestion]
+  );
+
+  const hasTrainingChallenge = Boolean(
+    trainingChallenge || currentDedicatedStory?.challenge_id || currentDedicatedStory?.challenge_prompt
+  );
+  const challengePrompt =
+    trainingChallenge?.prompt ?? currentDedicatedStory?.challenge_prompt ?? null;
+
+  if (!visible || !story || !activeStories.length) return null;
 
   const caption =
     activeSlide?.kind === "media"
       ? activeSlide.caption?.trim() ?? ""
-      : lastWorkout?.content?.trim() ?? "";
-  const showCaption = Boolean(caption) && activeSlide?.kind !== "text" && activeSlide?.kind !== "workout";
+      : activeSlide?.kind === "text"
+        ? activeSlide.content.trim()
+        : "";
+  const showCaption = Boolean(caption) && activeSlide?.kind !== "workout";
   const captionNeedsMore = caption.length > 96 || caption.includes("\n");
-  const showEmptySelfCta = story.is_self && !activeStories.length && !lastWorkout;
-  const activeStoryId = slideContext?.storyId ?? currentDedicatedStory?.id ?? lastWorkout?.post_id ?? null;
+  const activeStoryId = slideContext?.storyId ?? currentDedicatedStory?.id ?? null;
   const canEngage = Boolean(activeStoryId) && !story.is_self;
 
   const timePosted = currentDedicatedStory
     ? formatRelativeTime(currentDedicatedStory.created_at)
-    : lastWorkout
-      ? formatRelativeTime(lastWorkout.created_at)
-      : "";
+    : "";
+
+  const workoutSlide = activeSlide?.kind === "workout" ? activeSlide : null;
 
   const headerTopPad = Math.max(insets.top, Platform.OS === "web" ? spacing.md : spacing.lg);
   const footerBottomPad = Math.max(insets.bottom, spacing.md, Platform.OS === "web" ? 12 : 0);
@@ -535,43 +634,31 @@ export function WorkoutStoryViewer({
               </Pressable>
             </View>
 
-            {spotlightMilestone ? (
-              <StoryAchievementMoment milestone={spotlightMilestone} resetKey={timerKey} />
-            ) : null}
-
             {story.is_self && storyInsights ? (
               <StoryInsightsStrip
                 insights={storyInsights}
                 onViewsPress={onOpenViewers}
+                onReactionsPress={onOpenReactions}
                 onPress={onOpenAnalytics}
               />
             ) : null}
           </View>
 
           <View style={[styles.footer, { paddingBottom: footerBottomPad }]} pointerEvents="box-none">
-            {lastWorkout && !canEngage ? (
+            {workoutSlide?.kind === "workout" ? (
               <View style={styles.compactWorkoutMeta} pointerEvents="none">
-                <WorkoutTypeChips types={lastWorkout} maxVisible={2} size="compact" overlay />
+                <WorkoutTypeChips
+                  types={{ workout_types: workoutSlide.activity ? [workoutSlide.activity] : [] }}
+                  maxVisible={2}
+                  size="compact"
+                  overlay
+                />
                 <Text style={styles.compactWorkoutText} numberOfLines={1}>
                   {[
-                    formatStoryDuration(lastWorkout.metrics?.duration_seconds),
-                    formatStoryCalories(lastWorkout.metrics?.calories),
+                    workoutSlide.metrics.duration,
+                    workoutSlide.metrics.calories,
                     story.workout_streak > 0 ? formatStreakBadgeLabel(story.workout_streak) : null,
-                    formatStoryCompletedTime(lastWorkout.created_at),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </View>
-            ) : null}
-
-            {canEngage && lastWorkout ? (
-              <View style={styles.compactWorkoutMeta} pointerEvents="none">
-                <WorkoutTypeChips types={lastWorkout} maxVisible={2} size="compact" overlay />
-                <Text style={styles.compactWorkoutText} numberOfLines={1}>
-                  {[
-                    formatStoryDuration(lastWorkout.metrics?.duration_seconds),
-                    formatStoryCompletedTime(lastWorkout.created_at),
+                    timePosted,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -615,18 +702,55 @@ export function WorkoutStoryViewer({
               </Pressable>
             ) : null}
 
-            {currentDedicatedStory?.challenge_id && currentDedicatedStory.challenge_prompt ? (
+            {workoutCommitment?.completed_at ? <StoryCompletionBadge /> : null}
+
+            {storyCountdown ? (
+              <StoryCountdownCard
+                countdown={storyCountdown}
+                disabled={paused}
+                onSubscribe={story.is_self ? undefined : handleCountdownSubscribe}
+              />
+            ) : null}
+
+            {storyPoll ? (
+              <StoryPollVoteCard poll={storyPoll} disabled={paused} onVote={handlePollVote} />
+            ) : null}
+
+            {storyQuestion ? (
+              <Pressable
+                disabled={!story.is_self}
+                onPress={() => story.is_self && setQuestionAnswersVisible(true)}
+              >
+                <StoryQuestionCard
+                  question={storyQuestion}
+                  isOwner={story.is_self}
+                  disabled={paused}
+                  onSubmitAnswer={story.is_self ? undefined : handleQuestionAnswer}
+                />
+              </Pressable>
+            ) : null}
+
+            {story.is_self && (challengeJoins.length > 0 || challengePrompt) ? (
+              <StoryChallengeAccepts prompt={challengePrompt} joins={challengeJoins} />
+            ) : null}
+
+            {hasTrainingChallenge && !story.is_self ? (
               <Pressable
                 style={styles.challengeCta}
                 onPress={() =>
-                  onJoinChallenge?.(
-                    story.user_id,
-                    currentDedicatedStory.id,
-                    currentDedicatedStory.challenge_id!
-                  )
+                  onJoinChallenge?.(story.user_id, activeStoryId!, {
+                    challengeId: currentDedicatedStory?.challenge_id ?? null,
+                    trainingChallengeId: trainingChallenge?.id ?? null,
+                  })
                 }
               >
-                <Text style={styles.challengeCtaText}>Join Challenge</Text>
+                <Text style={styles.challengeCtaText}>I'm In</Text>
+              </Pressable>
+            ) : null}
+
+            {story.is_self && workoutCommitment && !workoutCommitment.completed_at && onMarkCommitmentComplete ? (
+              <Pressable style={styles.viewersCta} onPress={() => onMarkCommitmentComplete()}>
+                <Text style={styles.viewersCtaText}>Mark commitment complete</Text>
               </Pressable>
             ) : null}
 
@@ -634,10 +758,6 @@ export function WorkoutStoryViewer({
               <Pressable style={styles.viewersCta} onPress={onOpenViewers}>
                 <Text style={styles.viewersCtaText}>See viewers</Text>
               </Pressable>
-            ) : null}
-
-            {showEmptySelfCta ? (
-              <StoryDailyMotivation onShareWorkout={onShareWorkout} seed={story.user_id} />
             ) : null}
 
             {canEngage ? (
@@ -661,21 +781,21 @@ export function WorkoutStoryViewer({
                 />
                 <StoryQuickActionsBar
                   disabled={paused || showReply}
-                  hasChallenge={Boolean(currentDedicatedStory?.challenge_id)}
+                  hasChallenge={hasTrainingChallenge}
                   inviteLoading={inviteLoading}
                   onMessage={() => setShowReply(true)}
-                  onInviteWorkout={() => onInviteToTrain?.(story.user_id, lastWorkout?.post_id ?? null)}
+                  onInviteWorkout={() =>
+                    onInviteToTrain?.(story.user_id, currentDedicatedStory?.post_id ?? null)
+                  }
                   onInviteEvent={() =>
                     activeStoryId && onInviteToEvent?.(story.user_id, activeStoryId)
                   }
                   onJoinChallenge={() =>
-                    currentDedicatedStory?.challenge_id &&
                     activeStoryId &&
-                    onJoinChallenge?.(
-                      story.user_id,
-                      activeStoryId,
-                      currentDedicatedStory.challenge_id
-                    )
+                    onJoinChallenge?.(story.user_id, activeStoryId, {
+                      challengeId: currentDedicatedStory?.challenge_id ?? null,
+                      trainingChallengeId: trainingChallenge?.id ?? null,
+                    })
                   }
                   onViewProfile={() =>
                     onViewProfileFromStory?.(story.user_id, story.profile.username) ??
@@ -710,6 +830,13 @@ export function WorkoutStoryViewer({
           </View>
         </Animated.View>
       </View>
+      <StoryQuestionAnswersModal
+        visible={questionAnswersVisible}
+        answers={questionAnswers}
+        loading={questionAnswersLoading}
+        onClose={() => setQuestionAnswersVisible(false)}
+        onShareAnswer={handleShareQuestionAnswer}
+      />
     </Modal>
   );
 }

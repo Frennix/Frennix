@@ -1,10 +1,35 @@
 # Frennix Product Roadmap
 
-**Status:** Official — approved direction, pending per-milestone start approval  
-**Last updated:** June 2025  
+**Status:** Official — product building mode (approved 2026-07-04)  
+**Last updated:** 2026-07-04  
 **Owner:** Founder  
 **Source of truth:** [`PRODUCT_VISION.md`](./PRODUCT_VISION.md) — all features must align  
 **Long-term goal:** Build Frennix into a world-class fitness social platform that scales from beta to millions of users.
+
+---
+
+## Product building mode (approved 2026-07-04)
+
+Platform architecture is **complete enough**. Development focus has shifted from infrastructure to **exceptional user experience**.
+
+**Primary objective:** Ship polished, intuitive, fast, reliable features that users love every day — extending the existing capability foundation, not expanding it.
+
+**No architecture pauses:** Product development continues unless a **real limitation** is discovered. Competitive advantage comes from **execution, polish, and a best-in-class fitness experience**.
+
+**Current product priorities** (override infra work unless genuinely required):
+
+| Priority | Focus |
+|----------|-------|
+| 1 | Polish the **Training Calendar** |
+| 2 | Make **Stories** the most engaging fitness-first story experience |
+| 3 | Refine **Workout Invites** and **Favorite Training Partners** |
+| 4 | Continue improving **Challenges** and **Events** |
+| 5 | Performance, stability, accessibility, and interaction polish app-wide |
+| 6 | Daily-use features that reinforce motivation, accountability, and connection |
+
+**Litmus test:** *"Does this make it easier or more motivating for someone to stay consistent with their fitness journey?"*
+
+**Architecture:** Extend existing capabilities per [`PLATFORM_CAPABILITIES.md`](../docs/PLATFORM_CAPABILITIES.md). New systems only with documented justification ([`SYSTEM_ARCHITECTURE.md`](../docs/SYSTEM_ARCHITECTURE.md) § Architecture Freeze Rule).
 
 ---
 

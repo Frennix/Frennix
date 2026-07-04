@@ -3,18 +3,13 @@ import { Platform, Pressable, StyleSheet } from "react-native";
 import { colors, spacing } from "@frennix/ui";
 
 type MessageActionsMenuProps = {
-  visible: boolean;
   onPress: () => void;
 };
 
-export function MessageActionsMenu({ visible, onPress }: MessageActionsMenuProps) {
+export function MessageActionsMenu({ onPress }: MessageActionsMenuProps) {
   return (
     <Pressable
-      style={[
-        styles.button,
-        Platform.OS === "web" && styles.webButton,
-        visible ? styles.visible : styles.hidden,
-      ]}
+      style={[styles.button, Platform.OS === "web" && styles.webButton]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Message options"
@@ -38,12 +33,5 @@ const styles = StyleSheet.create({
   },
   webButton: {
     cursor: "pointer",
-  },
-  visible: {
-    opacity: 1,
-  },
-  hidden: {
-    opacity: 0,
-    pointerEvents: "none",
   },
 });

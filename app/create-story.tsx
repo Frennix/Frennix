@@ -13,9 +13,11 @@ import {
 } from "react-native";
 import {
   STORY_LOCATION_TYPES,
+  STORY_POLL_PRESETS,
   STORY_PRIVACY_OPTIONS,
   STORY_WORKOUT_TAGS,
   type StoryLocationType,
+  type StoryPollPresetId,
   type StoryPrivacy,
   type StorySlideDraft,
 } from "@frennix/types";
@@ -26,7 +28,14 @@ import {
   uploadStoryMedia,
   withTimeout,
   POST_CREATE_TIMEOUT_MS,
+  createStoryPoll,
+  createStoryTrainingChallenge,
+  createStoryCountdown,
+  createStoryQuestion,
+  createStoryWorkoutCommitment,
 } from "@frennix/api";
+import { combineDateAndTime } from "@/lib/event-datetime";
+import { STORY_WORKOUT_TEMPLATES } from "@/lib/story-templates";
 import { resolveVideoUploadFile } from "@/lib/video-upload";
 import {
   formatVideoDuration,
@@ -65,6 +74,15 @@ export default function CreateStoryScreen() {
   const [locationName, setLocationName] = useState("");
   const [locationType, setLocationType] = useState<StoryLocationType | null>(null);
   const [caption, setCaption] = useState("");
+  const [selectedPollPreset, setSelectedPollPreset] = useState<StoryPollPresetId | "custom" | null>(null);
+  const [customPollQuestion, setCustomPollQuestion] = useState("");
+  const [customPollOptions, setCustomPollOptions] = useState("");
+  const [trainingChallengePrompt, setTrainingChallengePrompt] = useState("");
+  const [countdownLabel, setCountdownLabel] = useState("");
+  const [countdownDate, setCountdownDate] = useState("");
+  const [countdownTime, setCountdownTime] = useState("09:00");
+  const [trainingQuestion, setTrainingQuestion] = useState("");
+  const [workoutCommitment, setWorkoutCommitment] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -184,7 +202,7 @@ export default function CreateStoryScreen() {
         });
       }
 
-      await withTimeout(
+      const publishedStory = await withTimeout(
         publishStory({
           user_id: userId,
           privacy,
@@ -196,6 +214,53 @@ export default function CreateStoryScreen() {
         POST_CREATE_TIMEOUT_MS,
         "Publishing story"
       );
+
+      if (selectedPollPreset && selectedPollPreset !== "custom") {
+        const preset = STORY_POLL_PRESETS.find((item) => item.id === selectedPollPreset);
+        if (preset) {
+          await createStoryPoll({
+            storyId: publishedStory.id,
+            question: preset.question,
+            options: [...preset.options],
+          });
+        }
+      } else if (selectedPollPreset === "custom" && customPollQuestion.trim()) {
+        const options = customPollOptions
+          .split(",")
+          .map((option) => option.trim())
+          .filter(Boolean);
+        await createStoryPoll({
+          storyId: publishedStory.id,
+          question: customPollQuestion.trim(),
+          options,
+        });
+      }
+
+      if (trainingChallengePrompt.trim()) {
+        await createStoryTrainingChallenge(publishedStory.id, trainingChallengePrompt.trim());
+      }
+
+      const countdownAt = combineDateAndTime(countdownDate, countdownTime);
+      if (countdownLabel.trim() && countdownAt) {
+        await createStoryCountdown({
+          storyId: publishedStory.id,
+          label: countdownLabel.trim(),
+          targetAt: countdownAt,
+        });
+      }
+
+      if (trainingQuestion.trim()) {
+        await createStoryQuestion(publishedStory.id, trainingQuestion.trim());
+      }
+
+      if (workoutCommitment.trim()) {
+        await createStoryWorkoutCommitment({
+          storyId: publishedStory.id,
+          userId,
+          commitmentText: workoutCommitment.trim(),
+          dueAt: countdownAt,
+        });
+      }
 
       await queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] });
       router.back();
@@ -210,7 +275,7 @@ export default function CreateStoryScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.lead}>
-          Stories disappear after 24 hours. Add slides, rearrange, preview, then publish.
+          Fitness-first stories disappear after 24 hours. Share workouts, challenges, and training invites — not feed posts.
         </Text>
 
         {previewMode && previewSlide ? (
@@ -258,6 +323,120 @@ export default function CreateStoryScreen() {
           placeholder="Great workout with @sarah"
           editable={!loading}
         />
+
+        <Text style={styles.sectionLabel}>Quick templates</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          {STORY_WORKOUT_TEMPLATES.map((template) => (
+            <Pressable
+              key={template.id}
+              style={[styles.chip, caption === template.caption && styles.chipActive]}
+              onPress={() => setCaption(template.caption)}
+            >
+              <Text style={[styles.chipText, caption === template.caption && styles.chipTextActive]}>
+                {template.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <Text style={styles.sectionLabel}>Workout poll (optional)</Text>
+        <View style={styles.chipRow}>
+          {STORY_POLL_PRESETS.map((preset) => (
+            <Pressable
+              key={preset.id}
+              style={[styles.chip, selectedPollPreset === preset.id && styles.chipActive]}
+              onPress={() =>
+                setSelectedPollPreset((current) => (current === preset.id ? null : preset.id))
+              }
+            >
+              <Text
+                style={[styles.chipText, selectedPollPreset === preset.id && styles.chipTextActive]}
+              >
+                {preset.question}
+              </Text>
+            </Pressable>
+          ))}
+          <Pressable
+            style={[styles.chip, selectedPollPreset === "custom" && styles.chipActive]}
+            onPress={() =>
+              setSelectedPollPreset((current) => (current === "custom" ? null : "custom"))
+            }
+          >
+            <Text style={[styles.chipText, selectedPollPreset === "custom" && styles.chipTextActive]}>
+              Custom poll
+            </Text>
+          </Pressable>
+        </View>
+        {selectedPollPreset === "custom" ? (
+          <>
+            <Input
+              label="Poll question"
+              value={customPollQuestion}
+              onChangeText={setCustomPollQuestion}
+              placeholder="What's your go-to warm-up?"
+              editable={!loading}
+            />
+            <Input
+              label="Options (comma-separated)"
+              value={customPollOptions}
+              onChangeText={setCustomPollOptions}
+              placeholder="Option A, Option B"
+              editable={!loading}
+            />
+          </>
+        ) : null}
+
+        <Input
+          label="Training challenge (optional)"
+          value={trainingChallengePrompt}
+          onChangeText={setTrainingChallengePrompt}
+          placeholder="100 push-ups today — who's in?"
+          editable={!loading}
+        />
+
+        <Input
+          label="Training question (optional)"
+          value={trainingQuestion}
+          onChangeText={setTrainingQuestion}
+          placeholder="What's your favorite leg exercise?"
+          editable={!loading}
+        />
+
+        <Input
+          label="Workout commitment (optional)"
+          value={workoutCommitment}
+          onChangeText={setWorkoutCommitment}
+          placeholder="5K run before sunset"
+          editable={!loading}
+        />
+
+        <Input
+          label="Countdown label (optional)"
+          value={countdownLabel}
+          onChangeText={setCountdownLabel}
+          placeholder="Race day · Leg day · Group run"
+          editable={!loading}
+        />
+        <View style={styles.inlineRow}>
+          <View style={styles.inlineField}>
+            <Input
+              label="Countdown date"
+              value={countdownDate}
+              onChangeText={setCountdownDate}
+              placeholder="YYYY-MM-DD"
+              editable={!loading}
+            />
+          </View>
+          <View style={styles.inlineField}>
+            <Input
+              label="Time"
+              value={countdownTime}
+              onChangeText={setCountdownTime}
+              placeholder="09:00"
+              editable={!loading}
+            />
+          </View>
+        </View>
 
         <Text style={styles.sectionLabel}>Privacy</Text>
         <View style={styles.chipRow}>
@@ -417,5 +596,12 @@ const styles = StyleSheet.create({
   error: {
     ...typography.bodySmall,
     color: colors.danger,
+  },
+  inlineRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  inlineField: {
+    flex: 1,
   },
 });

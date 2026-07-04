@@ -1,5 +1,5 @@
 /**
- * Message + notification soft-delete verification.
+ * Message + notification soft-delete and inbox management verification.
  * Run: npx tsx scripts/verify-message-notification-delete.ts
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -7,6 +7,18 @@ import { join } from "node:path";
 
 const ROOT = join(__dirname, "..");
 const MIGRATION = join(ROOT, "supabase/migrations/20250709000001_message_notification_soft_delete.sql");
+const CONVERSATION_HIDE_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20250711000001_conversation_user_hide.sql"
+);
+const CONVERSATION_PREFS_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20250712000001_conversation_preferences.sql"
+);
+const CONVERSATION_FAVORITES_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20250713000001_conversation_favorites.sql"
+);
 
 type Check = { id: string; status: "PASS" | "FAIL"; detail: string };
 const results: Check[] = [];
@@ -33,8 +45,65 @@ if (existsSync(MIGRATION)) {
   fail("migration", "20250709000001_message_notification_soft_delete.sql missing");
 }
 
+if (existsSync(CONVERSATION_HIDE_MIGRATION)) {
+  const sql = readFileSync(CONVERSATION_HIDE_MIGRATION, "utf8");
+  for (const token of ["conversation_user_hides", "Hide conversations for self", "hidden_at"]) {
+    if (sql.includes(token)) pass(`sql:conversation-hide:${token}`, "present");
+    else fail(`sql:conversation-hide:${token}`, "missing");
+  }
+} else {
+  fail("migration", "20250711000001_conversation_user_hide.sql missing");
+}
+
+if (existsSync(CONVERSATION_PREFS_MIGRATION)) {
+  const sql = readFileSync(CONVERSATION_PREFS_MIGRATION, "utf8");
+  for (const token of [
+    "conversation_user_preferences",
+    "conversation_user_deletions",
+    "reply_to_message_id",
+    "pinned_at",
+    "muted_at",
+    "marked_unread_at",
+  ]) {
+    if (sql.includes(token)) pass(`sql:conversation-prefs:${token}`, "present");
+    else fail(`sql:conversation-prefs:${token}`, "missing");
+  }
+} else {
+  fail("migration", "20250712000001_conversation_preferences.sql missing");
+}
+
+if (existsSync(CONVERSATION_FAVORITES_MIGRATION)) {
+  const sql = readFileSync(CONVERSATION_FAVORITES_MIGRATION, "utf8");
+  if (sql.includes("favorited_at")) pass("sql:conversation-favorites:favorited_at", "present");
+  else fail("sql:conversation-favorites:favorited_at", "missing");
+} else {
+  fail("migration", "20250713000001_conversation_favorites.sql missing");
+}
+
+const storiesApi = readFileSync(join(ROOT, "packages/api/src/stories.ts"), "utf8");
+if (storiesApi.includes("getFeedStoriesForPartners")) {
+  pass("api:stories:getFeedStoriesForPartners", "present");
+} else {
+  fail("api:stories:getFeedStoriesForPartners", "missing");
+}
+
 const messagingApi = readFileSync(join(ROOT, "packages/api/src/messaging.ts"), "utf8");
-for (const token of ["deleteMessageForUser", "message_user_deletions", "getDeletedMessageIds"]) {
+for (const token of [
+  "deleteMessageForUser",
+  "hideConversationForUser",
+  "deleteConversationForUser",
+  "favoriteConversationForUser",
+  "favorited_at",
+  "MAX_FAVORITE_TRAINING_PARTNERS",
+  "muteConversationForUser",
+  "markConversationUnreadForUser",
+  "message_user_deletions",
+  "conversation_user_hides",
+  "conversation_user_deletions",
+  "conversation_user_preferences",
+  "reply_to_message_id",
+  "MAX_PINNED_CONVERSATIONS",
+]) {
   if (messagingApi.includes(token)) pass(`api:messaging:${token}`, "present");
   else fail(`api:messaging:${token}`, "missing");
 }
@@ -45,34 +114,60 @@ for (const token of ["dismissNotification", "deleted_at"]) {
   else fail(`api:notifications:${token}`, "missing");
 }
 
+const pushFn = readFileSync(join(ROOT, "supabase/functions/send-push/index.ts"), "utf8");
+if (pushFn.includes("conversation_user_preferences") && pushFn.includes("muted_at")) {
+  pass("push:mute-check", "present");
+} else {
+  fail("push:mute-check", "missing");
+}
+
 const types = readFileSync(join(ROOT, "packages/types/src/index.ts"), "utf8");
-if (types.includes("deleted_at")) pass("types:notification-deleted_at", "present");
-else fail("types:notification-deleted_at", "missing");
+for (const token of ["is_pinned", "is_favorite", "is_muted", "marked_unread", "reply_to_message_id"]) {
+  if (types.includes(token)) pass(`types:${token}`, "present");
+  else fail(`types:${token}`, "missing");
+}
 
 for (const [file, token] of [
-  ["app/chat/[conversationId].tsx", "deleteMessageForUser"],
-  ["app/chat/[conversationId].tsx", "useDismissWithAnimation"],
-  ["app/chat/[conversationId].tsx", "sender_id === userId"],
-  ["components/ChatMessageRow.tsx", "SwipeToDeleteRow"],
+  ["app/chat/[conversationId].tsx", "buildMessageMenuActions"],
+  ["app/chat/[conversationId].tsx", "confirmDeleteMessageForMe"],
+  ["app/chat/[conversationId].tsx", "copyMessageText"],
+  ["app/chat/[conversationId].tsx", "replyToMessageId"],
   ["components/ChatMessageRow.tsx", "MessageActionsMenu"],
-  ["components/ChatMessageRow.tsx", "enabled={isOwn}"],
-  ["components/MessageActionsMenu.tsx", "MoreVertical"],
-  ["components/SwipeToDeleteRow.tsx", "Platform.OS === \"web\""],
-  ["app/notifications.tsx", "dismissNotification"],
-  ["app/notifications.tsx", "useDismissWithAnimation"],
-  ["app/notifications.tsx", "SwipeToDeleteRow"],
-  ["components/FrennixNotificationRow.tsx", "onDelete"],
-  ["components/SwipeToDeleteRow.tsx", "Swipeable"],
+  ["components/ChatMessageRow.tsx", "onLongPressMenu"],
+  ["components/SwipeableActionsRow.tsx", "rightActions"],
+  ["components/FavoriteTrainingPartnersSection.tsx", "Favorite Training Partners"],
+  ["components/FavoriteTrainingPartnersSection.tsx", "formatStreakBadgeLabel"],
+  ["components/FavoriteTrainingPartnersSection.tsx", "avatarRingStory"],
+  ["components/FavoritePartnerQuickActions.tsx", "Send Message"],
+  ["components/FavoritePartnerQuickActions.tsx", "Invite to Workout"],
+  ["app/(tabs)/messages.tsx", "getFeedStoriesForPartners"],
+  ["app/(tabs)/messages.tsx", "FeedStoryViewer"],
+  ["components/ConversationRow.tsx", "Pin"],
+  ["app/(tabs)/messages.tsx", "favoriteConversationForUser"],
+  ["lib/conversation-menu-actions.ts", "Favorite Training Partners"],
+  ["components/ConversationRow.tsx", "onLongPress"],
+  ["app/(tabs)/messages.tsx", "buildConversationMenuActions"],
+  ["app/(tabs)/messages.tsx", "confirmDeleteConversation"],
+  ["app/(tabs)/messages.tsx", "deleteConversationForUser"],
+  ["app/(tabs)/messages.tsx", "pinConversationForUser"],
+  ["lib/conversation-menu-actions.ts", "Reply"],
+  ["lib/conversation-menu-actions.ts", "Pin Conversation"],
+  ["components/ChatComposer.tsx", "replyTo"],
+  ["packages/ui/src/MessageBubble.tsx", "replyTo"],
   ["components/AnimatedDismissRow.tsx", "useAnimatedStyle"],
   ["lib/useDismissWithAnimation.ts", "confirmDismiss"],
-  ["lib/alerts.ts", "confirmDismiss"],
+  ["lib/alerts.ts", "confirmHideConversation"],
+  ["lib/alerts.ts", "confirmDeleteConversation"],
+  ["lib/alerts.ts", "confirmDeleteMessageForMe"],
+  ["app/notifications.tsx", "dismissNotification"],
+  ["components/FrennixNotificationRow.tsx", "onDelete"],
 ] as const) {
   const content = readFileSync(join(ROOT, file), "utf8");
   if (content.includes(token)) pass(`ui:${file}:${token}`, "wired");
   else fail(`ui:${file}:${token}`, "missing");
 }
 
-console.log("\nMessage + notification delete verification\n");
+console.log("\nMessage inbox management verification\n");
 for (const result of results) {
   console.log(`${result.status === "PASS" ? "✅" : "❌"} ${result.id} — ${result.detail}`);
 }

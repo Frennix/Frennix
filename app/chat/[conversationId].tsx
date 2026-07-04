@@ -27,13 +27,16 @@ import type { Conversation, Message, Profile, TrainerVerificationLevel } from "@
 import { useAuth } from "@/providers/AuthProvider";
 import { useMessageReaction } from "@/lib/useMessageReaction";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
-import { ChatComposer, type ChatComposerHandle, type ChatSendPayload } from "@/components/ChatComposer";
+import { ChatComposer, type ChatComposerHandle, type ChatReplyTarget, type ChatSendPayload } from "@/components/ChatComposer";
 import { ChatMessageRow } from "@/components/ChatMessageRow";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { TrainerBadge } from "@/components/TrainerBadge";
-import { entityAction, type EntityActionId } from "@/lib/entity-actions";
+import type { EntityActionId } from "@/lib/entity-actions";
+import { buildMessageMenuActions } from "@/lib/conversation-menu-actions";
+import { copyMessageText } from "@/lib/copy-message";
 import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
+import { confirmDeleteMessageForMe } from "@/lib/alerts";
 import { trackMessagingLoad } from "@/lib/product-analytics";
 import { formatPresenceStatus, isProfileOnline, ReactionPicker, colors, spacing, typography } from "@frennix/ui";
 
@@ -72,6 +75,7 @@ const ChatMessageList = memo(function ChatMessageList({
         userId={userId}
         myProfile={myProfile}
         sender={participantProfiles[item.sender_id]}
+        participantProfiles={participantProfiles}
         dismissing={isDismissing(item.id)}
         onMediaPress={onMediaPress}
         onReaction={onReaction}
@@ -111,6 +115,7 @@ export default function ChatScreen() {
   const [realtimeDegraded, setRealtimeDegraded] = useState(false);
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<ChatReplyTarget | null>(null);
   const queryClient = useQueryClient();
   const hideTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerRef = useRef<ChatComposerHandle>(null);
@@ -247,9 +252,17 @@ export default function ChatScreen() {
 
   const sendMutation = useMutation({
     mutationFn: (payload: ChatSendPayload) =>
-      sendMessage(conversationId!, userId, payload.content, payload.mediaUrl),
+      sendMessage(
+        conversationId!,
+        userId,
+        payload.content,
+        payload.mediaUrl,
+        null,
+        payload.replyToMessageId
+      ),
     onSuccess: () => {
       composerRef.current?.clear();
+      setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
@@ -300,7 +313,10 @@ export default function ChatScreen() {
   });
 
   const { requestDismiss: requestMessageDismiss, isDismissing: isMessageDismissing } =
-    useDismissWithAnimation((messageId) => deleteMutation.mutate(messageId));
+    useDismissWithAnimation(
+      (messageId) => deleteMutation.mutate(messageId),
+      confirmDeleteMessageForMe
+    );
 
   const handleDeleteMessage = useCallback(
     (message: Message) => {
@@ -323,16 +339,42 @@ export default function ChatScreen() {
       closeMessageActions();
       if (!message) return;
 
+      if (actionId === "reply") {
+        const senderName =
+          message.sender_id === userId
+            ? participantProfiles[userId]?.display_name ?? "You"
+            : participantProfiles[message.sender_id]?.display_name ?? otherProfile?.display_name;
+        setReplyTo({
+          id: message.id,
+          content: message.content,
+          senderName,
+        });
+        composerRef.current?.focus();
+        return;
+      }
+
+      if (actionId === "copy") {
+        void copyMessageText(message.content);
+        return;
+      }
+
       if (actionId === "react") {
         setReactionMessageId(message.id);
         return;
       }
 
-      if (actionId === "delete") {
+      if (actionId === "delete" && message.sender_id === userId) {
         requestMessageDismiss(message.id);
       }
     },
-    [actionMessage, closeMessageActions, requestMessageDismiss]
+    [
+      actionMessage,
+      closeMessageActions,
+      otherProfile?.display_name,
+      participantProfiles,
+      requestMessageDismiss,
+      userId,
+    ]
   );
 
   const reactionTarget = useMemo(
@@ -396,12 +438,11 @@ export default function ChatScreen() {
       <EntityActionSheet
         visible={!!actionMessage}
         title="Message"
-        actions={[
-          entityAction("react", "Add reaction"),
-          ...(actionMessage?.sender_id === userId
-            ? [entityAction("delete", "Delete message", { tone: "danger" })]
-            : []),
-        ]}
+        actions={
+          actionMessage
+            ? buildMessageMenuActions(actionMessage.sender_id === userId)
+            : []
+        }
         onSelect={handleMessageAction}
         onClose={closeMessageActions}
       />
@@ -422,6 +463,8 @@ export default function ChatScreen() {
           ref={composerRef}
           conversationId={conversationId!}
           userId={userId}
+          replyTo={replyTo}
+          onClearReply={() => setReplyTo(null)}
           onSend={handleSend}
           sending={sendMutation.isPending}
         />

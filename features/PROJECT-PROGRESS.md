@@ -1,6 +1,6 @@
 # Frennix Project Progress Dashboard
 
-**Last updated:** 2026-06-28  
+**Last updated:** 2026-07-04  
 **Maintained by:** Engineering — **update after every milestone start and completion**
 
 > Living document for founder review. See also [`MILESTONE-PERSPECTIVES.md`](./MILESTONE-PERSPECTIVES.md) for four-perspective status across P1–P10.
@@ -11,15 +11,13 @@
 
 | Field | Value |
 |-------|-------|
+| **Development mode** | **Product building** — execution & polish (approved 2026-07-04) |
 | **Current milestone** | **P1 — Matchmaking (Production Ready)** |
 | **P1 completion** | **~95%** — v1.0.0 rolled back; v1.0.1 hotfix pending via new release process |
 | **Overall project completion** | **~40%** (weighted across P1–P10) |
-| **Mode** | **Execution** — production-grade release process enforced |
 | **Current production version** | **v0.8.0** (`c2cb3f9`) — stable after v1.0.0 rollback |
 | **Next release target** | **v1.0.1** (P1 hotfix — Safari tab layout) |
-| **Estimated P1 completion** | QA + deploy approval (~1–2 weeks) |
-| **Estimated P1–P7 completion** | ~9–12 months |
-| **Estimated full roadmap (P1–P10)** | ~14–18 months |
+| **Product focus** | Training Calendar polish → Stories → Invites/Partners → Challenges/Events → Performance |
 
 ---
 
@@ -27,7 +25,9 @@
 
 | Doc | Purpose |
 |-----|---------|
-| [`PRODUCT_VISION.md`](./PRODUCT_VISION.md) | **Source of truth** — mission, principles, alignment gate |
+| [`PRODUCT_VISION.md`](./PRODUCT_VISION.md) | **Source of truth** — mission, principles, product building mode |
+| [`../docs/SYSTEM_ARCHITECTURE.md`](../docs/SYSTEM_ARCHITECTURE.md) | Frozen architectural baseline |
+| [`../docs/PLATFORM_CAPABILITIES.md`](../docs/PLATFORM_CAPABILITIES.md) | Capability registry — extend before creating |
 | [`MILESTONE-FRAMEWORK.md`](./MILESTONE-FRAMEWORK.md) | Four perspectives + required metadata |
 | [`MILESTONE-PERSPECTIVES.md`](./MILESTONE-PERSPECTIVES.md) | UX / Growth / Founder Ops / Scale per P1–P10 |
 | [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md) | 18-item finish gate |

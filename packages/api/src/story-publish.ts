@@ -15,6 +15,7 @@ import {
 } from "./upload-utils";
 import { getSupabase } from "./supabase";
 import { formatSupabaseError } from "./profile-utils";
+import { publishPlatformActivity } from "./platform-activity-engine";
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -166,6 +167,17 @@ export async function publishStory(input: PublishStoryInput): Promise<FrennixSto
       }).catch(() => undefined);
     }
   }
+
+  await publishPlatformActivity({
+    userId: input.user_id,
+    activityType: "story_posted",
+    sourceType: "stories",
+    sourceId: storyId,
+    metadata: {
+      slide_count: input.slides.length,
+      workout_tag: input.workout_tag ?? null,
+    },
+  }).catch(() => undefined);
 
   return {
     id: storyId,

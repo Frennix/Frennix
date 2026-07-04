@@ -8,6 +8,8 @@ export type EntityActionId =
   | "edit"
   | "delete"
   | "react"
+  | "reply"
+  | "copy"
   | "share"
   | "copy_link"
   | "report"
@@ -17,7 +19,15 @@ export type EntityActionId =
   | "close_early"
   | "cancel"
   | "invite"
-  | "duplicate";
+  | "duplicate"
+  | "hide"
+  | "mute"
+  | "unmute"
+  | "pin"
+  | "unpin"
+  | "favorite"
+  | "unfavorite"
+  | "mark_unread";
 
 export type EntityActionTone = "default" | "danger" | "muted";
 

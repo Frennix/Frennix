@@ -44,10 +44,67 @@ export function confirmDelete(entityLabel: string, onConfirm: () => void) {
   ]);
 }
 
-/** Dismiss messages/notifications from the user's view (soft delete). */
+/** Dismiss notifications from the user's view (soft delete). */
 export function confirmDismiss(onConfirm: () => void) {
   const title = "Delete this?";
   const message = "This will be removed from your view.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+/** Hide a conversation from the inbox (other participant keeps all messages). */
+export function confirmHideConversation(onConfirm: () => void) {
+  const title = "Hide this conversation?";
+  const message =
+    "It will be removed from your inbox. The other person can still see the full conversation.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Hide", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+/** Permanently remove a conversation from the current user's inbox. */
+export function confirmDeleteConversation(onConfirm: () => void) {
+  const title = "Delete this conversation?";
+  const message =
+    "It will be removed from your inbox. Messages stay available for the other person.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+/** Remove a single message from the current user's view only. */
+export function confirmDeleteMessageForMe(onConfirm: () => void) {
+  const title = "Delete this message?";
+  const message =
+    "This removes the message from your view only. The other person can still see it.";
 
   if (Platform.OS === "web") {
     if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {

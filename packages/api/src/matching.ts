@@ -16,6 +16,7 @@ import { formatSupabaseError } from "./profile-utils";
 import { getProfile, getProfilesByIds, updateProfile } from "./profiles";
 import { getWorkoutStreaksForUserIds } from "./matching-streaks";
 import { getSupabase } from "./supabase";
+import { publishPlatformActivity } from "./platform-activity-engine";
 
 const DEFAULT_CANDIDATE_LIMIT = 20;
 const MAX_CANDIDATE_LIMIT = 50;
@@ -205,7 +206,30 @@ export async function recordMatchSwipe(
     throw formatSupabaseError(error, "Failed to record swipe");
   }
 
-  return parseRecordMatchSwipeResult(data);
+  const result = parseRecordMatchSwipeResult(data);
+
+  if (result.is_mutual && result.match) {
+    const { data: session } = await getSupabase().auth.getUser();
+    const swiperId = session?.user?.id;
+    if (swiperId) {
+      await publishPlatformActivity({
+        userId: swiperId,
+        activityType: "match_created",
+        sourceType: "matches",
+        sourceId: result.match.id,
+        metadata: { matched_user_id: swipeeId },
+      }).catch(() => undefined);
+      await publishPlatformActivity({
+        userId: swipeeId,
+        activityType: "match_created",
+        sourceType: "matches",
+        sourceId: result.match.id,
+        metadata: { matched_user_id: swiperId },
+      }).catch(() => undefined);
+    }
+  }
+
+  return result;
 }
 
 export async function getMatches(userId: string): Promise<Match[]> {

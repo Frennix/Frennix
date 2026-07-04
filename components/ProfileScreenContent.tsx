@@ -11,11 +11,12 @@ import {
   type NativeSyntheticEvent,
   type ViewStyle,
 } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import type { MatchReason, Post, Profile, ProfileStats } from "@frennix/types";
 import { MatchReasonsList } from "@/components/MatchReasonsList";
 import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
 import { getFrennixMatchWhyTitle } from "@frennix/matching";
-import { computeProfileAchievements } from "@frennix/api";
+import { computeProfileAchievements, getProfileAchievementDisplays } from "@frennix/api";
 import { formatActivity, formatGoal } from "@/lib/labels";
 import { getProfileBio } from "@/lib/profile";
 import { splitProfileActivities } from "@/lib/profile-interests";
@@ -25,6 +26,7 @@ import {
   tabScreenContainer,
   tabScreenScrollSurface,
 } from "@/lib/screen-shell";
+import { StoryHighlightsRail } from "@/components/story/StoryHighlightsRail";
 import {
   Button,
   CachedImage,
@@ -130,7 +132,23 @@ export function ProfileScreenContent({
   const avatarUri = avatarDisplayUri(profile.avatar_url, profile.updated_at);
   const storedCoverUri = avatarDisplayUri(profile.cover_image_url, profile.updated_at);
   const coverUri = coverPreviewUri ?? storedCoverUri;
-  const achievements = useMemo(() => computeProfileAchievements(stats), [stats]);
+  const { data: earnedAchievements } = useQuery({
+    queryKey: ["profile-achievements", profile.id],
+    queryFn: () => getProfileAchievementDisplays(profile.id),
+    staleTime: 120_000,
+  });
+
+  const achievements = useMemo(() => {
+    if (earnedAchievements?.length) {
+      return earnedAchievements.map((badge) => ({
+        id: badge.id,
+        emoji: badge.emoji,
+        label: badge.label,
+        description: badge.description,
+      }));
+    }
+    return computeProfileAchievements(stats);
+  }, [earnedAchievements, stats]);
   const photoPosts = useMemo(() => posts.filter(isPhotoPost), [posts]);
   const presenceOnline = !isOwn && isProfileOnline(profile);
   const presenceLabel = !isOwn ? formatPresenceStatus(profile) : null;
@@ -283,6 +301,7 @@ export function ProfileScreenContent({
       </View>
 
       <WorkoutStreakBadge streak={stats.workoutStreak} />
+      <StoryHighlightsRail profileId={profile.id} isOwn={isOwn} />
 
       {!isOwn && frennixMatchScore && frennixMatchScore > 0 ? (
         <View style={styles.matchSection}>

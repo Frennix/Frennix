@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Notification } from "@frennix/types";
 import { buildNotificationDisplay } from "@frennix/api";
+import { DismissTrashButton } from "@/components/DismissTrashButton";
 import { Avatar, formatRelativeTime, colors, spacing, typography } from "@frennix/ui";
 
 type FrennixNotificationRowProps = {
@@ -51,15 +52,10 @@ export const FrennixNotificationRow = memo(function FrennixNotificationRow({
           </View>
         </View>
       </Pressable>
-      <Pressable
+      <DismissTrashButton
         onPress={onDelete}
-        hitSlop={10}
-        style={styles.deleteButton}
-        accessibilityRole="button"
         accessibilityLabel="Delete notification"
-      >
-        <Text style={styles.deleteIcon}>🗑</Text>
-      </Pressable>
+      />
     </View>
   );
 });
@@ -117,15 +113,4 @@ const styles = StyleSheet.create({
   status: { ...typography.caption, fontWeight: "700" },
   statusUnread: { color: colors.accent },
   statusRead: { color: colors.textMuted },
-  deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  deleteIcon: { fontSize: 16, lineHeight: 18 },
 });

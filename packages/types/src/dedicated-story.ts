@@ -76,8 +76,12 @@ export interface StoryViewerRecord {
     username: string;
     display_name: string;
     avatar_url: string | null;
+    is_online?: boolean | null;
+    last_seen_at?: string | null;
   };
   viewed_at: string;
+  is_following?: boolean;
+  follows_you?: boolean;
 }
 
 export interface StoryReactionRecord {
@@ -98,6 +102,90 @@ export interface StoryAnalytics {
   reactions: number;
   replies: number;
   challenge_joins: number;
+  profile_visits: number;
+}
+
+export const STORY_POLL_PRESETS = [
+  { id: "chest-or-back", question: "Chest or Back?", options: ["Chest", "Back"] },
+  { id: "morning-or-evening", question: "Morning or Evening?", options: ["Morning 🌅", "Evening 🌙"] },
+  { id: "cardio-or-weights", question: "Cardio or Weights?", options: ["Cardio", "Weights"] },
+  { id: "outdoor-or-gym", question: "Outdoor or Gym?", options: ["Outdoor", "Gym"] },
+] as const;
+
+export interface StoryTrainingChallenge {
+  id: string;
+  story_id: string;
+  prompt: string;
+  created_at: string;
+}
+
+export interface StoryChallengeJoinRecord {
+  user_id: string;
+  profile: {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_url: string | null;
+  };
+  joined_at: string;
+}
+
+export interface StoryCountdown {
+  id: string;
+  story_id: string;
+  label: string;
+  target_at: string;
+  event_id: string | null;
+  subscribed?: boolean;
+}
+
+export interface StoryQuestion {
+  id: string;
+  story_id: string;
+  question: string;
+  answer_count?: number;
+  my_answer?: string | null;
+}
+
+export interface StoryQuestionAnswer {
+  id: string;
+  question_id: string;
+  user_id: string;
+  answer_text: string;
+  shared_at: string | null;
+  created_at: string;
+  profile?: {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
+
+export interface StoryWorkoutCommitment {
+  id: string;
+  story_id: string;
+  commitment_text: string;
+  due_at: string | null;
+  completed_at: string | null;
+}
+
+export type StoryPollPresetId = (typeof STORY_POLL_PRESETS)[number]["id"];
+
+export interface StoryPollOption {
+  id: string;
+  poll_id: string;
+  label: string;
+  sort_order: number;
+  vote_count?: number;
+}
+
+export interface StoryPoll {
+  id: string;
+  story_id: string;
+  question: string;
+  options: StoryPollOption[];
+  my_vote_option_id?: string | null;
 }
 
 export type StoryShareMode = "feed" | "story" | "both";
@@ -105,7 +193,7 @@ export type StoryShareMode = "feed" | "story" | "both";
 export const STORY_SHARE_MODE_OPTIONS: Array<{ value: StoryShareMode; label: string; hint: string }> = [
   { value: "feed", label: "Post to Feed", hint: "Share on your home feed only" },
   { value: "story", label: "Add to Story", hint: "24-hour story only" },
-  { value: "both", label: "Feed + Story", hint: "Share to both places" },
+  { value: "both", label: "Post to Feed + Story", hint: "Create separate feed and story records" },
 ];
 
 /** Draft slide before publishing. */

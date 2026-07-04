@@ -155,6 +155,16 @@ export function openNotificationTarget(notification: Notification): Notification
     return { ok: false, message: "This challenge is no longer available." };
   }
 
+  if (
+    type === "training_session_invite" ||
+    type === "training_session_accepted" ||
+    type === "training_session_reminder"
+  ) {
+    const calendarItemId = asString(payload.calendar_item_id);
+    if (calendarItemId) return pushHref(`/training-calendar/${calendarItemId}`);
+    return pushHref("/(tabs)/events");
+  }
+
   if (type === "group_invite") {
     const groupId = asString(payload.group_id);
     if (groupId) return pushHref(`/group/${groupId}`);
@@ -248,6 +258,17 @@ export function openNotificationFromPushData(data: Record<string, unknown>): Not
     const challengeId = asString(data.challenge_id) ?? asString(payload.challenge_id);
     if (challengeId) return pushHref(`/challenge/${challengeId}`);
     return { ok: false, message: "This challenge is no longer available." };
+  }
+
+  if (
+    type === "training_session_invite" ||
+    type === "training_session_accepted" ||
+    type === "training_session_reminder"
+  ) {
+    const calendarItemId =
+      asString(data.calendar_item_id) ?? asString(payload.calendar_item_id);
+    if (calendarItemId) return pushHref(`/training-calendar/${calendarItemId}`);
+    return pushHref("/(tabs)/events");
   }
 
   if (type === "group_invite") {

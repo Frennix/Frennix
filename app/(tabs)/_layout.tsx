@@ -117,8 +117,9 @@ const TabsShell = memo(function TabsShell() {
       <Tabs.Screen
         name="events"
         options={{
-          title: "Events",
+          title: "Calendar",
           headerTitle: renderEventsHeaderTitle,
+          tabBarLabel: "Calendar",
           tabBarIcon: ({ color, size }) => <AppIcon name="events" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => (

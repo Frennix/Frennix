@@ -132,6 +132,16 @@ export default function RootLayout() {
               name="create-event"
               options={backScreen("Create event", { presentation: "modal" })}
             />
+            <Stack.Screen name="events/browse" options={backScreen("Community Events", fadeScreen)} />
+            <Stack.Screen
+              name="training-calendar/create"
+              options={backScreen("Schedule Training", { presentation: "modal" })}
+            />
+            <Stack.Screen name="training-calendar/[id]" options={backScreen("Session")} />
+            <Stack.Screen
+              name="training-calendar/edit/[id]"
+              options={backScreen("Edit Session", { presentation: "modal" })}
+            />
             <Stack.Screen
               name="edit-event/[id]"
               options={backScreen("Edit event", { presentation: "modal" })}
@@ -178,6 +188,7 @@ export default function RootLayout() {
             <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />
             <Stack.Screen name="privacy-settings" options={backScreen("Privacy")} />
             <Stack.Screen name="stories/discover" options={backScreen("Discover Stories", fadeScreen)} />
+            <Stack.Screen name="stories/explore" options={backScreen("Explore Stories", fadeScreen)} />
             <Stack.Screen name="invite-friends" options={backScreen("Invite Friends")} />
             <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
             <Stack.Screen name="blocked-users" options={backScreen("Blocked users")} />
