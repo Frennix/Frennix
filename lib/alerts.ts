@@ -44,6 +44,24 @@ export function confirmDelete(entityLabel: string, onConfirm: () => void) {
   ]);
 }
 
+/** Dismiss messages/notifications from the user's view (soft delete). */
+export function confirmDismiss(onConfirm: () => void) {
+  const title = "Delete this?";
+  const message = "This will be removed from your view.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 export function confirmDeleteChallenge(onConfirm: () => void) {
   confirmDelete("Challenge", onConfirm);
 }

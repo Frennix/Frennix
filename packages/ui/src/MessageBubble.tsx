@@ -18,6 +18,7 @@ interface MessageBubbleProps {
   onMediaPress?: () => void;
   onSharedPostPress?: () => void;
   onReaction?: (emoji: string) => void;
+  onLongPressMenu?: () => void;
   senderAvatarUrl?: string | null;
   senderName?: string;
   showAvatar?: boolean;
@@ -33,6 +34,7 @@ export function MessageBubble({
   onMediaPress,
   onSharedPostPress,
   onReaction,
+  onLongPressMenu,
   senderAvatarUrl,
   senderName,
   showAvatar = true,
@@ -48,7 +50,13 @@ export function MessageBubble({
       ) : null}
       <View style={styles.messageColumn}>
         <Pressable
-          onLongPress={onReaction ? () => setPickerOpen(true) : undefined}
+          onLongPress={() => {
+            if (onLongPressMenu) {
+              onLongPressMenu();
+              return;
+            }
+            if (onReaction) setPickerOpen(true);
+          }}
           delayLongPress={350}
         >
           <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>

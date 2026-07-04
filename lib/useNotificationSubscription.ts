@@ -69,6 +69,13 @@ export function useNotificationSubscription(userId: string) {
     }
 
     function handleUpdate(notification: Notification) {
+      if (notification.deleted_at) {
+        queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
+          current?.filter((item) => item.id !== notification.id)
+        );
+        return;
+      }
+
       queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
         current?.map((item) => (item.id === notification.id ? { ...item, ...notification } : item))
       );

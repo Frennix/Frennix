@@ -1,6 +1,9 @@
 import { router } from "expo-router";
 import { memo, useCallback, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 import type { Message, Profile } from "@frennix/types";
+import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
+import { SwipeToDeleteRow } from "@/components/SwipeToDeleteRow";
 import { MessageBubble } from "@frennix/ui";
 
 type ChatMessageRowProps = {
@@ -8,8 +11,11 @@ type ChatMessageRowProps = {
   userId: string;
   myProfile?: Profile;
   sender?: Profile;
+  dismissing?: boolean;
   onMediaPress: (uri: string) => void;
   onReaction: (messageId: string, emoji: string, currentEmoji?: string | null) => void;
+  onLongPressMenu: (message: Message) => void;
+  onDelete: (message: Message) => void;
 };
 
 function reactionsEqual(a: Message["reactions"], b: Message["reactions"]) {
@@ -26,6 +32,7 @@ function rowPropsEqual(prev: ChatMessageRowProps, next: ChatMessageRowProps) {
     prev.myProfile?.display_name === next.myProfile?.display_name &&
     prev.sender?.avatar_url === next.sender?.avatar_url &&
     prev.sender?.display_name === next.sender?.display_name &&
+    prev.dismissing === next.dismissing &&
     a.id === b.id &&
     a.content === b.content &&
     a.media_url === b.media_url &&
@@ -41,8 +48,11 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   userId,
   myProfile,
   sender,
+  dismissing = false,
   onMediaPress,
   onReaction,
+  onLongPressMenu,
+  onDelete,
 }: ChatMessageRowProps) {
   const isOwn = message.sender_id === userId;
   const time = useMemo(
@@ -64,19 +74,39 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     [message.id, message.my_reaction, onReaction]
   );
 
+  const handleLongPressMenu = useCallback(
+    () => onLongPressMenu(message),
+    [message, onLongPressMenu]
+  );
+
+  const handleDelete = useCallback(() => onDelete(message), [message, onDelete]);
+
   return (
-    <MessageBubble
-      content={message.content}
-      isOwn={isOwn}
-      timestamp={time}
-      mediaUrl={message.media_url}
-      sharedPost={message.shared_post}
-      onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
-      onMediaPress={message.media_url ? handleMediaPress : undefined}
-      reactions={message.reactions}
-      onReaction={handleReaction}
-      senderAvatarUrl={isOwn ? myProfile?.avatar_url : sender?.avatar_url}
-      senderName={isOwn ? myProfile?.display_name : sender?.display_name}
-    />
+    <AnimatedDismissRow dismissing={dismissing}>
+      <SwipeToDeleteRow onDelete={handleDelete}>
+        <View style={styles.row}>
+          <MessageBubble
+            content={message.content}
+            isOwn={isOwn}
+            timestamp={time}
+            mediaUrl={message.media_url}
+            sharedPost={message.shared_post}
+            onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
+            onMediaPress={message.media_url ? handleMediaPress : undefined}
+            reactions={message.reactions}
+            onReaction={handleReaction}
+            onLongPressMenu={handleLongPressMenu}
+            senderAvatarUrl={isOwn ? myProfile?.avatar_url : sender?.avatar_url}
+            senderName={isOwn ? myProfile?.display_name : sender?.display_name}
+          />
+        </View>
+      </SwipeToDeleteRow>
+    </AnimatedDismissRow>
   );
 }, rowPropsEqual);
+
+const styles = StyleSheet.create({
+  row: {
+    width: "100%",
+  },
+});

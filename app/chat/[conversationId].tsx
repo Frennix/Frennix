@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import {
+  deleteMessageForUser,
   getConversationProfiles,
   getMessages,
   getTrainerVerificationForUser,
@@ -28,10 +29,13 @@ import { useMessageReaction } from "@/lib/useMessageReaction";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { ChatComposer, type ChatComposerHandle, type ChatSendPayload } from "@/components/ChatComposer";
 import { ChatMessageRow } from "@/components/ChatMessageRow";
+import { EntityActionSheet } from "@/components/EntityActionSheet";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { TrainerBadge } from "@/components/TrainerBadge";
+import { entityAction, type EntityActionId } from "@/lib/entity-actions";
+import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
 import { trackMessagingLoad } from "@/lib/product-analytics";
-import { formatPresenceStatus, isProfileOnline, colors, spacing, typography } from "@frennix/ui";
+import { formatPresenceStatus, isProfileOnline, ReactionPicker, colors, spacing, typography } from "@frennix/ui";
 
 const TYPING_HIDE_MS = 3000;
 
@@ -42,6 +46,9 @@ type ChatMessageListProps = {
   otherTyping: boolean;
   onMediaPress: (uri: string) => void;
   onReaction: (messageId: string, emoji: string, currentEmoji?: string | null) => void;
+  onLongPressMenu: (message: Message) => void;
+  onDelete: (message: Message) => void;
+  isDismissing: (messageId: string) => boolean;
 };
 
 const ChatMessageList = memo(function ChatMessageList({
@@ -51,6 +58,9 @@ const ChatMessageList = memo(function ChatMessageList({
   otherTyping,
   onMediaPress,
   onReaction,
+  onLongPressMenu,
+  onDelete,
+  isDismissing,
 }: ChatMessageListProps) {
   const listRef = useRef<FlatList>(null);
   const myProfile = participantProfiles[userId];
@@ -62,11 +72,14 @@ const ChatMessageList = memo(function ChatMessageList({
         userId={userId}
         myProfile={myProfile}
         sender={participantProfiles[item.sender_id]}
+        dismissing={isDismissing(item.id)}
         onMediaPress={onMediaPress}
         onReaction={onReaction}
+        onLongPressMenu={onLongPressMenu}
+        onDelete={onDelete}
       />
     ),
-    [userId, myProfile, participantProfiles, onMediaPress, onReaction]
+    [userId, myProfile, participantProfiles, isDismissing, onMediaPress, onReaction, onLongPressMenu, onDelete]
   );
 
   return (
@@ -96,6 +109,8 @@ export default function ChatScreen() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [realtimeDegraded, setRealtimeDegraded] = useState(false);
+  const [actionMessage, setActionMessage] = useState<Message | null>(null);
+  const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const hideTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerRef = useRef<ChatComposerHandle>(null);
@@ -263,6 +278,68 @@ export default function ChatScreen() {
     [conversationId]
   );
 
+  const deleteMutation = useMutation({
+    mutationFn: (messageId: string) => deleteMessageForUser(messageId, userId),
+    onMutate: async (messageId) => {
+      await queryClient.cancelQueries({ queryKey: ["messages", conversationId] });
+      const previous = queryClient.getQueryData<Message[]>(["messages", conversationId]);
+      queryClient.setQueryData<Message[]>(["messages", conversationId], (old = []) =>
+        old.filter((message) => message.id !== messageId)
+      );
+      return { previous };
+    },
+    onError: (_error, _messageId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["messages", conversationId], context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
+    },
+  });
+
+  const { requestDismiss: requestMessageDismiss, isDismissing: isMessageDismissing } =
+    useDismissWithAnimation((messageId) => deleteMutation.mutate(messageId));
+
+  const handleDeleteMessage = useCallback(
+    (message: Message) => {
+      requestMessageDismiss(message.id);
+    },
+    [requestMessageDismiss]
+  );
+
+  const handleLongPressMenu = useCallback((message: Message) => {
+    setActionMessage(message);
+  }, []);
+
+  const closeMessageActions = useCallback(() => {
+    setActionMessage(null);
+  }, []);
+
+  const handleMessageAction = useCallback(
+    (actionId: EntityActionId) => {
+      const message = actionMessage;
+      closeMessageActions();
+      if (!message) return;
+
+      if (actionId === "react") {
+        setReactionMessageId(message.id);
+        return;
+      }
+
+      if (actionId === "delete") {
+        requestMessageDismiss(message.id);
+      }
+    },
+    [actionMessage, closeMessageActions, requestMessageDismiss]
+  );
+
+  const reactionTarget = useMemo(
+    () => messages.find((message) => message.id === reactionMessageId) ?? null,
+    [messages, reactionMessageId]
+  );
+
   if (loading || (chatReady && messagesLoading && messages.length === 0)) {
     return (
       <View style={styles.loading}>
@@ -311,8 +388,30 @@ export default function ChatScreen() {
           otherTyping={otherTyping}
           onMediaPress={handleMediaPress}
           onReaction={handleReaction}
+          onLongPressMenu={handleLongPressMenu}
+          onDelete={handleDeleteMessage}
+          isDismissing={isMessageDismissing}
         />
       </View>
+      <EntityActionSheet
+        visible={!!actionMessage}
+        title="Message"
+        actions={[
+          entityAction("react", "Add reaction"),
+          entityAction("delete", "Delete message", { tone: "danger" }),
+        ]}
+        onSelect={handleMessageAction}
+        onClose={closeMessageActions}
+      />
+      <ReactionPicker
+        visible={!!reactionTarget}
+        onClose={() => setReactionMessageId(null)}
+        onSelect={(emoji) => {
+          if (!reactionTarget) return;
+          handleReaction(reactionTarget.id, emoji, reactionTarget.my_reaction);
+          setReactionMessageId(null);
+        }}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={90}

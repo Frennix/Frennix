@@ -221,7 +221,8 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
     .from("notifications")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
-    .is("read_at", null);
+    .is("read_at", null)
+    .is("deleted_at", null);
 
   if (error) throw error;
   return count ?? 0;
@@ -241,7 +242,20 @@ export async function markAllNotificationsRead(userId: string) {
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("user_id", userId)
-    .is("read_at", null);
+    .is("read_at", null)
+    .is("deleted_at", null);
+
+  if (error) throw error;
+}
+
+/** Soft-delete a notification for the current user. */
+export async function dismissNotification(id: string, userId: string) {
+  const { error } = await getSupabase()
+    .from("notifications")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .is("deleted_at", null);
 
   if (error) throw error;
 }

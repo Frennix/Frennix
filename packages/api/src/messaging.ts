@@ -15,6 +15,43 @@ function formatMessagingError(error: unknown, context: string): Error {
   return formatSupabaseError(error, context);
 }
 
+async function getDeletedMessageIds(userId: string, messageIds: string[]): Promise<Set<string>> {
+  if (!messageIds.length) return new Set();
+
+  const { data, error } = await getSupabase()
+    .from("message_user_deletions")
+    .select("message_id")
+    .eq("user_id", userId)
+    .in("message_id", messageIds);
+
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.message_id as string));
+}
+
+async function getVisibleLastMessage(
+  conversationId: string,
+  userId: string
+): Promise<Message | undefined> {
+  const { data, error } = await getSupabase()
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+
+  const messages = (data ?? []) as Message[];
+  if (!messages.length) return undefined;
+
+  const deletedIds = await getDeletedMessageIds(
+    userId,
+    messages.map((message) => message.id)
+  );
+
+  return messages.find((message) => !deletedIds.has(message.id));
+}
+
 export async function getConversations(userId: string): Promise<Conversation[]> {
   const blockedIds = new Set(await getBlockedIds(userId));
 
@@ -36,13 +73,7 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
       .eq("id", convId)
       .single();
 
-    const { data: lastMsg } = await getSupabase()
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", convId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const lastMsg = await getVisibleLastMessage(convId, userId);
 
     const { data: members } = await getSupabase()
       .from("conversation_members")
@@ -52,18 +83,24 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
     const other = (members?.[0] as { profile: Profile } | undefined)?.profile;
 
-    const { count: unreadCount } = await getSupabase()
+    const { data: unreadMessages, error: unreadError } = await getSupabase()
       .from("messages")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("conversation_id", convId)
       .neq("sender_id", userId)
       .is("read_at", null);
 
+    if (unreadError) throw unreadError;
+
+    const unreadIds = (unreadMessages ?? []).map((row) => row.id as string);
+    const deletedUnreadIds = await getDeletedMessageIds(userId, unreadIds);
+    const unreadCount = unreadIds.filter((id) => !deletedUnreadIds.has(id)).length;
+
     conversations.push({
       ...(conv as Conversation),
-      last_message: lastMsg as Message | undefined,
+      last_message: lastMsg,
       other_participant: other,
-      unread_count: unreadCount ?? 0,
+      unread_count: unreadCount,
     });
   }
 
@@ -77,14 +114,19 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 }
 
 export async function getUnreadMessageCount(userId: string): Promise<number> {
-  const { count, error } = await getSupabase()
+  const { data, error } = await getSupabase()
     .from("messages")
-    .select("*", { count: "exact", head: true })
+    .select("id")
     .neq("sender_id", userId)
     .is("read_at", null);
 
   if (error) throw error;
-  return count ?? 0;
+
+  const unreadIds = (data ?? []).map((row) => row.id as string);
+  if (!unreadIds.length) return 0;
+
+  const deletedIds = await getDeletedMessageIds(userId, unreadIds);
+  return unreadIds.filter((id) => !deletedIds.has(id)).length;
 }
 
 export async function markMessagesAsRead(conversationId: string, userId: string) {
@@ -155,6 +197,15 @@ export async function getMessages(conversationId: string, viewerId?: string): Pr
   if (error) throw error;
 
   let messages = (data ?? []) as Message[];
+
+  if (viewerId) {
+    const deletedIds = await getDeletedMessageIds(
+      viewerId,
+      messages.map((message) => message.id)
+    );
+    messages = messages.filter((message) => !deletedIds.has(message.id));
+  }
+
   const postIds = messages.map((m) => m.post_id).filter((id): id is string => Boolean(id));
 
   if (postIds.length) {
@@ -205,6 +256,20 @@ export async function sendMessage(
     .eq("id", conversationId);
 
   return data as Message;
+}
+
+/** Soft-delete a message for the current user only (delete for me). */
+export async function deleteMessageForUser(messageId: string, userId: string) {
+  const { error } = await getSupabase().from("message_user_deletions").upsert(
+    {
+      message_id: messageId,
+      user_id: userId,
+      deleted_at: new Date().toISOString(),
+    },
+    { onConflict: "message_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to delete message");
 }
 
 export async function uploadMessageMedia(userId: string, uri: string, mimeType: string) {

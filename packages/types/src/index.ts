@@ -389,6 +389,8 @@ export interface Notification {
   payload: Record<string, unknown>;
   read_at: string | null;
   created_at: string;
+  /** Soft-delete — set when user dismisses from notification center. */
+  deleted_at?: string | null;
   actor?: Profile;
 }
 

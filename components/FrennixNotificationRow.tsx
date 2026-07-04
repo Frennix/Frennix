@@ -7,11 +7,13 @@ import { Avatar, formatRelativeTime, colors, spacing, typography } from "@frenni
 type FrennixNotificationRowProps = {
   notification: Notification;
   onPress: () => void;
+  onDelete: () => void;
 };
 
 export const FrennixNotificationRow = memo(function FrennixNotificationRow({
   notification,
   onPress,
+  onDelete,
 }: FrennixNotificationRowProps) {
   const isUnread = !notification.read_at;
   const actor = notification.actor;
@@ -22,32 +24,43 @@ export const FrennixNotificationRow = memo(function FrennixNotificationRow({
   );
 
   return (
-    <Pressable
-      style={[styles.row, isUnread && styles.unreadRow]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isUnread }}
-      accessibilityLabel={`${display.headline}. ${display.detail}. ${isUnread ? "Unread" : "Read"}. ${formatRelativeTime(createdAt)}`}
-    >
-      <View style={styles.avatarWrap}>
-        <Avatar uri={actor?.avatar_url} name={actor?.display_name ?? "Athlete"} size={48} />
-        {isUnread ? <View style={styles.unreadDot} /> : null}
-      </View>
-      <View style={styles.content}>
-        <Text style={[styles.headline, isUnread && styles.unreadHeadline]} numberOfLines={1}>
-          {display.headline}
-        </Text>
-        <Text style={[styles.detail, isUnread && styles.unreadDetail]} numberOfLines={2}>
-          {display.detail}
-        </Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.time}>{formatRelativeTime(createdAt)}</Text>
-          <Text style={[styles.status, isUnread ? styles.statusUnread : styles.statusRead]}>
-            {isUnread ? "Unread" : "Read"}
-          </Text>
+    <View style={[styles.row, isUnread && styles.unreadRow]}>
+      <Pressable
+        style={styles.tapArea}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected: isUnread }}
+        accessibilityLabel={`${display.headline}. ${display.detail}. ${isUnread ? "Unread" : "Read"}. ${formatRelativeTime(createdAt)}`}
+      >
+        <View style={styles.avatarWrap}>
+          <Avatar uri={actor?.avatar_url} name={actor?.display_name ?? "Athlete"} size={48} />
+          {isUnread ? <View style={styles.unreadDot} /> : null}
         </View>
-      </View>
-    </Pressable>
+        <View style={styles.content}>
+          <Text style={[styles.headline, isUnread && styles.unreadHeadline]} numberOfLines={1}>
+            {display.headline}
+          </Text>
+          <Text style={[styles.detail, isUnread && styles.unreadDetail]} numberOfLines={2}>
+            {display.detail}
+          </Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.time}>{formatRelativeTime(createdAt)}</Text>
+            <Text style={[styles.status, isUnread ? styles.statusUnread : styles.statusRead]}>
+              {isUnread ? "Unread" : "Read"}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+      <Pressable
+        onPress={onDelete}
+        hitSlop={10}
+        style={styles.deleteButton}
+        accessibilityRole="button"
+        accessibilityLabel="Delete notification"
+      >
+        <Text style={styles.deleteIcon}>🗑</Text>
+      </Pressable>
+    </View>
   );
 });
 
@@ -55,12 +68,19 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    paddingRight: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.background,
+  },
+  tapArea: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   unreadRow: {
     backgroundColor: colors.surfaceElevated,
@@ -97,4 +117,15 @@ const styles = StyleSheet.create({
   status: { ...typography.caption, fontWeight: "700" },
   statusUnread: { color: colors.accent },
   statusRead: { color: colors.textMuted },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteIcon: { fontSize: 16, lineHeight: 18 },
 });

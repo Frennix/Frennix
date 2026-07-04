@@ -10,14 +10,17 @@ import {
 } from "react-native";
 import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead } from "@frennix/api";
+import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead, dismissNotification } from "@frennix/api";
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTargetAsync } from "@/lib/notification-navigation";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { showAlert } from "@/lib/alerts";
+import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
+import { SwipeToDeleteRow } from "@/components/SwipeToDeleteRow";
 import { NotificationsListSkeleton } from "@/components/NotificationsListSkeleton";
 import { EmptyState, QueryErrorState, ScreenSpinner, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
@@ -26,11 +29,25 @@ import { FrennixNotificationRow } from "@/components/FrennixNotificationRow";
 const SafeNotificationRow = memo(function SafeNotificationRow({
   notification,
   onPress,
+  onDelete,
+  dismissing,
 }: {
   notification: Notification;
   onPress: (id: string) => void;
+  onDelete: (notification: Notification) => void;
+  dismissing: boolean;
 }) {
-  return <FrennixNotificationRow notification={notification} onPress={() => onPress(notification.id)} />;
+  return (
+    <AnimatedDismissRow dismissing={dismissing}>
+      <SwipeToDeleteRow onDelete={() => onDelete(notification)}>
+        <FrennixNotificationRow
+          notification={notification}
+          onPress={() => onPress(notification.id)}
+          onDelete={() => onDelete(notification)}
+        />
+      </SwipeToDeleteRow>
+    </AnimatedDismissRow>
+  );
 });
 
 export default function NotificationsScreen() {
@@ -105,6 +122,49 @@ export default function NotificationsScreen() {
     },
   });
 
+  const dismissMutation = useMutation({
+    mutationFn: (notificationId: string) => dismissNotification(notificationId, userId),
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications", userId] });
+      const previous = queryClient.getQueryData<Notification[]>(["notifications", userId]);
+      const removed = (previous ?? []).find((item) => item.id === notificationId);
+      queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
+        (current ?? []).filter((item) => item.id !== notificationId)
+      );
+      if (removed && !removed.read_at) {
+        queryClient.setQueryData<number>(["unread-notifications", userId], (current) =>
+          Math.max(0, (current ?? 0) - 1)
+        );
+      }
+      return { previous, removedWasUnread: removed && !removed.read_at };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications", userId], context.previous);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+    },
+    onSuccess: (_data, _id, context) => {
+      if (context?.removedWasUnread) {
+        const nextUnread = Math.max(
+          0,
+          (queryClient.getQueryData<number>(["unread-notifications", userId]) ?? 0)
+        );
+        void syncNotificationBadgeCount(nextUnread);
+      }
+    },
+  });
+
+  const { requestDismiss: requestNotificationDismiss, isDismissing: isNotificationDismissing } =
+    useDismissWithAnimation((notificationId) => dismissMutation.mutate(notificationId));
+
+  const handleDeleteNotification = useCallback(
+    (notification: Notification) => {
+      requestNotificationDismiss(notification.id);
+    },
+    [requestNotificationDismiss]
+  );
+
   const handlePressById = useCallback(
     async (notificationId: string) => {
       const notification = notifications.find((item) => item.id === notificationId);
@@ -124,9 +184,14 @@ export default function NotificationsScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: Notification }) => (
-      <SafeNotificationRow notification={item} onPress={handlePressById} />
+      <SafeNotificationRow
+        notification={item}
+        onPress={handlePressById}
+        onDelete={handleDeleteNotification}
+        dismissing={isNotificationDismissing(item.id)}
+      />
     ),
-    [handlePressById]
+    [handleDeleteNotification, handlePressById, isNotificationDismissing]
   );
 
   if (authLoading) {

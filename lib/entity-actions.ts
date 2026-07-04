@@ -7,6 +7,7 @@
 export type EntityActionId =
   | "edit"
   | "delete"
+  | "react"
   | "share"
   | "copy_link"
   | "report"
