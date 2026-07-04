@@ -27,7 +27,12 @@
 | 7 | Human QA checklist linked + signed | ⬜ | |
 | 8 | Staging checklist linked + signed | ⬜ | |
 | 9 | Production checklist linked + signed | ⬜ | |
+| 9b | **Critical User Flows** verification archived | ⬜ | `critical-flows/vX.Y.Z-CUF-VERIFICATION.md` — all ✅ required |
+| 9c | **Postmortems closed** for all production user bugs in this release | ⬜ | [`postmortems/README.md`](../postmortems/README.md) |
+| 9d | **Bug severity metadata** complete for all bugs in release log | ⬜ | `npm run verify:bug-severity` PASS · [`BUG-SEVERITY.md`](../BUG-SEVERITY.md) |
 | 10 | Monitoring checklist linked + signed | ⬜ | |
+
+**Release cannot be marked Complete** until Critical User Flows verification shows **all flows ✅** on production.
 
 ---
 

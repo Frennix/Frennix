@@ -1,6 +1,7 @@
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import type { EntityActionDefinition, EntityActionId } from "@/lib/entity-actions";
-import { colors, radius, spacing, typography } from "@frennix/ui";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
+import { colors, spacing, typography } from "@frennix/ui";
 
 interface EntityActionSheetProps {
   visible: boolean;
@@ -23,47 +24,34 @@ export function EntityActionSheet({
   onSelect,
   onClose,
 }: EntityActionSheetProps) {
-  if (Platform.OS === "web" && !visible) return null;
-
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>{title}</Text>
-          {actions.map((action) => (
-            <Pressable
-              key={action.id}
-              style={styles.option}
-              onPress={() => onSelect(action.id)}
-            >
-              <Text style={labelStyle(action.tone)}>
-                {action.label}
-                {action.placeholder ? " (coming soon)" : ""}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable style={[styles.option, styles.cancelOption]} onPress={onClose}>
-            <Text style={styles.cancelText}>Cancel</Text>
+    <BottomOverlayShell visible={visible} onClose={onClose}>
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={actions.length > 6}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.sheetContent}
+      >
+        <Text style={styles.title}>{title}</Text>
+        {actions.map((action) => (
+          <Pressable key={action.id} style={styles.option} onPress={() => onSelect(action.id)}>
+            <Text style={labelStyle(action.tone)}>
+              {action.label}
+              {action.placeholder ? " (coming soon)" : ""}
+            </Text>
           </Pressable>
+        ))}
+        <Pressable style={[styles.option, styles.cancelOption]} onPress={onClose}>
+          <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </ScrollView>
+    </BottomOverlayShell>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(10, 10, 11, 0.72)",
-    justifyContent: "flex-end",
-    padding: spacing.md,
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
+  sheetContent: {
+    paddingBottom: spacing.lg,
   },
   title: {
     ...typography.caption,
@@ -78,6 +66,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     alignItems: "center",
+    minHeight: 48,
+    justifyContent: "center",
   },
   optionText: { ...typography.body, fontWeight: "600", color: colors.text },
   dangerText: { ...typography.body, fontWeight: "600", color: colors.danger },

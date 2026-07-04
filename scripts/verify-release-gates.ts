@@ -40,6 +40,14 @@ const GATE_CHECKS: Record<Phase, Array<{ label: string; patterns: RegExp[] }>> =
       patterns: [/Human QA approved\s*\|\s*✅/i, /\*\*Human QA approved\*\*\s*\|\s*✅/i],
     },
     {
+      label: "Critical User Flows verified",
+      patterns: [
+        /Critical User Flows.*\|\s*✅/i,
+        /Critical user flows verified/i,
+        /All critical flows pass\s*\|\s*✅/i,
+      ],
+    },
+    {
       label: "Founder staging approval",
       patterns: [/Founder staging approval\s*\|\s*✅/i, /\*\*Founder staging approval\*\*\s*\|\s*✅/i],
     },
@@ -75,6 +83,15 @@ const GATE_CHECKS: Record<Phase, Array<{ label: string; patterns: RegExp[] }>> =
     {
       label: "Push approval",
       patterns: [/Approved — push v[\d.]+[^\n]*\|\s*✅/i],
+    },
+    {
+      label: "Critical User Flows verified",
+      patterns: [
+        /Critical User Flows.*\|\s*✅/i,
+        /\*\*Critical User Flows.*\*\*\s*\|\s*✅/i,
+        /Critical user flows verified/i,
+        /All critical flows pass\s*\|\s*✅/i,
+      ],
     },
     {
       label: "Deploy approval",

@@ -231,14 +231,14 @@ async function main() {
     const sheetChecks = await page.evaluate(() => {
       const scrollEl = document.getElementById("feed-scroll-list");
       const buttons = [...document.querySelectorAll('[role="button"],[accessibilityrole="button"]')];
-      const likeBtn = buttons.find((el) => {
-        const label = el.getAttribute("aria-label") ?? el.getAttribute("accessibilitylabel") ?? el.textContent ?? "";
-        return /like/i.test(label);
-      });
-      const moreBtn = buttons.find((el) => {
-        const label = el.getAttribute("aria-label") ?? el.getAttribute("accessibilitylabel") ?? el.textContent ?? "";
-        return /more/i.test(label);
-      });
+      const labelFor = (el) =>
+        el.getAttribute("aria-label") ?? el.getAttribute("accessibilitylabel") ?? el.textContent ?? "";
+
+      const likeBtn = buttons.find((el) => /like/i.test(labelFor(el)));
+      const moreBtn = buttons.find((el) => /more/i.test(labelFor(el)));
+      const strongBtn = buttons.find((el) => /strong work/i.test(labelFor(el)));
+      const replyBtn = buttons.find((el) => /reply/i.test(labelFor(el)));
+
       const handle = [...document.querySelectorAll("[aria-label],[accessibilitylabel]")].find(
         (el) => {
           const label =
@@ -248,13 +248,27 @@ async function main() {
       );
       const captionVisible = /Safari feed fix verification post/i.test(document.body.innerText);
       const sheetText = document.body.innerText.includes("Strong Work") || document.body.innerText.includes("Reply");
+
+      const vv = window.visualViewport;
+      const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight;
+      const actionEls = [likeBtn, strongBtn, replyBtn, moreBtn].filter(Boolean);
+      const actionRects = actionEls.map((el) => el.getBoundingClientRect());
+      const allButtonsInView =
+        actionRects.length >= 4 &&
+        actionRects.every((rect) => rect.height > 0 && rect.bottom <= visibleBottom - 2 && rect.top >= 0);
+
       return {
         scrollOverflow: scrollEl ? getComputedStyle(scrollEl).overflowY : null,
         likePresent: Boolean(likeBtn),
         morePresent: Boolean(moreBtn),
+        strongPresent: Boolean(strongBtn),
+        replyPresent: Boolean(replyBtn),
         handlePresent: Boolean(handle),
         captionVisible,
         sheetText,
+        allButtonsInView,
+        visibleBottom,
+        actionBottoms: actionRects.map((r) => Math.round(r.bottom)),
       };
     });
 
@@ -280,8 +294,11 @@ async function main() {
       emergencyBanner === 0 &&
       sheetChecks.likePresent &&
       sheetChecks.morePresent &&
+      sheetChecks.strongPresent &&
+      sheetChecks.replyPresent &&
       sheetChecks.sheetText &&
       sheetChecks.captionVisible &&
+      sheetChecks.allButtonsInView &&
       scrollLocked &&
       dismissOk;
 

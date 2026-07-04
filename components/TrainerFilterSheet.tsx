@@ -1,4 +1,4 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { TrainerSearchFilters } from "@frennix/types";
 import {
   TRAINER_BUDGET_FILTER_OPTIONS,
@@ -9,6 +9,7 @@ import {
   formatVerificationLevel,
 } from "@/lib/trainer-labels";
 import { TRAINER_CATEGORIES, TRAINER_COACHING_FORMATS, TRAINER_SPECIALTIES, TRAINER_VERIFICATION_LEVELS } from "@frennix/types";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
 import { Button, Chip, Input, colors, spacing, typography } from "@frennix/ui";
 
 type TrainerFilterSheetProps = {
@@ -31,11 +32,19 @@ export function TrainerFilterSheet({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <Text style={styles.title}>Filter trainers</Text>
-          <ScrollView contentContainerStyle={styles.content}>
+    <BottomOverlayShell
+      visible={visible}
+      onClose={onClose}
+      animationType="slide"
+      expanded
+      dismissOnBackdrop={false}
+      backdropColor="rgba(0,0,0,0.55)"
+      horizontalPadding={0}
+      sheetMaxHeight="85%"
+      sheetStyle={styles.sheet}
+    >
+      <Text style={styles.title}>Filter trainers</Text>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>Goal</Text>
             <View style={styles.chipRow}>
               {TRAINER_GOAL_FILTER_OPTIONS.map((opt) => (
@@ -131,30 +140,24 @@ export function TrainerFilterSheet({
             </View>
           </ScrollView>
 
-          <View style={styles.actions}>
-            <Pressable onPress={() => onChange({})}>
-              <Text style={styles.reset}>Reset</Text>
-            </Pressable>
-            <Button title="Apply filters" onPress={onApply} />
-            <Button title="Close" variant="secondary" onPress={onClose} />
-          </View>
-        </View>
+      <View style={styles.actions}>
+        <Pressable onPress={() => onChange({})}>
+          <Text style={styles.reset}>Reset</Text>
+        </Pressable>
+        <Button title="Apply filters" onPress={onApply} />
+        <Button title="Close" variant="secondary" onPress={onClose} />
       </View>
-    </Modal>
+    </BottomOverlayShell>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
-  },
   sheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    maxHeight: "85%",
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     padding: spacing.lg,
     gap: spacing.md,
   },

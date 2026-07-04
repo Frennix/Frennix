@@ -1,6 +1,7 @@
 import { memo } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import type { StoryReactionRecord } from "@frennix/types";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
 import { Avatar, colors, formatRelativeTime, spacing, typography } from "@frennix/ui";
 
 type StoryReactionsModalProps = {
@@ -17,54 +18,51 @@ export const StoryReactionsModal = memo(function StoryReactionsModal({
   onClose,
 }: StoryReactionsModalProps) {
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
-          <Text style={styles.title}>Reactions</Text>
-          {loading ? (
-            <Text style={styles.empty}>Loading reactions…</Text>
-          ) : reactions.length ? (
-            <FlatList
-              data={reactions}
-              keyExtractor={(item) => `${item.user_id}-${item.created_at}`}
-              renderItem={({ item }) => (
-                <View style={styles.row}>
-                  <Avatar
-                    uri={item.profile.avatar_url}
-                    name={item.profile.display_name}
-                    size={44}
-                  />
-                  <View style={styles.meta}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {item.profile.display_name}
-                    </Text>
-                    <Text style={styles.subtitle} numberOfLines={1}>
-                      {item.reaction} · {formatRelativeTime(item.created_at)}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            />
-          ) : (
-            <Text style={styles.empty}>No reactions yet.</Text>
+    <BottomOverlayShell
+      visible={visible}
+      onClose={onClose}
+      animationType="slide"
+      expanded
+      backdropColor="rgba(0,0,0,0.45)"
+      horizontalPadding={0}
+      sheetMaxHeight="70%"
+      sheetStyle={styles.sheet}
+    >
+      <Text style={styles.title}>Reactions</Text>
+      {loading ? (
+        <Text style={styles.empty}>Loading reactions…</Text>
+      ) : reactions.length ? (
+        <FlatList
+          data={reactions}
+          keyExtractor={(item) => `${item.user_id}-${item.created_at}`}
+          renderItem={({ item }) => (
+            <View style={styles.row}>
+              <Avatar uri={item.profile.avatar_url} name={item.profile.display_name} size={44} />
+              <View style={styles.meta}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {item.profile.display_name}
+                </Text>
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {item.reaction} · {formatRelativeTime(item.created_at)}
+                </Text>
+              </View>
+            </View>
           )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+        />
+      ) : (
+        <Text style={styles.empty}>No reactions yet.</Text>
+      )}
+    </BottomOverlayShell>
   );
 });
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
   sheet: {
-    maxHeight: "70%",
     backgroundColor: colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     padding: spacing.lg,
     gap: spacing.md,
   },

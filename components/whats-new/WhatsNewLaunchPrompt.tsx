@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
+import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
 import {
   getLatestWhatsNewRelease,
   getWhatsNewLaunchPromptVersion,
@@ -46,6 +47,8 @@ export function WhatsNewLaunchPrompt() {
     }
   }, [promptVersion]);
 
+  const { backdropStyle } = useCenterOverlaySafeArea(visible);
+
   const handleViewReleaseNotes = useCallback(async () => {
     await dismiss();
     pushScreen("/whats-new");
@@ -63,7 +66,7 @@ export function WhatsNewLaunchPrompt() {
       onRequestClose={() => void dismiss()}
       accessibilityViewIsModal
     >
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, ...backdropStyle]}>
         <View style={styles.card}>
           <Text style={styles.eyebrow}>What&apos;s New · {promptVersion}</Text>
           <Text style={styles.title}>{latestRelease.title}</Text>

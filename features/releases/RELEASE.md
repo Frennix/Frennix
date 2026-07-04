@@ -9,19 +9,26 @@
 
 ## How we use this log
 
-1. **Before fixing anything** reported in production or QA → add an issue row to the **active release** below.
-2. **When fixed** → fill root cause, fix, QA verified, deploy commit.
-3. **On ship** → set status to **Released**, update CHANGELOG + whats-new.ts.
-4. **Never mix** roadmap features into bug-fix releases — use FUTURE-IDEAS.md instead.
+1. **Before fixing anything** reported in production or QA → add an issue row to the **active release** below with **Severity (P0–P3) classified first** — see [`BUG-SEVERITY.md`](./BUG-SEVERITY.md).
+2. **Production user-reported bugs** → create postmortem immediately: [`POSTMORTEM-PROCESS.md`](./POSTMORTEM-PROCESS.md) · `postmortems/BUG-XXX-POSTMORTEM.md`. **Bug cannot close until postmortem is Closed.**
+3. **When fixed** → fill root cause, fix, QA verified, deploy commit; update postmortem → Fixed → Verified.
+4. **On ship** → set status to **Released**, update CHANGELOG + whats-new.ts.
+5. **Never mix** roadmap features into bug-fix releases — use FUTURE-IDEAS.md instead.
+6. **Overlays** → every new modal, bottom sheet, popup, or menu must pass [`checklists/OVERLAY-MODAL-QA.md`](./checklists/OVERLAY-MODAL-QA.md) on iPhone Safari, iPhone Chrome, Android Chrome, and Desktop before deploy. **Safe area:** use [`OVERLAY-SAFE-AREA.md`](./OVERLAY-SAFE-AREA.md) — `BottomOverlayShell` or `useSheetSafeArea`; never flush against bottom edge.
+7. **Critical User Flows** → before every production deploy, complete [`checklists/CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md). Record Tester, Date, Device, Browser, Version, Pass/Fail, Notes per flow. Any failure → bug in active release **before** fixing. Production deploy and release completion blocked until all pass.
+8. **Postmortems** → every production bug discovered by a user requires a postmortem before the bug is Closed. If the bug reveals a process weakness, update QA checklists or release docs as part of closing the postmortem.
+9. **Severity classification** → every issue gets P0–P3 severity, priority, version found, version fixed, status, and assigned milestone **before work begins**. See [`BUG-SEVERITY.md`](./BUG-SEVERITY.md).
 
-### Issue priority
+### Severity (P0–P3)
 
-| Priority | Meaning |
-|----------|---------|
-| **Critical** | Core flow broken for all or most users |
-| **High** | Major feature degraded; workaround difficult |
-| **Medium** | Partial impact or easy workaround |
-| **Low** | Cosmetic or edge case |
+Full definitions: [`BUG-SEVERITY.md`](./BUG-SEVERITY.md)
+
+| Severity | Summary | Priority |
+|----------|---------|----------|
+| **P0** | Crash, login failure, data loss, security, outage | Fix immediately |
+| **P1** | Core feature broken; significant user impact | Next patch release |
+| **P2** | Degraded feature, UI bugs, performance | Next planned release |
+| **P3** | Cosmetic, minor UX, nice-to-have | Backlog |
 
 ---
 
@@ -45,9 +52,9 @@ _None yet._
 
 ### Bug fixes
 
-| ID | Priority | Description | Reported | Reporter | Root cause | Fix | QA | Prod |
-|----|----------|-------------|----------|----------|------------|-----|-----|------|
-| — | — | — | — | — | — | — | — | — |
+| ID | Sev | Priority | Version Found | Version Fixed | Milestone | Status | Description | Postmortem |
+|----|-----|----------|---------------|---------------|-----------|--------|-------------|------------|
+| BUG-002 | **P1** | Next patch | v1.0.2 | — | v1.0.3 | In Progress | Post interaction sheet cut off on iPhone Safari — buttons behind browser toolbar | Open — **not closed until Founder confirms full sheet visible** |
 
 ### Performance improvements
 
@@ -55,11 +62,11 @@ _None yet._
 
 ### Known issues
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Events RSVP | Temporary | Confirmations may lag; RSVP still saved |
-| Training Together Today | Coming Soon | UI shell only; data in v1.1 |
-| Story Replies | Coming Soon | Planned |
+| Feature | Sev | Priority | Version Found | Version Fixed | Milestone | Status | Notes |
+|---------|-----|----------|---------------|---------------|-----------|--------|-------|
+| Events RSVP | P2 | Next planned | v1.0.1 | — | v1.0.3 | temporary_issue | Confirmations may lag; RSVP still saved |
+| Training Together Today | P3 | Backlog | v1.0.1 | — | v1.1 | coming_soon | UI shell only; data in v1.1 |
+| Story Replies | P3 | Backlog | v1.0.1 | — | TBD | coming_soon | Planned |
 
 ### Database migrations
 
@@ -67,6 +74,8 @@ _None planned._
 
 ### QA checklist
 
+- [ ] [`CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md) — [`critical-flows/v1.0.3-CUF-VERIFICATION.md`](./critical-flows/v1.0.3-CUF-VERIFICATION.md)
+- [ ] [`OVERLAY-MODAL-QA.md`](./checklists/OVERLAY-MODAL-QA.md) — BUG-002 post interaction sheet (pre-deploy)
 - [ ] _Add items when v1.0.3 scope is defined_
 
 ### Production verification
@@ -104,9 +113,9 @@ _None — stability release only._
 
 ### Bug fixes
 
-| ID | Priority | Description | Reported | Reporter | Root cause | Fix | QA | Prod |
-|----|----------|-------------|----------|----------|------------|-----|-----|------|
-| BUG-001 | **Critical** | Sharing workout/post fails: `column 'event_type' of relation 'platform_activity_events' does not exist` | 2026-07-04 | User (production) | `20250719000001` renamed `event_type` → `activity_type` but left legacy `workout_post_activity_record` trigger calling `record_activity_workout_post()` which still INSERTs `event_type` | Migration `20250722000001_fix_post_activity_trigger.sql` + friendly share errors | ✅ | ✅ |
+| ID | Sev | Priority | Version Found | Version Fixed | Milestone | Status | Description | Postmortem |
+|----|-----|----------|---------------|---------------|-----------|--------|-------------|------------|
+| BUG-001 | **P0** | Immediate | v1.0.1 | v1.0.2 | v1.0.2 | Closed | Sharing workout/post fails: `column 'event_type' of relation 'platform_activity_events' does not exist` | [Closed](./postmortems/BUG-001-POSTMORTEM.md) |
 
 ### Performance improvements
 
@@ -114,11 +123,11 @@ _None._
 
 ### Known issues (after v1.0.2)
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Events RSVP | Temporary | Confirmations may lag; RSVP still saved |
-| Training Together Today | Coming Soon | UI shell only; data in v1.1 |
-| Story Replies | Coming Soon | Planned |
+| Feature | Sev | Priority | Version Found | Version Fixed | Milestone | Status | Notes |
+|---------|-----|----------|---------------|---------------|-----------|--------|-------|
+| Events RSVP | P2 | Next planned | v1.0.1 | — | v1.0.3 | temporary_issue | Confirmations may lag; RSVP still saved |
+| Training Together Today | P3 | Backlog | v1.0.1 | — | v1.1 | coming_soon | UI shell only; data in v1.1 |
+| Story Replies | P3 | Backlog | v1.0.1 | — | TBD | coming_soon | Planned |
 
 ### Database migrations
 
@@ -198,6 +207,8 @@ _None._
 ## Related
 
 - [`RELEASE_PROCESS.md`](./RELEASE_PROCESS.md)
+- [`POSTMORTEM-PROCESS.md`](./POSTMORTEM-PROCESS.md)
+- [`postmortems/README.md`](./postmortems/README.md)
 - [`v1.0.3-BUG-LIST.md`](./v1.0.3-BUG-LIST.md) — **active**
 - [`v1.0.2-BUG-LIST.md`](./v1.0.2-BUG-LIST.md)
 - [`RELEASE-HISTORY.md`](./RELEASE-HISTORY.md)

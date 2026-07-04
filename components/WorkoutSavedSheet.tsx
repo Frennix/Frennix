@@ -1,5 +1,6 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { StoryShareMode } from "@frennix/types";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
 import { colors, spacing, typography } from "@frennix/ui";
 
 const OPTIONS: Array<{ mode: StoryShareMode | "done"; label: string; hint: string; emoji: string }> = [
@@ -18,49 +19,49 @@ type WorkoutSavedSheetProps = {
 
 export function WorkoutSavedSheet({ visible, loading, onSelect, onClose }: WorkoutSavedSheetProps) {
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
-          <View style={styles.header}>
-            <Text style={styles.emoji}>💪</Text>
-            <Text style={styles.title}>Workout Saved</Text>
-            <Text style={styles.subtitle}>Choose where to share — nothing posts automatically.</Text>
-          </View>
+    <BottomOverlayShell
+      visible={visible}
+      onClose={onClose}
+      animationType="slide"
+      backdropColor="rgba(0,0,0,0.5)"
+      horizontalPadding={0}
+      sheetStyle={styles.sheet}
+    >
+      <View style={styles.header}>
+        <Text style={styles.emoji}>💪</Text>
+        <Text style={styles.title}>Workout Saved</Text>
+        <Text style={styles.subtitle}>Choose where to share — nothing posts automatically.</Text>
+      </View>
 
-          <View style={styles.options}>
-            {OPTIONS.map((option) => (
-              <Pressable
-                key={option.mode}
-                style={[styles.option, loading && styles.optionDisabled]}
-                onPress={() => onSelect(option.mode)}
-                disabled={loading}
-                accessibilityRole="button"
-                accessibilityLabel={option.label}
-              >
-                <Text style={styles.optionEmoji}>{option.emoji}</Text>
-                <View style={styles.optionText}>
-                  <Text style={styles.optionLabel}>{option.label}</Text>
-                  <Text style={styles.optionHint}>{option.hint}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      <View style={styles.options}>
+        {OPTIONS.map((option) => (
+          <Pressable
+            key={option.mode}
+            style={[styles.option, loading && styles.optionDisabled]}
+            onPress={() => onSelect(option.mode)}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={option.label}
+          >
+            <Text style={styles.optionEmoji}>{option.emoji}</Text>
+            <View style={styles.optionText}>
+              <Text style={styles.optionLabel}>{option.label}</Text>
+              <Text style={styles.optionHint}>{option.hint}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </BottomOverlayShell>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
   sheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     padding: spacing.lg,
     gap: spacing.lg,
   },
@@ -84,6 +85,7 @@ const styles = StyleSheet.create({
   },
   options: {
     gap: spacing.sm,
+    paddingBottom: spacing.md,
   },
   option: {
     flexDirection: "row",
@@ -94,6 +96,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    minHeight: 48,
   },
   optionDisabled: {
     opacity: 0.6,

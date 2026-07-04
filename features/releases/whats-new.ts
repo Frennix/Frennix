@@ -6,6 +6,8 @@
  * 2. Set WHATS_NEW_LATEST_VERSION to the new semver tag.
  * 3. Refresh WHATS_NEW_COMING_SOON from the product roadmap.
  * 4. Update WHATS_NEW_KNOWN_ISSUES for active feature status.
+ *    Engineering metadata (Severity, Priority, Version Found/Fixed, Milestone) lives in
+ *    features/releases/RELEASE.md — see BUG-SEVERITY.md. User-facing copy only here.
  * 5. Set WHATS_NEW_LAUNCH_PROMPT_VERSION for major updates (null for patch-only).
  * 6. Update CHANGELOG.md to match.
  *

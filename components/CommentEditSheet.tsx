@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 interface CommentEditSheetProps {
@@ -18,6 +19,7 @@ export function CommentEditSheet({
   onSave,
 }: CommentEditSheetProps) {
   const [content, setContent] = useState(initialContent);
+  const { backdropStyle } = useCenterOverlaySafeArea(visible);
 
   useEffect(() => {
     if (visible) setContent(initialContent);
@@ -25,7 +27,7 @@ export function CommentEditSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={[styles.backdrop, ...backdropStyle]} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>Edit comment</Text>
           <Input

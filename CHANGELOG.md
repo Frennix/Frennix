@@ -1,6 +1,6 @@
 # Changelog
 
-Public release summaries. **Full release log (issues, QA, migrations):** [`features/releases/RELEASE.md`](features/releases/RELEASE.md)  
+Public release summaries. **Full release log (issues, QA, migrations, severity):** [`features/releases/RELEASE.md`](features/releases/RELEASE.md) · **Severity system:** [`features/releases/BUG-SEVERITY.md`](features/releases/BUG-SEVERITY.md)  
 **In-app:** Settings → Release Notes · **Future ideas:** [`features/releases/FUTURE-IDEAS.md`](features/releases/FUTURE-IDEAS.md)
 
 ## [1.0.2] – Workout Sharing Hotfix — 2026-07-04

@@ -10,11 +10,17 @@
 1. **Development branch** — feature branch → PR → merge (no direct `main` commits)
 2. **Internal testing** — [`checklists/INTERNAL-TESTING.md`](./checklists/INTERNAL-TESTING.md)
 2.5. **Release Readiness Report** — [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md) — Founder reviews **before** Human QA
-3. **Human QA** — [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) — iPhone, Android, Web
+3. **Human QA** — [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) + [`checklists/CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md)
 4. **Staging** — [`checklists/STAGING-DEPLOYMENT.md`](./checklists/STAGING-DEPLOYMENT.md) — Founder approval required
 5. **Production** — [`checklists/PRODUCTION-DEPLOYMENT.md`](./checklists/PRODUCTION-DEPLOYMENT.md) — separate commit/tag/push/deploy approvals
 6. **Monitoring** — [`checklists/POST-RELEASE-MONITORING.md`](./checklists/POST-RELEASE-MONITORING.md) — 24–48h
 7. **Completion** — [`checklists/RELEASE-COMPLETION.md`](./checklists/RELEASE-COMPLETION.md)
+
+**Production user bugs:** [`POSTMORTEM-PROCESS.md`](./POSTMORTEM-PROCESS.md) — mandatory before closing bug.
+
+**Bug severity (P0–P3):** [`BUG-SEVERITY.md`](./BUG-SEVERITY.md) — classify every issue **before** fixing. Template: [`templates/BUG-REPORT-TEMPLATE.md`](./templates/BUG-REPORT-TEMPLATE.md). Verify: `npm run verify:bug-severity`.
+
+**Overlay safe area (permanent):** [`OVERLAY-SAFE-AREA.md`](./OVERLAY-SAFE-AREA.md) — 28px margin above iOS safe area on all sheets/modals. Use `BottomOverlayShell`. Verify: `npm run verify:sheet-safe-area`.
 
 ---
 

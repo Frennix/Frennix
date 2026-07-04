@@ -1,5 +1,6 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing, typography } from "@frennix/ui";
+import { Pressable, StyleSheet, Text } from "react-native";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
+import { colors, spacing, typography } from "@frennix/ui";
 
 interface ContentModerationSheetProps {
   visible: boolean;
@@ -19,41 +20,24 @@ export function ContentModerationSheet({
   blockLabel = "Block user",
 }: ContentModerationSheetProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>{title}</Text>
-          <Pressable style={styles.option} onPress={onReport}>
-            <Text style={styles.optionText}>Report</Text>
-          </Pressable>
-          {onBlock ? (
-            <Pressable style={styles.option} onPress={onBlock}>
-              <Text style={[styles.optionText, styles.dangerText]}>{blockLabel}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable style={[styles.option, styles.cancelOption]} onPress={onClose}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
-        </Pressable>
+    <BottomOverlayShell visible={visible} onClose={onClose}>
+      <Text style={styles.title}>{title}</Text>
+      <Pressable style={styles.option} onPress={onReport}>
+        <Text style={styles.optionText}>Report</Text>
       </Pressable>
-    </Modal>
+      {onBlock ? (
+        <Pressable style={styles.option} onPress={onBlock}>
+          <Text style={[styles.optionText, styles.dangerText]}>{blockLabel}</Text>
+        </Pressable>
+      ) : null}
+      <Pressable style={[styles.option, styles.cancelOption]} onPress={onClose}>
+        <Text style={styles.cancelText}>Cancel</Text>
+      </Pressable>
+    </BottomOverlayShell>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(10, 10, 11, 0.72)",
-    justifyContent: "flex-end",
-    padding: spacing.md,
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
   title: {
     ...typography.caption,
     color: colors.textMuted,
@@ -67,6 +51,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     alignItems: "center",
+    minHeight: 48,
+    justifyContent: "center",
   },
   optionText: { ...typography.body, fontWeight: "600", color: colors.text },
   dangerText: { color: colors.danger },

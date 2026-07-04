@@ -13,7 +13,9 @@
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
 | 1 | Staging checklist complete + Founder staging approval | ⬜ | Phase 4 |
+| 1b | **Critical User Flows** verified on staging/candidate build | ⬜ | [`CRITICAL-USER-FLOWS.md`](./CRITICAL-USER-FLOWS.md) — all flows ✅ |
 | 2 | `verify-release-gates.ts --phase production` exit 0 | ⬜ | |
+| 2b | `npm run verify:critical-user-flows` exit 0 | ⬜ | Checklist wired in release docs |
 | 3 | Rollback plan documented in release file | ⬜ | |
 | 4 | Release notes drafted for GitHub Release | ⬜ | |
 
@@ -56,7 +58,9 @@
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
 | 16 | Founder approval: `Approved — deploy vX.Y.Z` | ⬜ | |
-| 16b | `npm run verify:schema-sync` exit 0 | ⬜ | Catches legacy triggers / schema drift |
+| 16a | **Critical User Flows** sign-off linked in release file | ⬜ | `critical-flows/vX.Y.Z-CUF-VERIFICATION.md` — **blocks deploy if any ❌** |
+| 16b | Overlay/modal QA complete if release touches sheets/menus | ⬜ | [`OVERLAY-MODAL-QA.md`](./OVERLAY-MODAL-QA.md) |
+| 16c | `npm run verify:schema-sync` exit 0 | ⬜ | Catches legacy triggers / schema drift |
 | 17 | Migrations applied to production **before** client deploy | ⬜ | `npx supabase db push` |
 | 18 | `supabase migration list` — all synced | ⬜ | |
 | 19 | Web build fresh (`expo export -p web`) | ⬜ | |
@@ -76,6 +80,7 @@
 | 26 | Login → feed on iPhone Safari | ⬜ | **No black screen** |
 | 27 | Login → feed on Desktop Web | ⬜ | |
 | 28 | No spike in Sentry errors | ⬜ | |
+| 29 | **Critical User Flows** re-verified on production (spot-check minimum: AUTH-02, FEED-01, POST-01, INT-05) | ⬜ | Full checklist within 24h |
 
 ---
 
@@ -91,6 +96,7 @@
 | Bundle hash | |
 | Deploy date | |
 | Deployed by | |
+| Critical flows verification | [`critical-flows/vX.Y.Z-CUF-VERIFICATION.md`](../critical-flows/vX.Y.Z-CUF-VERIFICATION.md) |
 
 ---
 

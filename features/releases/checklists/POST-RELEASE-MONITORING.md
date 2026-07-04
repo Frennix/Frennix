@@ -42,6 +42,7 @@
 | # | Check | 0–2h | 24h | 48h | Notes |
 |---|-------|------|-----|-----|-------|
 | 8 | New Beta Feedback triaged | ⬜ | ⬜ | ⬜ | `/founder/support` |
+| 8b | New **production user bug** → log in RELEASE.md + open postmortem (`Status: Open`) | ⬜ | ⬜ | ⬜ | [`POSTMORTEM-PROCESS.md`](../POSTMORTEM-PROCESS.md) |
 | 9 | No surge in bug reports | ⬜ | ⬜ | ⬜ | |
 | 10 | No black-screen / login reports | ⬜ | ⬜ | ⬜ | |
 

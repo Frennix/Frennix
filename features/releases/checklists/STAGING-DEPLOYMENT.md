@@ -16,6 +16,8 @@
 |---|-------|------|-------|
 | 1 | Internal testing checklist complete | ⬜ | Phase 2 |
 | 2 | Human QA checklist complete | ⬜ | Phase 3 |
+| 2a | **Critical User Flows** checklist started on staging | ⬜ | [`CRITICAL-USER-FLOWS.md`](./CRITICAL-USER-FLOWS.md) |
+| 2b | Overlay/modal QA complete *(if release touches sheets/menus)* | ⬜ | [`OVERLAY-MODAL-QA.md`](./OVERLAY-MODAL-QA.md) |
 | 3 | `verify-release-gates.ts --phase staging` exit 0 | ⬜ | |
 | 4 | Release file status = `staging-ready` | ⬜ | |
 
@@ -46,6 +48,8 @@
 | 16 | Founder Dashboard | ⬜ | Staff account |
 | 17 | Beta Feedback Dashboard | ⬜ | Staff account |
 | 18 | **iPhone Safari — login → feed (no black screen)** | ⬜ | **Required** |
+| 18b | **Overlay QA** *(if in scope)* | ⬜ | [`OVERLAY-MODAL-QA.md`](./OVERLAY-MODAL-QA.md) |
+| 18c | **Critical User Flows** — full checklist on staging | ⬜ | [`CRITICAL-USER-FLOWS.md`](./CRITICAL-USER-FLOWS.md) — all ✅ before production |
 | 19 | Android Chrome — core flows | ⬜ | |
 | 20 | Desktop Web — core flows | ⬜ | |
 | 21 | Analytics events reaching Supabase | ⬜ | Spot-check `product_events` |

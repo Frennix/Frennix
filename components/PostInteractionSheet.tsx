@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSheetSafeArea } from "@/lib/use-sheet-safe-area";
 import type { Post, Profile } from "@frennix/types";
 import {
   MORE_ACTIONS_SCROLL_THRESHOLD,
@@ -164,7 +164,8 @@ export function PostInteractionSheet({
   onAction,
   onClose,
 }: PostInteractionSheetProps) {
-  const insets = useSafeAreaInsets();
+  const { sheetMarginBottom, contentBottomPadding, sheetMaxHeight, webOverlayStyle } =
+    useSheetSafeArea(panel === "more", visible);
   const { height: windowHeight } = useWindowDimensions();
   const slide = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -316,7 +317,10 @@ export function PostInteractionSheet({
 
   const author = post.author;
   const caption = post.content?.trim();
-  const sheetBottomPad = Math.max(insets.bottom, spacing.md);
+  const sheetBottomPad = contentBottomPadding;
+
+  const webSheetMaxHeight = Platform.OS === "web" ? (sheetMaxHeight as string) : undefined;
+  const nativeSheetMaxHeight = Platform.OS === "web" ? undefined : (sheetMaxHeight as number);
 
   const openOffset = panel === "more" ? Math.min(windowHeight * 0.55, 460) : 300;
   const translateY = Animated.add(
@@ -343,7 +347,7 @@ export function PostInteractionSheet({
       onRequestClose={handleDismiss}
       accessibilityViewIsModal
     >
-      <View style={styles.root} pointerEvents="box-none">
+      <View style={[styles.root, webOverlayStyle]} pointerEvents="box-none">
         <Animated.View style={[styles.backdrop, styles.backdropBlur, { opacity: fade }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -358,7 +362,9 @@ export function PostInteractionSheet({
             styles.sheet,
             panel === "more" && styles.sheetExpanded,
             {
+              marginBottom: sheetMarginBottom,
               paddingBottom: sheetBottomPad,
+              maxHeight: webSheetMaxHeight ?? nativeSheetMaxHeight,
               transform: [{ translateY }],
             },
           ]}
@@ -373,7 +379,15 @@ export function PostInteractionSheet({
             <View style={styles.handle} />
           </View>
 
-          <View style={styles.headerRow}>
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetScrollContent}
+            showsVerticalScrollIndicator={panel === "more" && moreScrollBounded}
+            bounces
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.headerRow}>
             {panel === "more" ? (
               <Pressable
                 style={styles.backButton}
@@ -451,15 +465,11 @@ export function PostInteractionSheet({
               ))}
             </View>
           ) : (
-            <ScrollView
+            <View
               style={[
                 styles.moreScroll,
                 moreScrollBounded ? { maxHeight: moreScrollMaxHeight } : null,
               ]}
-              contentContainerStyle={styles.moreScrollContent}
-              showsVerticalScrollIndicator={moreScrollBounded}
-              bounces
-              nestedScrollEnabled
             >
               {POST_INTERACTION_MORE_SECTIONS.map((section) => (
                 <View key={section.title} style={styles.section}>
@@ -482,8 +492,9 @@ export function PostInteractionSheet({
                   ))}
                 </View>
               ))}
-            </ScrollView>
+            </View>
           )}
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>
@@ -510,6 +521,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(10, 10, 11, 0.01)",
+    ...(Platform.OS === "web"
+      ? ({
+          minHeight: "100dvh",
+          height: "100%",
+        } as object)
+      : null),
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -525,12 +542,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xs,
-    maxHeight: "36%",
+    width: "100%",
     ...(Platform.OS === "android" ? { elevation: 28 } : null),
     ...WEB_SHEET_SHADOW,
   },
-  sheetExpanded: {
-    maxHeight: "58%",
+  sheetExpanded: {},
+  sheetScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  sheetScrollContent: {
+    flexGrow: 0,
+    paddingBottom: spacing.md,
   },
   handleWrap: {
     alignItems: "center",
@@ -589,7 +612,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   primaryTileWrap: {
     width: "48%",
@@ -626,10 +649,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   primaryLabelActive: { color: colors.accent },
-  moreScroll: { flexGrow: 0 },
-  moreScrollContent: {
-    paddingBottom: spacing.lg,
+  moreScroll: {
+    flexGrow: 0,
     gap: spacing.lg,
+    paddingBottom: spacing.md,
   },
   section: { gap: spacing.xs },
   sectionTitle: {

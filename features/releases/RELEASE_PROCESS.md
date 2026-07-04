@@ -19,7 +19,7 @@
 | 1. Development branch | — | Feature PR merged to `main` only after local testing |
 | 2. Internal testing | [`checklists/INTERNAL-TESTING.md`](./checklists/INTERNAL-TESTING.md) | All automated checks green |
 | **2.5. Release Readiness Report** | [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READINESS-REPORT-TEMPLATE.md) | Founder reviews report **before** Human QA |
-| 3. Human QA | [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) | Founder QA sign-off (requires readiness report) |
+| 3. Human QA | [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) + [`checklists/CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md) | Founder QA sign-off (requires readiness report) |
 | 4. Staging deployment | [`checklists/STAGING-DEPLOYMENT.md`](./checklists/STAGING-DEPLOYMENT.md) | Founder staging approval |
 | 5. Production deployment | [`checklists/PRODUCTION-DEPLOYMENT.md`](./checklists/PRODUCTION-DEPLOYMENT.md) | Separate approvals: commit → tag → push → deploy |
 | 6. Monitoring (24–48h) | [`checklists/POST-RELEASE-MONITORING.md`](./checklists/POST-RELEASE-MONITORING.md) | No P0/P1 regressions |
@@ -51,6 +51,10 @@ npx tsx scripts/verify-release-gates.ts --release features/releases/RELEASE-vX.Y
 6. **No deploy with incomplete checklists.** Run `verify-release-gates.ts` — exit code 1 blocks deploy.
 7. **24–48h monitoring.** A release is not complete until post-deploy monitoring passes.
 8. **Release Readiness Report before Human QA.** Engineering delivers `RELEASE-vX.Y.Z-READINESS.md` after Phase 2. Founder must review it and approve Phase 3 explicitly. Human QA does not start on "Not Ready" recommendations.
+9. **Critical User Flows before every production deploy.** Complete [`checklists/CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md) on the staging or production-candidate build — **all 43 flows**, regardless of release scope. Per-release file: `critical-flows/vX.Y.Z-CUF-VERIFICATION.md`. Each flow records Tester, Date, Device, Browser, Version, Pass/Fail, Notes. **Any failure** → add bug to active `RELEASE.md` + `vX.Y.Z-BUG-LIST.md` before fixing. Production deploy and release completion are blocked until every flow passes.
+10. **Postmortems for production user bugs.** Every production bug discovered by a user (end user, tester, or Founder in production) requires a postmortem per [`POSTMORTEM-PROCESS.md`](./POSTMORTEM-PROCESS.md) before the bug is **Closed**. Postmortems document root cause, testing gaps, code changes, regression tests, and **process improvements**. If the bug reveals a release weakness, update the relevant QA checklist or release doc before closing the postmortem.
+11. **Bug severity classification before work begins.** Every production issue must receive P0–P3 severity and required metadata (priority, version found, version fixed, status, assigned milestone) **before engineering starts**. See [`BUG-SEVERITY.md`](./BUG-SEVERITY.md). Use [`templates/BUG-REPORT-TEMPLATE.md`](./templates/BUG-REPORT-TEMPLATE.md). Run `npm run verify:bug-severity` in Phase 2 internal testing.
+12. **Overlay safe area margin (permanent).** All bottom sheets, modals, drawers, and action menus must leave **28px comfortable spacing** above the iOS safe area — never flush against the screen bottom. Use [`OVERLAY-SAFE-AREA.md`](./OVERLAY-SAFE-AREA.md): `BottomOverlayShell` for standard sheets, `useSheetSafeArea` for custom overlays. Run `npm run verify:sheet-safe-area` in Phase 2.
 
 ---
 
@@ -143,6 +147,10 @@ Copy [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](./templates/RELEASE-READ
 
 Use [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md).
 
+**Critical User Flows:** Complete [`checklists/CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md) before production deploy. Copy [`templates/CRITICAL-USER-FLOWS-VERIFICATION-TEMPLATE.md`](./templates/CRITICAL-USER-FLOWS-VERIFICATION-TEMPLATE.md) → `critical-flows/vX.Y.Z-CUF-VERIFICATION.md`. All flows must pass; failures become bugs in the active release log before any fix.
+
+**Overlay UI:** Any release adding or changing modals, bottom sheets, popups, or action menus must also complete [`checklists/OVERLAY-MODAL-QA.md`](./checklists/OVERLAY-MODAL-QA.md) on **iPhone Safari**, **iPhone Chrome**, **Android Chrome**, and **Desktop** (including iPhone Safari portrait/landscape, smallest screen, Safari toolbar states, keyboard open, Dynamic Type, and Home Indicator clearance).
+
 **Prerequisite:** [`RELEASE-vX.Y.Z-READINESS.md`](./RELEASE-vX.Y.Z-READINESS.md) reviewed; recommendation must be **Ready for Human QA**; Founder must explicitly approve Phase 3.
 
 Founder (or designated QA) completes manual testing on **all three platforms**:
@@ -166,7 +174,7 @@ Founder (or designated QA) completes manual testing on **all three platforms**:
 - Founder Dashboard *(staff only)*
 - Beta Feedback Dashboard *(staff only)*
 
-**Exit criteria:** QA checklist 100% pass; no P0/P1 open; Founder signs **Human QA Approved** in release file.
+**Exit criteria:** QA checklist 100% pass; **Critical User Flows all ✅**; no P0/P1 open; Founder signs **Human QA Approved** in release file.
 
 > **Lesson from v1.0.0:** iPhone Safari post-login must be explicitly tested. Automated route checks are not sufficient.
 

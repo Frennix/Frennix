@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import type { StoryViewerRecord } from "@frennix/types";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
 import {
   Avatar,
   colors,
@@ -31,18 +32,25 @@ export const StoryViewersModal = memo(function StoryViewersModal({
   const [activeViewerId, setActiveViewerId] = useState<string | null>(null);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
-          <Text style={styles.title}>Viewed By</Text>
-          <Text style={styles.subtitle}>Tap a viewer to message, follow, invite, or view profile.</Text>
-          {loading ? (
-            <Text style={styles.empty}>Loading viewers…</Text>
-          ) : viewers.length ? (
-            <FlatList
-              data={viewers}
-              keyExtractor={(item) => item.viewer_id}
-              renderItem={({ item }) => {
+    <BottomOverlayShell
+      visible={visible}
+      onClose={onClose}
+      animationType="slide"
+      expanded
+      backdropColor="rgba(0,0,0,0.45)"
+      horizontalPadding={0}
+      sheetMaxHeight="78%"
+      sheetStyle={styles.sheet}
+    >
+      <Text style={styles.title}>Viewed By</Text>
+      <Text style={styles.subtitle}>Tap a viewer to message, follow, invite, or view profile.</Text>
+      {loading ? (
+        <Text style={styles.empty}>Loading viewers…</Text>
+      ) : viewers.length ? (
+        <FlatList
+          data={viewers}
+          keyExtractor={(item) => item.viewer_id}
+          renderItem={({ item }) => {
                 const online = isProfileOnline(item.profile);
                 const menuOpen = activeViewerId === item.viewer_id;
 
@@ -112,27 +120,21 @@ export const StoryViewersModal = memo(function StoryViewersModal({
                   </View>
                 );
               }}
-            />
-          ) : (
-            <Text style={styles.empty}>No views yet.</Text>
-          )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+        />
+      ) : (
+        <Text style={styles.empty}>No views yet.</Text>
+      )}
+    </BottomOverlayShell>
   );
 });
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
   sheet: {
-    maxHeight: "78%",
     backgroundColor: colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     padding: spacing.lg,
     gap: spacing.sm,
   },

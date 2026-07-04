@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { FRENIX_MATCH_BRAND } from "@frennix/matching";
 import { FrennixLogo } from "@/components/FrennixLogo";
+import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
 import { Button, colors, radius, spacing, typography } from "@frennix/ui";
 
 type FrennixMatchExplainerModalProps = {
@@ -10,6 +11,7 @@ type FrennixMatchExplainerModalProps = {
 
 export function FrennixMatchExplainerModal({ visible, onClose }: FrennixMatchExplainerModalProps) {
   const { explainer } = FRENIX_MATCH_BRAND;
+  const { backdropStyle } = useCenterOverlaySafeArea(visible);
 
   return (
     <Modal
@@ -19,7 +21,7 @@ export function FrennixMatchExplainerModal({ visible, onClose }: FrennixMatchExp
       onRequestClose={onClose}
       accessibilityViewIsModal
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={[styles.backdrop, ...backdropStyle]} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <FrennixLogo variant="icon" height={28} style={styles.logo} />
 

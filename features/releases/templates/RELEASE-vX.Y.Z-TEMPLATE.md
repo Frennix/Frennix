@@ -58,17 +58,21 @@
 
 ## Phase 3 — Human QA
 
-**Checklist:** [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md)
+**Checklists:** [`checklists/HUMAN-QA.md`](./checklists/HUMAN-QA.md) · [`checklists/CRITICAL-USER-FLOWS.md`](./checklists/CRITICAL-USER-FLOWS.md)
+
+**Critical flows record:** [`critical-flows/vX.Y.Z-CUF-VERIFICATION.md`](./critical-flows/vX.Y.Z-CUF-VERIFICATION.md) (copy from [`templates/CRITICAL-USER-FLOWS-VERIFICATION-TEMPLATE.md`](./templates/CRITICAL-USER-FLOWS-VERIFICATION-TEMPLATE.md))
 
 | Platform | Tester | Date | Pass |
 |----------|--------|------|------|
 | iPhone Safari | | | ⬜ |
+| iPhone Chrome | | | ⬜ |
 | iPhone app | | | ⬜ |
-| Android | | | ⬜ |
+| Android Chrome | | | ⬜ |
 | Desktop Web | | | ⬜ |
 
 | Gate | Status | Date |
 |------|--------|------|
+| Critical User Flows — all ✅ | ⬜ | |
 | All critical flows pass | ⬜ | |
 | Post-login not black (iPhone Safari) | ⬜ | |
 | **Human QA approved** | ⬜ | |
@@ -118,8 +122,14 @@
 | Deployment ID | |
 | Bundle hash | |
 | Deploy date | |
+| Critical flows verification | [`critical-flows/vX.Y.Z-CUF-VERIFICATION.md`](./critical-flows/vX.Y.Z-CUF-VERIFICATION.md) |
 
-### Migrations
+### Pre-deploy gates
+
+| Gate | Status | Date |
+|------|--------|------|
+| **Critical User Flows all ✅** | ⬜ | Blocks deploy |
+| Founder deploy approval | ⬜ | |
 
 | Migration | Applied staging | Applied production |
 |-----------|-----------------|-------------------|
@@ -149,6 +159,18 @@
 
 ---
 
+## Production bug postmortems
+
+**Process:** [`POSTMORTEM-PROCESS.md`](./POSTMORTEM-PROCESS.md) · **Index:** [`postmortems/README.md`](./postmortems/README.md)
+
+| Bug ID | Sev | Priority | Version Found | Version Fixed | Milestone | Discovered by | Postmortem status | File |
+|--------|-----|----------|---------------|---------------|-----------|---------------|-------------------|------|
+| | P_ | | vX.Y.Z | — | vX.Y.Z | | Open / Fixed / Verified / Closed | `postmortems/BUG-XXX-POSTMORTEM.md` |
+
+> Classify severity per [`BUG-SEVERITY.md`](./BUG-SEVERITY.md) **before** fixing. Production user-reported bugs cannot be **Closed** until postmortem is **Closed** and process improvements applied.
+
+---
+
 ## Phase 7 — Release completion
 
 **Checklist:** [`checklists/RELEASE-COMPLETION.md`](./checklists/RELEASE-COMPLETION.md)
@@ -159,6 +181,8 @@
 | PROJECT-PROGRESS.md updated | ⬜ |
 | RELEASE-HISTORY.md updated | ⬜ |
 | QA checklists archived | ⬜ |
+| Postmortems closed for production user bugs | ⬜ |
+| Bug severity metadata complete (`verify:bug-severity`) | ⬜ |
 | Lessons learned recorded | ⬜ |
 | **Founder release complete approval** | ⬜ |
 

@@ -2,6 +2,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Profile } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
+import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
 import { Avatar, Button, colors, spacing, typography } from "@frennix/ui";
 
 type TrainingMatchModalProps = {
@@ -19,6 +20,7 @@ export function TrainingMatchModal({
   onSendMessage,
   onKeepBrowsing,
 }: TrainingMatchModalProps) {
+  const { backdropStyle } = useCenterOverlaySafeArea(visible);
   if (!partner) return null;
 
   return (
@@ -29,7 +31,7 @@ export function TrainingMatchModal({
       onRequestClose={onKeepBrowsing}
       accessibilityViewIsModal
     >
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, ...backdropStyle]}>
         <View style={styles.sheet}>
           <FrennixLogo variant="icon" height={32} style={styles.logo} />
 

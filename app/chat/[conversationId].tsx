@@ -39,6 +39,7 @@ import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
 import { confirmDeleteMessageForMe } from "@/lib/alerts";
 import { trackMessagingLoad } from "@/lib/product-analytics";
 import { formatPresenceStatus, isProfileOnline, ReactionPicker, colors, spacing, typography } from "@frennix/ui";
+import { useSheetSafeArea } from "@/lib/use-sheet-safe-area";
 
 const TYPING_HIDE_MS = 3000;
 
@@ -381,6 +382,7 @@ export default function ChatScreen() {
     () => messages.find((message) => message.id === reactionMessageId) ?? null,
     [messages, reactionMessageId]
   );
+  const { sheetMarginBottom } = useSheetSafeArea(false, !!reactionTarget);
 
   if (loading || (chatReady && messagesLoading && messages.length === 0)) {
     return (
@@ -448,6 +450,7 @@ export default function ChatScreen() {
       />
       <ReactionPicker
         visible={!!reactionTarget}
+        bottomInset={sheetMarginBottom}
         onClose={() => setReactionMessageId(null)}
         onSelect={(emoji) => {
           if (!reactionTarget) return;

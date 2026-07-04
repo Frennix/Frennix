@@ -2,15 +2,14 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import type { Challenge, Conversation, Group, Post } from "@frennix/types";
-import { Avatar, colors, radius, spacing, typography } from "@frennix/ui";
+import { BottomOverlayShell } from "@/components/BottomOverlayShell";
+import { Avatar, colors, spacing, typography } from "@frennix/ui";
 
 type ShareStep = "menu" | "message" | "group" | "challenge";
 type ShareDestination = "message" | "group" | "challenge";
@@ -169,39 +168,24 @@ export function SharePostSheet({
     );
   }
 
-  if (Platform.OS === "web" && !visible) return null;
-
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          {post ? (
-            <Text style={styles.previewHint} numberOfLines={2}>
-              Sharing {post.author?.display_name ? `${post.author.display_name}'s post` : "this post"}
-            </Text>
-          ) : null}
-          {content}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <BottomOverlayShell
+      visible={visible}
+      onClose={handleClose}
+      sheetMaxHeight="70%"
+      dismissOnBackdrop={!sharing}
+    >
+      {post ? (
+        <Text style={styles.previewHint} numberOfLines={2}>
+          Sharing {post.author?.display_name ? `${post.author.display_name}'s post` : "this post"}
+        </Text>
+      ) : null}
+      {content}
+    </BottomOverlayShell>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(10, 10, 11, 0.72)",
-    justifyContent: "flex-end",
-    padding: spacing.md,
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-    maxHeight: "70%",
-  },
   previewHint: {
     ...typography.caption,
     color: colors.textMuted,

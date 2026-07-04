@@ -19,6 +19,8 @@ Copy applicable rows into `features/releases/RELEASE-vX.Y.Z.md` and mark each it
 | 5 | TypeScript | `npx tsc --noEmit` | ⬜ | Zero errors on touched packages |
 | 6 | Web build | `npx expo export -p web && node scripts/patch-web-html.js` | ⬜ | Zero errors |
 | 7 | Release gate — internal | `npx tsx scripts/verify-release-gates.ts --release <file> --phase internal` | ⬜ | Exit 0 |
+| 8 | Bug severity docs wired | `npm run verify:bug-severity` | ⬜ | [`BUG-SEVERITY.md`](../BUG-SEVERITY.md) |
+| 9 | Postmortem docs wired | `npm run verify:postmortem` | ⬜ | [`POSTMORTEM-PROCESS.md`](../POSTMORTEM-PROCESS.md) |
 
 After all applicable rows pass, produce the **Release Readiness Report** (Phase 2.5) before requesting Human QA.
 
@@ -28,10 +30,10 @@ After all applicable rows pass, produce the **Release Readiness Report** (Phase 
 
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
-| 8 | Migration files reviewed (RLS, RPC auth, rollback SQL) | ⬜ | |
-| 9 | `supabase db reset` or local migration up succeeds | ⬜ | |
-| 10 | `supabase migration list` — no unexpected drift | ⬜ | |
-| 11 | Enum/type additions split across transactions if needed | ⬜ | See M7.3 lesson |
+| 10 | Migration files reviewed (RLS, RPC auth, rollback SQL) | ⬜ | |
+| 11 | `supabase db reset` or local migration up succeeds | ⬜ | |
+| 12 | `supabase migration list` — no unexpected drift | ⬜ | |
+| 13 | Enum/type additions split across transactions if needed | ⬜ | See M7.3 lesson |
 
 ---
 
@@ -39,9 +41,9 @@ After all applicable rows pass, produce the **Release Readiness Report** (Phase 
 
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
-| 12 | New events defined in `packages/types/src/analytics.ts` | ⬜ | |
-| 13 | Events fire in dev (console / Supabase `product_events`) | ⬜ | |
-| 14 | Founder analytics RPCs return expected shape | ⬜ | If dashboard touched |
+| 14 | New events defined in `packages/types/src/analytics.ts` | ⬜ | |
+| 15 | Events fire in dev (console / Supabase `product_events`) | ⬜ | |
+| 16 | Founder analytics RPCs return expected shape | ⬜ | If dashboard touched |
 
 ---
 
@@ -49,10 +51,10 @@ After all applicable rows pass, produce the **Release Readiness Report** (Phase 
 
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
-| 15 | RLS policies on new/changed tables | ⬜ | |
-| 16 | RPC `SECURITY DEFINER` has capability checks | ⬜ | |
-| 17 | Staff/founder routes gated by capability | ⬜ | |
-| 18 | No secrets in committed files | ⬜ | |
+| 17 | RLS policies on new/changed tables | ⬜ | |
+| 18 | RPC `SECURITY DEFINER` has capability checks | ⬜ | |
+| 19 | Staff/founder routes gated by capability | ⬜ | |
+| 20 | No secrets in committed files | ⬜ | |
 
 ---
 
@@ -60,10 +62,10 @@ After all applicable rows pass, produce the **Release Readiness Report** (Phase 
 
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
-| 19 | Push notification copy reviewed | ⬜ | |
-| 20 | In-app notification rows render | ⬜ | |
-| 21 | Realtime subscribe/unsubscribe lifecycle clean | ⬜ | |
-| 22 | Message send/receive in dev | ⬜ | |
+| 21 | Push notification copy reviewed | ⬜ | |
+| 22 | In-app notification rows render | ⬜ | |
+| 23 | Realtime subscribe/unsubscribe lifecycle clean | ⬜ | |
+| 24 | Message send/receive in dev | ⬜ | |
 
 ---
 
@@ -71,9 +73,9 @@ After all applicable rows pass, produce the **Release Readiness Report** (Phase 
 
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
-| 23 | No console.error in touched flows (dev) | ⬜ | |
-| 24 | No linter errors on changed files | ⬜ | |
-| 25 | Bundle size change documented if >10% | ⬜ | |
+| 25 | No console.error in touched flows (dev) | ⬜ | |
+| 26 | No linter errors on changed files | ⬜ | |
+| 27 | Bundle size change documented if >10% | ⬜ | |
 
 ---
 
@@ -89,9 +91,9 @@ After all applicable rows pass, produce the **Release Readiness Report** (Phase 
 
 | # | Task | Done |
 |---|------|------|
-| 26 | Copy [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](../templates/RELEASE-READINESS-REPORT-TEMPLATE.md) → `RELEASE-vX.Y.Z-READINESS.md` | ⬜ |
-| 27 | Fill all sections: tests, build, migrations, perf, security, risks, recommendation | ⬜ |
-| 28 | Link report from release file; mark **Release readiness report delivered** ✅ | ⬜ |
-| 29 | Deliver report to Founder for review **before** Human QA | ⬜ |
+| 28 | Copy [`templates/RELEASE-READINESS-REPORT-TEMPLATE.md`](../templates/RELEASE-READINESS-REPORT-TEMPLATE.md) → `RELEASE-vX.Y.Z-READINESS.md` | ⬜ | |
+| 29 | Fill all sections: tests, build, migrations, perf, security, risks, recommendation | ⬜ | |
+| 30 | Link report from release file; mark **Release readiness report delivered** ✅ | ⬜ | |
+| 31 | Deliver report to Founder for review **before** Human QA | ⬜ | |
 
 **Human QA (Phase 3) must not begin until the Founder reviews the readiness report and approves Phase 3.**
