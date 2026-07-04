@@ -52,7 +52,12 @@ else fail("types:notification-deleted_at", "missing");
 for (const [file, token] of [
   ["app/chat/[conversationId].tsx", "deleteMessageForUser"],
   ["app/chat/[conversationId].tsx", "useDismissWithAnimation"],
+  ["app/chat/[conversationId].tsx", "sender_id === userId"],
   ["components/ChatMessageRow.tsx", "SwipeToDeleteRow"],
+  ["components/ChatMessageRow.tsx", "MessageActionsMenu"],
+  ["components/ChatMessageRow.tsx", "enabled={isOwn}"],
+  ["components/MessageActionsMenu.tsx", "MoreVertical"],
+  ["components/SwipeToDeleteRow.tsx", "Platform.OS === \"web\""],
   ["app/notifications.tsx", "dismissNotification"],
   ["app/notifications.tsx", "useDismissWithAnimation"],
   ["app/notifications.tsx", "SwipeToDeleteRow"],

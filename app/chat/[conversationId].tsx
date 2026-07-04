@@ -398,7 +398,9 @@ export default function ChatScreen() {
         title="Message"
         actions={[
           entityAction("react", "Add reaction"),
-          entityAction("delete", "Delete message", { tone: "danger" }),
+          ...(actionMessage?.sender_id === userId
+            ? [entityAction("delete", "Delete message", { tone: "danger" })]
+            : []),
         ]}
         onSelect={handleMessageAction}
         onClose={closeMessageActions}

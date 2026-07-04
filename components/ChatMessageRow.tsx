@@ -1,9 +1,11 @@
 import { router } from "expo-router";
-import { memo, useCallback, useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { memo, useCallback, useMemo, useState } from "react";
+import { Platform, Pressable, StyleSheet } from "react-native";
 import type { Message, Profile } from "@frennix/types";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
+import { MessageActionsMenu } from "@/components/MessageActionsMenu";
 import { SwipeToDeleteRow } from "@/components/SwipeToDeleteRow";
+import { usePrefersCoarsePointer } from "@/lib/usePrefersCoarsePointer";
 import { MessageBubble } from "@frennix/ui";
 
 type ChatMessageRowProps = {
@@ -81,25 +83,64 @@ export const ChatMessageRow = memo(function ChatMessageRow({
 
   const handleDelete = useCallback(() => onDelete(message), [message, onDelete]);
 
+  const [hovered, setHovered] = useState(false);
+  const [tapped, setTapped] = useState(false);
+  const prefersCoarsePointer = usePrefersCoarsePointer();
+  const isWeb = Platform.OS === "web";
+
+  const showActionsMenu =
+    isOwn &&
+    (isWeb
+      ? prefersCoarsePointer || hovered || tapped
+      : true);
+
+  const handleOwnMessagePress = useCallback(() => {
+    if (!isOwn || !isWeb || prefersCoarsePointer) return;
+    setTapped((value) => !value);
+  }, [isOwn, isWeb, prefersCoarsePointer]);
+
+  const handleOpenMenu = useCallback(() => {
+    setTapped(false);
+    handleLongPressMenu();
+  }, [handleLongPressMenu]);
+
+  const rowContent = (
+    <Pressable
+      style={[styles.row, isOwn && styles.rowOwn]}
+      onPress={handleOwnMessagePress}
+      onHoverIn={isWeb && isOwn ? () => setHovered(true) : undefined}
+      onHoverOut={isWeb && isOwn ? () => setHovered(false) : undefined}
+      {...(isWeb && isOwn
+        ? ({
+            onContextMenu: (event: { preventDefault?: () => void }) => {
+              event.preventDefault?.();
+              handleOpenMenu();
+            },
+          } as object)
+        : null)}
+    >
+      {isOwn ? <MessageActionsMenu visible={showActionsMenu} onPress={handleOpenMenu} /> : null}
+      <MessageBubble
+        content={message.content}
+        isOwn={isOwn}
+        timestamp={time}
+        mediaUrl={message.media_url}
+        sharedPost={message.shared_post}
+        onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
+        onMediaPress={message.media_url ? handleMediaPress : undefined}
+        reactions={message.reactions}
+        onReaction={handleReaction}
+        onLongPressMenu={handleLongPressMenu}
+        senderAvatarUrl={isOwn ? myProfile?.avatar_url : sender?.avatar_url}
+        senderName={isOwn ? myProfile?.display_name : sender?.display_name}
+      />
+    </Pressable>
+  );
+
   return (
     <AnimatedDismissRow dismissing={dismissing}>
-      <SwipeToDeleteRow onDelete={handleDelete}>
-        <View style={styles.row}>
-          <MessageBubble
-            content={message.content}
-            isOwn={isOwn}
-            timestamp={time}
-            mediaUrl={message.media_url}
-            sharedPost={message.shared_post}
-            onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
-            onMediaPress={message.media_url ? handleMediaPress : undefined}
-            reactions={message.reactions}
-            onReaction={handleReaction}
-            onLongPressMenu={handleLongPressMenu}
-            senderAvatarUrl={isOwn ? myProfile?.avatar_url : sender?.avatar_url}
-            senderName={isOwn ? myProfile?.display_name : sender?.display_name}
-          />
-        </View>
+      <SwipeToDeleteRow enabled={isOwn} onDelete={handleDelete}>
+        {rowContent}
       </SwipeToDeleteRow>
     </AnimatedDismissRow>
   );
@@ -108,5 +149,10 @@ export const ChatMessageRow = memo(function ChatMessageRow({
 const styles = StyleSheet.create({
   row: {
     width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  rowOwn: {
+    justifyContent: "flex-end",
   },
 });
