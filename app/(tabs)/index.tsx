@@ -15,12 +15,15 @@ import {
   getFeedStories,
   getSuggestedAthletes,
   getErrorMessage,
-  getStoryInsights,
-  markStoryViewed,
+  getDedicatedStoryInsights,
+  getStoryViewers,
+  joinStoryChallenge,
+  markDedicatedStoryViewed,
+  sendDedicatedStoryReaction,
+  sendDedicatedStoryReply,
   sendStoryChallenge,
+  sendStoryEventInvite,
   sendStoryInviteToTrain,
-  sendStoryQuickReaction,
-  sendStoryReply,
   trackStoryFollowFromStory,
   trackStoryProfileVisit,
 } from "@frennix/api";
@@ -37,12 +40,14 @@ import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
+import { StoryAnalyticsModal } from "@/components/story/StoryAnalyticsModal";
+import { StoryViewersModal } from "@/components/story/StoryViewersModal";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
 import { usePostActions } from "@/lib/usePostActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
-import { openCreatePost, pushScreen } from "@/lib/press-utils";
+import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
 import { usePostInteraction, postReplyHref } from "@/lib/usePostInteraction";
 import { handleTabRetap, scrollFlatListToTop, scrollScrollViewToTop } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
@@ -75,6 +80,9 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyInviteUserId, setStoryInviteUserId] = useState<string | null>(null);
+  const [viewersModalVisible, setViewersModalVisible] = useState(false);
+  const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
+  const [activeInsightStoryId, setActiveInsightStoryId] = useState<string | null>(null);
   const { openShare, shareSheet, shareVisible } = useSharePost(userId);
   markFeedHook("share-post");
   const { openPostActions, postActionSheets } = usePostActions({
@@ -135,14 +143,14 @@ export default function HomeScreen() {
   markFeedHook("post-interaction");
 
   const markStoryViewedOptimistic = useCallback(
-    (storyUserId: string, postId: string | null) => {
-      if (!userId || !postId) return;
+    (storyUserId: string, storyId: string | null, slideId: string | null) => {
+      if (!userId || !storyId) return;
       queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
         current?.map((story) =>
           story.user_id === storyUserId ? { ...story, viewed: true } : story
         )
       );
-      void markStoryViewed(userId, storyUserId, postId).catch(() => undefined);
+      void markDedicatedStoryViewed(userId, storyId, slideId, storyUserId).catch(() => undefined);
     },
     [queryClient, userId]
   );
@@ -160,9 +168,14 @@ export default function HomeScreen() {
   markFeedHook("stories-query");
 
   const handleStoryReact = useCallback(
-    async (storyUserId: string, postId: string, emoji: StoryQuickReactionEmoji) => {
+    async (
+      storyUserId: string,
+      storyId: string,
+      emoji: StoryQuickReactionEmoji,
+      slideId?: string | null
+    ) => {
       if (!userId) return;
-      await sendStoryQuickReaction(userId, storyUserId, postId, emoji);
+      await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
     },
     [userId]
   );
@@ -171,35 +184,77 @@ export default function HomeScreen() {
     async (storyUserId: string, key: StoryChallengeKey) => {
       if (!userId) return;
       const challenge = STORY_CHALLENGE_RESPONSES.find((item) => item.key === key);
-      const postId = stories.find((story) => story.user_id === storyUserId)?.last_workout?.post_id;
-      if (!challenge) return;
-      await sendStoryChallenge(userId, storyUserId, challenge.message, postId ?? null);
+      const storyId =
+        stories.find((story) => story.user_id === storyUserId)?.active_stories.at(-1)?.id ?? null;
+      if (!challenge || !storyId) return;
+      await sendStoryChallenge(userId, storyUserId, challenge.message, storyId, { isDedicated: true });
     },
     [userId, stories]
   );
 
   const handleStoryReply = useCallback(
-    async (storyUserId: string, text: string) => {
-      if (!userId) return;
-      const postId = stories.find((story) => story.user_id === storyUserId)?.last_workout?.post_id;
-      await sendStoryReply(userId, storyUserId, text, postId ?? null);
+    async (storyUserId: string, text: string, storyId?: string | null) => {
+      if (!userId || !storyId) return;
+      await sendDedicatedStoryReply(userId, storyUserId, text, storyId);
     },
-    [userId, stories]
+    [userId]
   );
 
   const handleStoryFollow = useCallback(
     (storyUserId: string, isFollowing: boolean) => {
       if (!userId || isFollowing) return;
-      const postId = stories.find((story) => story.user_id === storyUserId)?.last_workout?.post_id ?? null;
+      const storyId =
+        stories.find((story) => story.user_id === storyUserId)?.active_stories.at(-1)?.id ?? null;
       followMutation.mutate({ targetUserId: storyUserId, isFollowing: false });
       queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
         current?.map((story) =>
           story.user_id === storyUserId ? { ...story, viewer_follows: true } : story
         )
       );
-      void trackStoryFollowFromStory(userId, storyUserId, postId).catch(() => undefined);
+      if (storyId) {
+        void trackStoryFollowFromStory(userId, storyUserId, storyId, { isDedicated: true }).catch(
+          () => undefined
+        );
+      }
     },
     [followMutation, queryClient, stories, userId]
+  );
+
+  const handleStoryEventInvite = useCallback(
+    async (storyUserId: string, storyId: string) => {
+      if (!userId) return;
+      setStoryInviteUserId(storyUserId);
+      try {
+        await sendStoryEventInvite(userId, storyUserId, storyId);
+        showAlert("Invite sent", "Your event invite was sent as a message.");
+      } catch (error) {
+        showAlert("Could not invite", getErrorMessage(error));
+      } finally {
+        setStoryInviteUserId(null);
+      }
+    },
+    [userId]
+  );
+
+  const handleDiscoverStoryTag = useCallback((tag: string) => {
+    setActiveStoryIndex(null);
+    pushScreen({ pathname: "/stories/discover", params: { tag } });
+  }, []);
+
+  const handleDiscoverStoryLocation = useCallback((location: string) => {
+    setActiveStoryIndex(null);
+    pushScreen({ pathname: "/stories/discover", params: { location } });
+  const handleJoinStoryChallenge = useCallback(
+    async (storyUserId: string, storyId: string, challengeId: string) => {
+      if (!userId) return;
+      try {
+        await joinStoryChallenge(userId, storyUserId, storyId, challengeId);
+        showAlert("Challenge joined", "You're in! Keep the momentum going.");
+      } catch (error) {
+        showAlert("Could not join", getErrorMessage(error));
+      }
+    },
+    [userId]
   );
 
   const handleStoryInviteToTrain = useCallback(
@@ -520,14 +575,22 @@ export default function HomeScreen() {
   );
 
   const activeStory = activeStoryIndex !== null ? stories[activeStoryIndex] ?? null : null;
+  const activeInsightStoryIdResolved =
+    activeInsightStoryId ?? activeStory?.active_stories.at(-1)?.id ?? null;
 
   const { data: storyInsights } = useQuery({
-    queryKey: ["story-insights", userId, activeStory?.last_workout?.post_id],
-    queryFn: () => getStoryInsights(userId, activeStory!.last_workout!.post_id),
-    enabled: Boolean(activeStory?.is_self && activeStory?.last_workout?.post_id && activeStoryIndex !== null),
+    queryKey: ["story-insights", userId, activeInsightStoryIdResolved],
+    queryFn: () => getDedicatedStoryInsights(activeInsightStoryIdResolved!),
+    enabled: Boolean(activeStory?.is_self && activeInsightStoryIdResolved && activeStoryIndex !== null),
     staleTime: 30_000,
   });
   markFeedHook("story-insights-query");
+
+  const { data: storyViewers = [], isLoading: storyViewersLoading } = useQuery({
+    queryKey: ["story-viewers", userId, activeInsightStoryIdResolved],
+    queryFn: () => getStoryViewers(userId, activeInsightStoryIdResolved!),
+    enabled: Boolean(viewersModalVisible && activeInsightStoryIdResolved && activeStory?.is_self),
+  });
 
   const handleListLayout = useCallback(
     (height: number) => {
@@ -739,19 +802,36 @@ export default function HomeScreen() {
           pushScreen(`/user/${username}`);
         }}
         onViewProfileFromStory={(storyUserId, username) => {
-          const postId = stories.find((item) => item.user_id === storyUserId)?.last_workout?.post_id ?? null;
-          void trackStoryProfileVisit(userId, storyUserId, postId).catch(() => undefined);
+          const storyId =
+            stories.find((item) => item.user_id === storyUserId)?.active_stories.at(-1)?.id ?? null;
+          if (storyId) {
+            void trackStoryProfileVisit(userId, storyUserId, storyId, { isDedicated: true }).catch(
+              () => undefined
+            );
+          }
           setActiveStoryIndex(null);
           pushScreen(`/user/${username}`);
         }}
         onShareWorkout={() => {
           setActiveStoryIndex(null);
-          openCreatePost();
+          openCreateStory();
         }}
         onMarkViewed={markStoryViewedOptimistic}
         onReact={handleStoryReact}
         onChallenge={handleStoryChallenge}
         onReply={handleStoryReply}
+        onJoinChallenge={handleJoinStoryChallenge}
+        onInviteToEvent={handleStoryEventInvite}
+        onDiscoverTag={handleDiscoverStoryTag}
+        onDiscoverLocation={handleDiscoverStoryLocation}
+        onOpenViewers={() => {
+          setActiveInsightStoryId(activeStory?.active_stories.at(-1)?.id ?? null);
+          setViewersModalVisible(true);
+        }}
+        onOpenAnalytics={() => {
+          setActiveInsightStoryId(activeStory?.active_stories.at(-1)?.id ?? null);
+          setAnalyticsModalVisible(true);
+        }}
         onFollow={handleStoryFollow}
         onInviteToTrain={handleStoryInviteToTrain}
         storyInsights={storyInsights ?? null}
@@ -765,6 +845,21 @@ export default function HomeScreen() {
         }
       />
       </FeedRenderTraceProbe>
+      <StoryViewersModal
+        visible={viewersModalVisible}
+        viewers={storyViewers}
+        loading={storyViewersLoading}
+        onClose={() => setViewersModalVisible(false)}
+      />
+      <StoryAnalyticsModal
+        visible={analyticsModalVisible}
+        analytics={storyInsights ?? null}
+        onClose={() => setAnalyticsModalVisible(false)}
+        onOpenViewers={() => {
+          setAnalyticsModalVisible(false);
+          setViewersModalVisible(true);
+        }}
+      />
       {feedDebugEnabled ? (
         <FeedScrollDebugOverlay
           snapshot={feedDebugSnapshot}

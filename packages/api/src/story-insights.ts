@@ -4,17 +4,20 @@ import { getSupabase } from "./supabase";
 export async function trackStoryEngagementEvent(input: {
   viewerId: string;
   storyUserId: string;
-  postId: string | null;
+  storyId?: string | null;
+  postId?: string | null;
   eventType: StoryEngagementEventType;
   metadata?: Record<string, unknown>;
 }) {
-  if (!input.postId) return;
+  const refId = input.storyId ?? input.postId;
+  if (!refId) return;
   if (input.viewerId === input.storyUserId && input.eventType !== "view") return;
 
   const { error } = await getSupabase().from("story_engagement_events").insert({
     viewer_id: input.viewerId,
     story_user_id: input.storyUserId,
-    post_id: input.postId,
+    story_id: input.storyId ?? null,
+    post_id: input.postId ?? null,
     event_type: input.eventType,
     metadata: input.metadata ?? {},
   });
@@ -22,6 +25,71 @@ export async function trackStoryEngagementEvent(input: {
   if (error) throw error;
 }
 
+export async function getDedicatedStoryInsights(storyId: string): Promise<StoryInsights> {
+  const { data, error } = await getSupabase()
+    .from("story_engagement_events")
+    .select("event_type")
+    .eq("story_id", storyId);
+
+  if (error) throw error;
+
+  const counts: StoryInsights = {
+    story_id: storyId,
+    views: 0,
+    replies: 0,
+    reactions: 0,
+    train_invites: 0,
+    profile_visits: 0,
+    new_followers: 0,
+    challenges: 0,
+  };
+
+  for (const row of data ?? []) {
+    switch (row.event_type as StoryEngagementEventType) {
+      case "view":
+        counts.views += 1;
+        break;
+      case "reply":
+        counts.replies += 1;
+        break;
+      case "reaction":
+        counts.reactions += 1;
+        break;
+      case "train_invite":
+        counts.train_invites += 1;
+        break;
+      case "profile_visit":
+        counts.profile_visits += 1;
+        break;
+      case "follow":
+        counts.new_followers += 1;
+        break;
+      case "challenge":
+        counts.challenges += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  const { count: viewCount } = await getSupabase()
+    .from("story_item_views")
+    .select("*", { count: "exact", head: true })
+    .eq("story_id", storyId);
+
+  if (viewCount != null) counts.views = Math.max(counts.views, viewCount);
+
+  const { count: reactionCount } = await getSupabase()
+    .from("story_item_reactions")
+    .select("*", { count: "exact", head: true })
+    .eq("story_id", storyId);
+
+  if (reactionCount != null) counts.reactions = Math.max(counts.reactions, reactionCount);
+
+  return counts;
+}
+
+/** @deprecated Use getDedicatedStoryInsights */
 export async function getStoryInsights(
   storyUserId: string,
   postId: string
@@ -35,6 +103,7 @@ export async function getStoryInsights(
   if (error) throw error;
 
   const counts: StoryInsights = {
+    story_id: postId,
     post_id: postId,
     views: 0,
     replies: 0,

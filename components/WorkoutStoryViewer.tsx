@@ -32,14 +32,18 @@ import {
   formatStoryCalories,
 } from "@/lib/story-format";
 import { primaryStoryMilestone } from "@frennix/api";
-import { StoryActionDock } from "./story/StoryActionDock";
+import { StoryWorkoutSlideCard } from "./story/StoryWorkoutSlideCard";
+import { StoryQuickActionsBar } from "./story/StoryQuickActionsBar";
+import { StoryReplyBar } from "./story/StoryReplyBar";
 import { StoryFooterGradient } from "./story/StoryFooterGradient";
 import { StoryDailyMotivation } from "./story/StoryDailyMotivation";
 import { StoryAchievementMoment } from "./story/StoryAchievementMoment";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
 import {
+  buildDedicatedStorySlides,
   buildStorySlides,
   prefetchStorySlide,
+  resolveSlideContext,
   type WorkoutStorySlide,
 } from "../lib/story-utils";
 
@@ -106,6 +110,21 @@ function StorySlideContent({
     );
   }
 
+  if (slide.kind === "workout") {
+    return (
+      <StoryWorkoutSlideCard
+        title={slide.title}
+        activity={slide.activity}
+        distance={slide.metrics.distance}
+        duration={slide.metrics.duration}
+        calories={slide.metrics.calories}
+        gym={slide.metrics.gym}
+        location={slide.metrics.location}
+        caption={slide.caption}
+      />
+    );
+  }
+
   if (slide.kind === "text") {
     return (
       <View style={[styles.textSlide, { width, height }]}>
@@ -157,12 +176,23 @@ export interface WorkoutStoryViewerProps {
   onClose: () => void;
   onShareWorkout?: () => void;
   onViewProfile?: (username: string) => void;
-  onMarkViewed?: (storyUserId: string, postId: string | null) => void;
-  onReact?: (storyUserId: string, postId: string, emoji: StoryQuickReactionEmoji) => void | Promise<void>;
+  onMarkViewed?: (storyUserId: string, storyId: string | null, slideId: string | null) => void;
+  onReact?: (
+    storyUserId: string,
+    storyId: string,
+    emoji: StoryQuickReactionEmoji,
+    slideId?: string | null
+  ) => void | Promise<void>;
   onChallenge?: (storyUserId: string, key: StoryChallengeKey) => void | Promise<void>;
-  onReply?: (storyUserId: string, text: string) => void | Promise<void>;
+  onReply?: (storyUserId: string, text: string, storyId?: string | null) => void | Promise<void>;
+  onJoinChallenge?: (storyUserId: string, storyId: string, challengeId: string) => void | Promise<void>;
+  onOpenViewers?: () => void;
+  onOpenAnalytics?: () => void;
   onFollow?: (storyUserId: string, isFollowing: boolean) => void | Promise<void>;
   onInviteToTrain?: (storyUserId: string, postId: string | null) => void | Promise<void>;
+  onInviteToEvent?: (storyUserId: string, storyId: string) => void | Promise<void>;
+  onDiscoverTag?: (tag: string) => void;
+  onDiscoverLocation?: (location: string) => void;
   onViewProfileFromStory?: (storyUserId: string, username: string) => void;
   storyInsights?: StoryInsights | null;
   followLoading?: boolean;
@@ -181,8 +211,14 @@ export function WorkoutStoryViewer({
   onReact,
   onChallenge,
   onReply,
+  onJoinChallenge,
+  onOpenViewers,
+  onOpenAnalytics,
   onFollow,
   onInviteToTrain,
+  onInviteToEvent,
+  onDiscoverTag,
+  onDiscoverLocation,
   onViewProfileFromStory,
   storyInsights,
   followLoading,
@@ -195,20 +231,37 @@ export function WorkoutStoryViewer({
   const [paused, setPaused] = useState(false);
   const [interactionLocked, setInteractionLocked] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  const [showReply, setShowReply] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
+  const slideOpacity = useRef(new Animated.Value(1)).current;
   const timerRef = useRef<Animated.CompositeAnimation | null>(null);
   const elapsedMsRef = useRef(0);
   const holdStartedAtRef = useRef<number | null>(null);
   const didHoldRef = useRef(false);
 
   const story = stories[storyIndex] ?? null;
+  const activeStories = story?.active_stories ?? [];
   const lastWorkout = story?.last_workout ?? null;
-  const slides = useMemo(() => buildStorySlides(lastWorkout), [lastWorkout]);
+  const slides = useMemo(
+    () =>
+      activeStories.length
+        ? buildDedicatedStorySlides(activeStories)
+        : buildStorySlides(lastWorkout),
+    [activeStories, lastWorkout]
+  );
   const activeSlide = slides[slideIndex] ?? slides[0];
+  const slideContext = useMemo(
+    () => resolveSlideContext(activeStories, slideIndex),
+    [activeStories, slideIndex]
+  );
+  const currentDedicatedStory = useMemo(() => {
+    if (!slideContext) return activeStories[0] ?? null;
+    return activeStories.find((item) => item.id === slideContext.storyId) ?? null;
+  }, [activeStories, slideContext]);
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
-  const autoAdvancePaused = paused || interactionLocked;
+  const autoAdvancePaused = paused || interactionLocked || showReply;
   const spotlightMilestone = primaryStoryMilestone(lastWorkout?.milestones ?? []);
 
   useEffect(() => {
@@ -224,8 +277,20 @@ export function WorkoutStoryViewer({
 
   useEffect(() => {
     if (!visible || !story) return;
-    onMarkViewed?.(story.user_id, lastWorkout?.post_id ?? null);
-  }, [visible, story?.user_id, lastWorkout?.post_id, onMarkViewed, story]);
+    onMarkViewed?.(
+      story.user_id,
+      slideContext?.storyId ?? currentDedicatedStory?.id ?? null,
+      slideContext?.slideId ?? null
+    );
+  }, [
+    visible,
+    story?.user_id,
+    slideContext?.storyId,
+    slideContext?.slideId,
+    currentDedicatedStory?.id,
+    onMarkViewed,
+    story,
+  ]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
@@ -265,7 +330,10 @@ export function WorkoutStoryViewer({
       return;
     }
     if (storyIndex > 0) {
-      const prevSlides = buildStorySlides(stories[storyIndex - 1]?.last_workout ?? null);
+      const prevStory = stories[storyIndex - 1];
+      const prevSlides = prevStory?.active_stories?.length
+        ? buildDedicatedStorySlides(prevStory.active_stories)
+        : buildStorySlides(prevStory?.last_workout ?? null);
       setStoryIndex((current) => current - 1);
       setSlideIndex(Math.max(prevSlides.length - 1, 0));
     }
@@ -305,7 +373,14 @@ export function WorkoutStoryViewer({
   useEffect(() => {
     setInteractionLocked(false);
     setCaptionExpanded(false);
-  }, [timerKey]);
+    setShowReply(false);
+    slideOpacity.setValue(0);
+    Animated.timing(slideOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [timerKey, slideOpacity]);
 
   useEffect(() => {
     if (!visible || !story) {
@@ -331,7 +406,10 @@ export function WorkoutStoryViewer({
     prefetchStorySlide(slides[slideIndex + 1]);
     const nextStory = stories[storyIndex + 1];
     if (slideIndex >= slides.length - 1 && nextStory) {
-      prefetchStorySlide(buildStorySlides(nextStory.last_workout)[0]);
+      const firstSlide = nextStory.active_stories?.length
+        ? buildDedicatedStorySlides(nextStory.active_stories)[0]
+        : buildStorySlides(nextStory.last_workout)[0];
+      prefetchStorySlide(firstSlide);
     }
   }, [slideIndex, slides, storyIndex, stories]);
 
@@ -377,13 +455,21 @@ export function WorkoutStoryViewer({
 
   if (!visible || !story) return null;
 
-  const caption = lastWorkout?.content?.trim() ?? "";
-  const showCaption = Boolean(caption) && activeSlide?.kind !== "text";
+  const caption =
+    activeSlide?.kind === "media"
+      ? activeSlide.caption?.trim() ?? ""
+      : lastWorkout?.content?.trim() ?? "";
+  const showCaption = Boolean(caption) && activeSlide?.kind !== "text" && activeSlide?.kind !== "workout";
   const captionNeedsMore = caption.length > 96 || caption.includes("\n");
-  const showEmptySelfCta = story.is_self && !lastWorkout;
-  const canEngage = Boolean(lastWorkout?.post_id) && !story.is_self;
+  const showEmptySelfCta = story.is_self && !activeStories.length && !lastWorkout;
+  const activeStoryId = slideContext?.storyId ?? currentDedicatedStory?.id ?? lastWorkout?.post_id ?? null;
+  const canEngage = Boolean(activeStoryId) && !story.is_self;
 
-  const timePosted = lastWorkout ? formatRelativeTime(lastWorkout.created_at) : "";
+  const timePosted = currentDedicatedStory
+    ? formatRelativeTime(currentDedicatedStory.created_at)
+    : lastWorkout
+      ? formatRelativeTime(lastWorkout.created_at)
+      : "";
 
   const headerTopPad = Math.max(insets.top, Platform.OS === "web" ? spacing.md : spacing.lg);
   const footerBottomPad = Math.max(insets.bottom, spacing.md, Platform.OS === "web" ? 12 : 0);
@@ -402,14 +488,14 @@ export function WorkoutStoryViewer({
           style={[styles.stage, { transform: [{ translateY: dismissY }] }]}
           {...panResponder.panHandlers}
         >
-          <View style={styles.mediaStage} pointerEvents="none">
+          <Animated.View style={[styles.mediaStage, { opacity: slideOpacity }]} pointerEvents="none">
             <StorySlideContent
               slide={activeSlide}
               shouldPlayVideo={visible && isVideoSlide && !autoAdvancePaused}
               width={width}
               height={height}
             />
-          </View>
+          </Animated.View>
 
           <View style={styles.scrimTop} pointerEvents="none" />
           <StoryFooterGradient />
@@ -453,7 +539,13 @@ export function WorkoutStoryViewer({
               <StoryAchievementMoment milestone={spotlightMilestone} resetKey={timerKey} />
             ) : null}
 
-            {story.is_self && storyInsights ? <StoryInsightsStrip insights={storyInsights} /> : null}
+            {story.is_self && storyInsights ? (
+              <StoryInsightsStrip
+                insights={storyInsights}
+                onViewsPress={onOpenViewers}
+                onPress={onOpenAnalytics}
+              />
+            ) : null}
           </View>
 
           <View style={[styles.footer, { paddingBottom: footerBottomPad }]} pointerEvents="box-none">
@@ -511,28 +603,86 @@ export function WorkoutStoryViewer({
               </View>
             ) : null}
 
+            {currentDedicatedStory?.workout_tag ? (
+              <Pressable onPress={() => onDiscoverTag?.(currentDedicatedStory.workout_tag!)}>
+                <Text style={styles.workoutTag}>#{currentDedicatedStory.workout_tag}</Text>
+              </Pressable>
+            ) : null}
+
+            {currentDedicatedStory?.location_name ? (
+              <Pressable onPress={() => onDiscoverLocation?.(currentDedicatedStory.location_name!)}>
+                <Text style={styles.locationTag}>📍 {currentDedicatedStory.location_name}</Text>
+              </Pressable>
+            ) : null}
+
+            {currentDedicatedStory?.challenge_id && currentDedicatedStory.challenge_prompt ? (
+              <Pressable
+                style={styles.challengeCta}
+                onPress={() =>
+                  onJoinChallenge?.(
+                    story.user_id,
+                    currentDedicatedStory.id,
+                    currentDedicatedStory.challenge_id!
+                  )
+                }
+              >
+                <Text style={styles.challengeCtaText}>Join Challenge</Text>
+              </Pressable>
+            ) : null}
+
+            {story.is_self && onOpenViewers ? (
+              <Pressable style={styles.viewersCta} onPress={onOpenViewers}>
+                <Text style={styles.viewersCtaText}>See viewers</Text>
+              </Pressable>
+            ) : null}
+
             {showEmptySelfCta ? (
               <StoryDailyMotivation onShareWorkout={onShareWorkout} seed={story.user_id} />
             ) : null}
 
             {canEngage ? (
-              <StoryActionDock
-                disabled={paused}
-                resetKey={timerKey}
-                onInteractionLockChange={setInteractionLocked}
-                isFollowing={story.viewer_follows}
-                followLoading={followLoading}
-                inviteLoading={inviteLoading}
-                onReact={(emoji) => onReact?.(story.user_id, lastWorkout!.post_id, emoji)}
-                onChallenge={(key) => onChallenge?.(story.user_id, key)}
-                onReply={(text) => onReply?.(story.user_id, text) ?? Promise.resolve()}
-                onFollow={() => onFollow?.(story.user_id, story.viewer_follows)}
-                onInviteToTrain={() => onInviteToTrain?.(story.user_id, lastWorkout?.post_id ?? null)}
-                onViewProfile={() =>
-                  onViewProfileFromStory?.(story.user_id, story.profile.username) ??
-                  onViewProfile?.(story.profile.username)
-                }
-              />
+              <View style={styles.engageStack}>
+                {showReply ? (
+                  <StoryReplyBar
+                    disabled={paused}
+                    compact
+                    onCancel={() => setShowReply(false)}
+                    onSend={async (text) => {
+                      await onReply?.(story.user_id, text, activeStoryId);
+                      setShowReply(false);
+                    }}
+                  />
+                ) : null}
+                <StoryReactionRow
+                  disabled={paused}
+                  onReact={(emoji) =>
+                    onReact?.(story.user_id, activeStoryId!, emoji, slideContext?.slideId ?? null)
+                  }
+                />
+                <StoryQuickActionsBar
+                  disabled={paused || showReply}
+                  hasChallenge={Boolean(currentDedicatedStory?.challenge_id)}
+                  inviteLoading={inviteLoading}
+                  onMessage={() => setShowReply(true)}
+                  onInviteWorkout={() => onInviteToTrain?.(story.user_id, lastWorkout?.post_id ?? null)}
+                  onInviteEvent={() =>
+                    activeStoryId && onInviteToEvent?.(story.user_id, activeStoryId)
+                  }
+                  onJoinChallenge={() =>
+                    currentDedicatedStory?.challenge_id &&
+                    activeStoryId &&
+                    onJoinChallenge?.(
+                      story.user_id,
+                      activeStoryId,
+                      currentDedicatedStory.challenge_id
+                    )
+                  }
+                  onViewProfile={() =>
+                    onViewProfileFromStory?.(story.user_id, story.profile.username) ??
+                    onViewProfile?.(story.profile.username)
+                  }
+                />
+              </View>
             ) : null}
           </View>
 
@@ -573,6 +723,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
     overflow: "hidden",
+  },
+  engageStack: {
+    gap: spacing.sm,
   },
   mediaStage: {
     ...StyleSheet.absoluteFillObject,
@@ -761,5 +914,56 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 24,
     textAlign: "center",
+  },
+  workoutTitle: {
+    ...typography.heading,
+    color: colors.text,
+    fontWeight: "800",
+    marginBottom: spacing.md,
+    textAlign: "center",
+  },
+  workoutMetric: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: spacing.xs,
+  },
+  workoutLocation: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    textAlign: "center",
+  },
+  workoutTag: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "700",
+  },
+  locationTag: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: "600",
+  },
+  challengeCta: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.accent,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  challengeCtaText: {
+    ...typography.bodySmall,
+    color: colors.white,
+    fontWeight: "800",
+  },
+  viewersCta: {
+    alignSelf: "flex-start",
+    paddingVertical: spacing.xs,
+  },
+  viewersCtaText: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "700",
   },
 });

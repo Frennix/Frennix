@@ -28,6 +28,7 @@ export interface WorkoutStoryMilestone {
 
 export type StoryAudience = "public" | "followers" | "friends" | "private";
 
+/** @deprecated Use StoryPrivacy from dedicated-story.ts for new stories. */
 export const STORY_AUDIENCE_OPTIONS: Array<{ value: StoryAudience; label: string; hint: string }> = [
   { value: "public", label: "Public", hint: "Anyone on Frennix" },
   { value: "followers", label: "Followers", hint: "People who follow you" },
@@ -53,10 +54,11 @@ export interface WorkoutStorySlideMeta {
 }
 
 export const STORY_QUICK_REACTIONS = [
-  { emoji: "💪", label: "Strong Work" },
+  { emoji: "❤️", label: "Love" },
   { emoji: "🔥", label: "Fire" },
-  { emoji: "👏", label: "Nice Work" },
-  { emoji: "❤️", label: "Like" },
+  { emoji: "💪", label: "Strong" },
+  { emoji: "👏", label: "Clap" },
+  { emoji: "😂", label: "Laugh" },
 ] as const;
 
 export type StoryQuickReactionEmoji = (typeof STORY_QUICK_REACTIONS)[number]["emoji"];
@@ -81,7 +83,9 @@ export type StoryEngagementEventType =
   | "follow";
 
 export interface StoryInsights {
-  post_id: string;
+  story_id: string;
+  /** @deprecated Use story_id */
+  post_id?: string;
   views: number;
   replies: number;
   reactions: number;

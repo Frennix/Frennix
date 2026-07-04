@@ -1,6 +1,7 @@
 export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "💪"] as const;
 
 import type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
+import type { FrennixStory } from "./dedicated-story";
 import type { SkillLevel, TrainingEnvironment, TrainingScheduleSlot } from "./matching";
 import type {
   ChildrenAgeGroup,
@@ -10,6 +11,7 @@ import type {
   PreferredWorkoutTime,
 } from "./lifestyle";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
+export * from "./dedicated-story";
 
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
@@ -58,7 +60,11 @@ export type NotificationType =
   | "event_join"
   | "event_invite"
   | "post_share"
-  | "story_train_invite";
+  | "story_train_invite"
+  | "story_reaction"
+  | "story_reply"
+  | "story_mention"
+  | "story_challenge_join";
 
 export type ChallengeInvitationStatus = "pending" | "declined";
 
@@ -256,10 +262,13 @@ export interface FeedStory {
   workout_streak: number;
   workout_count: number;
   has_recent_workout: boolean;
+  /** Active dedicated stories (24h window). */
+  active_stories: FrennixStory[];
+  /** @deprecated Post-derived story — kept for migration fallback. */
   last_workout: FeedStoryLastWorkout | null;
   is_self: boolean;
   viewer_follows: boolean;
-  /** True when the viewer has seen the current last_workout post. */
+  /** True when the viewer has seen all active stories. */
   viewed?: boolean;
 }
 

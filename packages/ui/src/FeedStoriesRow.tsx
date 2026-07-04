@@ -1,7 +1,7 @@
 import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { FeedStory } from "@frennix/types";
 import { Avatar } from "./Avatar";
-import { formatLastWorkoutLabel, formatStreakBadgeLabel } from "./formatRelativeTime";
+import { formatRelativeTime, formatStreakBadgeLabel } from "./formatRelativeTime";
 import { colors, spacing, typography } from "./theme";
 
 interface FeedStoriesRowProps {
@@ -10,8 +10,24 @@ interface FeedStoriesRowProps {
   onAddStoryPress?: () => void;
 }
 
-function StoryAvatar({ story }: { story: FeedStory }) {
-  const hasStoryContent = Boolean(story.last_workout) || story.is_self;
+function storyLabel(item: FeedStory): string {
+  const latest = item.active_stories.at(-1);
+  if (!latest) return item.is_self ? "Add your story" : "No story yet";
+  const time = formatRelativeTime(latest.created_at);
+  if (latest.workout_tag) return `${latest.workout_tag} · ${time}`;
+  const slideCount = latest.slides.length;
+  if (slideCount > 1) return `${slideCount} slides · ${time}`;
+  return `Story · ${time}`;
+}
+
+function StoryAvatar({
+  story,
+  onAddStoryPress,
+}: {
+  story: FeedStory;
+  onAddStoryPress?: () => void;
+}) {
+  const hasStoryContent = story.active_stories.length > 0 || story.is_self;
   const ringStyle = !hasStoryContent
     ? styles.avatarRingMuted
     : story.viewed
@@ -23,7 +39,17 @@ function StoryAvatar({ story }: { story: FeedStory }) {
       <View style={styles.avatarInner}>
         <Avatar uri={story.profile.avatar_url} name={story.profile.display_name} size={58} />
       </View>
-      {story.workout_streak > 0 ? (
+      {story.is_self ? (
+        <Pressable
+          style={styles.addBadge}
+          onPress={onAddStoryPress}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Create story"
+        >
+          <Text style={styles.addBadgeText}>＋</Text>
+        </Pressable>
+      ) : story.workout_streak > 0 ? (
         <View style={styles.streakBadge}>
           <Text style={styles.streakBadgeText}>🔥{story.workout_streak}</Text>
         </View>
@@ -37,7 +63,7 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Workout stories</Text>
+      <Text style={styles.sectionTitle}>Stories</Text>
       <FlatList
         data={stories}
         horizontal
@@ -48,21 +74,22 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const isSelf = item.is_self;
-          const lastWorkoutLabel = formatLastWorkoutLabel(item.last_workout);
+          const label = storyLabel(item);
           const streakLabel = formatStreakBadgeLabel(item.workout_streak);
+          const hasActiveStory = item.active_stories.length > 0;
 
           return (
             <Pressable
               style={styles.item}
-              onPress={() => (isSelf && !item.last_workout ? onAddStoryPress?.() : onStoryPress?.(item))}
+              onPress={() =>
+                isSelf && !hasActiveStory ? onAddStoryPress?.() : onStoryPress?.(item)
+              }
               accessibilityRole="button"
               accessibilityLabel={
-                isSelf
-                  ? `Your story, ${streakLabel}, ${lastWorkoutLabel}`
-                  : `${item.profile.username} story, ${streakLabel}, ${lastWorkoutLabel}`
+                isSelf ? `Your story, ${streakLabel}, ${label}` : `${item.profile.username} story, ${label}`
               }
             >
-              <StoryAvatar story={item} />
+              <StoryAvatar story={item} onAddStoryPress={onAddStoryPress} />
               <Text style={styles.username} numberOfLines={1}>
                 {isSelf ? "You" : item.profile.username}
               </Text>
@@ -70,7 +97,7 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
                 {streakLabel}
               </Text>
               <Text style={styles.lastWorkout} numberOfLines={2}>
-                {lastWorkoutLabel}
+                {label}
               </Text>
             </Pressable>
           );
@@ -133,6 +160,25 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.background,
     padding: 2,
+  },
+  addBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.accent,
+    borderWidth: 2,
+    borderColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addBadgeText: {
+    color: colors.black,
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: "800",
   },
   streakBadge: {
     position: "absolute",

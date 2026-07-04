@@ -1,12 +1,20 @@
-import type { StoryQuickReactionEmoji } from "@frennix/types";
+import type {
+  StoryAnalytics,
+  StoryQuickReactionEmoji,
+  StoryReactionRecord,
+  StoryViewerRecord,
+} from "@frennix/types";
+import { createNotification } from "./notifications";
 import { getOrCreateConversation, sendMessage } from "./messaging";
 import { trackStoryEngagementEvent } from "./story-insights";
 import { sendStoryTrainInvite } from "./story-train-invites";
+import { getProfilesByIds } from "./profiles";
 import { getSupabase } from "./supabase";
 
 export * from "./story-insights";
 export * from "./story-train-invites";
 
+/** @deprecated Post-based views — use markDedicatedStoryViewed */
 export async function getStoryViewsForViewer(
   viewerId: string,
   storyUserIds: string[]
@@ -23,6 +31,35 @@ export async function getStoryViewsForViewer(
   return data ?? [];
 }
 
+export async function markDedicatedStoryViewed(
+  viewerId: string,
+  storyId: string,
+  slideId: string | null,
+  storyOwnerId: string
+) {
+  const { error } = await getSupabase().from("story_item_views").upsert(
+    {
+      story_id: storyId,
+      viewer_id: viewerId,
+      last_viewed_slide_id: slideId,
+      viewed_at: new Date().toISOString(),
+    },
+    { onConflict: "story_id,viewer_id" }
+  );
+
+  if (error) throw error;
+
+  if (viewerId !== storyOwnerId) {
+    await trackStoryEngagementEvent({
+      viewerId,
+      storyUserId: storyOwnerId,
+      storyId,
+      eventType: "view",
+    }).catch(() => undefined);
+  }
+}
+
+/** @deprecated Use markDedicatedStoryViewed */
 export async function markStoryViewed(
   viewerId: string,
   storyUserId: string,
@@ -52,6 +89,47 @@ export async function markStoryViewed(
   }
 }
 
+export async function sendDedicatedStoryReaction(
+  viewerId: string,
+  storyOwnerId: string,
+  storyId: string,
+  emoji: StoryQuickReactionEmoji,
+  slideId?: string | null
+) {
+  if (viewerId === storyOwnerId) return;
+
+  const { error } = await getSupabase().from("story_item_reactions").upsert(
+    {
+      story_id: storyId,
+      user_id: viewerId,
+      slide_id: slideId ?? null,
+      reaction: emoji,
+    },
+    { onConflict: "story_id,user_id" }
+  );
+
+  if (error) throw error;
+
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId: storyOwnerId,
+    storyId,
+    eventType: "reaction",
+    metadata: { emoji },
+  }).catch(() => undefined);
+
+  await createNotification({
+    user_id: storyOwnerId,
+    type: "story_reaction",
+    payload: {
+      story_id: storyId,
+      reactor_id: viewerId,
+      reaction: emoji,
+    },
+  }).catch(() => undefined);
+}
+
+/** @deprecated Use sendDedicatedStoryReaction */
 export async function sendStoryQuickReaction(
   viewerId: string,
   storyUserId: string,
@@ -81,22 +159,68 @@ export async function sendStoryQuickReaction(
   }).catch(() => undefined);
 }
 
-/** @deprecated Use sendStoryQuickReaction */
 export async function sendStoryReaction(
   viewerId: string,
   storyUserId: string,
-  postId: string,
-  emoji: StoryQuickReactionEmoji
+  storyIdOrPostId: string,
+  emoji: StoryQuickReactionEmoji,
+  options?: { isDedicated?: boolean; slideId?: string | null }
 ) {
-  return sendStoryQuickReaction(viewerId, storyUserId, postId, emoji);
+  if (options?.isDedicated) {
+    return sendDedicatedStoryReaction(viewerId, storyUserId, storyIdOrPostId, emoji, options.slideId);
+  }
+  return sendStoryQuickReaction(viewerId, storyUserId, storyIdOrPostId, emoji);
+}
+
+export async function sendDedicatedStoryReply(
+  viewerId: string,
+  storyOwnerId: string,
+  replyText: string,
+  storyId: string
+) {
+  const trimmed = replyText.trim();
+  if (!trimmed) throw new Error("Reply cannot be empty");
+  if (viewerId === storyOwnerId) throw new Error("You cannot reply to your own story");
+
+  const conversationId = await getOrCreateConversation(viewerId, storyOwnerId);
+  const message = await sendMessage(
+    conversationId,
+    viewerId,
+    `Replied to your Story: ${trimmed}`
+  );
+
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId: storyOwnerId,
+    storyId,
+    eventType: "reply",
+  }).catch(() => undefined);
+
+  await createNotification({
+    user_id: storyOwnerId,
+    type: "story_reply",
+    payload: {
+      story_id: storyId,
+      replier_id: viewerId,
+      conversation_id: conversationId,
+      preview: trimmed.slice(0, 120),
+    },
+  }).catch(() => undefined);
+
+  return message;
 }
 
 export async function sendStoryReply(
   viewerId: string,
   storyUserId: string,
   replyText: string,
-  postId?: string | null
+  storyIdOrPostId?: string | null,
+  options?: { isDedicated?: boolean }
 ) {
+  if (options?.isDedicated && storyIdOrPostId) {
+    return sendDedicatedStoryReply(viewerId, storyUserId, replyText, storyIdOrPostId);
+  }
+
   const trimmed = replyText.trim();
   if (!trimmed) throw new Error("Reply cannot be empty");
   if (viewerId === storyUserId) throw new Error("You cannot reply to your own story");
@@ -105,14 +229,14 @@ export async function sendStoryReply(
   const message = await sendMessage(
     conversationId,
     viewerId,
-    `Replied to your workout story: ${trimmed}`
+    `Replied to your Story: ${trimmed}`
   );
 
-  if (postId) {
+  if (storyIdOrPostId) {
     await trackStoryEngagementEvent({
       viewerId,
       storyUserId,
-      postId,
+      postId: storyIdOrPostId,
       eventType: "reply",
     }).catch(() => undefined);
   }
@@ -120,22 +244,58 @@ export async function sendStoryReply(
   return message;
 }
 
+export async function joinStoryChallenge(
+  viewerId: string,
+  storyOwnerId: string,
+  storyId: string,
+  challengeId: string
+) {
+  if (viewerId === storyOwnerId) return;
+
+  const { error } = await getSupabase().from("story_challenge_joins").insert({
+    story_id: storyId,
+    challenge_id: challengeId,
+    user_id: viewerId,
+  });
+
+  if (error) throw error;
+
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId: storyOwnerId,
+    storyId,
+    eventType: "challenge",
+  }).catch(() => undefined);
+
+  await createNotification({
+    user_id: storyOwnerId,
+    type: "story_challenge_join",
+    payload: {
+      story_id: storyId,
+      challenge_id: challengeId,
+      joiner_id: viewerId,
+    },
+  }).catch(() => undefined);
+}
+
 export async function sendStoryChallenge(
   viewerId: string,
   storyUserId: string,
   message: string,
-  postId?: string | null
+  storyIdOrPostId?: string | null,
+  options?: { isDedicated?: boolean }
 ) {
   if (viewerId === storyUserId) return;
 
   const conversationId = await getOrCreateConversation(viewerId, storyUserId);
   const result = await sendMessage(conversationId, viewerId, message);
 
-  if (postId) {
+  if (storyIdOrPostId) {
     await trackStoryEngagementEvent({
       viewerId,
       storyUserId,
-      postId,
+      storyId: options?.isDedicated ? storyIdOrPostId : undefined,
+      postId: options?.isDedicated ? undefined : storyIdOrPostId,
       eventType: "challenge",
     }).catch(() => undefined);
   }
@@ -154,13 +314,15 @@ export async function sendStoryInviteToTrain(
 export async function trackStoryProfileVisit(
   viewerId: string,
   storyUserId: string,
-  postId: string | null
+  storyIdOrPostId: string | null,
+  options?: { isDedicated?: boolean }
 ) {
-  if (!postId || viewerId === storyUserId) return;
+  if (!storyIdOrPostId || viewerId === storyUserId) return;
   await trackStoryEngagementEvent({
     viewerId,
     storyUserId,
-    postId,
+    storyId: options?.isDedicated ? storyIdOrPostId : undefined,
+    postId: options?.isDedicated ? undefined : storyIdOrPostId,
     eventType: "profile_visit",
   }).catch(() => undefined);
 }
@@ -168,13 +330,136 @@ export async function trackStoryProfileVisit(
 export async function trackStoryFollowFromStory(
   viewerId: string,
   storyUserId: string,
-  postId: string | null
+  storyIdOrPostId: string | null,
+  options?: { isDedicated?: boolean }
 ) {
-  if (!postId || viewerId === storyUserId) return;
+  if (!storyIdOrPostId || viewerId === storyUserId) return;
   await trackStoryEngagementEvent({
     viewerId,
     storyUserId,
-    postId,
+    storyId: options?.isDedicated ? storyIdOrPostId : undefined,
+    postId: options?.isDedicated ? undefined : storyIdOrPostId,
     eventType: "follow",
   }).catch(() => undefined);
+}
+
+export async function sendStoryEventInvite(
+  viewerId: string,
+  storyOwnerId: string,
+  storyId: string
+) {
+  if (viewerId === storyOwnerId) return;
+
+  const conversationId = await getOrCreateConversation(viewerId, storyOwnerId);
+  const message = await sendMessage(
+    conversationId,
+    viewerId,
+    "I'd love to invite you to a workout event! Want to join me? 📅"
+  );
+
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId: storyOwnerId,
+    storyId,
+    eventType: "challenge",
+    metadata: { kind: "event_invite" },
+  }).catch(() => undefined);
+
+  return message;
+}
+
+export async function getStoryViewers(
+  storyOwnerId: string,
+  storyId: string
+): Promise<StoryViewerRecord[]> {
+  const { data, error } = await getSupabase()
+    .from("story_item_views")
+    .select("viewer_id, viewed_at")
+    .eq("story_id", storyId)
+    .neq("viewer_id", storyOwnerId)
+    .order("viewed_at", { ascending: false });
+
+  if (error) throw error;
+  if (!data?.length) return [];
+
+  const viewerIds = data.map((row) => row.viewer_id as string);
+  const profiles = await getProfilesByIds(viewerIds);
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+  return data.map((row) => {
+    const profile = profileById.get(row.viewer_id as string);
+    return {
+      viewer_id: row.viewer_id as string,
+      profile: {
+        id: profile?.id ?? (row.viewer_id as string),
+        username: profile?.username ?? "athlete",
+        display_name: profile?.display_name ?? "Athlete",
+        avatar_url: profile?.avatar_url ?? null,
+      },
+      viewed_at: row.viewed_at as string,
+    };
+  });
+}
+
+export async function getStoryReactions(
+  storyOwnerId: string,
+  storyId: string
+): Promise<StoryReactionRecord[]> {
+  const { data, error } = await getSupabase()
+    .from("story_item_reactions")
+    .select("user_id, reaction, created_at")
+    .eq("story_id", storyId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  if (!data?.length) return [];
+
+  const userIds = data.map((row) => row.user_id as string);
+  const profiles = await getProfilesByIds(userIds);
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+  return data.map((row) => {
+    const profile = profileById.get(row.user_id as string);
+    return {
+      user_id: row.user_id as string,
+      profile: {
+        id: profile?.id ?? (row.user_id as string),
+        username: profile?.username ?? "athlete",
+        display_name: profile?.display_name ?? "Athlete",
+        avatar_url: profile?.avatar_url ?? null,
+      },
+      reaction: row.reaction as string,
+      created_at: row.created_at as string,
+    };
+  });
+}
+
+export async function getDedicatedStoryAnalytics(storyId: string): Promise<StoryAnalytics> {
+  const [viewsResult, reactionsResult, repliesResult, joinsResult] = await Promise.all([
+    getSupabase()
+      .from("story_item_views")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", storyId),
+    getSupabase()
+      .from("story_item_reactions")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", storyId),
+    getSupabase()
+      .from("story_engagement_events")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", storyId)
+      .eq("event_type", "reply"),
+    getSupabase()
+      .from("story_challenge_joins")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", storyId),
+  ]);
+
+  return {
+    story_id: storyId,
+    views: viewsResult.count ?? 0,
+    reactions: reactionsResult.count ?? 0,
+    replies: repliesResult.count ?? 0,
+    challenge_joins: joinsResult.count ?? 0,
+  };
 }

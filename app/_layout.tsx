@@ -117,6 +117,10 @@ export default function RootLayout() {
               options={backScreen("Share workout", { presentation: "modal" })}
             />
             <Stack.Screen
+              name="create-story"
+              options={backScreen("Create Story", { presentation: "modal" })}
+            />
+            <Stack.Screen
               name="adjust-photo"
               options={backScreen("Adjust photo", { presentation: "modal" })}
             />
@@ -173,7 +177,7 @@ export default function RootLayout() {
             />
             <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />
             <Stack.Screen name="privacy-settings" options={backScreen("Privacy")} />
-            <Stack.Screen name="saved-posts" options={backScreen("Saved Posts")} />
+            <Stack.Screen name="stories/discover" options={backScreen("Discover Stories", fadeScreen)} />
             <Stack.Screen name="invite-friends" options={backScreen("Invite Friends")} />
             <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
             <Stack.Screen name="blocked-users" options={backScreen("Blocked users")} />

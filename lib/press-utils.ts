@@ -46,3 +46,15 @@ export function openCreatePost() {
     createPostNavLocked = false;
   }, 400);
 }
+
+let createStoryNavLocked = false;
+
+/** Open dedicated story creator. */
+export function openCreateStory() {
+  if (createStoryNavLocked) return;
+  createStoryNavLocked = true;
+  router.push("/create-story");
+  setTimeout(() => {
+    createStoryNavLocked = false;
+  }, 400);
+}

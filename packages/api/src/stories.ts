@@ -1,85 +1,111 @@
-import type { FeedStory, FeedStoryLastWorkout, Post, Profile, StoryAudience } from "@frennix/types";
-import { normalizePostWorkoutFields } from "@frennix/types";
+import type { FeedStory, FrennixStory, Profile, StoryLocationType, StoryPrivacy, StorySlide } from "@frennix/types";
 import { getFollowing } from "./follows";
-import { getStoryViewsForViewer } from "./story-engagement";
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
-import { computeStoryMilestones, normalizeWorkoutStoryMetrics } from "./workout-story-utils";
 
 const WORKOUT_POST_TYPES = ["workout_update", "photo", "video"] as const;
-const RECENT_WORKOUT_MS = 24 * 60 * 60 * 1000;
 
-function toLastWorkout(
-  post: Post,
-  streak: number,
-  workoutCount: number
-): FeedStoryLastWorkout {
-  const normalized = normalizePostWorkoutFields(post);
-  const metrics = normalizeWorkoutStoryMetrics(
-    (normalized as Post).workout_metrics ?? null
-  );
-  const milestoneFlags = (normalized as Post).story_milestones ?? [];
-
-  return {
-    post_id: normalized.id,
-    post_type: normalized.post_type,
-    workout_type: normalized.workout_type,
-    workout_types: normalized.workout_types,
-    media_urls: normalized.media_urls ?? [],
-    thumbnail_url: normalized.thumbnail_url ?? null,
-    content: normalized.content,
-    created_at: normalized.created_at,
-    metrics,
-    milestones: computeStoryMilestones({
-      streak,
-      workoutCount,
-      storyMilestoneFlags: milestoneFlags,
-    }),
-    story_audience: ((normalized as Post).story_audience ?? "public") as StoryAudience,
-  };
-}
-
-function canViewerSeeStory(
-  post: Post | null,
+function canViewerSeeStoryPrivacy(
+  privacy: StoryPrivacy,
   authorId: string,
   viewerId: string,
   followingIds: Set<string>,
   mutualFriendIds: Set<string>
 ): boolean {
   if (authorId === viewerId) return true;
-  if (!post) return true;
-  const audience = post.story_audience ?? "public";
-  if (audience === "private") return false;
-  if (audience === "friends") return mutualFriendIds.has(authorId);
-  if (audience === "followers") return followingIds.has(authorId);
-  return true;
+  if (privacy === "everyone") return true;
+  if (privacy === "friends") return mutualFriendIds.has(authorId);
+  if (privacy === "followers") return followingIds.has(authorId);
+  return false;
 }
 
-function buildStory(
-  profile: Profile,
-  viewerId: string,
-  followingIds: Set<string>,
-  workoutDates: string[],
-  workoutCount: number,
-  latestPost: Post | null,
-  now: Date
-): FeedStory {
-  const streak = computeWorkoutStreakFromDates(workoutDates, now);
-  const lastWorkout = latestPost ? toLastWorkout(latestPost, streak, workoutCount) : null;
-  const hasRecentWorkout = lastWorkout
-    ? now.getTime() - new Date(lastWorkout.created_at).getTime() <= RECENT_WORKOUT_MS
-    : false;
+function groupSlidesByStory(slides: StorySlide[]): Map<string, StorySlide[]> {
+  const map = new Map<string, StorySlide[]>();
+  for (const slide of slides) {
+    const list = map.get(slide.story_id) ?? [];
+    list.push(slide);
+    map.set(slide.story_id, list);
+  }
+  for (const [storyId, list] of map) {
+    map.set(
+      storyId,
+      [...list].sort((a, b) => a.sort_order - b.sort_order)
+    );
+  }
+  return map;
+}
 
-  return {
-    user_id: profile.id,
-    profile,
-    workout_streak: streak,
-    workout_count: workoutCount,
-    has_recent_workout: hasRecentWorkout,
-    last_workout: lastWorkout,
-    is_self: profile.id === viewerId,
-    viewer_follows: profile.id === viewerId || followingIds.has(profile.id),
-  };
+async function fetchActiveStoriesForUsers(userIds: string[]): Promise<FrennixStory[]> {
+  if (!userIds.length) return [];
+
+  const now = new Date().toISOString();
+
+  const { data: storyRows, error } = await getSupabase()
+    .from("stories")
+    .select("*")
+    .in("user_id", userIds)
+    .gt("expires_at", now)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  if (!storyRows?.length) return [];
+
+  const storyIds = storyRows.map((row) => row.id as string);
+
+  const { data: slideRows, error: slidesError } = await getSupabase()
+    .from("story_slides")
+    .select("*")
+    .in("story_id", storyIds)
+    .order("sort_order", { ascending: true });
+
+  if (slidesError) throw slidesError;
+
+  const slidesByStory = groupSlidesByStory((slideRows ?? []) as StorySlide[]);
+
+  return storyRows.map((row) => ({
+    id: row.id as string,
+    user_id: row.user_id as string,
+    privacy: row.privacy as StoryPrivacy,
+    post_id: row.post_id as string | null,
+    workout_tag: row.workout_tag as string | null,
+    location_name: row.location_name as string | null,
+    location_type: row.location_type as StoryLocationType | null,
+    challenge_id: row.challenge_id as string | null,
+    challenge_prompt: row.challenge_prompt as string | null,
+    created_at: row.created_at as string,
+    expires_at: row.expires_at as string,
+    slides: slidesByStory.get(row.id as string) ?? [],
+  }));
+}
+
+async function getStoryViewStatus(
+  viewerId: string,
+  storiesByUser: Map<string, FrennixStory[]>
+): Promise<Map<string, boolean>> {
+  const allStoryIds = [...storiesByUser.values()].flat().map((story) => story.id);
+  if (!allStoryIds.length) return new Map();
+
+  const { data, error } = await getSupabase()
+    .from("story_item_views")
+    .select("story_id, last_viewed_slide_id")
+    .eq("viewer_id", viewerId)
+    .in("story_id", allStoryIds);
+
+  if (error) throw error;
+
+  const viewedStories = new Set((data ?? []).map((row) => row.story_id as string));
+  const result = new Map<string, boolean>();
+
+  for (const [userId, stories] of storiesByUser) {
+    if (!stories.length) {
+      result.set(userId, true);
+      continue;
+    }
+    const allViewed = stories.every((story) => viewedStories.has(story.id));
+    result.set(userId, allViewed);
+  }
+
+  return result;
 }
 
 export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
@@ -108,26 +134,19 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     if (followingIds.has(followerId)) mutualFriendIds.add(followerId);
   }
 
-  const [{ data: workoutPosts }, { data: latestPosts }] = await Promise.all([
+  const [{ data: workoutPosts }, activeStories] = await Promise.all([
     getSupabase()
       .from("posts")
       .select("author_id, created_at")
       .in("author_id", userIds)
       .in("post_type", [...WORKOUT_POST_TYPES]),
-    getSupabase()
-      .from("posts")
-      .select("*")
-      .in("author_id", userIds)
-      .in("post_type", [...WORKOUT_POST_TYPES])
-      .order("created_at", { ascending: false }),
+    fetchActiveStoriesForUsers(userIds),
   ]);
 
   if (workoutPosts.error) throw workoutPosts.error;
-  if (latestPosts.error) throw latestPosts.error;
 
   const datesByUser = new Map<string, string[]>();
   const countByUser = new Map<string, number>();
-  const latestByUser = new Map<string, Post>();
 
   for (const row of workoutPosts ?? []) {
     const authorId = row.author_id as string;
@@ -137,59 +156,60 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
     countByUser.set(authorId, (countByUser.get(authorId) ?? 0) + 1);
   }
 
-  for (const post of (latestPosts ?? []) as Post[]) {
-    if (!latestByUser.has(post.author_id)) {
-      latestByUser.set(post.author_id, normalizePostWorkoutFields(post));
-    }
-  }
-
-  const stories = profiles
-    .map((profile) =>
-      buildStory(
-        profile,
-        viewerId,
-        followingIds,
-        datesByUser.get(profile.id) ?? [],
-        countByUser.get(profile.id) ?? 0,
-        latestByUser.get(profile.id) ?? null,
-        now
-      )
-    )
-    .filter((story) =>
-      canViewerSeeStory(
-        latestByUser.get(story.user_id) ?? null,
+  const storiesByUser = new Map<string, FrennixStory[]>();
+  for (const story of activeStories) {
+    if (
+      !canViewerSeeStoryPrivacy(
+        story.privacy,
         story.user_id,
         viewerId,
         followingIds,
         mutualFriendIds
       )
-    );
+    ) {
+      continue;
+    }
+    const list = storiesByUser.get(story.user_id) ?? [];
+    list.push(story);
+    storiesByUser.set(story.user_id, list);
+  }
 
-  stories.sort((a, b) => {
+  const viewedByUser = await getStoryViewStatus(viewerId, storiesByUser);
+
+  const feedStories: FeedStory[] = profiles.map((profile) => {
+    const userStories = storiesByUser.get(profile.id) ?? [];
+    const streak = computeWorkoutStreakFromDates(datesByUser.get(profile.id) ?? [], now);
+    const hasActiveStory = userStories.length > 0;
+
+    return {
+      user_id: profile.id,
+      profile,
+      workout_streak: streak,
+      workout_count: countByUser.get(profile.id) ?? 0,
+      has_recent_workout: hasActiveStory,
+      active_stories: userStories,
+      last_workout: null,
+      is_self: profile.id === viewerId,
+      viewer_follows: profile.id === viewerId || followingIds.has(profile.id),
+      viewed: viewedByUser.get(profile.id) ?? true,
+    };
+  });
+
+  feedStories.sort((a, b) => {
     if (a.is_self) return -1;
     if (b.is_self) return 1;
     if (a.has_recent_workout !== b.has_recent_workout) {
       return a.has_recent_workout ? -1 : 1;
     }
-    const aTime = a.last_workout ? new Date(a.last_workout.created_at).getTime() : 0;
-    const bTime = b.last_workout ? new Date(b.last_workout.created_at).getTime() : 0;
-    return bTime - aTime;
+    const aTime = a.active_stories.at(-1)?.created_at ?? "";
+    const bTime = b.active_stories.at(-1)?.created_at ?? "";
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
-  const views = await getStoryViewsForViewer(
-    viewerId,
-    stories.map((story) => story.user_id)
-  );
-  const viewedPostByUser = new Map(
-    views.map((view) => [view.story_user_id, view.last_viewed_post_id])
-  );
+  return feedStories;
+}
 
-  return stories.map((story) => {
-    const postId = story.last_workout?.post_id ?? null;
-    const viewedPostId = viewedPostByUser.get(story.user_id) ?? null;
-    return {
-      ...story,
-      viewed: Boolean(postId && viewedPostId === postId),
-    };
-  });
+/** Flatten all active stories for a feed user into viewer segments. */
+export function flattenFeedStorySegments(story: FeedStory): FrennixStory[] {
+  return story.active_stories ?? [];
 }

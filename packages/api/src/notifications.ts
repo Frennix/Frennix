@@ -46,6 +46,14 @@ export function notificationActorId(notification: Notification): string | null {
       return (payload.sharer_id as string) ?? null;
     case "story_train_invite":
       return (payload.inviter_id as string) ?? null;
+    case "story_reaction":
+      return (payload.reactor_id as string) ?? null;
+    case "story_reply":
+      return (payload.replier_id as string) ?? null;
+    case "story_mention":
+      return (payload.mentioner_id as string) ?? null;
+    case "story_challenge_join":
+      return (payload.joiner_id as string) ?? null;
     default:
       return null;
   }
@@ -159,6 +167,32 @@ export function buildNotificationDisplay(
       return {
         headline: "Train invite",
         detail: `${actorName} invited you to train.`,
+      };
+    case "story_reaction": {
+      const reaction = (payload.reaction as string) ?? "❤️";
+      return {
+        headline: "Story reaction",
+        detail: `${actorName} reacted ${reaction} to your Story.`,
+      };
+    }
+    case "story_reply": {
+      const preview = payload.preview as string | undefined;
+      return {
+        headline: "Story reply",
+        detail: preview
+          ? `${actorName} replied to your Story: ${preview}`
+          : `${actorName} replied to your Story.`,
+      };
+    }
+    case "story_mention":
+      return {
+        headline: "Story mention",
+        detail: `${actorName} mentioned you in a Story.`,
+      };
+    case "story_challenge_join":
+      return {
+        headline: "Challenge joined",
+        detail: `${actorName} joined your Story challenge.`,
       };
     default:
       return { headline: "Frennix", detail: "New activity on Frennix" };

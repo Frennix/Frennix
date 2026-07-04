@@ -11,19 +11,16 @@ import {
   Text,
   View,
 } from "react-native";
-import { ACTIVITIES, STORY_AUDIENCE_OPTIONS, type StoryAudience } from "@frennix/types";
 import {
-  createPost,
-  getErrorMessage,
-  isVideoMime,
-  uploadPostMedia,
-  withTimeout,
-  POST_CREATE_TIMEOUT_MS,
-  THUMBNAIL_CAPTURE_TIMEOUT_MS,
-} from "@frennix/api";
-import { generateAndUploadVideoThumbnail } from "@/lib/video-thumbnail";
+  ACTIVITIES,
+  STORY_PRIVACY_OPTIONS,
+  type StoryPrivacy,
+  type StoryShareMode,
+} from "@frennix/types";
+import { getErrorMessage, isVideoMime } from "@frennix/api";
+import { WorkoutSavedSheet } from "@/components/WorkoutSavedSheet";
+import { shareWorkout } from "@/lib/share-workout";
 import { resolveVideoUploadFile } from "@/lib/video-upload";
-import type { PostType } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatActivity } from "@/lib/labels";
 import {
@@ -141,7 +138,13 @@ export default function CreatePostScreen() {
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
   const [error, setError] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<SelectedMediaItem[]>([]);
-  const [storyAudience, setStoryAudience] = useState<StoryAudience>("public");
+  const [storyPrivacy, setStoryPrivacy] = useState<StoryPrivacy>("followers");
+  const [savedSheetVisible, setSavedSheetVisible] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [distanceKm, setDistanceKm] = useState("");
+  const [calories, setCalories] = useState("");
+  const [gym, setGym] = useState("");
+  const [locationName, setLocationName] = useState("");
 
   const {
     hydrated,
@@ -310,6 +313,82 @@ export default function CreatePostScreen() {
     await clearMedia();
   }
 
+  function buildWorkoutMetrics() {
+    const duration = Number(durationMinutes);
+    const distance = Number(distanceKm);
+    const cal = Number(calories);
+    return {
+      duration_seconds: Number.isFinite(duration) && duration > 0 ? Math.round(duration * 60) : null,
+      distance_meters: Number.isFinite(distance) && distance > 0 ? Math.round(distance * 1000) : null,
+      calories: Number.isFinite(cal) && cal > 0 ? Math.round(cal) : null,
+      extra: {
+        gym: gym.trim() || null,
+        location: locationName.trim() || null,
+      },
+    };
+  }
+
+  async function executeShare(mode: StoryShareMode | "done") {
+    if (!session?.user.id) return;
+
+    setLoading(true);
+    setUploadStage("creating_post");
+    setSavedSheetVisible(false);
+
+    try {
+      if (mode === "done") {
+        await clearDraft();
+        setSelectedMedia([]);
+        router.back();
+        return;
+      }
+
+      const result = await shareWorkout(
+        mode,
+        {
+          userId: session.user.id,
+          content: content || undefined,
+          workoutTypes,
+          metrics: buildWorkoutMetrics(),
+          gym: gym.trim() || null,
+          locationName: locationName.trim() || null,
+          media: selectedMedia.map((item) => ({
+            uri: item.uri,
+            mimeType: item.mimeType,
+            file: item.file,
+            durationSeconds: item.durationSeconds,
+          })),
+          storyPrivacy,
+        },
+        queryClient
+      );
+
+      await clearDraft();
+      setSelectedMedia([]);
+      setUploadStage("success");
+
+      navigateTimeoutRef.current = setTimeout(() => {
+        if (result.postId) {
+          navigateAfterPost(result.postId);
+        } else {
+          router.back();
+        }
+        setUploadStage("idle");
+        submittingRef.current = false;
+        setPersistPaused(false);
+        setLoading(false);
+      }, SUCCESS_NAV_DELAY_MS);
+    } catch (e) {
+      const message = getErrorMessage(e);
+      setError(message);
+      showAlert("Could not share", message);
+      setUploadStage("idle");
+      setLoading(false);
+      submittingRef.current = false;
+      setPersistPaused(false);
+    }
+  }
+
   async function submit() {
     if (submittingRef.current || loading || isSuccess || navigateTimeoutRef.current) return;
 
@@ -330,133 +409,63 @@ export default function CreatePostScreen() {
 
     submittingRef.current = true;
     setPersistPaused(true);
-    setLoading(true);
-    setUploadStage("idle");
     setError("");
-
-    const postDestination = destination;
-    const postContextId = contextId;
 
     try {
       await flushDraft();
 
-      let mediaUrls: string[] = [];
-      let thumbnailUrl: string | null = null;
-      let postType: PostType = "text";
-
-      if (selectedMedia.length) {
-        setUploadStage("uploading_media");
-        try {
-          for (const item of selectedMedia) {
-            const url = await uploadPostMedia(session.user.id, item.uri, item.mimeType, item.file);
-            mediaUrls.push(url);
-          }
-
-          if (hasVideo) {
-            const video = selectedMedia[0];
-            postType = "video";
-            try {
-              thumbnailUrl = await withTimeout(
-                generateAndUploadVideoThumbnail(
-                  session.user.id,
-                  video.uri,
-                  video.mimeType,
-                  video.file
-                ),
-                THUMBNAIL_CAPTURE_TIMEOUT_MS + 30_000,
-                "Video thumbnail upload"
-              );
-            } catch (thumbError) {
-              logCreatePostInfo(
-                "media_upload",
-                `Video thumbnail skipped: ${getErrorMessage(thumbError)}`
-              );
-              thumbnailUrl = null;
-            }
-            if (!thumbnailUrl) {
-              logCreatePostInfo(
-                "media_upload",
-                "Video thumbnail unavailable; feed will use first-frame fallback"
-              );
-            }
-          } else {
-            postType = "photo";
-          }
-        } catch (uploadError) {
-          logCreatePostError("media_upload", uploadError, {
-            mimeType: selectedMedia[0]?.mimeType,
-            hasMedia: true,
-            destination: postDestination,
-          });
-          throw uploadError;
-        }
-      } else if (workoutTypes.length || content) {
-        postType = "workout_update";
+      if (!isContextPost) {
+        submittingRef.current = false;
+        setPersistPaused(false);
+        setSavedSheetVisible(true);
+        return;
       }
 
+      setLoading(true);
+      setUploadStage("idle");
+      const postDestination = destination;
+      const postContextId = contextId;
+
+      setLoading(true);
       setUploadStage("creating_post");
-      let created;
-      try {
-        created = await withTimeout(
-          createPost({
-            author_id: session.user.id,
-            content: content || undefined,
-            media_urls: mediaUrls,
-            thumbnail_url: thumbnailUrl,
-            post_type: postType,
-            workout_types: workoutTypes,
-            story_audience: postDestination === "home" ? storyAudience : undefined,
-            group_id: groupId ?? null,
-            challenge_id: challengeId ?? null,
-            event_id: eventId ?? null,
-          }),
-          POST_CREATE_TIMEOUT_MS,
-          "Creating post"
-        );
-      } catch (saveError) {
-        logCreatePostError("post_save", saveError, {
-          postType,
-          destination: postDestination,
-          hasMedia: Boolean(selectedMedia.length),
-        });
-        throw saveError;
-      }
 
-      if (selectedMedia.length && !created.media_urls?.length) {
-        throw new Error("Post saved but media URL is missing from the response");
-      }
-      if (hasVideo && created.post_type !== "video") {
-        throw new Error(`Post saved but post_type is "${created.post_type}" instead of video`);
-      }
+      const result = await shareWorkout(
+        "feed",
+        {
+          userId: session.user.id,
+          content: content || undefined,
+          workoutTypes,
+          metrics: buildWorkoutMetrics(),
+          gym: gym.trim() || null,
+          locationName: locationName.trim() || null,
+          media: selectedMedia.map((item) => ({
+            uri: item.uri,
+            mimeType: item.mimeType,
+            file: item.file,
+            durationSeconds: item.durationSeconds,
+          })),
+          groupId: groupId ?? null,
+          challengeId: challengeId ?? null,
+          eventId: eventId ?? null,
+        },
+        queryClient
+      );
 
-      try {
-        await refreshFeedForDestination(queryClient, postDestination, session.user.id, postContextId);
-      } catch (refreshError) {
-        logCreatePostError("post_save", refreshError, {
-          action: "refresh_feed",
-          destination: postDestination,
-        });
-      }
-
+      await refreshFeedForDestination(queryClient, postDestination, session.user.id, postContextId);
       await clearDraft();
       setSelectedMedia([]);
       setLoading(false);
       setUploadStage("success");
-      logCreatePostInfo("navigation", "Post created", {
-        destination: postDestination,
-        postId: created.id,
-      });
 
       navigateTimeoutRef.current = setTimeout(() => {
-        try {
-          navigateAfterPost(created.id);
-        } catch (navigationError) {
-          logCreatePostError("navigation", navigationError, { destination: postDestination });
-        } finally {
-          setUploadStage("idle");
-          submittingRef.current = false;
-          setPersistPaused(false);
+        if (result.postId) {
+          navigateAfterPost(result.postId);
+        } else {
+          router.back();
         }
+        setUploadStage("idle");
+        submittingRef.current = false;
+        setPersistPaused(false);
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
       const message = getErrorMessage(e);
@@ -515,18 +524,62 @@ export default function CreatePostScreen() {
 
         {!isContextPost ? (
           <>
-            <Text style={styles.sectionLabel}>Story audience</Text>
-            <Text style={styles.sectionHint}>Who can see this in Workout Stories</Text>
+            <Text style={styles.sectionLabel}>Workout details</Text>
+            <View style={styles.metricsRow}>
+              <Input
+                label="Duration (min)"
+                value={durationMinutes}
+                onChangeText={setDurationMinutes}
+                keyboardType="numeric"
+                editable={!isFormLocked}
+                placeholder="42"
+              />
+              <Input
+                label="Distance (km)"
+                value={distanceKm}
+                onChangeText={setDistanceKm}
+                keyboardType="decimal-pad"
+                editable={!isFormLocked}
+                placeholder="5.2"
+              />
+            </View>
+            <View style={styles.metricsRow}>
+              <Input
+                label="Calories"
+                value={calories}
+                onChangeText={setCalories}
+                keyboardType="numeric"
+                editable={!isFormLocked}
+                placeholder="610"
+              />
+              <Input
+                label="Gym"
+                value={gym}
+                onChangeText={setGym}
+                editable={!isFormLocked}
+                placeholder="LA Fitness"
+              />
+            </View>
+            <Input
+              label="Location"
+              value={locationName}
+              onChangeText={setLocationName}
+              editable={!isFormLocked}
+              placeholder="Portland Waterfront"
+            />
+
+            <Text style={styles.sectionLabel}>Story privacy</Text>
+            <Text style={styles.sectionHint}>Used when sharing to Story</Text>
             <View style={styles.chips}>
-              {STORY_AUDIENCE_OPTIONS.map((option) => (
+              {STORY_PRIVACY_OPTIONS.map((option) => (
                 <Pressable
                   key={option.value}
-                  style={[styles.chip, storyAudience === option.value && styles.chipActive]}
-                  onPress={() => setStoryAudience(option.value)}
+                  style={[styles.chip, storyPrivacy === option.value && styles.chipActive]}
+                  onPress={() => setStoryPrivacy(option.value)}
                   disabled={isFormLocked}
                 >
                   <Text
-                    style={[styles.chipText, storyAudience === option.value && styles.chipTextActive]}
+                    style={[styles.chipText, storyPrivacy === option.value && styles.chipTextActive]}
                   >
                     {option.label}
                   </Text>
@@ -664,14 +717,20 @@ export default function CreatePostScreen() {
                 : "Workout shared!"
               : isContextPost
                 ? "Share post"
-                : "Share workout"
+                : "Save Workout"
           }
-          loadingTitle="Sharing…"
+          loadingTitle={isContextPost ? "Sharing…" : "Saving…"}
           onPress={submit}
           loading={showSubmittingUi}
           disabled={isFormLocked}
         />
       </ScrollView>
+      <WorkoutSavedSheet
+        visible={savedSheetVisible}
+        loading={loading}
+        onSelect={(mode) => void executeShare(mode)}
+        onClose={() => setSavedSheetVisible(false)}
+      />
     </>
   );
 }
@@ -687,6 +746,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  metricsRow: { flexDirection: "row", gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

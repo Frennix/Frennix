@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, spacing, typography } from "@frennix/ui";
-import { openCreatePost, pushScreen, switchTab } from "@/lib/press-utils";
+import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
 interface FeedHeaderProps {
   stories?: FeedStory[];
@@ -64,7 +64,7 @@ export const FeedHeader = memo(function FeedHeader({
         <FeedStoriesRow
           stories={stories}
           onStoryPress={onStoryPress}
-          onAddStoryPress={openCreatePost}
+          onAddStoryPress={openCreateStory}
         />
       ) : null}
 

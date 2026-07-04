@@ -73,7 +73,7 @@ export async function openNotificationTargetAsync(
     return pushHref("/trainers/connections");
   }
 
-  if (type === "message") {
+  if (type === "message" || type === "story_reply") {
     const conversationId = asString(payload.conversation_id);
     if (conversationId) return pushHref(`/chat/${conversationId}`);
     return { ok: false, message: "This message conversation is no longer available." };
@@ -86,10 +86,22 @@ export function openNotificationTarget(notification: Notification): Notification
   const { type } = notification;
   const payload = safeNotificationPayload(notification.payload);
 
-  if (type === "message") {
+  if (type === "message" || type === "story_reply") {
     const conversationId = asString(payload.conversation_id);
     if (conversationId) return pushHref(`/chat/${conversationId}`);
     return { ok: false, message: "This message conversation is no longer available." };
+  }
+
+  if (type === "story_reaction" || type === "story_mention") {
+    const profileHref = actorProfileHref(notification);
+    if (profileHref) return pushHref(profileHref);
+    return { ok: true };
+  }
+
+  if (type === "story_challenge_join") {
+    const challengeId = asString(payload.challenge_id);
+    if (challengeId) return pushHref(`/challenge/${challengeId}`);
+    return { ok: true };
   }
 
   if (type === "post_share") {

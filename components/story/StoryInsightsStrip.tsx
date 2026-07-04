@@ -1,37 +1,36 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { StoryInsights } from "@frennix/types";
 import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryInsightsStripProps {
   insights: StoryInsights;
+  onViewsPress?: () => void;
+  onPress?: () => void;
 }
 
-/** Compact creator insights — views, reactions, invites, etc. */
-export function StoryInsightsStrip({ insights }: StoryInsightsStripProps) {
+/** Compact creator insights — tap views for viewer list. */
+export function StoryInsightsStrip({ insights, onViewsPress, onPress }: StoryInsightsStripProps) {
   const items = [
-    { label: "Views", value: insights.views },
-    { label: "Reactions", value: insights.reactions },
-    { label: "Replies", value: insights.replies },
-    { label: "Invites", value: insights.train_invites },
-    { label: "Profile", value: insights.profile_visits },
-    { label: "Follows", value: insights.new_followers },
-  ].filter((item) => item.value > 0);
+    { label: "Views", value: insights.views, onPress: onViewsPress ?? onPress },
+    { label: "Reactions", value: insights.reactions, onPress },
+    { label: "Replies", value: insights.replies, onPress },
+  ].filter((item) => item.value > 0 || item.label === "Views");
 
-  if (!items.length) {
+  if (!items.some((item) => item.value > 0)) {
     return (
-      <View style={styles.wrap}>
+      <Pressable onPress={onPress} style={styles.wrap}>
         <Text style={styles.empty}>Story insights will appear as people engage.</Text>
-      </View>
+      </Pressable>
     );
   }
 
   return (
     <View style={styles.wrap}>
       {items.map((item) => (
-        <View key={item.label} style={styles.chip}>
+        <Pressable key={item.label} style={styles.chip} onPress={item.onPress}>
           <Text style={styles.value}>{item.value}</Text>
           <Text style={styles.label}>{item.label}</Text>
-        </View>
+        </Pressable>
       ))}
     </View>
   );

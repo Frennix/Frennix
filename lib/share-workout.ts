@@ -1,0 +1,184 @@
+import type { QueryClient } from "@tanstack/react-query";
+import type { PostType, StoryPrivacy, StoryShareMode, WorkoutStoryMetrics } from "@frennix/types";
+import {
+  createPost,
+  isVideoMime,
+  publishStory,
+  uploadPostMedia,
+  uploadStoryMedia,
+  withTimeout,
+  POST_CREATE_TIMEOUT_MS,
+  THUMBNAIL_CAPTURE_TIMEOUT_MS,
+} from "@frennix/api";
+import { generateAndUploadVideoThumbnail } from "@/lib/video-thumbnail";
+import {
+  formatStoryCalories,
+  formatStoryDistance,
+  formatStoryDuration,
+} from "@/lib/story-format";
+
+export type WorkoutShareMedia = {
+  uri: string;
+  mimeType: string;
+  file?: File;
+  durationSeconds?: number | null;
+};
+
+export type WorkoutShareInput = {
+  userId: string;
+  content?: string;
+  workoutTypes: string[];
+  metrics: WorkoutStoryMetrics;
+  gym?: string | null;
+  locationName?: string | null;
+  locationType?: string | null;
+  media: WorkoutShareMedia[];
+  storyPrivacy?: StoryPrivacy;
+  groupId?: string | null;
+  challengeId?: string | null;
+  eventId?: string | null;
+};
+
+function buildWorkoutSlideData(
+  metrics: WorkoutStoryMetrics,
+  gym?: string | null,
+  locationName?: string | null
+): WorkoutStoryMetrics & Record<string, unknown> {
+  const durationLabel = formatStoryDuration(metrics.duration_seconds);
+  const distanceLabel = formatStoryDistance(metrics.distance_meters);
+  const caloriesLabel = formatStoryCalories(metrics.calories);
+
+  return {
+    ...metrics,
+    duration_label: durationLabel,
+    distance_label: distanceLabel,
+    calories_label: caloriesLabel,
+    gym: gym ?? null,
+    location: locationName ?? null,
+  };
+}
+
+async function uploadMediaAssets(userId: string, media: WorkoutShareMedia[]) {
+  const mediaUrls: string[] = [];
+  let thumbnailUrl: string | null = null;
+  let postType: PostType = "text";
+  const hasVideo = media.some((item) => isVideoMime(item.mimeType));
+
+  for (const item of media) {
+    const url = await uploadPostMedia(userId, item.uri, item.mimeType, item.file);
+    mediaUrls.push(url);
+  }
+
+  if (hasVideo && media[0]) {
+    postType = "video";
+    try {
+      thumbnailUrl = await withTimeout(
+        generateAndUploadVideoThumbnail(userId, media[0].uri, media[0].mimeType, media[0].file),
+        THUMBNAIL_CAPTURE_TIMEOUT_MS + 30_000,
+        "Video thumbnail upload"
+      );
+    } catch {
+      thumbnailUrl = null;
+    }
+  } else if (media.length) {
+    postType = "photo";
+  } else if (media.length === 0) {
+    postType = "workout_update";
+  }
+
+  return { mediaUrls, thumbnailUrl, postType, hasVideo };
+}
+
+async function buildStorySlides(
+  userId: string,
+  input: WorkoutShareInput,
+  mediaUrls: string[],
+  postId?: string | null
+) {
+  const workoutData = buildWorkoutSlideData(input.metrics, input.gym, input.locationName);
+  const primaryType = input.workoutTypes[0] ?? "Workout";
+
+  if (input.media.length) {
+    return Promise.all(
+      input.media.map(async (item, index) => {
+        const mediaUrl =
+          mediaUrls[index] ??
+          (await uploadStoryMedia(userId, item.uri, item.mimeType, item.file));
+        return {
+          media_url: mediaUrl,
+          media_type: isVideoMime(item.mimeType) ? ("video" as const) : ("photo" as const),
+          caption: index === 0 ? input.content ?? null : null,
+          workout_type: primaryType,
+          workout_data: workoutData,
+          sort_order: index,
+        };
+      })
+    );
+  }
+
+  return [
+    {
+      media_type: "workout" as const,
+      caption: input.content ?? null,
+      workout_type: primaryType,
+      workout_data: workoutData,
+      sort_order: 0,
+    },
+  ];
+}
+
+export async function shareWorkout(
+  mode: StoryShareMode | "done",
+  input: WorkoutShareInput,
+  queryClient: QueryClient
+) {
+  if (mode === "done") return { postId: null, storyId: null };
+
+  const shouldFeed = mode === "feed" || mode === "both";
+  const shouldStory = mode === "story" || mode === "both";
+
+  const { mediaUrls, thumbnailUrl, postType } = await uploadMediaAssets(input.userId, input.media);
+
+  let createdPost: Awaited<ReturnType<typeof createPost>> | null = null;
+
+  if (shouldFeed) {
+    createdPost = await withTimeout(
+      createPost({
+        author_id: input.userId,
+        content: input.content,
+        media_urls: mediaUrls,
+        thumbnail_url: thumbnailUrl,
+        post_type: postType,
+        workout_types: input.workoutTypes,
+        workout_metrics: input.metrics,
+        group_id: input.groupId ?? null,
+        challenge_id: input.challengeId ?? null,
+        event_id: input.eventId ?? null,
+      }),
+      POST_CREATE_TIMEOUT_MS,
+      "Creating post"
+    );
+  }
+
+  let storyId: string | null = null;
+
+  if (shouldStory) {
+    const slides = await buildStorySlides(input.userId, input, mediaUrls, createdPost?.id ?? null);
+    const story = await publishStory({
+      user_id: input.userId,
+      privacy: input.storyPrivacy ?? "followers",
+      post_id: createdPost?.id ?? null,
+      workout_tag: input.workoutTypes[0] ?? null,
+      location_name: input.locationName ?? input.gym ?? null,
+      location_type: (input.locationType as import("@frennix/types").StoryLocationType) ?? null,
+      slides,
+    });
+    storyId = story.id;
+  }
+
+  await queryClient.invalidateQueries({ queryKey: ["feed", input.userId] });
+  await queryClient.invalidateQueries({ queryKey: ["feed-stories", input.userId] });
+  await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+
+  return { postId: createdPost?.id ?? null, storyId };
+}

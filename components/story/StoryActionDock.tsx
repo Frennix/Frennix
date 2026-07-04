@@ -81,7 +81,7 @@ function buildPrimaryActions(lastReaction: StoryQuickReactionEmoji | null): Prim
 }
 
 const MORE_REACTIONS = STORY_QUICK_REACTIONS.filter(
-  (reaction) => reaction.emoji !== "❤️" && reaction.emoji !== "💪"
+  (reaction) => reaction.emoji !== "❤️" && reaction.emoji !== "💪" && reaction.emoji !== "😂"
 );
 
 interface StoryActionDockProps {

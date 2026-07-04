@@ -288,6 +288,7 @@ export async function createPost(input: {
   thumbnail_url?: string | null;
   post_type: PostType;
   workout_types?: string[];
+  workout_metrics?: import("@frennix/types").WorkoutStoryMetrics | null;
   /** @deprecated Prefer workout_types */
   workout_type?: string | null;
   group_id?: string | null;
@@ -303,13 +304,15 @@ export async function createPost(input: {
         ? [input.workout_type]
         : [];
 
-  const { workout_type: _legacy, workout_types: _ignored, story_audience, ...rest } = input;
+  const { workout_type: _legacy, workout_types: _ignored, story_audience, workout_metrics, ...rest } =
+    input;
 
   const { data, error } = await getSupabase()
     .from("posts")
     .insert({
       ...rest,
       workout_types,
+      ...(workout_metrics ? { workout_metrics } : {}),
       ...(story_audience ? { story_audience } : {}),
     })
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
