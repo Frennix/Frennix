@@ -84,7 +84,9 @@ _None planned._
 | Field | Value |
 |-------|-------|
 | **Status** | Closed |
-| **Date** | 2026-07-04 |
+| **Date** | 2026-07-04 12:44 PDT |
+| **Commit** | `56fba6dbc73d4c003060007f329f39cbc3a4f2d7` |
+| **Tag** | `v1.0.2` |
 | **Type** | Patch — production stability |
 | **Production** | https://frennix.vercel.app |
 | **Deploy** | `dpl_357TLT9m2EaRSG4fRe5Fem5QE6Fa` |

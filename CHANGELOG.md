@@ -5,7 +5,7 @@ Public release summaries. **Full release log (issues, QA, migrations):** [`featu
 
 ## [1.0.2] – Workout Sharing Hotfix — 2026-07-04
 
-**Status:** Closed · **Production:** https://frennix.vercel.app · **Deploy:** `dpl_357TLT9m2EaRSG4fRe5Fem5QE6Fa` · **Migration:** `20250722000001` applied
+**Status:** Closed · **Tag:** `v1.0.2` · **Commit:** `56fba6d` · **Production:** https://frennix.vercel.app · **Deploy:** `dpl_357TLT9m2EaRSG4fRe5Fem5QE6Fa` · **Migration:** `20250722000001` applied
 
 ### Fixed
 - Workout, photo, and video sharing failed when creating posts (`event_type` column error)
