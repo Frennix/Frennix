@@ -2,7 +2,8 @@
 
 **Status:** Pre-release QA (do not merge to `main` until founder sign-off)  
 **Build branch:** `hotfix/v1.0.1-safari-tab-layout`  
-**Last updated:** 2026-07-04
+**Last updated:** 2026-07-04  
+**Latest commit:** `795639d` (includes Messages → Calendar invite fix + QA guide)
 
 ---
 
@@ -13,9 +14,9 @@
 | Field | Value |
 |-------|--------|
 | **Branch** | `hotfix/v1.0.1-safari-tab-layout` |
-| **Commit** | `de164e6` (+ any QA fix commits after this doc) |
-| **Preview URL** | https://frennix-gk1p4t3v1-frennix-s-projects.vercel.app |
-| **Alternate preview** | https://mobile-c96810x63-frennix-s-projects.vercel.app |
+| **Commit** | `795639d` (Messages invite fix + QA guide) |
+| **Preview URL (latest)** | https://frennix-jsyx66a5g-frennix-s-projects.vercel.app |
+| **Preview URL (CLI)** | https://mobile-gawl60tfi-frennix-s-projects.vercel.app |
 
 **Note:** Preview URLs may require **Vercel team SSO** login on first visit. After authenticating, the app loads normally.
 
