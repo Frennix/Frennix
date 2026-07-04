@@ -3,6 +3,9 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
 
+const FRIENDLY_CRASH_MESSAGE =
+  "Something went wrong while loading Frennix. Please try again.";
+
 interface Props {
   children: ReactNode;
   /** Optional label for error reporting context. */
@@ -37,12 +40,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       return (
         <View style={styles.container}>
           <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>{error.message}</Text>
-          {error.stack ? (
-            <Text style={styles.stack} numberOfLines={12}>
-              {error.stack}
-            </Text>
-          ) : null}
+          <Text style={styles.message}>{FRIENDLY_CRASH_MESSAGE}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Retry"

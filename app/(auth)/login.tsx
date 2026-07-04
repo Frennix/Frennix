@@ -3,13 +3,7 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
-import {
-  formatAuthErrorForDisplay,
-  formatLoginError,
-  getAuthErrorDetails,
-  getSupabase,
-  signInWithEmail,
-} from "@frennix/api";
+import { formatAuthErrorForDisplay, formatLoginError, getAuthErrorDetails, getSupabase, signInWithEmail } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
@@ -40,10 +34,10 @@ export default function LoginScreen() {
         throw err;
       }
     } catch (e) {
-      const message = formatLoginError(e);
       console.error("[sign-in] signInWithPassword failed", getAuthErrorDetails(e));
-      showAlert("Sign in failed", formatAuthErrorForDisplay(e));
-      setError(message);
+      const friendly = formatLoginError(e);
+      showAlert("Sign in failed", friendly);
+      setError(friendly);
       setLoading(false);
       return;
     }
@@ -82,7 +76,7 @@ export default function LoginScreen() {
       router.replace("/");
     } catch (e) {
       if ((e as { code?: string }).code !== "ERR_REQUEST_CANCELED") {
-        setError(e instanceof Error ? e.message : "Apple sign in failed");
+        setError(formatAuthErrorForDisplay(e));
       }
     }
   }

@@ -11,7 +11,7 @@ Official audit trail of semver releases, approvals, deployments, and outcomes.
 |---------|------|--------|--------|-----------|-------|
 | v0.8.0 | 2026-06-28 | `c2cb3f9` | **Production (stable)** | Messaging stability | Current production after v1.0.0 rollback |
 | v1.0.0 | 2026-06-28 | `ccfb65b` | **Rolled back** | P1 Matchmaking | iPhone Safari black screen — see incident below |
-| v1.0.1 | — | — | **Planned hotfix** | P1 | Safari tab-scene layout fix — not deployed |
+| v1.0.1 | 2026-07-04 | `88e4b88` | **Production** — stabilization active | Training Calendar | [`STABILIZATION-v1.0.1.md`](./STABILIZATION-v1.0.1.md) |
 
 ---
 

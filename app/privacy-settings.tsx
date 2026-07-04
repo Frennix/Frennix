@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
-import { setPresence, updateProfile } from "@frennix/api";
+import { getUserFriendlyErrorMessage, setPresence, updateProfile } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { setPresenceSharingEnabled } from "@/lib/presence";
 import { showAlert } from "@/lib/alerts";
@@ -26,7 +26,7 @@ export default function PrivacySettingsScreen() {
     onError: (error) => {
       showAlert(
         "Could not update privacy setting",
-        error instanceof Error ? error.message : "Something went wrong"
+        getUserFriendlyErrorMessage(error, "Something went wrong")
       );
     },
   });

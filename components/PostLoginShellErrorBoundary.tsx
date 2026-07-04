@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { webAppShell } from "@/lib/flex-layout";
 
 interface Props {
@@ -13,7 +13,7 @@ interface State {
   resetKey: number;
 }
 
-/** Shows the real error on-screen after login — avoids blank white failures. */
+/** Catches post-login shell failures with user-friendly copy (technical detail logged only). */
 export class PostLoginShellErrorBoundary extends Component<Props, State> {
   state: State = { error: null, componentStack: null, resetKey: 0 };
 
@@ -40,18 +40,12 @@ export class PostLoginShellErrorBoundary extends Component<Props, State> {
     if (error) {
       return (
         <View style={styles.container}>
-          <Text style={styles.title}>Post-login shell error</Text>
-          <Text style={styles.label}>{this.props.label ?? "tabs/feed shell"}</Text>
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-            <Text style={styles.errorName}>{error.name}</Text>
-            <Text style={styles.errorMessage}>{error.message}</Text>
-            {error.stack ? <Text style={styles.stack}>{error.stack}</Text> : null}
-            {componentStack ? (
-              <Text style={styles.stack}>Component stack:{componentStack}</Text>
-            ) : null}
-          </ScrollView>
+          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.label}>
+            Frennix hit a problem loading this screen. Your account is safe — try again.
+          </Text>
           <Pressable style={styles.button} onPress={this.handleRetry}>
-            <Text style={styles.buttonText}>Retry shell</Text>
+            <Text style={styles.buttonText}>Try again</Text>
           </Pressable>
         </View>
       );

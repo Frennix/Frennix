@@ -13,6 +13,7 @@ import {
   cancelStaffInvite,
   createStaffInvite,
   getFounderAuditLog,
+  getUserFriendlyErrorMessage,
   listStaffInvites,
   listStaffMembers,
   revokeStaffMembership,
@@ -74,7 +75,7 @@ export default function FounderAdminScreen() {
       setEmail("");
       await queryClient.invalidateQueries({ queryKey: ["founder-staff-invites"] });
     } catch (error) {
-      Alert.alert("Invite failed", error instanceof Error ? error.message : "Could not create invite");
+      Alert.alert("Invite failed", getUserFriendlyErrorMessage(error, "Could not create invite"));
     } finally {
       setCreating(false);
     }
@@ -91,7 +92,7 @@ export default function FounderAdminScreen() {
             await revokeStaffMembership(userId);
             await queryClient.invalidateQueries({ queryKey: ["founder-staff-members"] });
           } catch (error) {
-            Alert.alert("Failed", error instanceof Error ? error.message : "Could not revoke");
+            Alert.alert("Failed", getUserFriendlyErrorMessage(error, "Could not revoke"));
           }
         },
       },
@@ -103,7 +104,7 @@ export default function FounderAdminScreen() {
       await cancelStaffInvite(inviteId);
       await queryClient.invalidateQueries({ queryKey: ["founder-staff-invites"] });
     } catch (error) {
-      Alert.alert("Failed", error instanceof Error ? error.message : "Could not cancel invite");
+      Alert.alert("Failed", getUserFriendlyErrorMessage(error, "Could not cancel invite"));
     }
   }
 

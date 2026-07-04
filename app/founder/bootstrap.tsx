@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { claimPlatformBootstrap, getPlatformBootstrapStatus } from "@frennix/api";
+import { claimPlatformBootstrap, getPlatformBootstrapStatus, getUserFriendlyErrorMessage } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { hashStaffToken } from "@/lib/founder/crypto";
 import { Button, EmptyState, colors, spacing, typography } from "@frennix/ui";
@@ -77,7 +77,7 @@ export default function FounderBootstrapScreen() {
       setTimeout(() => router.replace("/founder/admin"), 1500);
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Bootstrap claim failed");
+      setMessage(getUserFriendlyErrorMessage(error, "Bootstrap claim failed"));
     }
   }
 

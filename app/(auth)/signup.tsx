@@ -1,7 +1,7 @@
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
-import { signUpWithEmail } from "@frennix/api";
+import { getUserFriendlyErrorMessage, signUpWithEmail } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { storePendingReferralCode } from "@/lib/referral-storage";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
@@ -35,7 +35,7 @@ export default function SignupScreen() {
       await applySession(session);
       router.replace("/onboarding");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign up failed");
+      setError(getUserFriendlyErrorMessage(e, "Sign up failed. Please try again."));
     } finally {
       setLoading(false);
     }

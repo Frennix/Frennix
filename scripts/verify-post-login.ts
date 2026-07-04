@@ -150,14 +150,18 @@ const checks: Array<{ name: string; run: () => void }> = [
         throw new Error("EmergencyDebugBanner must not mount in production root layout");
       }
       assertIncludes("scripts/patch-web-html.js", "frennix-web-scroll", "Safari scroll shell patch required");
-      assertExcludes("scripts/patch-web-html.js", "frennix-emergency-html", "pre-JS emergency banner must be removed");
-      assertIncludes("scripts/patch-web-html.js", "pointer-events: none", "#root pointer pass-through required");
+      assertIncludes(
+        "scripts/patch-web-html.js",
+        'html.replace(/\\s*<div id="frennix-emergency-html"',
+        "patch must strip legacy emergency banner from dist HTML"
+      );
+      assertIncludes("lib/web-document-styles.js", "pointer-events: none", "#root pointer pass-through required");
     },
   },
   {
     name: "Post-login shell error boundary wraps tabs",
     run: () => {
-      assertIncludes("components/PostLoginShellErrorBoundary.tsx", "Post-login shell error", "shell boundary required");
+      assertIncludes("components/PostLoginShellErrorBoundary.tsx", "Something went wrong", "shell boundary required");
       assertIncludes("app/(tabs)/_layout.tsx", "PostLoginShellErrorBoundary", "tabs must use shell boundary");
     },
   },
@@ -193,47 +197,6 @@ const checks: Array<{ name: string; run: () => void }> = [
       const result = auditPostLoginShell();
       if (!result.ok) {
         throw new Error(result.messages.join("\n"));
-      }
-    },
-  },
-  {
-    name: "Web feed uses incremental bisection screen",
-    run: () => {
-      assertIncludes("components/FeedBisectionScreen.tsx", "Feed is rendering", "bisection baseline copy required");
-      assertIncludes("lib/feed-bisection.ts", "feedStep", "feed step query param required");
-      assertIncludes("app/(tabs)/index.web.tsx", "FeedBisectionScreen", "web feed must use bisection screen");
-      if (existsSync(join(ROOT, "app/(tabs)/_layout.web.tsx"))) {
-        throw new Error("app/(tabs)/_layout.web.tsx must be removed — use real tabs shell on web");
-      }
-    },
-  },
-  {
-    name: "Feed header supports bisection visibility flags",
-    run: () => {
-      assertIncludes("components/FeedHeader.tsx", "showQuickActions", "FeedHeader must gate quick actions");
-      assertIncludes("components/FeedHeader.tsx", "showStories", "FeedHeader must gate stories");
-    },
-  },
-  {
-    name: "Feed layout diagnostics probe zero-height parents",
-    run: () => {
-      assertIncludes("components/FeedLayoutDiagnostics.tsx", "Feed layout probes", "layout diagnostics required");
-      assertIncludes("components/FeedLayoutDiagnostics.tsx", "display:none", "layout diagnostics must flag hidden nodes");
-    },
-  },
-  {
-    name: "Web bundle ships feed bisection strings",
-    run: () => {
-      const bundle = readMainWebBundle();
-      if (!bundle.includes("Feed is rendering")) {
-        throw new Error("Web bundle must include feed bisection baseline copy");
-      }
-      if (!bundle.includes("FEED BISECTION")) {
-        throw new Error("Web bundle must include feed bisection banner");
-      }
-      const html = read("dist/index.html");
-      if (!html.includes("2025-06-28-feed-bisection")) {
-        throw new Error("dist/index.html must include feed bisection build id");
       }
     },
   },

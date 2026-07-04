@@ -166,6 +166,12 @@ export default function SettingsScreen() {
         </>
       ) : null}
 
+      <Text style={styles.section}>App</Text>
+      <Pressable onPress={() => pushScreen("/whats-new")}>
+        <Text style={styles.link}>Release Notes</Text>
+        <Text style={styles.linkHint}>What&apos;s new, known issues, and coming soon</Text>
+      </Pressable>
+
       <Text style={styles.section}>Beta</Text>
       <Link href="/beta-feedback" asChild>
         <Pressable>

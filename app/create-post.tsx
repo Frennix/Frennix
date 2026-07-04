@@ -17,7 +17,8 @@ import {
   type StoryPrivacy,
   type StoryShareMode,
 } from "@frennix/types";
-import { getErrorMessage, isVideoMime } from "@frennix/api";
+import { isVideoMime } from "@frennix/api";
+import { getSharePostUserMessage } from "@/lib/share-post-errors";
 import { WorkoutSavedSheet } from "@/components/WorkoutSavedSheet";
 import { shareWorkout } from "@/lib/share-workout";
 import { resolveVideoUploadFile } from "@/lib/video-upload";
@@ -379,7 +380,7 @@ export default function CreatePostScreen() {
         setLoading(false);
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
-      const message = getErrorMessage(e);
+      const message = getSharePostUserMessage(e);
       setError(message);
       showAlert("Could not share", message);
       setUploadStage("idle");
@@ -468,7 +469,7 @@ export default function CreatePostScreen() {
         setPersistPaused(false);
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
-      const message = getErrorMessage(e);
+      const message = getSharePostUserMessage(e);
       setError(message);
       showAlert("Could not post", message);
       setUploadStage("idle");

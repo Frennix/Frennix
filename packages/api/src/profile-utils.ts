@@ -28,31 +28,79 @@ export function logProfileError(scope: string, error: unknown, context?: Record<
   console.error(`[profile] ${scope}`, { ...context, ...getSupabaseErrorDetails(error) });
 }
 
-export function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown, fallback?: string): string {
+  return getUserFriendlyErrorMessage(error, fallback);
+}
+
+/** Technical detail for logs only — never show in UI. */
+export function getTechnicalErrorMessage(error: unknown): string {
   const { message, code, details, hint } = getSupabaseErrorDetails(error);
   return [message, code ? `code=${code}` : null, details ? `details=${details}` : null, hint ? `hint=${hint}` : null]
     .filter(Boolean)
     .join(" | ");
 }
 
-export function formatSupabaseError(error: unknown, context: string): Error {
-  if (error && typeof error === "object") {
-    const supabaseError = error as {
-      message?: string;
-      code?: string;
-      details?: string;
-      hint?: string;
-    };
-    const parts = [
-      context,
-      supabaseError.message,
-      supabaseError.code ? `code=${supabaseError.code}` : null,
-      supabaseError.details ? `details=${supabaseError.details}` : null,
-      supabaseError.hint ? `hint=${supabaseError.hint}` : null,
-    ].filter(Boolean);
-    return new Error(parts.join(" | "));
+const USER_ERROR_FALLBACK = "Something went wrong. Please try again.";
+
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+  invalid_credentials: "Invalid email or password.",
+  email_not_confirmed: "Please confirm your email before signing in.",
+  user_not_found: "We couldn't find an account with that email.",
+  over_request_rate_limit: "Too many attempts. Please wait a moment and try again.",
+  request_timeout: "The request timed out. Please try again.",
+};
+
+function looksTechnicalErrorMessage(message: string): boolean {
+  return (
+    /PGRST\d+/i.test(message) ||
+    /postgres|supabase|row-level security|violates .* constraint/i.test(message) ||
+    /\b(RLS|JWT|SQL|RPC)\b/i.test(message) ||
+    /code=|details=|hint=/i.test(message) ||
+    /TypeError|ReferenceError|SyntaxError/i.test(message) ||
+    /undefined is not|cannot read propert/i.test(message) ||
+    /ECONNREFUSED|ENOTFOUND/i.test(message)
+  );
+}
+
+/** User-safe error copy — never exposes Postgres codes, stack fragments, or internal API details. */
+export function getUserFriendlyErrorMessage(
+  error: unknown,
+  fallback: string = USER_ERROR_FALLBACK
+): string {
+  const { message, code } = getSupabaseErrorDetails(error);
+
+  if (code && ERROR_CODE_MESSAGES[code]) {
+    return ERROR_CODE_MESSAGES[code];
   }
-  return new Error(context);
+
+  if (/invalid login credentials/i.test(message)) return "Invalid email or password.";
+  if (/email not confirmed/i.test(message)) return "Please confirm your email before signing in.";
+  if (/jwt expired|session expired/i.test(message)) return "Your session expired. Please sign in again.";
+  if (/network request failed|failed to fetch/i.test(message)) {
+    return "Network error. Check your connection and try again.";
+  }
+  if (/rate limit|too many requests/i.test(message)) {
+    return "Too many attempts. Please wait a moment and try again.";
+  }
+
+  if (!message || looksTechnicalErrorMessage(message) || code) {
+    return fallback;
+  }
+
+  if (message.length > 120) {
+    return fallback;
+  }
+
+  return message;
+}
+
+export function formatSupabaseError(error: unknown, context: string): Error {
+  logProfileError(context, error);
+  const fallback =
+    /post|share|upload/i.test(context)
+      ? "We couldn't complete that action right now. Please try again in a few minutes."
+      : context;
+  return new Error(getUserFriendlyErrorMessage(error, fallback));
 }
 
 export function avatarDisplayUri(uri: string | null | undefined, version?: string | null) {

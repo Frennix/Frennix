@@ -1,3 +1,4 @@
+import { getUserFriendlyErrorMessage } from "./profile-utils";
 import { getSupabase } from "./supabase";
 
 export function getAuthErrorDetails(error: unknown): {
@@ -23,8 +24,7 @@ export function logAuthError(scope: string, error: unknown) {
 }
 
 export function formatAuthErrorForDisplay(error: unknown): string {
-  const { message, code } = getAuthErrorDetails(error);
-  return code ? `${message} (${code})` : message;
+  return getUserFriendlyErrorMessage(error, "Something went wrong. Please try again.");
 }
 
 export async function signInWithEmail(email: string, password: string) {

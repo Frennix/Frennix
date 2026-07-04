@@ -56,6 +56,7 @@
 | # | Check | Pass | Notes |
 |---|-------|------|-------|
 | 16 | Founder approval: `Approved — deploy vX.Y.Z` | ⬜ | |
+| 16b | `npm run verify:schema-sync` exit 0 | ⬜ | Catches legacy triggers / schema drift |
 | 17 | Migrations applied to production **before** client deploy | ⬜ | `npx supabase db push` |
 | 18 | `supabase migration list` — all synced | ⬜ | |
 | 19 | Web build fresh (`expo export -p web`) | ⬜ | |

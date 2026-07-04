@@ -179,6 +179,7 @@ export default function RootLayout() {
               options={backScreen("Edit profile", { presentation: "modal" })}
             />
             <Stack.Screen name="settings" options={backScreen("Settings")} />
+            <Stack.Screen name="whats-new" options={backScreen("What's New")} />
             <Stack.Screen
               name="matching-settings"
               options={{

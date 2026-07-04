@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { acceptStaffInvite } from "@frennix/api";
+import { acceptStaffInvite, getUserFriendlyErrorMessage } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { hashStaffToken } from "@/lib/founder/crypto";
 import { Button, EmptyState, colors, spacing, typography } from "@frennix/ui";
@@ -29,7 +29,7 @@ export default function StaffJoinScreen() {
       } catch (error) {
         if (cancelled) return;
         setStatus("error");
-        setMessage(error instanceof Error ? error.message : "Could not accept invite");
+        setMessage(getUserFriendlyErrorMessage(error, "Could not accept invite"));
       }
     })();
 

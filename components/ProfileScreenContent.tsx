@@ -291,6 +291,18 @@ export function ProfileScreenContent({
           )}
         </View>
 
+        {isOwn ? (
+          <Pressable
+            style={styles.whatsNewLink}
+            onPress={() => router.push("/whats-new")}
+            accessibilityRole="button"
+            accessibilityLabel="What's New"
+          >
+            <Text style={styles.whatsNewLinkText}>What&apos;s New</Text>
+            <Text style={styles.whatsNewLinkHint}>Release notes and known issues</Text>
+          </Pressable>
+        ) : null}
+
         {!isOwn ? null : (
           <Button
             title="Invite Friends"
@@ -509,6 +521,21 @@ const styles = StyleSheet.create({
   },
   actionButton: { flex: 1 },
   actionButtonCompact: { minWidth: 88 },
+  whatsNewLink: {
+    width: "100%",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    gap: 2,
+  },
+  whatsNewLinkText: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "700",
+  },
+  whatsNewLinkHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
   section: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,

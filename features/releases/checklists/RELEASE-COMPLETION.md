@@ -11,6 +11,7 @@
 | # | Task | Pass | Notes |
 |---|------|------|-------|
 | 1 | [`CHANGELOG.md`](../../../CHANGELOG.md) updated with vX.Y.Z section | ⬜ | |
+| 1b | [`whats-new.ts`](../whats-new.ts) updated · `npm run verify:whats-new` PASS | ⬜ | |
 | 2 | [`PROJECT-PROGRESS.md`](../../PROJECT-PROGRESS.md) updated | ⬜ | Milestone %, production version |
 | 3 | Release file status → **Complete** | ⬜ | `features/releases/RELEASE-vX.Y.Z.md` |
 | 4 | [`RELEASE-HISTORY.md`](../RELEASE-HISTORY.md) updated | ⬜ | Commit, tag, deploy ID, outcome |

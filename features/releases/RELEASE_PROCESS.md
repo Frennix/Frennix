@@ -298,6 +298,7 @@ Document rollback in release file and [`RELEASE-HISTORY.md`](./RELEASE-HISTORY.m
 Use [`checklists/RELEASE-COMPLETION.md`](./checklists/RELEASE-COMPLETION.md).
 
 - [ ] Update [`CHANGELOG.md`](../../CHANGELOG.md)
+- [ ] Update [`features/releases/whats-new.ts`](./whats-new.ts) and run `npm run verify:whats-new`
 - [ ] Update [`PROJECT-PROGRESS.md`](../PROJECT-PROGRESS.md)
 - [ ] Mark release status **Complete** in release file
 - [ ] Archive QA checklist (link from release file)
@@ -319,6 +320,8 @@ Use [`checklists/RELEASE-COMPLETION.md`](./checklists/RELEASE-COMPLETION.md).
 | `features/releases/templates/RELEASE-vX.Y.Z-TEMPLATE.md` | Copy for each new release |
 | `features/releases/templates/RELEASE-READINESS-REPORT-TEMPLATE.md` | Copy for each readiness report |
 | `CHANGELOG.md` | Public-facing release summary |
+| `features/releases/whats-new.ts` | In-app What's New page (Settings → What's New) |
+| `features/releases/WHATS-NEW.md` | How to update release notes each ship |
 | `scripts/verify-release-gates.ts` | Blocks deploy if gates incomplete |
 
 Legacy docs (still valid, superseded by this process for procedure detail):

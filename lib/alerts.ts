@@ -1,4 +1,5 @@
 import { Alert, Platform } from "react-native";
+import { getUserFriendlyErrorMessage } from "@frennix/api";
 
 export function showAlert(title: string, message: string) {
   if (Platform.OS === "web") {
@@ -189,4 +190,14 @@ export function confirmRemoveTrainingMatch(partnerName: string, onConfirm: () =>
     { text: "Cancel", style: "cancel" },
     { text: "Remove", style: "destructive", onPress: onConfirm },
   ]);
+}
+
+/** Log technical detail and show user-friendly copy only. */
+export function showFriendlyError(
+  title: string,
+  error: unknown,
+  fallback = "Something went wrong. Please try again."
+) {
+  console.error(`[friendly-error] ${title}`, error);
+  showAlert(title, getUserFriendlyErrorMessage(error, fallback));
 }
