@@ -3,7 +3,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { createTrainingCalendarItem, getErrorMessage } from "@frennix/api";
-import type { TrainingCalendarItemType, TrainingCalendarPrivacy } from "@frennix/types";
+import type { CreateTrainingCalendarItemInput, TrainingCalendarItemType, TrainingCalendarPrivacy } from "@frennix/types";
 import {
   TrainingCalendarSessionForm,
   type TrainingCalendarFormValues,
@@ -26,6 +26,8 @@ export default function CreateTrainingCalendarItemScreen() {
     workoutType?: string;
     date?: string;
     fromStory?: string;
+    sourceType?: string;
+    storyId?: string;
   }>();
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
@@ -84,7 +86,9 @@ export default function CreateTrainingCalendarItemScreen() {
         notes: values.notes.trim() || null,
         privacy: values.privacy as TrainingCalendarPrivacy,
         invitee_id: partnerId,
-        source_type: partnerId ? "story_invite" : "native",
+        source_type:
+          (paramValue(params.sourceType) as CreateTrainingCalendarItemInput["source_type"]) ||
+          (partnerId ? "story_invite" : "native"),
         source_id: paramValue(params.storyId) || null,
       });
       await queryClient.invalidateQueries({ queryKey: ["calendar-view", userId] });

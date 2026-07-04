@@ -15,14 +15,14 @@ import {
   muteConversationForUser,
   pinConversationForUser,
   sendStoryEventInvite,
-  sendStoryInviteToTrain,
   unfavoriteConversationForUser,
   unmuteConversationForUser,
   unpinConversationForUser,
 } from "@frennix/api";
 import type { Conversation, Profile } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
-import { ReportIssueLink } from "@/components/ReportIssueLink";
+import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
+import { openTrainingCalendarCreate } from "@/lib/training-calendar-navigation";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
 import { ConversationRow } from "@/components/ConversationRow";
 import {
@@ -389,15 +389,14 @@ export default function MessagesScreen() {
       }
 
       if (action === "invite_workout") {
-        setInviteLoadingUserId(partnerId);
-        try {
-          await sendStoryInviteToTrain(userId, partnerId, latestPostId);
-          showAlert("Invite sent", "They'll get a notification to train with you.");
-        } catch (inviteError) {
-          showAlert("Could not send invite", getErrorMessage(inviteError));
-        } finally {
-          setInviteLoadingUserId(null);
-        }
+        openTrainingCalendarCreate({
+          partnerId,
+          partnerUsername: partner.username ?? "",
+          workoutType: partnerStory?.active_stories.at(-1)?.workout_tag ?? "",
+          sourceType: "message_invite",
+          storyId: latestStoryId ?? "",
+          fromStory: latestStoryId ? "1" : "",
+        });
         return;
       }
 
@@ -579,16 +578,16 @@ export default function MessagesScreen() {
           pushScreen(`/user/${username}`);
         }}
         onMarkViewed={handleMarkStoryViewed}
-        onInviteToTrain={async (storyUserId, postId) => {
-          setInviteLoadingUserId(storyUserId);
-          try {
-            await sendStoryInviteToTrain(userId, storyUserId, postId);
-            showAlert("Invite sent", "They'll get a notification to train with you.");
-          } catch (inviteError) {
-            showAlert("Could not send invite", getErrorMessage(inviteError));
-          } finally {
-            setInviteLoadingUserId(null);
-          }
+        onInviteToTrain={(storyUserId, _postId) => {
+          const feedStory = partnerStories.find((item) => item.user_id === storyUserId);
+          const dedicatedStory = feedStory?.active_stories.at(-1) ?? null;
+          setStoryViewerIndex(null);
+          openStoryWorkoutInvite({
+            partnerId: storyUserId,
+            partnerUsername: feedStory?.profile.username,
+            workoutType: dedicatedStory?.workout_tag ?? null,
+            storyId: dedicatedStory?.id ?? null,
+          });
         }}
         onInviteToEvent={async (storyUserId, storyId) => {
           setInviteLoadingUserId(storyUserId);
