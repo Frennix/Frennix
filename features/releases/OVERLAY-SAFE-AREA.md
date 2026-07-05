@@ -42,9 +42,46 @@ import { BottomOverlayShell } from "@/components/BottomOverlayShell";
 - `sheetMarginBottom` — lifts sheet above browser chrome
 - `contentBottomPadding` — internal cushion below scroll content
 
-### Custom overlays (animations, gestures)
+### Native-style action sheets (spring animation, swipe-to-dismiss)
 
-If `BottomOverlayShell` is too rigid (e.g. `PostInteractionSheet` with pan-to-dismiss), **must** call `useSheetSafeArea(expanded, visible)` directly and apply:
+Use **`BottomActionSheet`** for polished iOS-style action menus (post actions, future Save/Report grids):
+
+```tsx
+import { BottomActionSheet } from "@/components/BottomActionSheet";
+import { ActionSheetGrid, ActionSheetPriorityGrid, ActionSheetTile } from "@/components/ActionSheetGrid";
+
+<BottomActionSheet visible={visible} onClose={onClose} fitToContent scrollEnabled={needsScroll}>
+  <ActionSheetPriorityGrid
+    primaryRow={[like, reply]}
+    secondaryRow={[reaction, more]}
+    renderItem={(action, tier) => (
+      <ActionSheetTile variant={tier} emoji={action.emoji} label={action.label} onPress={...} />
+    )}
+  />
+</BottomActionSheet>
+```
+
+`BottomActionSheet` wires `useBottomActionSheetLayout()` — visual viewport pinning, Safari toolbar lift (BUG-002), **content-sized height** (`fitToContent`), spring animation, centered drag handle, swipe-down dismiss.
+
+#### Founder design standard (action sheets)
+
+Full spec: [`BOTTOM-ACTION-SHEET-STANDARD.md`](./BOTTOM-ACTION-SHEET-STANDARD.md)
+
+Every Frennix bottom action sheet must feel at home in Instagram, Threads, or Apple Fitness:
+
+| Principle | Implementation |
+|-----------|----------------|
+| **No scroll for core actions** | `ActionSheetPriorityGrid` — emphasized Like/Reply row, secondary row below |
+| **Content-sized sheet** | `fitToContent={true}` — no empty space below buttons |
+| **Equal spacing & sizing** | `ActionSheetTile` variants (`primary` / `secondary` / `standard`) |
+| **Scroll only when needed** | Enable when actions exceed `ACTION_SHEET_GRID_SCROLL_THRESHOLD` (6) |
+| **Safari-safe** | Never regress BUG-002 toolbar lift or home-indicator spacing |
+
+Before shipping any overlay, ask: *Would this feel at home in a top-tier social app?* If not, refine until it does.
+
+### Custom overlays (other animations, gestures)
+
+If neither shell fits, **must** call `useSheetSafeArea(expanded, visible)` or `useBottomActionSheetLayout(visible)` directly and apply:
 
 | Property | Where |
 |----------|-------|
@@ -54,17 +91,24 @@ If `BottomOverlayShell` is too rigid (e.g. `PostInteractionSheet` with pan-to-di
 
 ### Centered modals
 
-Use **`useCenterOverlaySafeArea(visible)`** on the backdrop — prevents flush bottom on small viewports:
+Use **`CenterOverlayShell`**:
 
 ```tsx
-const { backdropStyle } = useCenterOverlaySafeArea(visible);
-<Pressable style={[styles.backdrop, ...backdropStyle]}>
+import { CenterOverlayShell } from "@/components/BottomOverlayShell";
+
+<CenterOverlayShell visible={visible} onClose={onClose} contentStyle={styles.sheet}>
+  {children}
+</CenterOverlayShell>
 ```
+
+### App-wide provider (`@frennix/ui` overlays)
+
+`OverlaySafeAreaProvider` in `app/_layout.tsx` supplies live safe-area values to **`useOverlaySafeArea()`** in `@frennix/ui` (e.g. `ReactionPicker` in feed/messages).
 
 ### Shared UI (`@frennix/ui`)
 
 - Constant: `OVERLAY_BOTTOM_SAFETY_MARGIN_PX` in `packages/ui/src/theme.ts`
-- `ReactionPicker` accepts optional `bottomInset` — pass `useSheetSafeArea().sheetMarginBottom` from app on web
+- Context: `OverlaySafeAreaContext` + `useOverlaySafeArea()` — used by `ReactionPicker`
 
 ---
 
@@ -81,7 +125,7 @@ const { backdropStyle } = useCenterOverlaySafeArea(visible);
 
 | Component | Pattern |
 |-----------|---------|
-| `PostInteractionSheet` | `useSheetSafeArea` (custom animation) |
+| `PostInteractionSheet` | `BottomActionSheet` + `useBottomActionSheetLayout` (Safari toolbar lift) |
 | `EntityActionSheet` | `BottomOverlayShell` |
 | `ReportReasonSheet` | `BottomOverlayShell` |
 | `EntityListSheet` | `BottomOverlayShell` |
@@ -93,11 +137,15 @@ const { backdropStyle } = useCenterOverlaySafeArea(visible);
 | `StoryViewersModal` | `BottomOverlayShell` |
 | `StoryReactionsModal` | `BottomOverlayShell` |
 | `StoryQuestionAnswersModal` | `BottomOverlayShell` |
-| `TrainingMatchModal` | `useCenterOverlaySafeArea` |
-| `FrennixMatchExplainerModal` | `useCenterOverlaySafeArea` |
-| `CommentEditSheet` | `useCenterOverlaySafeArea` |
-| `WhatsNewLaunchPrompt` | `useCenterOverlaySafeArea` |
-| `ReactionPicker` | `OVERLAY_BOTTOM_SAFETY_MARGIN_PX` + optional `bottomInset` |
+| `StoryAnalyticsModal` | `CenterOverlayShell` |
+| `TrainingMatchModal` | `CenterOverlayShell` |
+| `FrennixMatchExplainerModal` | `CenterOverlayShell` |
+| `CommentEditSheet` | `CenterOverlayShell` |
+| `WhatsNewLaunchPrompt` | `CenterOverlayShell` |
+| `ImageLightbox` | `useOverlaySafeArea` (fullscreen) |
+| `WorkoutStoryViewer` | `useSheetSafeArea` (fullscreen story footer) |
+| `FounderSidebar` (mobile drawer) | `useOverlaySafeArea` |
+| `ReactionPicker` | `useOverlaySafeArea` via provider |
 
 **New overlays:** Add to this table when created. Do not ship without safe area wiring.
 
@@ -107,7 +155,7 @@ const { backdropStyle } = useCenterOverlaySafeArea(visible);
 
 | Gate | Command / doc |
 |------|----------------|
-| Automated static checks | `npm run verify:sheet-safe-area` |
+| Automated static checks | `npm run verify:sheet-safe-area` (10 checks — all overlays audited) |
 | Manual overlay QA | [`checklists/OVERLAY-MODAL-QA.md`](./checklists/OVERLAY-MODAL-QA.md) |
 | BUG-002 (reference) | [`v1.0.3-BUG-LIST.md`](./v1.0.3-BUG-LIST.md) — not closed until Founder confirms |
 

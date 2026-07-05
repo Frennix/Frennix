@@ -55,6 +55,8 @@ _None yet._
 | ID | Sev | Priority | Version Found | Version Fixed | Milestone | Status | Description | Postmortem |
 |----|-----|----------|---------------|---------------|-----------|--------|-------------|------------|
 | BUG-002 | **P1** | Next patch | v1.0.2 | — | v1.0.3 | In Progress | Post interaction sheet cut off on iPhone Safari — buttons behind browser toolbar | Open — **not closed until Founder confirms full sheet visible** |
+| BUG-003 | **P2** | Next patch | v1.0.3 | — | v1.0.3 | In Progress | Training Calendar tab half blocked on iPhone Safari — viewport height / scroll band | Open |
+| BUG-004 | **P1** | Fix immediately | v1.0.3 | — | v1.0.3 | In Progress | Feed black dead band / freeze after closing post interaction sheet on iPhone Safari | Open — fix deployed (`dpl_8F8qnKnNgsnDgqDLj3gcDKTb5wz7`); automated PASS; **not closed until Founder confirms** |
 
 ### Performance improvements
 
