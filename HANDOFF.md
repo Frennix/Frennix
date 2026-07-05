@@ -7,11 +7,17 @@
 **Git remote:** https://github.com/Frennix/Frennix.git (git root = `apps/mobile`)
 
 **Companion documents (read these too):**
-- [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) — all UI/UX standards
-- [`ROADMAP.md`](./ROADMAP.md) — version-based product roadmap
-- [`DEVELOPMENT_STANDARDS.md`](./DEVELOPMENT_STANDARDS.md) — permanent dev standards (stabilize → perform → polish → features)
-- [`features/PRODUCT_VISION.md`](./features/PRODUCT_VISION.md) — mission and alignment rules
-- [`features/releases/RELEASE_PROCESS.md`](./features/releases/RELEASE_PROCESS.md) — official release SOP
+
+| Document | Purpose |
+|----------|---------|
+| [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) | UI/UX standards, tokens, components |
+| [`DEVELOPMENT_STANDARDS.md`](./DEVELOPMENT_STANDARDS.md) | Permanent dev rules (stabilize → perform → polish → features) |
+| [`ROADMAP.md`](./ROADMAP.md) | Version-based product roadmap |
+| [`features/PRODUCT_VISION.md`](./features/PRODUCT_VISION.md) | Mission and alignment |
+| [`features/releases/RELEASE_PROCESS.md`](./features/releases/RELEASE_PROCESS.md) | Seven-phase release SOP |
+| [`features/releases/FEED-POST-INTERACTION-PATTERN.md`](./features/releases/FEED-POST-INTERACTION-PATTERN.md) | Feed post interaction phases A–C |
+| [`features/releases/BOTTOM-ACTION-SHEET-STANDARD.md`](./features/releases/BOTTOM-ACTION-SHEET-STANDARD.md) | BottomActionSheet spec |
+| [`features/feed/QA-POST-INTERACTION.md`](./features/feed/QA-POST-INTERACTION.md) | Post interaction QA checklist |
 
 ---
 
@@ -1306,6 +1312,7 @@ The following **implementation code** exists locally on `main` but is **not yet 
 5. **Deploy project name** is `frennix`, not `mobile`
 6. **`whats-new.ts`** still shows v1.0.2 — update on v1.0.3 close
 7. **Playwright** needed locally for browser verification scripts (`npx playwright install chromium`)
+8. **Feed debug overlay** — append `?feedDebug=1` to feed URL for scroll diagnostics (`lib/feed-scroll-debug.ts`); not visible in normal use
 
 ---
 
