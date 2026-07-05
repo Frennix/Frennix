@@ -38,12 +38,14 @@ function readMainWebBundle() {
 
 function assertValidFeedPostCardHeader() {
   const source = read("packages/ui/src/FeedPostCard.tsx");
-  if (!source.includes("{isOwn ? (")) {
-    throw new Error("FeedPostCard header menu must guard on isOwn");
+  if (!source.includes("FeedLayout.Header")) {
+    throw new Error("FeedPostCard must render FeedLayout.Header");
   }
-  // Regression: orphaned ternary after ScalePressable refactor (049e85b).
-  if (/\)\s*:\s*onModerationPress\s*\?/.test(source) && !/\{isOwn \?\s*\(/.test(source)) {
-    throw new Error("FeedPostCard has orphaned ternary — header JSX is invalid");
+  if (!source.includes("FeedPostActionBar")) {
+    throw new Error("FeedPostCard must render FeedPostActionBar");
+  }
+  if (!source.includes("handleMorePress")) {
+    throw new Error("FeedPostCard must route overflow actions through handleMorePress");
   }
 }
 

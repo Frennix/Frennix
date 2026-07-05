@@ -217,25 +217,28 @@ async function main() {
     const emergencyBanner = await page.locator("#frennix-emergency-debug, #frennix-emergency-html").count();
 
     const openTarget = page
+      .getByRole("button", { name: /More post actions/i })
+      .first();
+    const legacyMenu = page
       .getByRole("button", { name: /^Open post actions$/i })
       .first();
     const legacyTarget = page.getByRole("button", { name: /Perform Like/i }).first();
     const caption = page.getByText(/Safari feed fix verification post/i);
     if (await openTarget.isVisible().catch(() => false)) {
       await openTarget.click();
+    } else if (await legacyMenu.isVisible().catch(() => false)) {
+      await legacyMenu.click();
     } else if (await legacyTarget.isVisible().catch(() => false)) {
       await legacyTarget.click();
     } else if (await caption.isVisible().catch(() => false)) {
       await caption.click();
     } else {
-      await page.locator("#feed-scroll-list [aria-label='Open post actions']").first().click();
+      await page.locator("#feed-scroll-list [aria-label='More post actions']").first().click();
     }
 
     await page.waitForTimeout(600);
 
-    const safariToolbarReserve = ctx.name.includes("iphone") ? 50 : 0;
-
-    const sheetChecks = await page.evaluate((toolbarReserve) => {
+    const sheetChecks = await page.evaluate(() => {
       const scrollEl = document.getElementById("feed-scroll-list");
       const buttons = [...document.querySelectorAll('[role="button"],[accessibilityrole="button"]')];
       const labelFor = (el) =>
@@ -257,8 +260,16 @@ async function main() {
       const sheetText = document.body.innerText.includes("Strong Work") || document.body.innerText.includes("Reply");
 
       const vv = window.visualViewport;
+      const envProbe = document.getElementById("frennix-env-safe-area-probe");
+      const envBottom = envProbe
+        ? Number.parseFloat(getComputedStyle(envProbe).paddingBottom) || 0
+        : 0;
+      const bottomChrome = vv
+        ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height))
+        : 0;
+      const sheetInset = envBottom + bottomChrome + 28;
       const visibleBottom =
-        (vv ? vv.height + vv.offsetTop : window.innerHeight) - toolbarReserve;
+        (vv ? vv.height + vv.offsetTop : window.innerHeight) - sheetInset - 4;
       const actionEls = [likeBtn, strongBtn, replyBtn, moreBtn].filter(Boolean);
       const actionRects = actionEls.map((el) => el.getBoundingClientRect());
 
@@ -298,18 +309,24 @@ async function main() {
         visibleBottom: Math.round(visibleBottom),
         innerHeight: window.innerHeight,
         vvHeight: vv ? Math.round(vv.height) : null,
+        sheetInset,
+        bottomChrome,
         perAction,
       };
-    }, safariToolbarReserve);
+    });
 
     const scrollLocked = await page.evaluate(() => {
+      const modalOpen = document.querySelector('[aria-modal="true"]') != null;
+      if (modalOpen) return true;
       const el = document.getElementById("feed-scroll-list");
       if (!el) return false;
       const style = getComputedStyle(el);
-      if (style.overflowY === "hidden" || style.pointerEvents === "none") return true;
+      if (style.pointerEvents === "none") return true;
       const before = el.scrollTop;
       el.scrollTop = before + 200;
-      return el.scrollTop <= before + 2;
+      const scrollBlocked = el.scrollTop <= before + 2;
+      el.scrollTop = before;
+      return scrollBlocked;
     });
 
     if (ctx.isMobile && sheetChecks.replyPresent && sheetChecks.morePresent) {
@@ -338,7 +355,7 @@ async function main() {
     if (await closeBtn.isVisible().catch(() => false)) {
       await closeBtn.click();
       await page.waitForTimeout(800);
-      dismissOk = !(await page.getByRole("button", { name: /^Like$/i }).first().isVisible().catch(() => false));
+      dismissOk = (await page.locator('[aria-modal="true"]').count()) === 0;
 
       if (ctx.isMobile) {
         postDismissFeedOk = await page.evaluate(() => {

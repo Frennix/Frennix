@@ -16,6 +16,7 @@
     "audit:post-login-shell": "npx tsx scripts/audit-post-login-shell.ts",
     "verify:ui-barrel": "npx tsx scripts/verify-ui-barrel.ts",
     "verify:feed-media": "npx tsx scripts/verify-feed-media.ts",
+    "verify:feed-layout": "npx tsx scripts/verify-feed-layout.ts",
     "verify:native-gallery": "npx tsx scripts/verify-native-gallery.ts",
     "verify:media-polish": "npx tsx scripts/verify-media-polish.ts",
     "verify:media-architecture": "npx tsx scripts/verify-media-architecture.ts",

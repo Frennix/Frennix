@@ -4,6 +4,8 @@
 **Last updated:** July 5, 2026  
 **Owner:** Engineering + Design + Founder  
 **Code tokens:** `packages/ui/src/theme.ts`  
+**Feed layout:** [`FEED_DESIGN_SYSTEM.md`](./FEED_DESIGN_SYSTEM.md) — canonical feed spacing, media, and post structure  
+**Performance baseline:** [`PERFORMANCE.md`](./PERFORMANCE.md) — feed metrics after FeedLayout redesign  
 **Overlay deep-dive:** `features/releases/FRENNIX-DESIGN-SYSTEM.md`  
 **Feed interactions:** `features/releases/FEED-POST-INTERACTION-PATTERN.md`  
 **Bottom sheets:** `features/releases/BOTTOM-ACTION-SHEET-STANDARD.md`  
@@ -145,7 +147,9 @@ Before merging or deploying any new UI:
 
 **Action sheet font scale cap:** `ACTION_SHEET_FONT_SCALE_MAX` = **1.35** — accessibility without layout break.
 
-**Feed post meta:** Use `formatFeedPostHeaderMeta()` (not deprecated `formatFeedPostMeta`).
+**Feed post meta:** Use `formatFeedCompactHeaderMeta()` for feed headers (workout types inline with timestamp). Use `formatFeedPostHeaderMeta()` for shared-post and non-workout fallbacks. Do not use deprecated `formatFeedPostMeta`.
+
+**Feed layout:** All feed posts must compose `FeedLayout` from `packages/ui/src/feed-layout/`. Spacing, typography, and section order are defined in `feedLayout` tokens — never hard-code feed post margins in individual components.
 
 ---
 
@@ -168,6 +172,31 @@ Before merging or deploying any new UI:
 **Sheet horizontal padding:** `spacing.md` (16px).
 
 **Grid gap (action tiles):** `spacing.sm` (8px).
+
+### FeedLayout (feed posts only)
+
+**Canonical doc:** [`FEED_DESIGN_SYSTEM.md`](./FEED_DESIGN_SYSTEM.md)
+
+**Source:** `packages/ui/src/feed-layout/tokens.ts` → `feedLayout`, `feedLayoutTypography`, `feedLayoutStyles`
+
+All feed posts compose `FeedLayout` section slots. **Do not** add feed-specific padding in child components.
+
+| Token / slot | Value | Use |
+|--------------|-------|-----|
+| `maxContentWidth` | 640px (web) | Max post width on large viewports |
+| `contentPaddingX` | 8px (`spacing.sm`) | Header, actions, caption, engagement, comments |
+| `mediaMarginX` | 0 | Edge-to-edge media |
+| `header.avatarSize` | 36px | Profile photo |
+| `header` typography | `feedLayoutTypography.displayName`, `.username`, `.meta` | Name, @username, workout · time |
+| `actions.rowHeight` | 44px | Inline action bar |
+| `actions.gap` | 24px (`spacing.lg`) | Space between action buttons |
+| `caption` | `typography.body`, 22px line height | Post caption |
+| `engagement` | `typography.bodySmall` | Likes + reaction summary |
+| `comments` | `typography.bodySmall` | Preview rows + “Add a comment…” |
+
+**Section order:** Header → Media → Actions → Caption → Engagement → Comments
+
+**Verification:** `npm run verify:feed-layout`
 
 ---
 
@@ -342,8 +371,11 @@ Scroll child only: webTabSceneHeightStyle() → bounded height from visualViewpo
 
 | Component | Purpose |
 |-----------|---------|
-| `FeedPostCard` | Feed post layout with `onInteractPress`, `MenuIconButton` |
-| `ReactionBar` | Reaction chips (no **＋** on feed — Phase A) |
+| `FeedLayout` | **Canonical feed post shell** — tokens + section slots (header, media, actions, caption, engagement, comments) |
+| `FeedMedia` | **Required** feed media mount — aspect-preserving, deferred load, edge-to-edge |
+| `FeedPostCard` | Feed post composer using `FeedLayout` + `FeedMedia` + `FeedPostActionBar` |
+| `FeedPostActionBar` | Inline Like · Strong Work · Comment · Share · More row |
+| `ReactionBar` | Emoji reaction counts below caption (tap to react) |
 | `MenuIconButton` | Standard **⋯** overflow trigger |
 | `Avatar`, `CachedImage`, `ProgressiveImage` | Media with caching |
 | `ScalePressable` | Press feedback (0.97 scale) |
@@ -377,21 +409,26 @@ Scroll child only: webTabSceneHeightStyle() → bounded height from visualViewpo
 
 ## 13. Interaction patterns
 
-### Feed post (Phase A — live)
+### Feed post (FeedLayout — live)
 
 | User action | Result |
 |-------------|--------|
-| Tap **⋯** (header) | Opens `PostInteractionSheet` |
-| Tap caption / media | Opens sheet (secondary — remove in polish pass) |
-| Tap author | Profile |
+| Tap **Like / Strong Work / Comment / Share** (action bar) | Inline action (like, react, post detail, share sheet) |
+| Tap **⋯** (action bar **More**) | Opens `PostInteractionSheet` |
+| Tap media | Full-screen lightbox / video viewer |
+| Tap author / @username | Profile |
+| Tap caption | Post detail |
 | Tap comment preview | Post detail / comments |
 | Tap reaction chip | Apply reaction |
-| **＋** on reaction bar | **Removed** (Phase A) → Quick Log Workout in Phase C |
 
-**Sheet content:**
+**Section order (every post):** Header → Media → Actions → Caption → Engagement → Comments
+
+**Sheet content (More panel):**
 - Primary: Like · Reply
 - Secondary: Strong Work · More
 - More panel: extended actions (scroll when tall)
+
+**Media:** Edge-to-edge within post; original aspect ratio preserved; never auto-crop.
 
 **Post-dismiss:** Feed scroll + tap restored; no modals lingering; `restoreWebDocumentScrollLock()`.
 

@@ -10,6 +10,7 @@ export * from "./EmptyState";
 export * from "./PostCard";
 export * from "./FeedPostCard";
 export * from "./FeedPostCardSkeleton";
+export * from "./feed-layout";
 export * from "./FeedMediaSlot";
 export * from "./FeedStoriesRow";
 export * from "./PeopleYouMayKnowCarousel";

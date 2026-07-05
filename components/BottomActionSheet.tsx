@@ -16,6 +16,7 @@ import {
   useBottomActionSheetLayout,
   type BottomActionSheetLayoutOptions,
 } from "@/lib/use-bottom-action-sheet-layout";
+import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
 import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
 import { colors, radius, spacing, touchTarget } from "@frennix/ui";
 
@@ -156,7 +157,10 @@ export function BottomActionSheet({
       }),
     ]).start(({ finished }) => {
       if (finished) {
-        if (Platform.OS === "web") restoreWebDocumentScrollLock();
+        if (Platform.OS === "web") {
+          restoreWebDocumentScrollLock();
+          requestSafariVisualViewportRemeasure();
+        }
         onClose();
       }
       dismissingRef.current = false;

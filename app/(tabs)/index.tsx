@@ -412,7 +412,7 @@ export default function HomeScreen() {
 
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
-  const feedScrollLocked = storyVisible || interactionVisible;
+  const feedScrollEnabled = !(storyVisible || interactionVisible);
 
   const {
     enabled: feedDebugEnabled,
@@ -421,7 +421,7 @@ export default function HomeScreen() {
     reportScroll: reportFeedDebugScroll,
   } = useFeedScrollDebug({
     listRef: useWebScroll ? webScrollRef : listRef,
-    scrollEnabled: !feedScrollLocked,
+    scrollEnabled: feedScrollEnabled,
     storyVisible,
     shareSheetVisible: shareVisible,
     lightboxVisible,
@@ -553,8 +553,15 @@ export default function HomeScreen() {
     onOwnerActionsPress: (post: Post) => {
       openPostActions(post);
     },
-    onMediaPress: (post: Post, _uri: string, index: number) => {
-      openInteraction(post, index);
+    onMediaPress: (post: Post, uri: string, index: number) => {
+      const displayPost = post.shared_post ?? post;
+      setCarouselIndex(post.id, index);
+      openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
+        setCarouselIndex(post.id, finalIndex);
+      }, {
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
+      });
     },
   };
 
@@ -769,7 +776,7 @@ export default function HomeScreen() {
         pointerEvents="box-none"
         nativeID="feed-root-container"
       >
-        <View style={[styles.feedScrollShell, webContainerStyle]} collapsable={false} nativeID="feed-scroll-shell">
+        <View style={styles.feedScrollShell} collapsable={false} nativeID="feed-scroll-shell">
           {useWebScroll ? (
             <FeedRenderTraceProbe id="feed:ui:scroll-list" detail="WebFeedScrollList">
               <WebFeedScrollList
@@ -777,7 +784,7 @@ export default function HomeScreen() {
             nativeID="feed-scroll-list"
             style={[styles.feedList, webScrollHeightStyle]}
             contentContainerStyle={styles.list}
-            scrollEnabled={!feedScrollLocked}
+            scrollEnabled={feedScrollEnabled}
             touchLock={storyVisible}
             data={listRows}
             keyExtractor={(item) => item.id}
@@ -824,7 +831,7 @@ export default function HomeScreen() {
             data={listRows}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
-            scrollEnabled={!feedScrollLocked}
+            scrollEnabled={feedScrollEnabled}
             nestedScrollEnabled
             initialNumToRender={10}
             maxToRenderPerBatch={10}

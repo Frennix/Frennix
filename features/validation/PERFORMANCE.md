@@ -1,5 +1,7 @@
 # Performance baselines — Phase 15
 
+> **Feed-specific baseline (FeedLayout redesign):** see [`../../PERFORMANCE.md`](../../PERFORMANCE.md)
+
 Measure before and during beta. Client events stored as `perf_*` in `product_events`; admin summary at **Settings → Product analytics**.
 
 ## Scripts

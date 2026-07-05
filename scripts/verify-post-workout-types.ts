@@ -75,11 +75,10 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed and profile render workout types as compact chips",
+    name: "Feed renders workout types inline in compact header meta",
     run: () => {
-      assertIncludes("packages/ui/src/WorkoutTypeChips.tsx", "maxVisible", "WorkoutTypeChips must support truncation");
-      assertIncludes("packages/ui/src/FeedPostCard.tsx", "WorkoutTypeChips", "FeedPostCard must render workout chips");
-      assertIncludes("packages/ui/src/FeedPostCard.tsx", "maxVisible={3}", "Feed must show up to 3 workout chips");
+      assertIncludes("packages/ui/src/formatRelativeTime.ts", "formatFeedCompactHeaderMeta", "formatRelativeTime must expose compact feed meta");
+      assertIncludes("packages/ui/src/FeedPostCard.tsx", "formatFeedCompactHeaderMeta", "FeedPostCard must use compact feed meta");
       assertIncludes("packages/ui/src/PostCard.tsx", "WorkoutTypeChips", "Post detail must render workout chips");
       assertIncludes("packages/ui/src/PostGrid.tsx", "WorkoutTypeChips", "Profile grid must render workout chips");
     },

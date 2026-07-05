@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import { Platform, useWindowDimensions, type ViewStyle } from "react-native";
+import {
+  measureSafariVisualViewport,
+  requestSafariVisualViewportRemeasure,
+  subscribeSafariVisualViewport,
+  isMobileWeb,
+} from "@/lib/safari-visual-viewport";
 
 /** React Navigation header on web tab scenes. */
 const WEB_APP_HEADER_PX = 52;
@@ -10,23 +16,14 @@ const WEB_BOTTOM_TAB_BAR_PX = 56;
 /** Legacy fallback when visualViewport is unavailable (desktop / older browsers). */
 const WEB_TAB_CHROME_FALLBACK_PX = 140;
 
-function isMobileWeb(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  return (
-    /Android|iPhone|iPad|iPod/i.test(ua) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
 function measureTabSceneHeight(layoutHeight: number): number {
   if (Platform.OS !== "web" || layoutHeight <= 0) return 0;
 
-  const vv = typeof window !== "undefined" ? window.visualViewport : null;
+  const snap = measureSafariVisualViewport();
   const appChrome = WEB_APP_HEADER_PX + WEB_BOTTOM_TAB_BAR_PX;
 
-  if (vv && isMobileWeb()) {
-    return Math.max(Math.round(vv.height - appChrome), 240);
+  if (isMobileWeb() && typeof window !== "undefined" && window.visualViewport) {
+    return Math.max(Math.round(snap.visualHeight - appChrome), 240);
   }
 
   return Math.max(Math.round(layoutHeight - WEB_TAB_CHROME_FALLBACK_PX), 240);
@@ -41,28 +38,19 @@ export function useWebTabSceneHeight(): number | undefined {
   const [sceneHeight, setSceneHeight] = useState<number | undefined>(() =>
     Platform.OS === "web" ? measureTabSceneHeight(layoutHeight) : undefined
   );
+  const [viewportTick, setViewportTick] = useState(0);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined" || layoutHeight <= 0) return;
+    if (Platform.OS !== "web") return;
+    return subscribeSafariVisualViewport(() => {
+      setViewportTick((tick) => tick + 1);
+    });
+  }, []);
 
-    const update = () => {
-      const next = measureTabSceneHeight(layoutHeight);
-      setSceneHeight((prev) => (prev === next ? prev : next));
-    };
-
-    update();
-    window.visualViewport?.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
-
-    return () => {
-      window.visualViewport?.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
-    };
-  }, [layoutHeight]);
+  useEffect(() => {
+    if (Platform.OS !== "web" || layoutHeight <= 0) return;
+    setSceneHeight(measureTabSceneHeight(layoutHeight));
+  }, [layoutHeight, viewportTick]);
 
   if (Platform.OS !== "web" || layoutHeight <= 0) return undefined;
   return sceneHeight ?? measureTabSceneHeight(layoutHeight);
@@ -93,3 +81,5 @@ export function webTabSceneContainerStyle(): ViewStyle {
     overflow: "hidden",
   };
 }
+
+export { requestSafariVisualViewportRemeasure };

@@ -76,7 +76,8 @@ const checks = [
     name: "hook:useBottomActionSheetLayout",
     run: () => {
       mustInclude("lib/use-bottom-action-sheet-layout.ts", "BOTTOM_SHEET_SAFETY_MARGIN_PX", "hook");
-      mustInclude("lib/use-bottom-action-sheet-layout.ts", "visualViewport", "hook");
+      mustInclude("lib/safari-visual-viewport.ts", "visualViewport", "shared viewport");
+      mustInclude("components/BottomActionSheet.tsx", "requestSafariVisualViewportRemeasure", "shell");
     },
   },
   {

@@ -69,8 +69,7 @@ export function WebFeedScrollList({
         styles.list,
         style,
         webScrollSurface,
-        !scrollEnabled && touchLock && styles.scrollHardLocked,
-        !scrollEnabled && !touchLock && styles.scrollSoftLocked,
+        touchLock && styles.scrollHardLocked,
       ]}
       contentContainerStyle={contentContainerStyle}
       scrollEnabled={scrollEnabled}
@@ -98,7 +97,6 @@ export function WebFeedScrollList({
 
 const styles = StyleSheet.create({
   list: { ...flexFill },
-  scrollSoftLocked: Platform.OS === "web" ? ({ overflow: "hidden" } as const) : {},
   scrollHardLocked:
     Platform.OS === "web" ? ({ overflow: "hidden", touchAction: "none" } as const) : {},
 });

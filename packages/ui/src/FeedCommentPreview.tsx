@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Comment } from "@frennix/types";
-import { colors, spacing, typography } from "./theme";
+import { feedAccessibility, feedLayout, feedLayoutTypography } from "./feed-layout";
 
 interface FeedCommentPreviewProps {
   comments?: Comment[];
@@ -25,7 +25,13 @@ export function FeedCommentPreview({
     <View style={styles.container}>
       {showViewAll ? (
         <Pressable onPress={openComments} accessibilityRole="button" accessibilityLabel="View all comments">
-          <Text style={styles.viewAll}>View all comments</Text>
+          <Text
+            style={styles.viewAll}
+            allowFontScaling
+            maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+          >
+            View all comments
+          </Text>
         </Pressable>
       ) : null}
 
@@ -39,7 +45,12 @@ export function FeedCommentPreview({
             accessibilityRole="button"
             accessibilityLabel={`Comment by ${username}`}
           >
-            <Text style={styles.commentText} numberOfLines={3}>
+            <Text
+              style={styles.commentText}
+              numberOfLines={3}
+              allowFontScaling
+              maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            >
               <Text
                 style={styles.author}
                 onPress={
@@ -57,8 +68,19 @@ export function FeedCommentPreview({
       })}
 
       {onCommentPress ? (
-        <Pressable onPress={onCommentPress} accessibilityRole="button" accessibilityLabel="Add a comment">
-          <Text style={styles.addComment}>Add a comment…</Text>
+        <Pressable
+          onPress={onCommentPress}
+          style={styles.commentInput}
+          accessibilityRole="button"
+          accessibilityLabel="Add a comment"
+        >
+          <Text
+            style={styles.addComment}
+            allowFontScaling
+            maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+          >
+            Add a comment…
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -67,33 +89,21 @@ export function FeedCommentPreview({
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
+    gap: feedLayout.comments.rowGap,
   },
   commentRow: {
     paddingVertical: 1,
   },
-  commentText: {
-    ...typography.bodySmall,
-    lineHeight: 18,
-  },
-  author: {
-    fontWeight: "700",
-    color: colors.text,
-  },
-  commentBody: {
-    color: colors.text,
-    fontWeight: "400",
-  },
+  commentText: feedLayoutTypography.commentText,
+  author: feedLayoutTypography.commentAuthor,
+  commentBody: feedLayoutTypography.commentBody,
   viewAll: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
+    ...feedLayoutTypography.commentMuted,
     fontWeight: "600",
     marginBottom: 2,
   },
-  addComment: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    marginTop: 2,
+  commentInput: {
+    marginTop: feedLayout.comments.commentInputMarginTop,
   },
+  addComment: feedLayoutTypography.commentMuted,
 });

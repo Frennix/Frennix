@@ -39,13 +39,12 @@ export function MediaAspectFrame({
       return isFeed ? FEED_MIN_MEDIA_HEIGHT : INLINE_DEFAULT_HEIGHT;
     }
     if (dimensions) {
-      const height = computeImageDisplayHeight(
+      return computeImageDisplayHeight(
         layoutWidth,
         dimensions.width,
         dimensions.height,
         maxHeight
       );
-      return isFeed ? Math.max(height, FEED_MIN_MEDIA_HEIGHT) : height;
     }
     if (isFeed) {
       return Math.max(layoutWidth * fallbackRatio, FEED_MIN_MEDIA_HEIGHT);

@@ -10,6 +10,7 @@
 
 | Document | Purpose |
 |----------|---------|
+| [`BUG-TRACKER.md`](./features/releases/BUG-TRACKER.md) | Living bug tracker — root causes, verification, agent notes |
 | [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) | UI/UX standards, tokens, components |
 | [`DEVELOPMENT_STANDARDS.md`](./DEVELOPMENT_STANDARDS.md) | Permanent dev rules (stabilize → perform → polish → features) |
 | [`ROADMAP.md`](./ROADMAP.md) | Version-based product roadmap |

@@ -83,6 +83,23 @@ export function formatFeedPostHeaderMeta(
   return `${kind} · ${time}`;
 }
 
+/** Compact feed header meta: workout types inline with timestamp, or post kind fallback. */
+export function formatFeedCompactHeaderMeta(
+  post: {
+    post_type: string;
+    created_at: string;
+    challenge_id?: string | null;
+    group_id?: string | null;
+    event_id?: string | null;
+  },
+  workoutTypes: string[] | null | undefined
+) {
+  const time = formatRelativeTime(post.created_at);
+  const workout = formatWorkoutTypesInline(workoutTypes);
+  if (workout) return `${workout} · ${time}`;
+  return formatFeedPostHeaderMeta(post, false);
+}
+
 /** @deprecated Prefer formatFeedPostHeaderMeta + WorkoutTypeChips */
 export function formatFeedPostMeta(
   post: {

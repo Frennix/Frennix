@@ -55,11 +55,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "FeedPostCard mounts media through FeedMediaSlot",
+    name: "FeedPostCard mounts media through FeedMedia",
     run: () => {
       const src = read("packages/ui/src/FeedPostCard.tsx");
-      if (!src.includes("<FeedMediaSlot")) {
-        throw new Error("FeedPostCard must render FeedMediaSlot for media");
+      if (!src.includes("<FeedMedia")) {
+        throw new Error("FeedPostCard must render FeedMedia for media");
       }
     },
   },

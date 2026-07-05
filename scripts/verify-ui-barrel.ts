@@ -8,7 +8,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const distDir = join(ROOT, "dist/_expo/static/js/web");
-const bundles = readdirSync(distDir).filter((f) => f.startsWith("entry-") && f.endsWith(".js"));
+const bundles = readdirSync(distDir)
+  .filter((f) => f.endsWith(".js") && f.startsWith("index-") && !f.includes("notifications"))
+  .sort((a, b) => readFileSync(join(distDir, b), "utf8").length - readFileSync(join(distDir, a), "utf8").length);
 
 if (bundles.length === 0) {
   console.error("[verify:ui-barrel] No web bundle — run build:web first");
