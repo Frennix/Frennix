@@ -1,7 +1,7 @@
 import { type ViewStyle } from "react-native";
 import { colors } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
-import { useWebTabSceneHeight, webTabSceneHeightStyle } from "@/lib/web-tab-scene-layout";
+import { useWebTabSceneHeight, webTabSceneContainerStyle, webTabSceneHeightStyle } from "@/lib/web-tab-scene-layout";
 
 /** Pull-to-refresh chrome — avoids Android white progress disk. */
 export const frennixRefreshControlProps = {
@@ -25,4 +25,9 @@ export const tabScreenScrollSurface: ViewStyle = {
 
 export function useTabScreenWebHeightStyle(): ViewStyle {
   return webTabSceneHeightStyle(useWebTabSceneHeight());
+}
+
+/** Flex wrapper for tab screens on web — no fixed pixel height on the outer shell. */
+export function useTabScreenWebContainerStyle(): ViewStyle {
+  return webTabSceneContainerStyle();
 }

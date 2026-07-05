@@ -94,7 +94,12 @@ export const FeedPostCard = memo(function FeedPostCard({
           </View>
         </ScalePressable>
 
-        {isOwn ? (
+        {onInteractPress ? (
+          <MenuIconButton
+            onPress={() => onInteractPress()}
+            accessibilityLabel="Open post actions"
+          />
+        ) : isOwn ? (
           <MenuIconButton onPress={onOwnerActionsPress} accessibilityLabel="Post options" />
         ) : onModerationPress ? (
           <MenuIconButton onPress={onModerationPress} accessibilityLabel="Post options" />
@@ -147,7 +152,6 @@ export const FeedPostCard = memo(function FeedPostCard({
         <ReactionBar
           reactions={post.reactions}
           onReactionPress={onReaction}
-          onAddReaction={openInteraction ? () => openInteraction() : undefined}
         />
 
         <FeedCommentPreview

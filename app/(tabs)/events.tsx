@@ -59,6 +59,7 @@ import {
   tabScreenContainer,
   tabScreenScrollSurface,
   useTabScreenWebHeightStyle,
+  useTabScreenWebContainerStyle,
 } from "@/lib/screen-shell";
 import { showAlert } from "@/lib/alerts";
 import { buildTodaysFocus } from "@/lib/training-calendar-focus";
@@ -74,6 +75,7 @@ export default function TrainingCalendarTabScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const webHeightStyle = useTabScreenWebHeightStyle();
+  const webContainerStyle = useTabScreenWebContainerStyle();
   const isWideLayout = useCalendarWideLayout();
   const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -276,7 +278,7 @@ export default function TrainingCalendarTabScreen() {
 
   if (!userId) {
     return (
-      <View style={[styles.centered, webHeightStyle]}>
+      <View style={[styles.centered, webContainerStyle]}>
         <EmptyState
           title="Sign in to plan training"
           description="Use your Training Calendar to schedule workouts, events, and partner sessions."
@@ -288,9 +290,11 @@ export default function TrainingCalendarTabScreen() {
   }
 
   return (
-    <View style={[styles.container, webHeightStyle]}>
+    <View style={[styles.container, webContainerStyle]}>
       <Animated.ScrollView
         ref={scrollRef}
+        nativeID="calendar-scroll"
+        testID="calendar-scroll"
         style={[tabScreenScrollSurface, webHeightStyle]}
         contentContainerStyle={styles.content}
         onScroll={onScroll}
@@ -381,9 +385,10 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xxl + 72,
+    paddingBottom: spacing.xl + 64,
     width: "100%",
     maxWidth: "100%",
+    flexGrow: 1,
   },
   pageHeader: {
     flexDirection: "row",

@@ -17,6 +17,8 @@ type WebFeedScrollListProps = {
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
   scrollEnabled: boolean;
+  /** Hard touch lock (story viewer) — avoid for modals; touchAction:none can freeze Safari feed. */
+  touchLock?: boolean;
   data: FeedListRow[];
   keyExtractor: (item: FeedListRow) => string;
   renderItem: (info: { item: FeedListRow }) => ReactNode;
@@ -37,6 +39,7 @@ export function WebFeedScrollList({
   style,
   contentContainerStyle,
   scrollEnabled,
+  touchLock = false,
   data,
   keyExtractor,
   renderItem,
@@ -66,7 +69,8 @@ export function WebFeedScrollList({
         styles.list,
         style,
         webScrollSurface,
-        !scrollEnabled && styles.scrollLocked,
+        !scrollEnabled && touchLock && styles.scrollHardLocked,
+        !scrollEnabled && !touchLock && styles.scrollSoftLocked,
       ]}
       contentContainerStyle={contentContainerStyle}
       scrollEnabled={scrollEnabled}
@@ -94,5 +98,7 @@ export function WebFeedScrollList({
 
 const styles = StyleSheet.create({
   list: { ...flexFill },
-  scrollLocked: Platform.OS === "web" ? ({ overflow: "hidden", touchAction: "none" } as const) : {},
+  scrollSoftLocked: Platform.OS === "web" ? ({ overflow: "hidden" } as const) : {},
+  scrollHardLocked:
+    Platform.OS === "web" ? ({ overflow: "hidden", touchAction: "none" } as const) : {},
 });

@@ -21,7 +21,12 @@ export type PostInteractionActionId =
   | "view_profile"
   | "view_media"
   | "share"
-  | "save";
+  | "save"
+  | "reaction_laugh"
+  | "reaction_impressive"
+  | "reaction_beast"
+  | "reaction_keep_going"
+  | "reaction_congrats";
 
 export type PostInteractionAction = {
   id: PostInteractionActionId;
@@ -41,6 +46,7 @@ export const POST_INTERACTION_PRIMARY: PostInteractionAction[] = [
   { id: "strong_work", category: "primary", emoji: "💪", label: "Strong Work" },
   { id: "reply", category: "primary", emoji: "💬", label: "Reply" },
   { id: "more", category: "primary", emoji: "⋯", label: "More" },
+  // Future 2×3 grid row: 🔖 Save | 🚩 Report — append here; sheet scrolls past 6 tiles.
 ];
 
 export const POST_INTERACTION_MORE_SECTIONS: PostInteractionSection[] = [
@@ -139,6 +145,24 @@ export function buildPrimaryActions(
   return [like, reactionSlot, reply, more];
 }
 
+/** Priority layout: top row Like + Reply, bottom row reaction slot + More. */
+export function partitionPrimaryActions(actions: PostInteractionAction[]): {
+  primaryRow: PostInteractionAction[];
+  secondaryRow: PostInteractionAction[];
+} {
+  const like = actions.find((action) => action.id === "like");
+  const reply = actions.find((action) => action.id === "reply");
+  const more = actions.find((action) => action.id === "more");
+  const reaction = actions.find(
+    (action) => action.id !== "like" && action.id !== "reply" && action.id !== "more"
+  );
+
+  return {
+    primaryRow: [like, reply].filter(Boolean) as PostInteractionAction[],
+    secondaryRow: [reaction, more].filter(Boolean) as PostInteractionAction[],
+  };
+}
+
 export function isReactionAction(id: PostInteractionActionId): boolean {
   return (
     id === "like" ||
@@ -170,4 +194,11 @@ export function countMoreActions(): number {
   return POST_INTERACTION_MORE_SECTIONS.reduce((total, section) => total + section.actions.length, 0);
 }
 
+/** Scroll the More panel when action count exceeds this. */
 export const MORE_ACTIONS_SCROLL_THRESHOLD = 6;
+
+/** Primary grid columns — 2×N layout (e.g. 2×3 when Save / Report join the row). */
+export const PRIMARY_GRID_COLUMNS = 2;
+
+/** Max primary tiles visible without scrolling (2 cols × 3 rows). */
+export const PRIMARY_ACTIONS_SCROLL_THRESHOLD = 6;

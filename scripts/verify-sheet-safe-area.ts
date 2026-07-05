@@ -1,9 +1,9 @@
 #!/usr/bin/env npx tsx
 /**
- * Static checks for overlay safe-area handling (permanent design rule).
- * Manual QA required: features/releases/checklists/OVERLAY-MODAL-QA.md
+ * Ensures every overlay uses the shared safe-area system.
+ * Manual QA: features/releases/checklists/OVERLAY-MODAL-QA.md
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -18,7 +18,13 @@ function mustInclude(file: string, needle: string, label: string) {
   }
 }
 
-const BOTTOM_SHELL_COMPONENTS = [
+function mustNotInclude(file: string, needle: string, label: string) {
+  if (read(file).includes(needle)) {
+    throw new Error(`${label}: must not include "${needle}" in ${file}`);
+  }
+}
+
+const BOTTOM_SHELL_FILES = [
   "components/EntityActionSheet.tsx",
   "components/ReportReasonSheet.tsx",
   "components/EntityListSheet.tsx",
@@ -32,55 +38,116 @@ const BOTTOM_SHELL_COMPONENTS = [
   "components/story/StoryQuestionAnswersModal.tsx",
 ];
 
+const CENTER_SHELL_FILES = [
+  "components/TrainingMatchModal.tsx",
+  "components/FrennixMatchExplainerModal.tsx",
+  "components/CommentEditSheet.tsx",
+  "components/whats-new/WhatsNewLaunchPrompt.tsx",
+];
+
+function walkTsx(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory()) {
+      if (entry === "node_modules" || entry === "dist") continue;
+      walkTsx(full, acc);
+      continue;
+    }
+    if (entry.endsWith(".tsx")) acc.push(full.slice(ROOT.length + 1));
+  }
+  return acc;
+}
+
 const checks = [
   {
-    name: "docs:OVERLAY-SAFE-AREA.md exists",
-    run: () => mustInclude("features/releases/OVERLAY-SAFE-AREA.md", "OVERLAY_BOTTOM_SAFETY_MARGIN_PX", "doc"),
+    name: "docs:OVERLAY-SAFE-AREA.md",
+    run: () => mustInclude("features/releases/OVERLAY-SAFE-AREA.md", "BottomOverlayShell", "doc"),
   },
   {
-    name: "hook:useSheetSafeArea + safety margin",
+    name: "docs:BOTTOM-ACTION-SHEET-STANDARD.md",
+    run: () => mustInclude("features/releases/BOTTOM-ACTION-SHEET-STANDARD.md", "BottomActionSheet", "doc"),
+  },
+  {
+    name: "layout:no app-wide OverlaySafeAreaProvider",
+    run: () => mustNotInclude("app/_layout.tsx", "OverlaySafeAreaProvider", "layout"),
+  },
+  {
+    name: "hook:useBottomActionSheetLayout",
     run: () => {
-      mustInclude("lib/use-sheet-safe-area.ts", "OVERLAY_BOTTOM_SAFETY_MARGIN_PX", "hook");
-      mustInclude("lib/use-sheet-safe-area.ts", "env(safe-area-inset-bottom", "hook");
-      mustInclude("lib/use-sheet-safe-area.ts", "visualViewport", "hook");
-      mustInclude("lib/use-sheet-safe-area.ts", "requestAnimationFrame", "hook");
-      mustInclude("lib/use-sheet-safe-area.ts", "webOverlayStyle", "hook");
-      mustInclude("lib/use-sheet-safe-area.ts", "sheetMarginBottom", "hook");
+      mustInclude("lib/use-bottom-action-sheet-layout.ts", "BOTTOM_SHEET_SAFETY_MARGIN_PX", "hook");
+      mustInclude("lib/use-bottom-action-sheet-layout.ts", "visualViewport", "hook");
     },
   },
   {
-    name: "shell:BottomOverlayShell exists",
+    name: "shell:BottomActionSheet canonical",
     run: () => {
-      mustInclude("components/BottomOverlayShell.tsx", "useSheetSafeArea", "shell");
+      mustInclude("components/BottomActionSheet.tsx", "useBottomActionSheetLayout", "shell");
+      mustInclude("components/BottomActionSheet.tsx", "restoreWebDocumentScrollLock", "shell");
+      mustInclude("components/PostInteractionSheet.tsx", "BottomActionSheet", "post sheet");
+    },
+  },
+  {
+    name: "shell:BottomOverlayShell + center overlay hook",
+    run: () => {
+      mustInclude("components/BottomOverlayShell.tsx", "BottomOverlayShell", "shell");
       mustInclude("components/BottomOverlayShell.tsx", "useCenterOverlaySafeArea", "shell");
     },
   },
   {
-    name: "ui:PostInteractionSheet uses safe area hook",
+    name: "ui:legacy bottom sheets use BottomOverlayShell",
     run: () => {
-      mustInclude("components/PostInteractionSheet.tsx", "useSheetSafeArea", "post sheet");
-      mustInclude("components/PostInteractionSheet.tsx", "sheetMarginBottom", "post sheet");
-      mustInclude("components/PostInteractionSheet.tsx", "webOverlayStyle", "post sheet");
-    },
-  },
-  {
-    name: "ui:all standard bottom sheets use BottomOverlayShell",
-    run: () => {
-      for (const file of BOTTOM_SHELL_COMPONENTS) {
+      for (const file of BOTTOM_SHELL_FILES) {
         mustInclude(file, "BottomOverlayShell", file);
+        mustNotInclude(file, 'justifyContent: "flex-end"', file);
       }
     },
   },
   {
-    name: "ui:ReactionPicker safety margin in @frennix/ui",
+    name: "ui:center modals use useCenterOverlaySafeArea",
     run: () => {
-      mustInclude("../../packages/ui/src/theme.ts", "OVERLAY_BOTTOM_SAFETY_MARGIN_PX", "ui theme");
-      mustInclude("../../packages/ui/src/ReactionPicker.tsx", "OVERLAY_BOTTOM_SAFETY_MARGIN_PX", "reaction picker");
+      for (const file of CENTER_SHELL_FILES) {
+        mustInclude(file, "useCenterOverlaySafeArea", file);
+      }
     },
   },
   {
-    name: "process:RELEASE_PROCESS overlay safe area rule",
-    run: () => mustInclude("features/releases/RELEASE_PROCESS.md", "OVERLAY-SAFE-AREA", "release process"),
+    name: "ui:ImageLightbox uses safe area insets",
+    run: () => {
+      mustInclude("components/ImageLightbox.tsx", "useSafeAreaInsets", "lightbox");
+    },
+  },
+  {
+    name: "audit:no orphan Modal flex-end backdrops",
+    run: () => {
+      const modalFiles = walkTsx(join(ROOT, "components")).filter((f) => read(f).includes("<Modal"));
+      const allowedCustom = new Set([
+        ...BOTTOM_SHELL_FILES,
+        ...CENTER_SHELL_FILES,
+        "components/BottomOverlayShell.tsx",
+        "components/BottomActionSheet.tsx",
+        "components/PostInteractionSheet.tsx",
+        "components/ImageLightbox.tsx",
+        "components/WorkoutStoryViewer.tsx",
+        "components/founder/FounderSidebar.tsx",
+        "components/story/StoryAnalyticsModal.tsx",
+      ]);
+      const offenders: string[] = [];
+      for (const file of modalFiles) {
+        if (allowedCustom.has(file)) continue;
+        const src = read(file);
+        if (src.includes('justifyContent: "flex-end"') || src.includes("justifyContent: 'flex-end'")) {
+          offenders.push(file);
+        }
+      }
+      if (offenders.length) {
+        throw new Error(`Modal files with custom flex-end backdrop: ${offenders.join(", ")}`);
+      }
+    },
+  },
+  {
+    name: "process:RELEASE_PROCESS overlay rule",
+    run: () => mustInclude("features/releases/RELEASE_PROCESS.md", "OVERLAY-SAFE-AREA", "process"),
   },
 ];
 

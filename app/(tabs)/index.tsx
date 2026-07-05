@@ -73,7 +73,7 @@ import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
 import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
-import { useWebTabSceneHeight, webTabSceneHeightStyle } from "@/lib/web-tab-scene-layout";
+import { useWebTabSceneHeight, webTabSceneHeightStyle, webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
 import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
 import { markFeedRender } from "@/lib/feed-render-trace";
@@ -348,7 +348,8 @@ export default function HomeScreen() {
   const webScrollRef = useRef<ScrollView>(null);
   const useWebScroll = Platform.OS === "web";
   const webTabSceneHeight = useWebTabSceneHeight();
-  const webHeightStyle = webTabSceneHeightStyle(webTabSceneHeight);
+  const webScrollHeightStyle = webTabSceneHeightStyle(webTabSceneHeight);
+  const webContainerStyle = webTabSceneContainerStyle();
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const { height: viewportHeight } = useWindowDimensions();
@@ -764,19 +765,20 @@ export default function HomeScreen() {
   return (
     <FeedRenderTraceProbe id="feed:ui:container">
       <View
-        style={[styles.container, webHeightStyle]}
+        style={[styles.container, webContainerStyle]}
         pointerEvents="box-none"
         nativeID="feed-root-container"
       >
-        <View style={[styles.feedScrollShell, webHeightStyle]} collapsable={false} nativeID="feed-scroll-shell">
+        <View style={[styles.feedScrollShell, webContainerStyle]} collapsable={false} nativeID="feed-scroll-shell">
           {useWebScroll ? (
             <FeedRenderTraceProbe id="feed:ui:scroll-list" detail="WebFeedScrollList">
               <WebFeedScrollList
             scrollRef={webScrollRef}
             nativeID="feed-scroll-list"
-            style={[styles.feedList, webHeightStyle]}
+            style={[styles.feedList, webScrollHeightStyle]}
             contentContainerStyle={styles.list}
             scrollEnabled={!feedScrollLocked}
+            touchLock={storyVisible}
             data={listRows}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}

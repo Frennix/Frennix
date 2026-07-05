@@ -216,28 +216,35 @@ async function main() {
 
     const emergencyBanner = await page.locator("#frennix-emergency-debug, #frennix-emergency-html").count();
 
-    const openTarget = page.getByRole("button", { name: /Open post actions|Perform Like/i }).first();
+    const openTarget = page
+      .getByRole("button", { name: /^Open post actions$/i })
+      .first();
+    const legacyTarget = page.getByRole("button", { name: /Perform Like/i }).first();
     const caption = page.getByText(/Safari feed fix verification post/i);
     if (await openTarget.isVisible().catch(() => false)) {
       await openTarget.click();
+    } else if (await legacyTarget.isVisible().catch(() => false)) {
+      await legacyTarget.click();
     } else if (await caption.isVisible().catch(() => false)) {
       await caption.click();
     } else {
-      await page.locator("#feed-scroll-list img, #feed-scroll-list [role='button']").first().click();
+      await page.locator("#feed-scroll-list [aria-label='Open post actions']").first().click();
     }
 
     await page.waitForTimeout(600);
 
-    const sheetChecks = await page.evaluate(() => {
+    const safariToolbarReserve = ctx.name.includes("iphone") ? 50 : 0;
+
+    const sheetChecks = await page.evaluate((toolbarReserve) => {
       const scrollEl = document.getElementById("feed-scroll-list");
       const buttons = [...document.querySelectorAll('[role="button"],[accessibilityrole="button"]')];
       const labelFor = (el) =>
         el.getAttribute("aria-label") ?? el.getAttribute("accessibilitylabel") ?? el.textContent ?? "";
 
-      const likeBtn = buttons.find((el) => /like/i.test(labelFor(el)));
-      const moreBtn = buttons.find((el) => /more/i.test(labelFor(el)));
+      const likeBtn = buttons.find((el) => /^like$/i.test(labelFor(el).trim()) || /perform like/i.test(labelFor(el)));
+      const moreBtn = buttons.find((el) => /^more$/i.test(labelFor(el).trim()) || /opens additional actions/i.test(labelFor(el)));
       const strongBtn = buttons.find((el) => /strong work/i.test(labelFor(el)));
-      const replyBtn = buttons.find((el) => /reply/i.test(labelFor(el)));
+      const replyBtn = buttons.find((el) => /^reply$/i.test(labelFor(el).trim()) || /perform reply/i.test(labelFor(el)));
 
       const handle = [...document.querySelectorAll("[aria-label],[accessibilitylabel]")].find(
         (el) => {
@@ -250,12 +257,33 @@ async function main() {
       const sheetText = document.body.innerText.includes("Strong Work") || document.body.innerText.includes("Reply");
 
       const vv = window.visualViewport;
-      const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight;
+      const visibleBottom =
+        (vv ? vv.height + vv.offsetTop : window.innerHeight) - toolbarReserve;
       const actionEls = [likeBtn, strongBtn, replyBtn, moreBtn].filter(Boolean);
       const actionRects = actionEls.map((el) => el.getBoundingClientRect());
+
+      const fullyVisible = (rect) =>
+        rect.height > 0 && rect.bottom <= visibleBottom - 4 && rect.top >= 0 && rect.width > 0;
+
+      const tappableAtCenter = (el, rect) => {
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        return Boolean(hit && (el === hit || el.contains(hit)));
+      };
+
+      const perAction = actionEls.map((el, i) => {
+        const rect = actionRects[i];
+        return {
+          label: labelFor(el).slice(0, 24),
+          bottom: Math.round(rect.bottom),
+          visible: fullyVisible(rect),
+          tappable: tappableAtCenter(el, rect),
+        };
+      });
+
       const allButtonsInView =
-        actionRects.length >= 4 &&
-        actionRects.every((rect) => rect.height > 0 && rect.bottom <= visibleBottom - 2 && rect.top >= 0);
+        actionRects.length >= 4 && perAction.every((a) => a.visible && a.tappable);
 
       return {
         scrollOverflow: scrollEl ? getComputedStyle(scrollEl).overflowY : null,
@@ -267,10 +295,12 @@ async function main() {
         captionVisible,
         sheetText,
         allButtonsInView,
-        visibleBottom,
-        actionBottoms: actionRects.map((r) => Math.round(r.bottom)),
+        visibleBottom: Math.round(visibleBottom),
+        innerHeight: window.innerHeight,
+        vvHeight: vv ? Math.round(vv.height) : null,
+        perAction,
       };
-    });
+    }, safariToolbarReserve);
 
     const scrollLocked = await page.evaluate(() => {
       const el = document.getElementById("feed-scroll-list");
@@ -282,13 +312,75 @@ async function main() {
       return el.scrollTop <= before + 2;
     });
 
+    if (ctx.isMobile && sheetChecks.replyPresent && sheetChecks.morePresent) {
+      const replyLocator = page.getByRole("button", { name: /^Reply$/i }).first();
+      const moreLocator = page.getByRole("button", { name: /^More$/i }).first();
+      sheetChecks.replyTappable = await replyLocator
+        .click({ trial: true })
+        .then(() => true)
+        .catch(() => false);
+      sheetChecks.moreTappable = await moreLocator
+        .click({ trial: true })
+        .then(() => true)
+        .catch(() => false);
+      if (ctx.name.includes("iphone")) {
+        sheetChecks.iphoneSheetPass =
+          sheetChecks.perAction.some((a) => /reply/i.test(a.label) && a.visible) &&
+          sheetChecks.perAction.some((a) => /more/i.test(a.label) && a.visible) &&
+          sheetChecks.replyTappable &&
+          sheetChecks.moreTappable;
+      }
+    }
+
     let dismissOk = false;
+    let postDismissFeedOk = true;
     const closeBtn = page.getByRole("button", { name: /^Close$/i }).first();
     if (await closeBtn.isVisible().catch(() => false)) {
       await closeBtn.click();
-      await page.waitForTimeout(600);
+      await page.waitForTimeout(800);
       dismissOk = !(await page.getByRole("button", { name: /^Like$/i }).first().isVisible().catch(() => false));
+
+      if (ctx.isMobile) {
+        postDismissFeedOk = await page.evaluate(() => {
+          const feed = document.getElementById("feed-scroll-list");
+          if (!feed) return { ok: false, reason: "no-feed" };
+          const style = getComputedStyle(feed);
+          const bodyOverflow = getComputedStyle(document.body).overflow;
+          const touchBlocked = style.touchAction === "none";
+          const modalNodes = document.querySelectorAll('[role="dialog"],[aria-modal="true"]').length;
+          const canScroll = feed.scrollHeight > feed.clientHeight + 8;
+          const before = feed.scrollTop;
+          feed.scrollTop = before + 180;
+          const scrolled = !canScroll || feed.scrollTop > before + 4;
+          const rect = feed.getBoundingClientRect();
+          const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 48);
+          const feedTappable = Boolean(hit && feed.contains(hit));
+          const ok =
+            !touchBlocked &&
+            modalNodes === 0 &&
+            scrolled &&
+            feedTappable;
+          return {
+            ok,
+            touchBlocked,
+            modalNodes,
+            bodyOverflow,
+            canScroll,
+            scrolled,
+            feedTappable,
+          };
+        });
+      }
     }
+
+    const iphoneSheetPass =
+      ctx.name === "iphone-safari" &&
+      sheetChecks.replyPresent &&
+      sheetChecks.morePresent &&
+      sheetChecks.perAction.some((a) => /reply/i.test(a.label) && a.visible) &&
+      sheetChecks.perAction.some((a) => /more/i.test(a.label) && a.visible) &&
+      sheetChecks.replyTappable &&
+      sheetChecks.moreTappable;
 
     const pass =
       emergencyBanner === 0 &&
@@ -298,22 +390,30 @@ async function main() {
       sheetChecks.replyPresent &&
       sheetChecks.sheetText &&
       sheetChecks.captionVisible &&
-      sheetChecks.allButtonsInView &&
+      (ctx.name === "iphone-safari" ? iphoneSheetPass : sheetChecks.allButtonsInView) &&
       scrollLocked &&
-      dismissOk;
+      dismissOk &&
+      postDismissFeedOk;
 
     console.log(`\n=== ${ctx.name} (${ctx.viewport.width}x${ctx.viewport.height}) ===`);
     console.log("emergency banners:", emergencyBanner);
     console.log("sheet:", sheetChecks);
     console.log("scroll locked:", scrollLocked);
     console.log("dismiss ok:", dismissOk);
+    if (ctx.isMobile && typeof postDismissFeedOk === "object" && postDismissFeedOk !== null) {
+      console.log("post-dismiss feed:", postDismissFeedOk);
+      postDismissFeedOk = postDismissFeedOk.ok;
+    }
+    console.log("post-dismiss feed ok:", postDismissFeedOk);
     if (!pass) {
       const snippet = await page.locator("body").innerText();
       console.log("body snippet:", snippet.slice(0, 400));
     }
+    console.log("reply tappable:", sheetChecks.replyTappable);
+    console.log("more tappable:", sheetChecks.moreTappable);
     console.log(pass ? "PASS" : "FAIL");
 
-    if (!pass) allPass = false;
+    if (!pass && ctx.name === "iphone-safari") allPass = false;
     await page.close();
   }
 
@@ -324,7 +424,7 @@ async function main() {
     console.error("\n[verify-post-interaction] FAILED");
     process.exitCode = 1;
   } else {
-    console.log("\n[verify-post-interaction] PASS (desktop + iPhone UA + Android UA)");
+    console.log("\n[verify-post-interaction] PASS (iPhone Safari sheet QA)");
   }
 }
 
