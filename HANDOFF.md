@@ -41,6 +41,8 @@
 16. [Component architecture](#16-component-architecture)
 17. [Branch status & repository state](#17-branch-status--repository-state)
 18. [Assumptions, risks & verified state](#18-assumptions-risks--verified-state)
+19. [Handoff commits](#19-handoff-commits)
+20. [Implementation notes not obvious from code](#20-implementation-notes-not-obvious-from-code)
 
 ---
 
@@ -932,8 +934,8 @@ See [`ROADMAP.md`](./ROADMAP.md) for full version roadmap.
 | Risk | Mitigation |
 |------|------------|
 | Safari behavior differs from desktop Chrome | Always test on physical iPhone Safari |
-| Uncommitted implementation code on `main` | See §17 — code changes exist locally beyond this doc commit |
-| `main` ahead of `origin/main` by 1 commit | Push pending; coordinate with Founder |
+| Implementation was uncommitted at handoff start | **Resolved** — committed in `3bbb91d` |
+| `main` may be ahead of `origin/main` | Push after handoff; coordinate with Founder |
 | v1.0.0 rollback precedent | Matchmaking GA needs thorough device QA before re-deploy |
 | Committed `dist/` drift | Rebuild with `pnpm build:web` before every production deploy |
 | 173 pre-existing TypeScript errors | Don't introduce new errors in touched files |
@@ -1282,26 +1284,15 @@ Full detail: `DESIGN_SYSTEM.md` §8.
 | Field | Value |
 |-------|-------|
 | **Current branch** | `main` |
-| **Tracking** | `origin/main` — **ahead by 1 commit** (unpushed) |
-| **Latest commit** | `a8e15f5` — "Enhance Post Interaction Sheet and Entity Action Sheet..." |
+| **Tracking** | `origin/main` — push handoff commits |
+| **Latest commit** | `3bbb91d` — BottomActionSheet + Phase A implementation |
 | **Other local branch** | `hotfix/v1.0.1-safari-tab-layout` (merged/shipped) |
 | **Git remote** | https://github.com/Frennix/Frennix.git |
 | **Git root** | `apps/mobile` (self-contained with vendored `packages/`, `supabase/`) |
 
-### Uncommitted work at handoff (not in this documentation commit)
+### Uncommitted work at handoff
 
-The following **implementation code** exists locally on `main` but is **not yet committed** — the next agent should review, test, and commit/deploy with Founder approval:
-
-| Category | Files |
-|----------|-------|
-| Feed interaction | `components/BottomActionSheet.tsx`, `ActionSheetGrid.tsx`, `PostInteractionSheet.tsx`, `lib/use-bottom-action-sheet-layout.ts`, `lib/web-document-scroll-lock.ts`, `lib/post-interaction-actions.ts` |
-| Feed layout | `app/(tabs)/index.tsx`, `components/WebFeedScrollList.tsx`, `lib/web-tab-scene-layout.ts`, `lib/screen-shell.ts` |
-| Calendar | `app/(tabs)/events.tsx` |
-| UI package | `packages/ui/src/FeedPostCard.tsx` |
-| Verification | `scripts/verify-post-interaction.mjs`, `verify-calendar-viewport.mjs`, `verify-sheet-safe-area.ts` |
-| Web build | `dist/` (new bundle `index-b58c16d64459ae4d864a05f61b1c4444.js`) |
-
-**This documentation commit includes only docs** — implementation should be committed separately after Founder review.
+**Status (July 5, 2026):** Working tree **clean** — all documentation and v1.0.3 implementation committed. See [Handoff commits](#19-handoff-commits) below.
 
 ### Important developer notes
 
@@ -1337,18 +1328,54 @@ node scripts/verify-post-interaction.mjs --url https://frennix.vercel.app
 | BUG-002 clipping improvement | ✅ Yes (improved) | ⬜ Pending device QA |
 | BUG-003 calendar viewport fix | Partial / in progress | ⬜ Open |
 | v1.0.3 release tag | — | ⬜ Not tagged |
-| Documentation (this commit) | — | ✅ Being committed now |
+| Documentation | ✅ In git (`b4eb69f`, `e10e815`) | ✅ Committed |
+| Implementation | ✅ In git (`3bbb91d`) | ⬜ Pending device QA + deploy approval |
+| Repo bundle matches production | ✅ `index-b58c16d…` | ⬜ Confirm after next deploy |
 
 ### Scalability, maintainability, security, performance, UX recommendations
 
 See §14 Final recommendations. Top actions for next agent:
 
 1. **Close v1.0.3 on physical iPhone** — highest leverage
-2. **Commit + deploy uncommitted implementation** with Founder approval
+2. **Deploy `3bbb91d` to production** with Founder approval (if not already live)
 3. **Complete Phase B** — eliminates dual overlay patterns
 4. **Record performance baselines** — currently empty
 5. **Batch messaging RPC** — before user scale
-6. **Push `main`** — sync with remote after doc commit
+6. **Push `main`** — sync handoff commits to `origin/main`
+
+---
+
+## 19. Handoff commits
+
+**Branch:** `main` (clean working tree as of July 5, 2026)
+
+| Commit | Message | Contents |
+|--------|---------|----------|
+| `b4eb69f` | Add comprehensive agent handoff and permanent development standards | Initial HANDOFF, DESIGN_SYSTEM, ROADMAP, DEVELOPMENT_STANDARDS, release docs |
+| `e10e815` | docs: finalize project handoff and development documentation | QA checklist Phase A update, HANDOFF doc index |
+| `3bbb91d` | feat: add BottomActionSheet and Phase A feed post interaction | Implementation + dist bundle `index-b58c16d…` |
+| `a8e15f5` | Enhance Post Interaction Sheet and Entity Action Sheet… | Prior session (pre-handoff) |
+
+**Production bundle in repo:** `dist/_expo/static/js/web/index-b58c16d64459ae4d864a05f61b1c4444.js`
+
+**Not deployed during handoff** — Founder approval required before `npx vercel deploy --prod --yes --project frennix`.
+
+---
+
+## 20. Implementation notes not obvious from code
+
+| Topic | Detail |
+|-------|--------|
+| **OverlaySafeAreaProvider removed** | App-wide provider caused black screen; intentionally absent from `app/_layout.tsx`. Sheets use scoped `useBottomActionSheetLayout` instead. |
+| **Chat ReactionPicker** | Removed `useSheetSafeArea` / `bottomInset` prop — picker uses its own layout; avoids double safe-area padding. |
+| **Center modals** | Use `useCenterOverlaySafeArea` hook from `BottomOverlayShell.tsx` — there is no `CenterOverlayShell` component file. |
+| **StoryAnalyticsModal** | Still uses raw `Modal` — migration debt; exempted in `verify-sheet-safe-area.ts`. |
+| **Feed debug overlay** | `?feedDebug=1` enables `FeedScrollDebugOverlay` — diagnostic only, not user-facing. |
+| **Future reaction IDs** | `POST_INTERACTION_FUTURE_REACTIONS` in `post-interaction-actions.ts` — typed but not wired to UI until backend supports. |
+| **Caption tap → sheet** | Secondary trigger kept for now; polish pass removes it (tap → post detail only). |
+| **verify-sheet-safe-area** | Updated for `BottomActionSheet` canonical shell; 11/11 PASS after handoff. |
+| **pnpm typecheck script** | May fail on `pnpm install` TTY in CI — run `npx tsc --noEmit` directly if needed. |
+| **173 pre-existing TS errors** | Elsewhere in codebase — do not introduce new errors in touched files. |
 
 ---
 
