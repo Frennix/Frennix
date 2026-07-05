@@ -1360,6 +1360,8 @@ See §14 Final recommendations. Top actions for next agent:
 
 **Not deployed during handoff** — Founder approval required before `npx vercel deploy --prod --yes --project frennix`.
 
+**GitHub (July 5, 2026):** All handoff commits pushed to `origin/main` at `fd9d90b`. Working tree clean.
+
 ---
 
 ## 20. Implementation notes not obvious from code
@@ -1376,6 +1378,21 @@ See §14 Final recommendations. Top actions for next agent:
 | **verify-sheet-safe-area** | Updated for `BottomActionSheet` canonical shell; 11/11 PASS after handoff. |
 | **pnpm typecheck script** | May fail on `pnpm install` TTY in CI — run `npx tsc --noEmit` directly if needed. |
 | **173 pre-existing TS errors** | Elsewhere in codebase — do not introduce new errors in touched files. |
+
+### Critical gotchas (read before first code change)
+
+| Gotcha | Why it matters |
+|--------|----------------|
+| **`touchLock={storyVisible}` only** | In `app/(tabs)/index.tsx`, `WebFeedScrollList` must **not** receive `touchLock={interactionVisible}` — that caused BUG-004 feed freeze. Interaction sheet uses soft `scrollEnabled={!feedScrollLocked}` only. |
+| **`lib/usePostInteraction.tsx`** | Single owner of sheet open state, `interactionVisible`, and `PostInteractionSheet` render on the feed. Change feed sheet behavior here + `index.tsx`, not in isolation. |
+| **Edit `apps/mobile/packages/`** | Git root vendors `@frennix/ui`, `@frennix/api`, etc. under `apps/mobile/packages/`. Do not edit a parent monorepo `packages/` path unless you confirm Metro resolves to it. |
+| **Stale `PROJECT-PROGRESS.md`** | Still references v0.8.0 as production — **ignore for release status**. Trust `HANDOFF.md`, `ROADMAP.md`, and `features/releases/RELEASE.md` instead. |
+| **Two roadmap files** | `ROADMAP.md` (version handoff) vs `features/PRODUCT-ROADMAP.md` (P1–P10 milestone detail). Both valid; start with `ROADMAP.md`. |
+| **Founder approval gates** | Commits, tags, pushes, and production deploys require **explicit Founder approval** per `features/releases/RELEASE-WORKFLOW.md` — do not self-ship. |
+| **Vercel project name** | Always `npx vercel deploy --prod --yes --project frennix`. Local `.vercel/project.json` may reference `mobile` — CLI flag overrides. |
+| **Browser verify scripts** | `verify-post-interaction.mjs` and peers need Playwright Chromium: `npx playwright install chromium`. |
+| **EntityActionSheet still live** | Post detail, profile grid, and some screens still use `EntityActionSheet` — Phase B merges into `PostInteractionSheet` More panel. Do not duplicate a third pattern. |
+| **Production vs repo** | Handoff commits are on GitHub; **deploy not run** in `fd9d90b` session. Confirm whether production already matches `3bbb91d` / bundle `index-b58c16d…` before assuming users see latest code. |
 
 ---
 
