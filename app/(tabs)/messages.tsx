@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { usePathname } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Platform, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
   archiveConversationForUser,
   archiveConversationsForUser,
@@ -10,6 +10,7 @@ import {
   getConversations,
   getErrorMessage,
   getFeedStoriesForPartners,
+  sortInboxConversations,
   markConversationReadForUser,
   markConversationUnreadForUser,
   markConversationsReadForUser,
@@ -55,8 +56,15 @@ import {
 } from "@/lib/alerts";
 import type { EntityActionId } from "@/lib/entity-actions";
 import { MessagesListSkeleton } from "@/components/MessagesListSkeleton";
+import { MessagesOfflineBanner } from "@/components/MessagesOfflineBanner";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
+import { hydrateMessagesInboxCache, writeMessagesInboxCache } from "@/lib/messages-inbox-cache";
+import { mergeInboxConversations } from "@/lib/messages-inbox-merge";
+import { logInboxPerf, markInboxVisible } from "@/lib/messages-inbox-perf";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import { EmptyState, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
+
+const INBOX_ROW_HEIGHT = 84;
 
 const SafeConversationRow = memo(function SafeConversationRow({
   conversation,
@@ -79,15 +87,30 @@ const SafeConversationRow = memo(function SafeConversationRow({
   selected: boolean;
   onToggleSelect: (conversation: Conversation) => void;
 }) {
+  const handlePress = useCallback(() => onPress(conversation.id), [conversation.id, onPress]);
+  const handleLongPress = useCallback(
+    () => onLongPress(conversation),
+    [conversation, onLongPress]
+  );
+  const handleMenuPress = useCallback(
+    () => onMenuPress(conversation),
+    [conversation, onMenuPress]
+  );
+  const handleDelete = useCallback(() => onDelete(conversation), [conversation, onDelete]);
+  const handleToggleSelect = useCallback(
+    () => onToggleSelect(conversation),
+    [conversation, onToggleSelect]
+  );
+
   const row = (
     <ConversationRow
       conversation={conversation}
-      onPress={() => onPress(conversation.id)}
-      onLongPress={() => onLongPress(conversation)}
-      onMenuPress={() => onMenuPress(conversation)}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      onMenuPress={handleMenuPress}
       selectMode={selectMode}
       selected={selected}
-      onToggleSelect={() => onToggleSelect(conversation)}
+      onToggleSelect={handleToggleSelect}
     />
   );
 
@@ -101,7 +124,7 @@ const SafeConversationRow = memo(function SafeConversationRow({
         rightActions={[
           {
             label: "Delete",
-            onPress: () => onDelete(conversation),
+            onPress: handleDelete,
             accessibilityLabel: "Delete conversation",
           },
         ]}
@@ -110,7 +133,22 @@ const SafeConversationRow = memo(function SafeConversationRow({
       </SwipeableActionsRow>
     </AnimatedDismissRow>
   );
-});
+}, (previous, next) =>
+  previous.conversation.id === next.conversation.id &&
+  previous.dismissing === next.dismissing &&
+  previous.selectMode === next.selectMode &&
+  previous.selected === next.selected &&
+  previous.conversation.unread_count === next.conversation.unread_count &&
+  previous.conversation.is_pinned === next.conversation.is_pinned &&
+  previous.conversation.is_muted === next.conversation.is_muted &&
+  previous.conversation.marked_unread === next.conversation.marked_unread &&
+  previous.conversation.last_message?.id === next.conversation.last_message?.id &&
+  previous.conversation.last_message?.content === next.conversation.last_message?.content &&
+  previous.conversation.other_participant?.avatar_url ===
+    next.conversation.other_participant?.avatar_url &&
+  previous.conversation.other_participant?.is_online ===
+    next.conversation.other_participant?.is_online
+);
 
 export default function MessagesScreen() {
   const { session } = useAuth();
@@ -124,16 +162,77 @@ export default function MessagesScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
   const [inviteLoadingUserId, setInviteLoadingUserId] = useState<string | null>(null);
+  const { isOnline } = useNetworkStatus();
+  const inboxVisibleLoggedRef = useRef(false);
+  const inboxPaintStartedRef = useRef<number | null>(null);
 
-  const { data: conversations = [], refetch, isRefetching, isLoading, isError, error } = useQuery({
+  useEffect(() => {
+    inboxVisibleLoggedRef.current = false;
+    inboxPaintStartedRef.current = null;
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void hydrateMessagesInboxCache(queryClient, userId);
+  }, [queryClient, userId]);
+
+  const {
+    data: conversations = [],
+    refetch,
+    isRefetching,
+    isFetching,
+    isPending,
+    isError,
+    error,
+    isFetchedAfterMount,
+  } = useQuery({
     queryKey: ["conversations", userId],
-    queryFn: () => getConversations(userId),
-    enabled: !!userId && isListActive,
+    queryFn: async () => {
+      const started = performance.now();
+      const result = await getConversations(userId);
+      logInboxPerf("inbox-query", started, { count: result.length, source: "network" });
+      void writeMessagesInboxCache(userId, result);
+      return result;
+    },
+    enabled: !!userId,
     staleTime: 60_000,
+    gcTime: 30 * 60 * 1000,
+    networkMode: "offlineFirst",
     placeholderData: (previousData) => previousData,
+    initialData: () => queryClient.getQueryData<Conversation[]>(["conversations", userId]),
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(["conversations", userId])?.dataUpdatedAt,
+    structuralSharing: (previousData, nextData) =>
+      mergeInboxConversations(
+        previousData as Conversation[] | undefined,
+        nextData as Conversation[]
+      ),
     refetchInterval: isListActive ? 60_000 : false,
     refetchIntervalInBackground: false,
   });
+
+  const showListSkeleton = isPending && conversations.length === 0;
+
+  useEffect(() => {
+    if (!isListActive || !conversations.length) return;
+    if (inboxVisibleLoggedRef.current) return;
+    inboxVisibleLoggedRef.current = true;
+    const started = inboxPaintStartedRef.current ?? performance.now();
+    logInboxPerf("inbox-visible", started, {
+      count: conversations.length,
+      source: isFetching && !isFetchedAfterMount ? "network" : "cache",
+    });
+    markInboxVisible(
+      userId,
+      conversations.length,
+      isFetching && !isFetchedAfterMount ? "network" : "cache"
+    );
+  }, [conversations.length, isFetchedAfterMount, isFetching, isListActive, userId]);
+
+  useEffect(() => {
+    if (!isListActive) return;
+    inboxPaintStartedRef.current = performance.now();
+  }, [isListActive]);
 
   const patchConversations = useCallback(
     (updater: (current: Conversation[]) => Conversation[]) => {
@@ -337,8 +436,8 @@ export default function MessagesScreen() {
       const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
       const now = new Date().toISOString();
 
-      patchConversations((current) =>
-        current.map((item) => {
+      patchConversations((current) => {
+        const next = current.map((item) => {
           if (item.id !== conversationId) return item;
           if (action === "pin") {
             return { ...item, is_pinned: true, pinned_at: now };
@@ -366,8 +465,18 @@ export default function MessagesScreen() {
             };
           }
           return item;
-        })
-      );
+        });
+
+        if (
+          action === "pin" ||
+          action === "unpin" ||
+          action === "unfavorite"
+        ) {
+          return sortInboxConversations(next);
+        }
+
+        return next;
+      });
 
       return { previous };
     },
@@ -378,7 +487,6 @@ export default function MessagesScreen() {
       showAlert("Could not update conversation", getErrorMessage(mutationError));
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
       void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
       void queryClient.invalidateQueries({ queryKey: ["favorite-partner-stories", userId] });
     },
@@ -746,7 +854,7 @@ export default function MessagesScreen() {
     )
   );
 
-  if (isError && conversations.length === 0) {
+  if (isError && conversations.length === 0 && !showListSkeleton) {
     return (
       <View style={styles.container}>
         <QueryErrorState
@@ -767,6 +875,7 @@ export default function MessagesScreen() {
           </Text>
         </View>
       ) : null}
+      <MessagesOfflineBanner visible={!isOnline && conversations.length > 0} retrying={isRefetching} />
       <MessagesInboxToolbar
         selectMode={selectMode}
         selectedCount={selectedIds.size}
@@ -785,9 +894,21 @@ export default function MessagesScreen() {
         scrollEventThrottle={16}
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
-        initialNumToRender={12}
-        maxToRenderPerBatch={8}
-        windowSize={7}
+        initialNumToRender={14}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        updateCellsBatchingPeriod={32}
+        removeClippedSubviews={Platform.OS !== "web"}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 24,
+        }}
+        getItemLayout={(_, index) => ({
+          length: INBOX_ROW_HEIGHT,
+          offset: INBOX_ROW_HEIGHT * index,
+          index,
+        })}
+        extraData={selectMode ? selectedIds : null}
         ListHeaderComponent={renderListHeader}
         refreshControl={
           <RefreshControl
@@ -797,7 +918,7 @@ export default function MessagesScreen() {
           />
         }
         ListEmptyComponent={
-          isLoading ? (
+          showListSkeleton ? (
             <MessagesListSkeleton />
           ) : inboxConversations.length === 0 && favoriteConversations.length === 0 ? (
             <EmptyState

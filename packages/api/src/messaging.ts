@@ -15,6 +15,14 @@ const MAX_PINNED_CONVERSATIONS = 3;
 export const MAX_FAVORITE_TRAINING_PARTNERS = 5;
 export const DELETED_FOR_EVERYONE_CONTENT = "Message deleted";
 
+const INBOX_CONVERSATION_SELECT = "id, created_at, updated_at";
+const INBOX_PROFILE_SELECT =
+  "id, display_name, username, avatar_url, is_online, last_seen_at";
+const INBOX_LAST_MESSAGE_SELECT =
+  "id, conversation_id, sender_id, content, media_url, post_id, created_at, deleted_for_everyone_at, read_at";
+const LAST_MESSAGE_SCAN_PER_CONVERSATION = 25;
+const LAST_MESSAGE_BATCH_SIZE = 25;
+
 type ConversationPreferencesRow = {
   conversation_id: string;
   pinned_at: string | null;
@@ -146,16 +154,28 @@ function conversationActivityAt(conversation: Conversation): number {
   return new Date(conversation.last_message?.created_at ?? conversation.updated_at).getTime();
 }
 
+function logMessagingPerf(
+  label: string,
+  startedAt: number,
+  details: Record<string, number | string | boolean>
+) {
+  if (typeof __DEV__ === "undefined" || !__DEV__) return;
+  console.info(`[messaging-perf] ${label}`, {
+    durationMs: Math.round(performance.now() - startedAt),
+    ...details,
+  });
+}
+
 async function getVisibleLastMessage(
   conversationId: string,
   userId: string
 ): Promise<Message | undefined> {
   const { data, error } = await getSupabase()
     .from("messages")
-    .select("*")
+    .select(INBOX_LAST_MESSAGE_SELECT)
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
-    .limit(25);
+    .limit(LAST_MESSAGE_SCAN_PER_CONVERSATION);
 
   if (error) throw error;
 
@@ -172,7 +192,105 @@ async function getVisibleLastMessage(
     .find((message) => !deletedIds.has(message.id));
 }
 
+async function getVisibleLastMessagesBatch(
+  userId: string,
+  conversationIds: string[]
+): Promise<Map<string, Message>> {
+  if (!conversationIds.length) return new Map();
+
+  const lastMessages = new Map<string, Message>();
+  const messagesByConversation = new Map<string, Message[]>();
+
+  for (let index = 0; index < conversationIds.length; index += LAST_MESSAGE_BATCH_SIZE) {
+    const chunk = conversationIds.slice(index, index + LAST_MESSAGE_BATCH_SIZE);
+    const { data, error } = await getSupabase()
+      .from("messages")
+      .select(INBOX_LAST_MESSAGE_SELECT)
+      .in("conversation_id", chunk)
+      .order("created_at", { ascending: false })
+      .limit(chunk.length * LAST_MESSAGE_SCAN_PER_CONVERSATION);
+
+    if (error) throw error;
+
+    for (const row of (data ?? []) as Message[]) {
+      const existing = messagesByConversation.get(row.conversation_id) ?? [];
+      if (existing.length < LAST_MESSAGE_SCAN_PER_CONVERSATION) {
+        existing.push(row);
+        messagesByConversation.set(row.conversation_id, existing);
+      }
+    }
+  }
+
+  const candidateIds = [...messagesByConversation.values()]
+    .flat()
+    .map((message) => message.id);
+  const deletedIds = await getDeletedMessageIds(userId, candidateIds);
+
+  for (const [conversationId, messages] of messagesByConversation) {
+    const visible = messages
+      .map(maskDeletedForEveryoneMessage)
+      .find((message) => !deletedIds.has(message.id));
+    if (visible) lastMessages.set(conversationId, visible);
+  }
+
+  return lastMessages;
+}
+
+export function sortInboxConversations(conversations: Conversation[]): Conversation[] {
+  return sortConversations(conversations);
+}
+
+function sortConversations(conversations: Conversation[]): Conversation[] {
+  return conversations.sort((a, b) => {
+    const aFavorite = a.is_favorite ? 1 : 0;
+    const bFavorite = b.is_favorite ? 1 : 0;
+    if (aFavorite !== bFavorite) return bFavorite - aFavorite;
+    if (a.is_favorite && b.is_favorite && a.favorited_at && b.favorited_at) {
+      const favoriteDelta =
+        new Date(b.favorited_at).getTime() - new Date(a.favorited_at).getTime();
+      if (favoriteDelta !== 0) return favoriteDelta;
+    }
+
+    const aPinned = a.is_pinned ? 1 : 0;
+    const bPinned = b.is_pinned ? 1 : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    if (a.is_pinned && b.is_pinned && a.pinned_at && b.pinned_at) {
+      const pinDelta = new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime();
+      if (pinDelta !== 0) return pinDelta;
+    }
+    return conversationActivityAt(b) - conversationActivityAt(a);
+  });
+}
+
+function buildInboxConversation(
+  conversation: Conversation,
+  lastMsg: Message | undefined,
+  other: Profile | undefined,
+  unreadCount: number,
+  prefs: ConversationPreferencesRow | undefined
+): Conversation {
+  const markedUnread = Boolean(prefs?.marked_unread_at);
+  let resolvedUnreadCount = unreadCount;
+  if (markedUnread && resolvedUnreadCount === 0) {
+    resolvedUnreadCount = 1;
+  }
+
+  return {
+    ...conversation,
+    last_message: lastMsg,
+    other_participant: other,
+    unread_count: resolvedUnreadCount,
+    is_pinned: Boolean(prefs?.pinned_at),
+    pinned_at: prefs?.pinned_at ?? null,
+    is_favorite: Boolean(prefs?.favorited_at),
+    favorited_at: prefs?.favorited_at ?? null,
+    is_muted: Boolean(prefs?.muted_at),
+    marked_unread: markedUnread,
+  };
+}
+
 export async function getConversations(userId: string): Promise<Conversation[]> {
+  const perfStart = performance.now();
   const blockedIds = new Set(await getBlockedIds(userId));
 
   const { data: memberships, error } = await getSupabase()
@@ -182,44 +300,204 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
   if (error) throw error;
   const convIds = (memberships ?? []).map((m) => m.conversation_id);
-  if (!convIds.length) return [];
+  if (!convIds.length) {
+    logMessagingPerf("getConversations", perfStart, { membershipCount: 0, resultCount: 0 });
+    return [];
+  }
 
-  const hiddenAtByConversation = await getHiddenConversationAt(userId, convIds);
-  const deletedAtByConversation = await getDeletedConversationAt(userId, convIds);
-  const preferencesByConversation = await getConversationPreferencesMap(userId, convIds);
+  const [
+    hiddenAtByConversation,
+    deletedAtByConversation,
+    preferencesByConversation,
+    { data: conversationRows, error: conversationError },
+    { data: memberRows, error: memberError },
+    { data: unreadRows, error: unreadError },
+    lastMsgByConversation,
+  ] = await Promise.all([
+    getHiddenConversationAt(userId, convIds),
+    getDeletedConversationAt(userId, convIds),
+    getConversationPreferencesMap(userId, convIds),
+    getSupabase().from("conversations").select(INBOX_CONVERSATION_SELECT).in("id", convIds),
+    getSupabase()
+      .from("conversation_members")
+      .select(`conversation_id, profile:profiles(${INBOX_PROFILE_SELECT})`)
+      .in("conversation_id", convIds)
+      .neq("user_id", userId),
+    getSupabase()
+      .from("messages")
+      .select("id, conversation_id")
+      .in("conversation_id", convIds)
+      .neq("sender_id", userId)
+      .is("read_at", null),
+    getVisibleLastMessagesBatch(userId, convIds),
+  ]);
+
+  if (conversationError) throw conversationError;
+  if (memberError) throw memberError;
+  if (unreadError) throw unreadError;
+
+  const conversationById = new Map(
+    (conversationRows ?? []).map((row) => [row.id as string, row as Conversation])
+  );
+  const otherByConversation = new Map<string, Profile>();
+  for (const row of memberRows ?? []) {
+    const typed = row as { conversation_id: string; profile: Profile | null };
+    if (typed.profile) {
+      otherByConversation.set(typed.conversation_id, typed.profile);
+    }
+  }
+
+  const unreadIdsByConversation = new Map<string, string[]>();
+  const allUnreadIds: string[] = [];
+  for (const row of unreadRows ?? []) {
+    const messageId = row.id as string;
+    const conversationId = row.conversation_id as string;
+    allUnreadIds.push(messageId);
+    const existing = unreadIdsByConversation.get(conversationId) ?? [];
+    existing.push(messageId);
+    unreadIdsByConversation.set(conversationId, existing);
+  }
+
+  const deletedUnreadIds = await getDeletedMessageIds(userId, allUnreadIds);
   const conversations: Conversation[] = [];
 
   for (const convId of convIds) {
-    const { data: conv } = await getSupabase()
-      .from("conversations")
-      .select("*")
-      .eq("id", convId)
-      .single();
+    const conversation = conversationById.get(convId);
+    if (!conversation) continue;
 
-    const lastMsg = await getVisibleLastMessage(convId, userId);
+    const lastMsg = lastMsgByConversation.get(convId);
+    const hiddenAt = hiddenAtByConversation.get(convId);
+    const deletedAt = deletedAtByConversation.get(convId);
+    if (
+      isConversationSuppressedFromInbox(
+        hiddenAt,
+        lastMsg?.created_at,
+        conversation.updated_at
+      ) ||
+      isConversationSuppressedFromInbox(
+        deletedAt,
+        lastMsg?.created_at,
+        conversation.updated_at
+      )
+    ) {
+      continue;
+    }
 
-    const { data: members } = await getSupabase()
+    const unreadCount = (unreadIdsByConversation.get(convId) ?? []).filter(
+      (messageId) => !deletedUnreadIds.has(messageId)
+    ).length;
+
+    conversations.push(
+      buildInboxConversation(
+        conversation,
+        lastMsg,
+        otherByConversation.get(convId),
+        unreadCount,
+        preferencesByConversation.get(convId)
+      )
+    );
+  }
+
+  const result = sortConversations(
+    conversations.filter(
+      (conv) => !conv.other_participant || !blockedIds.has(conv.other_participant.id)
+    )
+  );
+
+  logMessagingPerf("getConversations", perfStart, {
+    membershipCount: convIds.length,
+    resultCount: result.length,
+  });
+
+  return result;
+}
+
+export async function getUnreadMessageCount(userId: string): Promise<number> {
+  const perfStart = performance.now();
+  const blockedIds = new Set(await getBlockedIds(userId));
+
+  const { data: memberships, error } = await getSupabase()
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  const convIds = (memberships ?? []).map((m) => m.conversation_id);
+  if (!convIds.length) {
+    logMessagingPerf("getUnreadMessageCount", perfStart, { membershipCount: 0, unreadTotal: 0 });
+    return 0;
+  }
+
+  const [
+    hiddenAtByConversation,
+    deletedAtByConversation,
+    preferencesByConversation,
+    { data: conversationRows, error: conversationError },
+    { data: memberRows, error: memberError },
+    { data: unreadRows, error: unreadError },
+  ] = await Promise.all([
+    getHiddenConversationAt(userId, convIds),
+    getDeletedConversationAt(userId, convIds),
+    getConversationPreferencesMap(userId, convIds),
+    getSupabase().from("conversations").select("id, updated_at").in("id", convIds),
+    getSupabase()
       .from("conversation_members")
-      .select(`profile:profiles(*)`)
-      .eq("conversation_id", convId)
-      .neq("user_id", userId);
-
-    const other = (members?.[0] as { profile: Profile } | undefined)?.profile;
-
-    const { data: unreadMessages, error: unreadError } = await getSupabase()
+      .select("conversation_id, profile:profiles(id)")
+      .in("conversation_id", convIds)
+      .neq("user_id", userId),
+    getSupabase()
       .from("messages")
-      .select("id")
-      .eq("conversation_id", convId)
+      .select("id, conversation_id")
+      .in("conversation_id", convIds)
       .neq("sender_id", userId)
-      .is("read_at", null);
+      .is("read_at", null),
+  ]);
 
-    if (unreadError) throw unreadError;
+  if (conversationError) throw conversationError;
+  if (memberError) throw memberError;
+  if (unreadError) throw unreadError;
 
-    const unreadIds = (unreadMessages ?? []).map((row) => row.id as string);
-    const deletedUnreadIds = await getDeletedMessageIds(userId, unreadIds);
-    let unreadCount = unreadIds.filter((id) => !deletedUnreadIds.has(id)).length;
+  const conversationById = new Map(
+    (conversationRows ?? []).map((row) => [row.id as string, row as Conversation])
+  );
+  const otherByConversation = new Map<string, Profile>();
+  for (const row of memberRows ?? []) {
+    const typed = row as { conversation_id: string; profile: Profile | null };
+    if (typed.profile) {
+      otherByConversation.set(typed.conversation_id, typed.profile);
+    }
+  }
 
-    const conversation = conv as Conversation;
+  const unreadIdsByConversation = new Map<string, string[]>();
+  const allUnreadIds: string[] = [];
+  for (const row of unreadRows ?? []) {
+    const messageId = row.id as string;
+    const conversationId = row.conversation_id as string;
+    allUnreadIds.push(messageId);
+    const existing = unreadIdsByConversation.get(conversationId) ?? [];
+    existing.push(messageId);
+    unreadIdsByConversation.set(conversationId, existing);
+  }
+
+  const deletedUnreadIds = await getDeletedMessageIds(userId, allUnreadIds);
+
+  const convIdsNeedingLastMessage = convIds.filter(
+    (convId) =>
+      hiddenAtByConversation.has(convId) || deletedAtByConversation.has(convId)
+  );
+  const lastMsgByConversation = convIdsNeedingLastMessage.length
+    ? await getVisibleLastMessagesBatch(userId, convIdsNeedingLastMessage)
+    : new Map<string, Message>();
+
+  let unreadTotal = 0;
+  for (const convId of convIds) {
+    const conversation = conversationById.get(convId);
+    if (!conversation) continue;
+
+    const other = otherByConversation.get(convId);
+    if (other && blockedIds.has(other.id)) continue;
+
+    const lastMsg = lastMsgByConversation.get(convId);
     const hiddenAt = hiddenAtByConversation.get(convId);
     const deletedAt = deletedAtByConversation.get(convId);
     if (
@@ -239,50 +517,21 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
     const prefs = preferencesByConversation.get(convId);
     const markedUnread = Boolean(prefs?.marked_unread_at);
+    let unreadCount = (unreadIdsByConversation.get(convId) ?? []).filter(
+      (messageId) => !deletedUnreadIds.has(messageId)
+    ).length;
     if (markedUnread && unreadCount === 0) {
       unreadCount = 1;
     }
-
-    conversations.push({
-      ...conversation,
-      last_message: lastMsg,
-      other_participant: other,
-      unread_count: unreadCount,
-      is_pinned: Boolean(prefs?.pinned_at),
-      pinned_at: prefs?.pinned_at ?? null,
-      is_favorite: Boolean(prefs?.favorited_at),
-      favorited_at: prefs?.favorited_at ?? null,
-      is_muted: Boolean(prefs?.muted_at),
-      marked_unread: markedUnread,
-    });
+    unreadTotal += unreadCount;
   }
 
-  return conversations
-    .filter((conv) => !conv.other_participant || !blockedIds.has(conv.other_participant.id))
-    .sort((a, b) => {
-      const aFavorite = a.is_favorite ? 1 : 0;
-      const bFavorite = b.is_favorite ? 1 : 0;
-      if (aFavorite !== bFavorite) return bFavorite - aFavorite;
-      if (a.is_favorite && b.is_favorite && a.favorited_at && b.favorited_at) {
-        const favoriteDelta =
-          new Date(b.favorited_at).getTime() - new Date(a.favorited_at).getTime();
-        if (favoriteDelta !== 0) return favoriteDelta;
-      }
+  logMessagingPerf("getUnreadMessageCount", perfStart, {
+    membershipCount: convIds.length,
+    unreadTotal,
+  });
 
-      const aPinned = a.is_pinned ? 1 : 0;
-      const bPinned = b.is_pinned ? 1 : 0;
-      if (aPinned !== bPinned) return bPinned - aPinned;
-      if (a.is_pinned && b.is_pinned && a.pinned_at && b.pinned_at) {
-        const pinDelta = new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime();
-        if (pinDelta !== 0) return pinDelta;
-      }
-      return conversationActivityAt(b) - conversationActivityAt(a);
-    });
-}
-
-export async function getUnreadMessageCount(userId: string): Promise<number> {
-  const conversations = await getConversations(userId);
-  return conversations.reduce((total, conversation) => total + (conversation.unread_count ?? 0), 0);
+  return unreadTotal;
 }
 
 export async function markMessagesAsRead(conversationId: string, userId: string) {

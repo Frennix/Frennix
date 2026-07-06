@@ -10,12 +10,26 @@ import {
   getCalendarView,
   getWorkoutEvents,
 } from "@frennix/api";
+import { hydrateMessagesInboxCache, writeMessagesInboxCache } from "@/lib/messages-inbox-cache";
 
 const TAB_STALE_MS = 120_000;
 const TAB_GC_MS = 30 * 60 * 1000;
 
 /** Warm caches for non-Feed tabs after the app settles — instant tab switches without refetch storms. */
 export async function prefetchTabData(queryClient: QueryClient, userId: string) {
+  await hydrateMessagesInboxCache(queryClient, userId);
+
+  await queryClient.prefetchQuery({
+    queryKey: ["conversations", userId],
+    queryFn: async () => {
+      const conversations = await getConversations(userId);
+      void writeMessagesInboxCache(userId, conversations);
+      return conversations;
+    },
+    staleTime: 60_000,
+    gcTime: TAB_GC_MS,
+  });
+
   await Promise.allSettled([
     queryClient.prefetchQuery({
       queryKey: ["discover-suggestions", userId],
@@ -54,12 +68,6 @@ export async function prefetchTabData(queryClient: QueryClient, userId: string) 
         return getCalendarView(userId, padStart.toISOString(), padEnd.toISOString());
       },
       staleTime: TAB_STALE_MS,
-      gcTime: TAB_GC_MS,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["conversations", userId],
-      queryFn: () => getConversations(userId),
-      staleTime: 60_000,
       gcTime: TAB_GC_MS,
     }),
     queryClient.prefetchQuery({

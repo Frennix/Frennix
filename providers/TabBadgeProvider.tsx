@@ -33,6 +33,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
     queryFn: () => getUnreadMessageCount(userId),
     enabled: !!userId,
     staleTime: 45_000,
+    networkMode: "offlineFirst",
     refetchInterval: messagesRouteActive ? 60_000 : false,
     refetchIntervalInBackground: false,
   });

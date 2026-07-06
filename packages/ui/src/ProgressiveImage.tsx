@@ -15,6 +15,8 @@ type ProgressiveImageProps = {
   onError?: () => void;
   recyclingKey?: string;
   fadeDuration?: number;
+  /** When false, skip skeleton placeholder (use initials/background until image loads). */
+  showPlaceholder?: boolean;
 };
 
 const DEFAULT_FADE_MS = 280;
@@ -30,6 +32,7 @@ export function ProgressiveImage({
   onError,
   recyclingKey,
   fadeDuration = DEFAULT_FADE_MS,
+  showPlaceholder = true,
 }: ProgressiveImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -72,7 +75,7 @@ export function ProgressiveImage({
 
   return (
     <View style={[styles.wrap, style]} accessibilityLabel={accessibilityLabel}>
-      {!loaded ? <Skeleton style={StyleSheet.absoluteFillObject} /> : null}
+      {!loaded && showPlaceholder ? <Skeleton style={StyleSheet.absoluteFillObject} /> : null}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
         <CachedImage
           key={retryKey}

@@ -82,6 +82,7 @@ export const ConversationRow = memo(function ConversationRow({
         size={52}
         showOnline={!selectMode}
         isOnline={isProfileOnline(conversation.other_participant)}
+        deferImagePlaceholder
       />
       <View style={styles.info}>
         <View style={styles.nameRow}>
@@ -138,6 +139,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
+    minHeight: 84,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.background,

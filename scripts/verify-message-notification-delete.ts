@@ -23,6 +23,10 @@ const MESSAGING_PHASE1_MIGRATION = join(
   ROOT,
   "supabase/migrations/20260705000001_messaging_phase1_inbox.sql"
 );
+const MESSAGING_INBOX_PERF_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20260705000002_messaging_inbox_perf_indexes.sql"
+);
 
 type Check = { id: string; status: "PASS" | "FAIL"; detail: string };
 const results: Check[] = [];
@@ -133,6 +137,68 @@ for (const token of [
   else fail(`api:messaging:${token}`, "missing");
 }
 
+if (messagingApi.includes("getVisibleLastMessagesBatch")) {
+  pass("perf:getConversations:batch-last-messages", "present");
+} else {
+  fail("perf:getConversations:batch-last-messages", "missing");
+}
+
+if (messagingApi.includes("INBOX_PROFILE_SELECT")) {
+  pass("perf:getConversations:slim-profile-select", "present");
+} else {
+  fail("perf:getConversations:slim-profile-select", "missing");
+}
+
+if (messagingApi.includes('.in("id", convIds)')) {
+  pass("perf:getConversations:batch-conversation-rows", "present");
+} else {
+  fail("perf:getConversations:batch-conversation-rows", "missing");
+}
+
+const unreadCountFn = messagingApi.match(
+  /export async function getUnreadMessageCount[\s\S]*?(?=export async function|$)/
+)?.[0];
+if (unreadCountFn && !unreadCountFn.includes("getConversations(")) {
+  pass("perf:getUnreadMessageCount:no-full-inbox-fetch", "present");
+} else {
+  fail("perf:getUnreadMessageCount:no-full-inbox-fetch", "still calls getConversations");
+}
+
+const messagesScreen = readFileSync(join(ROOT, "app/(tabs)/messages.tsx"), "utf8");
+if (
+  messagesScreen.includes("showListSkeleton") &&
+  messagesScreen.includes("initialData:") &&
+  messagesScreen.includes("mergeInboxConversations") &&
+  messagesScreen.includes("networkMode: \"offlineFirst\"")
+) {
+  pass("perf:messages-screen:cache-first-skeleton", "present");
+} else {
+  fail("perf:messages-screen:cache-first-skeleton", "missing");
+}
+
+if (messagesScreen.includes("MessagesOfflineBanner")) {
+  pass("perf:messages-screen:offline-banner", "present");
+} else {
+  fail("perf:messages-screen:offline-banner", "missing");
+}
+
+if (existsSync(MESSAGING_INBOX_PERF_MIGRATION)) {
+  const sql = readFileSync(MESSAGING_INBOX_PERF_MIGRATION, "utf8");
+  if (sql.includes("idx_messages_unread_by_conversation")) {
+    pass("sql:inbox-perf:unread-index", "present");
+  } else {
+    fail("sql:inbox-perf:unread-index", "missing");
+  }
+} else {
+  fail("migration", "20260705000002_messaging_inbox_perf_indexes.sql missing");
+}
+
+if (existsSync(join(ROOT, "lib/messages-inbox-cache.ts"))) {
+  pass("perf:messages-inbox-cache", "present");
+} else {
+  fail("perf:messages-inbox-cache", "missing");
+}
+
 const notificationsApi = readFileSync(join(ROOT, "packages/api/src/notifications.ts"), "utf8");
 for (const token of ["dismissNotification", "deleted_at"]) {
   if (notificationsApi.includes(token)) pass(`api:notifications:${token}`, "present");
@@ -174,7 +240,7 @@ for (const [file, token] of [
   ["lib/conversation-menu-actions.ts", "buildFavoritePartnerConversationMenuActions"],
   ["components/ConversationRow.tsx", "onLongPress"],
   ["app/(tabs)/messages.tsx", "buildConversationInboxMenuActions"],
-  ["app/(tabs)/messages.tsx", "confirmDeleteConversation"],
+  ["lib/useConversationDeleteUndo.ts", "confirmDeleteConversation"],
   ["app/(tabs)/messages.tsx", "deleteConversationsForUser"],
   ["app/(tabs)/messages.tsx", "MessagesInboxToolbar"],
   ["app/(tabs)/messages.tsx", "confirmDeleteSelectedConversations"],

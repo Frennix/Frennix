@@ -10,9 +10,18 @@ interface AvatarProps {
   /** Show green online indicator when true */
   showOnline?: boolean;
   isOnline?: boolean;
+  /** Skip skeleton shimmer — useful in virtualized lists. */
+  deferImagePlaceholder?: boolean;
 }
 
-export function Avatar({ uri, name, size = 40, showOnline = false, isOnline = false }: AvatarProps) {
+export function Avatar({
+  uri,
+  name,
+  size = 40,
+  showOnline = false,
+  isOnline = false,
+  deferImagePlaceholder = false,
+}: AvatarProps) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -52,6 +61,7 @@ export function Avatar({ uri, name, size = 40, showOnline = false, isOnline = fa
           accessibilityLabel={name ? `${name} avatar` : "User avatar"}
           onError={() => setFailed(true)}
           recyclingKey={`avatar-${uri}`}
+          showPlaceholder={!deferImagePlaceholder}
         />
         {onlineDot}
       </View>
