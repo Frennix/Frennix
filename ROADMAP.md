@@ -59,6 +59,8 @@
 | **3 — Polish** | Phase B/C feed interaction, design system migration, haptics, animations |
 | **4 — Features** | Training Together Today, Matchmaking GA, Story Replies, Run Clubs |
 
+**Active sprint:** [`features/PERFORMANCE-POLISH-SPRINT.md`](features/PERFORMANCE-POLISH-SPRINT.md) — living backlog for performance, polish, bugs, and post-sprint features. Update there, not in chat.
+
 See [`DEVELOPMENT_STANDARDS.md`](DEVELOPMENT_STANDARDS.md) for permanent enforcement.
 
 ---
