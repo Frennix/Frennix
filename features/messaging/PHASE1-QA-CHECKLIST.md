@@ -1,7 +1,9 @@
 # Messaging Inbox QA Checklist
 
 **Status:** QA on staging only — do **not** promote to production until signed off  
-**Staging URL:** _(filled in after deploy)_
+**Staging URL (Vercel preview):** https://mobile-lxb58wato-frennix-s-projects.vercel.app  
+**Note:** Preview deployments require Frennix Vercel team SSO on first visit. Production was **not** updated.  
+**Branch:** `release/messaging-inbox-qa` · **Commit:** `7350352` · **Deploy:** `dpl_4tmBENpvShyMU2ZxL8JUwpurgwNz`
 
 ---
 
