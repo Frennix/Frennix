@@ -84,9 +84,9 @@ export function confirmHideConversation(onConfirm: () => void) {
 
 /** Permanently remove a conversation from the current user's inbox. */
 export function confirmDeleteConversation(onConfirm: () => void) {
-  const title = "Delete this conversation?";
+  const title = "Delete Conversation?";
   const message =
-    "It will be removed from your inbox. Messages stay available for the other person.";
+    "This will remove the conversation from your inbox. This will not delete it for the other person.";
 
   if (Platform.OS === "web") {
     if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
@@ -101,9 +101,47 @@ export function confirmDeleteConversation(onConfirm: () => void) {
   ]);
 }
 
+/** Remove multiple conversations from the current user's inbox only. */
+export function confirmDeleteSelectedConversations(onConfirm: () => void) {
+  const title = "Delete selected conversations?";
+  const message =
+    "This will remove these conversations from your inbox only. Other users will still keep their copies.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+/** Archive multiple conversations from the current user's inbox. */
+export function confirmArchiveSelectedConversations(onConfirm: () => void) {
+  const title = "Archive selected conversations?";
+  const message =
+    "These conversations will be removed from your inbox. They will reappear if someone sends a new message.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Archive", onPress: onConfirm },
+  ]);
+}
+
 /** Remove a single message from the current user's view only. */
 export function confirmDeleteMessageForMe(onConfirm: () => void) {
-  const title = "Delete this message?";
+  const title = "Delete message?";
   const message =
     "This removes the message from your view only. The other person can still see it.";
 
@@ -116,7 +154,26 @@ export function confirmDeleteMessageForMe(onConfirm: () => void) {
 
   Alert.alert(title, message, [
     { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: onConfirm },
+    { text: "Delete for me", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+/** Retract a sent message for all conversation members. */
+export function confirmDeleteMessageForEveryone(onConfirm: () => void) {
+  const title = "Delete for everyone?";
+  const message =
+    "This message will be removed for both participants. This cannot be undone.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete for everyone", style: "destructive", onPress: onConfirm },
   ]);
 }
 

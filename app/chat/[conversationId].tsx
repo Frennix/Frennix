@@ -12,7 +12,9 @@ import {
   View,
 } from "react-native";
 import {
+  deleteMessageForEveryone,
   deleteMessageForUser,
+  DELETED_FOR_EVERYONE_CONTENT,
   getConversationProfiles,
   getMessages,
   getTrainerVerificationForUser,
@@ -36,7 +38,7 @@ import type { EntityActionId } from "@/lib/entity-actions";
 import { buildMessageMenuActions } from "@/lib/conversation-menu-actions";
 import { copyMessageText } from "@/lib/copy-message";
 import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
-import { confirmDeleteMessageForMe } from "@/lib/alerts";
+import { confirmDeleteMessageForEveryone, confirmDeleteMessageForMe } from "@/lib/alerts";
 import { trackMessagingLoad } from "@/lib/product-analytics";
 import { formatPresenceStatus, isProfileOnline, ReactionPicker, colors, spacing, typography } from "@frennix/ui";
 
@@ -194,7 +196,9 @@ export default function ChatScreen() {
 
       queryClient.setQueryData<Conversation[]>(["conversations", userId], (old) => {
         if (!old) return old;
-        return old.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c));
+        return old.map((c) =>
+          c.id === conversationId ? { ...c, unread_count: 0, marked_unread: false } : c
+        );
       });
 
       if (convUnread > 0) {
@@ -221,6 +225,8 @@ export default function ChatScreen() {
           if (old.some((m) => m.id === message.id)) return old;
           return [...old, message];
         });
+        void queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+        void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
         markRead();
       });
 
@@ -312,6 +318,37 @@ export default function ChatScreen() {
     },
   });
 
+  const deleteForEveryoneMutation = useMutation({
+    mutationFn: (messageId: string) => deleteMessageForEveryone(messageId, userId),
+    onMutate: async (messageId) => {
+      await queryClient.cancelQueries({ queryKey: ["messages", conversationId] });
+      const previous = queryClient.getQueryData<Message[]>(["messages", conversationId]);
+      queryClient.setQueryData<Message[]>(["messages", conversationId], (old = []) =>
+        old.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                content: DELETED_FOR_EVERYONE_CONTENT,
+                media_url: null,
+                post_id: null,
+                shared_post: undefined,
+                deleted_for_everyone_at: new Date().toISOString(),
+              }
+            : message
+        )
+      );
+      return { previous };
+    },
+    onError: (_error, _messageId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["messages", conversationId], context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+    },
+  });
+
   const { requestDismiss: requestMessageDismiss, isDismissing: isMessageDismissing } =
     useDismissWithAnimation(
       (messageId) => deleteMutation.mutate(messageId),
@@ -332,6 +369,15 @@ export default function ChatScreen() {
   const closeMessageActions = useCallback(() => {
     setActionMessage(null);
   }, []);
+
+  const handleDeleteMessageForEveryone = useCallback(
+    (message: Message) => {
+      confirmDeleteMessageForEveryone(() => {
+        deleteForEveryoneMutation.mutate(message.id);
+      });
+    },
+    [deleteForEveryoneMutation]
+  );
 
   const handleMessageAction = useCallback(
     (actionId: EntityActionId) => {
@@ -363,13 +409,19 @@ export default function ChatScreen() {
         return;
       }
 
-      if (actionId === "delete" && message.sender_id === userId) {
+      if (actionId === "delete_for_me") {
         requestMessageDismiss(message.id);
+        return;
+      }
+
+      if (actionId === "delete_for_everyone" && message.sender_id === userId) {
+        handleDeleteMessageForEveryone(message);
       }
     },
     [
       actionMessage,
       closeMessageActions,
+      handleDeleteMessageForEveryone,
       otherProfile?.display_name,
       participantProfiles,
       requestMessageDismiss,

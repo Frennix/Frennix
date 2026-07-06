@@ -27,6 +27,7 @@ interface MessageBubbleProps {
   senderAvatarUrl?: string | null;
   senderName?: string;
   showAvatar?: boolean;
+  deletedForEveryone?: boolean;
 }
 
 export function MessageBubble({
@@ -45,10 +46,12 @@ export function MessageBubble({
   senderAvatarUrl,
   senderName,
   showAvatar = true,
+  deletedForEveryone = false,
 }: MessageBubbleProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const showText =
-    content && content !== "📷 Photo" && content !== "Shared a post" && !sharedPost;
+    deletedForEveryone ||
+    (content && content !== "📷 Photo" && content !== "Shared a post" && !sharedPost);
 
   return (
     <View style={[styles.wrapper, isOwn && styles.wrapperOwn]}>
@@ -74,7 +77,7 @@ export function MessageBubble({
                 </Text>
               </View>
             ) : null}
-            {replyTo ? (
+            {replyTo && !deletedForEveryone ? (
               <View style={[styles.replyQuote, isOwn && styles.replyQuoteOwn]}>
                 <Text style={[styles.replyQuoteLabel, isOwn && styles.replyQuoteLabelOwn]} numberOfLines={1}>
                   {replyTo.senderName ? `Reply to ${replyTo.senderName}` : "Reply"}
@@ -84,10 +87,10 @@ export function MessageBubble({
                 </Text>
               </View>
             ) : null}
-            {sharedPost ? (
+            {sharedPost && !deletedForEveryone ? (
               <SharedPostPreview post={sharedPost} onPress={onSharedPostPress} compact />
             ) : null}
-            {mediaUrl ? (
+            {mediaUrl && !deletedForEveryone ? (
               <Pressable
                 onPress={onMediaPress}
                 disabled={!onMediaPress}
@@ -103,7 +106,9 @@ export function MessageBubble({
                 style={[
                   styles.text,
                   isOwn && styles.textOwn,
-                  (mediaUrl || sharedPost) && styles.textWithMedia,
+                  (mediaUrl || sharedPost) && !deletedForEveryone && styles.textWithMedia,
+                  deletedForEveryone && styles.deletedText,
+                  deletedForEveryone && isOwn && styles.deletedTextOwn,
                 ]}
               >
                 {content}
@@ -113,9 +118,9 @@ export function MessageBubble({
         </Pressable>
 
         <ReactionBar
-          reactions={reactions}
+          reactions={deletedForEveryone ? undefined : reactions}
           onReactionPress={onReaction}
-          onAddReaction={onReaction ? () => setPickerOpen(true) : undefined}
+          onAddReaction={onReaction && !deletedForEveryone ? () => setPickerOpen(true) : undefined}
           compact
         />
 
@@ -178,6 +183,13 @@ const styles = StyleSheet.create({
   text: { ...typography.body, color: colors.text },
   textOwn: { color: colors.black },
   textWithMedia: { marginTop: spacing.xs },
+  deletedText: {
+    color: colors.textMuted,
+    fontStyle: "italic",
+  },
+  deletedTextOwn: {
+    color: "rgba(0,0,0,0.55)",
+  },
   media: { width: 200, height: 200, borderRadius: radius.md },
   mediaPressed: { opacity: 0.85 },
   time: { ...typography.caption, marginTop: 2 },

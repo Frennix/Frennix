@@ -40,6 +40,7 @@ function rowPropsEqual(prev: ChatMessageRowProps, next: ChatMessageRowProps) {
     a.media_url === b.media_url &&
     a.my_reaction === b.my_reaction &&
     a.created_at === b.created_at &&
+    a.deleted_for_everyone_at === b.deleted_for_everyone_at &&
     reactionsEqual(a.reactions, b.reactions) &&
     a.shared_post?.id === b.shared_post?.id &&
     a.reply_to_message_id === b.reply_to_message_id &&
@@ -61,6 +62,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   onDelete,
 }: ChatMessageRowProps) {
   const isOwn = message.sender_id === userId;
+  const deletedForEveryone = Boolean(message.deleted_for_everyone_at);
   const time = useMemo(
     () => new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     [message.created_at]
@@ -110,7 +112,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   const rowContent = (
     <Pressable
       style={[styles.row, isOwn && styles.rowOwn]}
-      {...(isWeb && isOwn
+      {...(isWeb
         ? ({
             onContextMenu: (event: { preventDefault?: () => void }) => {
               event.preventDefault?.();
@@ -119,7 +121,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           } as object)
         : null)}
     >
-      {isOwn ? <MessageActionsMenu onPress={handleLongPressMenu} /> : null}
+      {isOwn || isWeb ? <MessageActionsMenu onPress={handleLongPressMenu} /> : null}
       <MessageBubble
         content={message.content}
         isOwn={isOwn}
@@ -128,6 +130,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         sharedPost={message.shared_post}
         storyReply={Boolean(message.story_reply_id)}
         replyTo={replyToPreview}
+        deletedForEveryone={deletedForEveryone}
         onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
         onMediaPress={message.media_url ? handleMediaPress : undefined}
         reactions={message.reactions}
@@ -141,7 +144,11 @@ export const ChatMessageRow = memo(function ChatMessageRow({
 
   return (
     <AnimatedDismissRow dismissing={dismissing}>
-      <SwipeToDeleteRow enabled={isOwn} onDelete={handleDelete} actionLabel="Delete">
+      <SwipeToDeleteRow
+        enabled={!deletedForEveryone}
+        onDelete={handleDelete}
+        actionLabel="Delete"
+      >
         {rowContent}
       </SwipeToDeleteRow>
     </AnimatedDismissRow>

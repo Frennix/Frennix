@@ -13,6 +13,7 @@ import {
 const typingChannels = new Map<string, RealtimeChannel>();
 const MAX_PINNED_CONVERSATIONS = 3;
 export const MAX_FAVORITE_TRAINING_PARTNERS = 5;
+export const DELETED_FOR_EVERYONE_CONTENT = "Message deleted";
 
 type ConversationPreferencesRow = {
   conversation_id: string;
@@ -61,30 +62,47 @@ async function getHiddenConversationAt(
   );
 }
 
-function isConversationHidden(
-  hiddenAt: string | undefined,
+function isConversationSuppressedFromInbox(
+  suppressedAt: string | undefined,
   lastMessageAt: string | undefined,
   conversationUpdatedAt: string
 ): boolean {
-  if (!hiddenAt) return false;
+  if (!suppressedAt) return false;
   const activityAt = lastMessageAt ?? conversationUpdatedAt;
-  return new Date(activityAt).getTime() <= new Date(hiddenAt).getTime();
+  return new Date(activityAt).getTime() <= new Date(suppressedAt).getTime();
 }
 
-async function getDeletedConversationIds(
+async function getDeletedConversationAt(
   userId: string,
   conversationIds: string[]
-): Promise<Set<string>> {
-  if (!conversationIds.length) return new Set();
+): Promise<Map<string, string>> {
+  if (!conversationIds.length) return new Map();
 
   const { data, error } = await getSupabase()
     .from("conversation_user_deletions")
-    .select("conversation_id")
+    .select("conversation_id, deleted_at")
     .eq("user_id", userId)
     .in("conversation_id", conversationIds);
 
   if (error) throw error;
-  return new Set((data ?? []).map((row) => row.conversation_id as string));
+
+  return new Map(
+    (data ?? []).map((row) => [
+      row.conversation_id as string,
+      row.deleted_at as string,
+    ])
+  );
+}
+
+function maskDeletedForEveryoneMessage(message: Message): Message {
+  if (!message.deleted_for_everyone_at) return message;
+  return {
+    ...message,
+    content: DELETED_FOR_EVERYONE_CONTENT,
+    media_url: null,
+    post_id: null,
+    shared_post: undefined,
+  };
 }
 
 async function getConversationPreferencesMap(
@@ -149,7 +167,9 @@ async function getVisibleLastMessage(
     messages.map((message) => message.id)
   );
 
-  return messages.find((message) => !deletedIds.has(message.id));
+  return messages
+    .map(maskDeletedForEveryoneMessage)
+    .find((message) => !deletedIds.has(message.id));
 }
 
 export async function getConversations(userId: string): Promise<Conversation[]> {
@@ -165,12 +185,11 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
   if (!convIds.length) return [];
 
   const hiddenAtByConversation = await getHiddenConversationAt(userId, convIds);
-  const deletedConversationIds = await getDeletedConversationIds(userId, convIds);
+  const deletedAtByConversation = await getDeletedConversationAt(userId, convIds);
   const preferencesByConversation = await getConversationPreferencesMap(userId, convIds);
   const conversations: Conversation[] = [];
 
   for (const convId of convIds) {
-    if (deletedConversationIds.has(convId)) continue;
     const { data: conv } = await getSupabase()
       .from("conversations")
       .select("*")
@@ -202,9 +221,15 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
     const conversation = conv as Conversation;
     const hiddenAt = hiddenAtByConversation.get(convId);
+    const deletedAt = deletedAtByConversation.get(convId);
     if (
-      isConversationHidden(
+      isConversationSuppressedFromInbox(
         hiddenAt,
+        lastMsg?.created_at,
+        conversation.updated_at
+      ) ||
+      isConversationSuppressedFromInbox(
+        deletedAt,
         lastMsg?.created_at,
         conversation.updated_at
       )
@@ -256,19 +281,8 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 }
 
 export async function getUnreadMessageCount(userId: string): Promise<number> {
-  const { data, error } = await getSupabase()
-    .from("messages")
-    .select("id")
-    .neq("sender_id", userId)
-    .is("read_at", null);
-
-  if (error) throw error;
-
-  const unreadIds = (data ?? []).map((row) => row.id as string);
-  if (!unreadIds.length) return 0;
-
-  const deletedIds = await getDeletedMessageIds(userId, unreadIds);
-  return unreadIds.filter((id) => !deletedIds.has(id)).length;
+  const conversations = await getConversations(userId);
+  return conversations.reduce((total, conversation) => total + (conversation.unread_count ?? 0), 0);
 }
 
 export async function markMessagesAsRead(conversationId: string, userId: string) {
@@ -360,7 +374,11 @@ export async function getMessages(conversationId: string, viewerId?: string): Pr
       viewerId,
       messages.map((message) => message.id)
     );
-    messages = messages.filter((message) => !deletedIds.has(message.id));
+    messages = messages
+      .filter((message) => !deletedIds.has(message.id))
+      .map(maskDeletedForEveryoneMessage);
+  } else {
+    messages = messages.map(maskDeletedForEveryoneMessage);
   }
 
   const postIds = messages.map((m) => m.post_id).filter((id): id is string => Boolean(id));
@@ -387,7 +405,7 @@ export async function getMessages(conversationId: string, viewerId?: string): Pr
   if (replyIds.length) {
     const { data: replyRows, error: replyError } = await getSupabase()
       .from("messages")
-      .select("id, content, sender_id, media_url")
+      .select("id, content, sender_id, media_url, deleted_for_everyone_at")
       .in("id", [...new Set(replyIds)]);
 
     if (replyError) throw replyError;
@@ -397,17 +415,23 @@ export async function getMessages(conversationId: string, viewerId?: string): Pr
       const replyId = message.reply_to_message_id;
       if (!replyId) return message;
       const reply = replyById.get(replyId);
-      return reply
-        ? {
-            ...message,
-            reply_to: {
-              id: reply.id as string,
-              content: reply.content as string,
-              sender_id: reply.sender_id as string,
-              media_url: (reply.media_url as string | null) ?? null,
-            },
-          }
-        : message;
+      if (!reply) return message;
+      const replyDeletedForEveryone = Boolean(
+        (reply as { deleted_for_everyone_at?: string | null }).deleted_for_everyone_at
+      );
+      return {
+        ...message,
+        reply_to: {
+          id: reply.id as string,
+          content: replyDeletedForEveryone
+            ? DELETED_FOR_EVERYONE_CONTENT
+            : (reply.content as string),
+          sender_id: reply.sender_id as string,
+          media_url: replyDeletedForEveryone
+            ? null
+            : ((reply.media_url as string | null) ?? null),
+        },
+      };
     });
   }
 
@@ -499,6 +523,88 @@ export async function deleteConversationForUser(conversationId: string, userId: 
   );
 
   if (error) throw formatMessagingError(error, "Failed to delete conversation");
+}
+
+/** Soft-delete multiple conversations for the current user. */
+export async function deleteConversationsForUser(
+  conversationIds: string[],
+  userId: string
+): Promise<void> {
+  if (!conversationIds.length) return;
+
+  const deletedAt = new Date().toISOString();
+  const { error } = await getSupabase().from("conversation_user_deletions").upsert(
+    conversationIds.map((conversationId) => ({
+      conversation_id: conversationId,
+      user_id: userId,
+      deleted_at: deletedAt,
+    })),
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to delete conversations");
+}
+
+/** Archive (hide) a conversation from the current user's inbox. */
+export async function archiveConversationForUser(conversationId: string, userId: string) {
+  return hideConversationForUser(conversationId, userId);
+}
+
+/** Archive multiple conversations for the current user. */
+export async function archiveConversationsForUser(
+  conversationIds: string[],
+  userId: string
+): Promise<void> {
+  if (!conversationIds.length) return;
+
+  const hiddenAt = new Date().toISOString();
+  const { error } = await getSupabase().from("conversation_user_hides").upsert(
+    conversationIds.map((conversationId) => ({
+      conversation_id: conversationId,
+      user_id: userId,
+      hidden_at: hiddenAt,
+    })),
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to archive conversations");
+}
+
+/** Mark all messages in a conversation read for the current user. */
+export async function markConversationReadForUser(conversationId: string, userId: string) {
+  await markMessagesAsRead(conversationId, userId);
+}
+
+/** Mark multiple conversations read for the current user. */
+export async function markConversationsReadForUser(
+  conversationIds: string[],
+  userId: string
+): Promise<void> {
+  if (!conversationIds.length) return;
+  await Promise.all(
+    conversationIds.map((conversationId) => markMessagesAsRead(conversationId, userId))
+  );
+}
+
+/** Mark multiple conversations unread for the current user. */
+export async function markConversationsUnreadForUser(
+  conversationIds: string[],
+  userId: string
+): Promise<void> {
+  if (!conversationIds.length) return;
+
+  const markedAt = new Date().toISOString();
+  const { error } = await getSupabase().from("conversation_user_preferences").upsert(
+    conversationIds.map((conversationId) => ({
+      conversation_id: conversationId,
+      user_id: userId,
+      marked_unread_at: markedAt,
+      updated_at: markedAt,
+    })),
+    { onConflict: "conversation_id,user_id" }
+  );
+
+  if (error) throw formatMessagingError(error, "Failed to mark conversations unread");
 }
 
 /** Pin a training partner conversation (max 3). */
@@ -644,6 +750,29 @@ export async function deleteMessageForUser(messageId: string, userId: string) {
   );
 
   if (error) throw formatMessagingError(error, "Failed to delete message");
+}
+
+/** Retract a sent message for all conversation members (delete for everyone). */
+export async function deleteMessageForEveryone(messageId: string, userId: string) {
+  const { data: message, error: fetchError } = await getSupabase()
+    .from("messages")
+    .select("id, sender_id, deleted_for_everyone_at")
+    .eq("id", messageId)
+    .single();
+
+  if (fetchError) throw formatMessagingError(fetchError, "Failed to delete message");
+  if ((message?.sender_id as string) !== userId) {
+    throw new Error("You can only delete your own messages for everyone");
+  }
+  if (message?.deleted_for_everyone_at) return;
+
+  const { error } = await getSupabase()
+    .from("messages")
+    .update({ deleted_for_everyone_at: new Date().toISOString() })
+    .eq("id", messageId)
+    .eq("sender_id", userId);
+
+  if (error) throw formatMessagingError(error, "Failed to delete message for everyone");
 }
 
 export async function uploadMessageMedia(userId: string, uri: string, mimeType: string) {

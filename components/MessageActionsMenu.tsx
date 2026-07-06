@@ -4,16 +4,22 @@ import { colors, spacing } from "@frennix/ui";
 
 type MessageActionsMenuProps = {
   onPress: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 };
 
-export function MessageActionsMenu({ onPress }: MessageActionsMenuProps) {
+export function MessageActionsMenu({
+  onPress,
+  accessibilityLabel = "Message options",
+  accessibilityHint = "Opens delete and reaction options",
+}: MessageActionsMenuProps) {
   return (
     <Pressable
       style={[styles.button, Platform.OS === "web" && styles.webButton]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Message options"
-      accessibilityHint="Opens delete and reaction options"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       hitSlop={8}
     >
       <MoreVertical color={colors.textMuted} size={18} strokeWidth={2} />

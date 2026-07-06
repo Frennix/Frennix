@@ -406,6 +406,8 @@ export interface Message {
   reply_to?: Pick<Message, "id" | "content" | "sender_id" | "media_url" | "sender"> | null;
   created_at: string;
   read_at: string | null;
+  /** Set when sender deletes for everyone — content hidden for all members. */
+  deleted_for_everyone_at?: string | null;
   shared_post?: Post;
   reactions?: ReactionSummary[];
   my_reaction?: string | null;

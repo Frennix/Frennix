@@ -27,7 +27,10 @@ export type EntityActionId =
   | "unpin"
   | "favorite"
   | "unfavorite"
-  | "mark_unread";
+  | "mark_unread"
+  | "mark_read"
+  | "delete_for_me"
+  | "delete_for_everyone";
 
 export type EntityActionTone = "default" | "danger" | "muted";
 

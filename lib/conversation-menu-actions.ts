@@ -4,27 +4,11 @@ import type { Conversation } from "@frennix/types";
 export const MAX_PINNED_CONVERSATIONS = 3;
 export const MAX_FAVORITE_TRAINING_PARTNERS = 5;
 
-export function buildConversationMenuActions(
+/** Inbox management: pin, read state, mute, archive, delete. */
+export function buildConversationInboxMenuActions(
   conversation: Conversation
 ): EntityActionDefinition[] {
   const actions: EntityActionDefinition[] = [];
-
-  if (conversation.is_favorite) {
-    actions.push(entityAction("unfavorite", "Remove from Favorite Training Partners"));
-  } else {
-    actions.push(
-      entityAction("favorite", "Add to Favorite Training Partners")
-    );
-  }
-
-  actions.push(
-    entityAction("hide", "Hide Conversation"),
-    entityAction("delete", "Delete Conversation", { tone: "danger" }),
-    conversation.is_muted
-      ? entityAction("unmute", "Unmute Notifications")
-      : entityAction("mute", "Mute Notifications"),
-    entityAction("mark_unread", "Mark as Unread")
-  );
 
   if (conversation.is_pinned) {
     actions.push(entityAction("unpin", "Unpin Conversation"));
@@ -32,7 +16,40 @@ export function buildConversationMenuActions(
     actions.push(entityAction("pin", "Pin Conversation"));
   }
 
+  actions.push(
+    entityAction("mark_read", "Mark as Read"),
+    entityAction("mark_unread", "Mark as Unread")
+  );
+
+  if (conversation.is_muted) {
+    actions.push(entityAction("unmute", "Unmute Notifications"));
+  } else {
+    actions.push(entityAction("mute", "Mute Notifications"));
+  }
+
+  actions.push(
+    entityAction("hide", "Archive Conversation"),
+    entityAction("delete", "Delete Conversation", { tone: "danger" })
+  );
+
   return actions;
+}
+
+/** Favorite partner row menu — unfavorite plus inbox actions. */
+export function buildFavoritePartnerConversationMenuActions(
+  conversation: Conversation
+): EntityActionDefinition[] {
+  return [
+    entityAction("unfavorite", "Remove from Favorite Training Partners"),
+    ...buildConversationInboxMenuActions(conversation),
+  ];
+}
+
+/** @deprecated Use buildConversationInboxMenuActions — kept for verify script compatibility. */
+export function buildConversationMenuActions(
+  conversation: Conversation
+): EntityActionDefinition[] {
+  return buildConversationInboxMenuActions(conversation);
 }
 
 export function buildMessageMenuActions(isOwn: boolean): EntityActionDefinition[] {
@@ -40,10 +57,13 @@ export function buildMessageMenuActions(isOwn: boolean): EntityActionDefinition[
     entityAction("reply", "Reply"),
     entityAction("copy", "Copy"),
     entityAction("react", "React"),
+    entityAction("delete_for_me", "Delete for me", { tone: "danger" }),
   ];
 
   if (isOwn) {
-    actions.push(entityAction("delete", "Delete Message", { tone: "danger" }));
+    actions.push(
+      entityAction("delete_for_everyone", "Delete for everyone", { tone: "danger" })
+    );
   }
 
   return actions;

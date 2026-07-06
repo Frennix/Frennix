@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { usePathname } from "expo-router";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
+  archiveConversationForUser,
+  archiveConversationsForUser,
   deleteConversationForUser,
-  favoriteConversationForUser,
+  deleteConversationsForUser,
   getConversations,
   getErrorMessage,
   getFeedStoriesForPartners,
-  hideConversationForUser,
+  markConversationReadForUser,
   markConversationUnreadForUser,
+  markConversationsReadForUser,
+  markConversationsUnreadForUser,
   markDedicatedStoryViewed,
   muteConversationForUser,
   pinConversationForUser,
@@ -31,8 +35,12 @@ import {
 } from "@/components/FavoriteTrainingPartnersSection";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
+import { MessagesInboxToolbar, type MessagesBulkAction } from "@/components/MessagesInboxToolbar";
 import { SwipeableActionsRow } from "@/components/SwipeableActionsRow";
-import { buildConversationMenuActions } from "@/lib/conversation-menu-actions";
+import {
+  buildConversationInboxMenuActions,
+  buildFavoritePartnerConversationMenuActions,
+} from "@/lib/conversation-menu-actions";
 import { pushScreen, switchTab } from "@/lib/press-utils";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
@@ -40,7 +48,12 @@ import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
-import { confirmDeleteConversation, confirmHideConversation, showAlert } from "@/lib/alerts";
+import {
+  confirmArchiveSelectedConversations,
+  confirmDeleteConversation,
+  confirmDeleteSelectedConversations,
+  showAlert,
+} from "@/lib/alerts";
 import type { EntityActionId } from "@/lib/entity-actions";
 import { MessagesListSkeleton } from "@/components/MessagesListSkeleton";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
@@ -50,27 +63,43 @@ const SafeConversationRow = memo(function SafeConversationRow({
   conversation,
   onPress,
   onLongPress,
-  onHide,
+  onMenuPress,
   onDelete,
   dismissing,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   conversation: Conversation;
   onPress: (id: string) => void;
   onLongPress: (conversation: Conversation) => void;
-  onHide: (conversation: Conversation) => void;
+  onMenuPress: (conversation: Conversation) => void;
   onDelete: (conversation: Conversation) => void;
   dismissing: boolean;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: (conversation: Conversation) => void;
 }) {
+  const row = (
+    <ConversationRow
+      conversation={conversation}
+      onPress={() => onPress(conversation.id)}
+      onLongPress={() => onLongPress(conversation)}
+      onMenuPress={() => onMenuPress(conversation)}
+      selectMode={selectMode}
+      selected={selected}
+      onToggleSelect={() => onToggleSelect(conversation)}
+    />
+  );
+
+  if (selectMode) {
+    return row;
+  }
+
   return (
     <AnimatedDismissRow dismissing={dismissing}>
       <SwipeableActionsRow
         rightActions={[
-          {
-            label: "Hide",
-            backgroundColor: colors.textMuted,
-            onPress: () => onHide(conversation),
-            accessibilityLabel: "Hide conversation",
-          },
           {
             label: "Delete",
             onPress: () => onDelete(conversation),
@@ -78,11 +107,7 @@ const SafeConversationRow = memo(function SafeConversationRow({
           },
         ]}
       >
-        <ConversationRow
-          conversation={conversation}
-          onPress={() => onPress(conversation.id)}
-          onLongPress={() => onLongPress(conversation)}
-        />
+        {row}
       </SwipeableActionsRow>
     </AnimatedDismissRow>
   );
@@ -96,8 +121,17 @@ export default function MessagesScreen() {
   const isListActive = isFocused && !pathname.startsWith("/chat/");
   const queryClient = useQueryClient();
   const [menuConversation, setMenuConversation] = useState<Conversation | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
   const [inviteLoadingUserId, setInviteLoadingUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isListActive) return;
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setMenuConversation(null);
+  }, [isListActive]);
 
   const { data: conversations = [], refetch, isRefetching, isLoading, isError, error } = useQuery({
     queryKey: ["conversations", userId],
@@ -118,21 +152,6 @@ export default function MessagesScreen() {
     [queryClient, userId]
   );
 
-  const hideMutation = useMutation({
-    mutationFn: (conversationId: string) => hideConversationForUser(conversationId, userId),
-    onMutate: async (conversationId) => {
-      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
-      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
-      patchConversations((current) => current.filter((item) => item.id !== conversationId));
-      return { previous };
-    },
-    onError: (_error, _id, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["conversations", userId], context.previous);
-      }
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (conversationId: string) => deleteConversationForUser(conversationId, userId),
     onMutate: async (conversationId) => {
@@ -141,10 +160,143 @@ export default function MessagesScreen() {
       patchConversations((current) => current.filter((item) => item.id !== conversationId));
       return { previous };
     },
-    onError: (_error, _id, context) => {
+    onError: (mutationError, _id, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["conversations", userId], context.previous);
       }
+      showAlert("Could not delete conversation", getErrorMessage(mutationError));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
+    },
+  });
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: (conversationIds: string[]) =>
+      deleteConversationsForUser(conversationIds, userId),
+    onMutate: async (conversationIds) => {
+      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
+      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
+      const selected = new Set(conversationIds);
+      patchConversations((current) => current.filter((item) => !selected.has(item.id)));
+      return { previous };
+    },
+    onSuccess: () => {
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    },
+    onError: (mutationError, _ids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["conversations", userId], context.previous);
+      }
+      showAlert("Could not delete conversations", getErrorMessage(mutationError));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
+    },
+  });
+
+  const batchArchiveMutation = useMutation({
+    mutationFn: (conversationIds: string[]) =>
+      archiveConversationsForUser(conversationIds, userId),
+    onMutate: async (conversationIds) => {
+      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
+      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
+      const selected = new Set(conversationIds);
+      patchConversations((current) => current.filter((item) => !selected.has(item.id)));
+      return { previous };
+    },
+    onSuccess: () => {
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    },
+    onError: (mutationError, _ids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["conversations", userId], context.previous);
+      }
+      showAlert("Could not archive conversations", getErrorMessage(mutationError));
+    },
+  });
+
+  const batchMarkReadMutation = useMutation({
+    mutationFn: (conversationIds: string[]) =>
+      markConversationsReadForUser(conversationIds, userId),
+    onMutate: async (conversationIds) => {
+      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
+      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
+      const selected = new Set(conversationIds);
+      patchConversations((current) =>
+        current.map((item) =>
+          selected.has(item.id)
+            ? { ...item, unread_count: 0, marked_unread: false }
+            : item
+        )
+      );
+      return { previous };
+    },
+    onSuccess: () => {
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    },
+    onError: (mutationError, _ids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["conversations", userId], context.previous);
+      }
+      showAlert("Could not mark conversations read", getErrorMessage(mutationError));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
+    },
+  });
+
+  const batchMarkUnreadMutation = useMutation({
+    mutationFn: (conversationIds: string[]) =>
+      markConversationsUnreadForUser(conversationIds, userId),
+    onMutate: async (conversationIds) => {
+      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
+      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
+      const selected = new Set(conversationIds);
+      patchConversations((current) =>
+        current.map((item) =>
+          selected.has(item.id)
+            ? {
+                ...item,
+                marked_unread: true,
+                unread_count: Math.max(1, item.unread_count ?? 0),
+              }
+            : item
+        )
+      );
+      return { previous };
+    },
+    onSuccess: () => {
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    },
+    onError: (mutationError, _ids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["conversations", userId], context.previous);
+      }
+      showAlert("Could not mark conversations unread", getErrorMessage(mutationError));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (conversationId: string) => archiveConversationForUser(conversationId, userId),
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
+      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
+      patchConversations((current) => current.filter((item) => item.id !== conversationId));
+      return { previous };
+    },
+    onError: (mutationError, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["conversations", userId], context.previous);
+      }
+      showAlert("Could not archive conversation", getErrorMessage(mutationError));
     },
   });
 
@@ -163,9 +315,6 @@ export default function MessagesScreen() {
         case "unpin":
           await unpinConversationForUser(conversationId, userId);
           return;
-        case "favorite":
-          await favoriteConversationForUser(conversationId, userId);
-          return;
         case "unfavorite":
           await unfavoriteConversationForUser(conversationId, userId);
           return;
@@ -174,6 +323,9 @@ export default function MessagesScreen() {
           return;
         case "unmute":
           await unmuteConversationForUser(conversationId, userId);
+          return;
+        case "mark_read":
+          await markConversationReadForUser(conversationId, userId);
           return;
         case "mark_unread":
           await markConversationUnreadForUser(conversationId, userId);
@@ -196,9 +348,6 @@ export default function MessagesScreen() {
           if (action === "unpin") {
             return { ...item, is_pinned: false, pinned_at: null };
           }
-          if (action === "favorite") {
-            return { ...item, is_favorite: true, favorited_at: now };
-          }
           if (action === "unfavorite") {
             return { ...item, is_favorite: false, favorited_at: null };
           }
@@ -207,6 +356,9 @@ export default function MessagesScreen() {
           }
           if (action === "unmute") {
             return { ...item, is_muted: false };
+          }
+          if (action === "mark_read") {
+            return { ...item, unread_count: 0, marked_unread: false };
           }
           if (action === "mark_unread") {
             return {
@@ -234,21 +386,9 @@ export default function MessagesScreen() {
     },
   });
 
-  const { requestDismiss: requestHide, isDismissing: isHiding } = useDismissWithAnimation(
-    (conversationId) => hideMutation.mutate(conversationId),
-    confirmHideConversation
-  );
-
   const { requestDismiss: requestDelete, isDismissing: isDeleting } = useDismissWithAnimation(
     (conversationId) => deleteMutation.mutate(conversationId),
     confirmDeleteConversation
-  );
-
-  const handleHideConversation = useCallback(
-    (conversation: Conversation) => {
-      requestHide(conversation.id);
-    },
-    [requestHide]
   );
 
   const handleDeleteConversation = useCallback(
@@ -258,9 +398,86 @@ export default function MessagesScreen() {
     [requestDelete]
   );
 
-  const handleLongPressConversation = useCallback((conversation: Conversation) => {
+  const openConversationMenu = useCallback((conversation: Conversation) => {
+    if (selectMode) return;
     setMenuConversation(conversation);
+  }, [selectMode]);
+
+  const enterSelectMode = useCallback(() => {
+    setMenuConversation(null);
+    setSelectMode(true);
+    setSelectedIds(new Set());
   }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleConversationSelection = useCallback((conversation: Conversation) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(conversation.id)) {
+        next.delete(conversation.id);
+      } else {
+        next.add(conversation.id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds((current) => {
+      const allIds = conversations
+        .filter((conversation) => !conversation.is_favorite)
+        .map((conversation) => conversation.id);
+      if (allIds.length > 0 && allIds.every((id) => current.has(id))) {
+        return new Set();
+      }
+      return new Set(allIds);
+    });
+  }, [conversations]);
+
+  const bulkLoading =
+    batchDeleteMutation.isPending ||
+    batchArchiveMutation.isPending ||
+    batchMarkReadMutation.isPending ||
+    batchMarkUnreadMutation.isPending;
+
+  const handleBulkAction = useCallback(
+    (action: MessagesBulkAction) => {
+      const ids = [...selectedIds];
+      if (!ids.length) return;
+
+      if (action === "delete") {
+        confirmDeleteSelectedConversations(() => {
+          batchDeleteMutation.mutate(ids);
+        });
+        return;
+      }
+
+      if (action === "archive") {
+        confirmArchiveSelectedConversations(() => {
+          batchArchiveMutation.mutate(ids);
+        });
+        return;
+      }
+
+      if (action === "mark_read") {
+        batchMarkReadMutation.mutate(ids);
+        return;
+      }
+
+      batchMarkUnreadMutation.mutate(ids);
+    },
+    [
+      batchArchiveMutation,
+      batchDeleteMutation,
+      batchMarkReadMutation,
+      batchMarkUnreadMutation,
+      selectedIds,
+    ]
+  );
 
   const closeConversationMenu = useCallback(() => {
     setMenuConversation(null);
@@ -272,36 +489,43 @@ export default function MessagesScreen() {
       closeConversationMenu();
       if (!conversation) return;
 
-      if (actionId === "hide") {
-        handleHideConversation(conversation);
+      if (actionId === "delete") {
+        handleDeleteConversation(conversation);
         return;
       }
 
-      if (actionId === "delete") {
-        handleDeleteConversation(conversation);
+      if (actionId === "hide") {
+        archiveMutation.mutate(conversation.id);
         return;
       }
 
       if (
         actionId === "pin" ||
         actionId === "unpin" ||
-        actionId === "favorite" ||
         actionId === "unfavorite" ||
         actionId === "mute" ||
         actionId === "unmute" ||
+        actionId === "mark_read" ||
         actionId === "mark_unread"
       ) {
         preferenceMutation.mutate({ conversationId: conversation.id, action: actionId });
       }
     },
     [
+      archiveMutation,
       closeConversationMenu,
       handleDeleteConversation,
-      handleHideConversation,
       menuConversation,
       preferenceMutation,
     ]
   );
+
+  const conversationMenuActions = useMemo(() => {
+    if (!menuConversation) return [];
+    return menuConversation.is_favorite
+      ? buildFavoritePartnerConversationMenuActions(menuConversation)
+      : buildConversationInboxMenuActions(menuConversation);
+  }, [menuConversation]);
 
   const favoriteConversations = useMemo(
     () => conversations.filter((conversation) => conversation.is_favorite),
@@ -351,9 +575,13 @@ export default function MessagesScreen() {
     ...partnerIds,
   ]);
 
-  const handlePress = useCallback((id: string) => {
-    pushScreen(`/chat/${id}`);
-  }, []);
+  const handlePress = useCallback(
+    (id: string) => {
+      if (selectMode) return;
+      pushScreen(`/chat/${id}`);
+    },
+    [selectMode]
+  );
 
   const handleFavoritePartnerAction = useCallback(
     async ({ conversation, action }: FavoritePartnerAction) => {
@@ -439,46 +667,55 @@ export default function MessagesScreen() {
   );
 
   const isConversationDismissing = useCallback(
-    (id: string) => isHiding(id) || isDeleting(id),
-    [isDeleting, isHiding]
+    (id: string) => isDeleting(id),
+    [isDeleting]
   );
 
   const renderListHeader = useCallback(
     () => (
-      <FavoriteTrainingPartnersSection
-        favorites={favoriteConversations}
-        partnerStoriesByUserId={partnerStoriesByUserId}
-        inviteLoadingUserId={inviteLoadingUserId}
-        onAction={handleFavoritePartnerAction}
-        onLongPress={handleLongPressConversation}
-      />
+      <>
+        <FavoriteTrainingPartnersSection
+          favorites={favoriteConversations}
+          partnerStoriesByUserId={partnerStoriesByUserId}
+          inviteLoadingUserId={inviteLoadingUserId}
+          onAction={handleFavoritePartnerAction}
+          onLongPress={openConversationMenu}
+        />
+      </>
     ),
     [
       favoriteConversations,
       handleFavoritePartnerAction,
-      handleLongPressConversation,
+      openConversationMenu,
       inviteLoadingUserId,
       partnerStoriesByUserId,
     ]
   );
+
+  const canEditInbox = inboxConversations.length > 0;
 
   const renderItem = useCallback(
     ({ item }: { item: Conversation }) => (
       <SafeConversationRow
         conversation={item}
         onPress={handlePress}
-        onLongPress={handleLongPressConversation}
-        onHide={handleHideConversation}
+        onLongPress={openConversationMenu}
+        onMenuPress={openConversationMenu}
         onDelete={handleDeleteConversation}
         dismissing={isConversationDismissing(item.id)}
+        selectMode={selectMode}
+        selected={selectedIds.has(item.id)}
+        onToggleSelect={toggleConversationSelection}
       />
     ),
     [
       handleDeleteConversation,
-      handleHideConversation,
-      handleLongPressConversation,
       handlePress,
       isConversationDismissing,
+      openConversationMenu,
+      selectMode,
+      selectedIds,
+      toggleConversationSelection,
     ]
   );
 
@@ -529,6 +766,17 @@ export default function MessagesScreen() {
           </Text>
         </View>
       ) : null}
+      <MessagesInboxToolbar
+        selectMode={selectMode}
+        selectedCount={selectedIds.size}
+        totalSelectable={inboxConversations.length}
+        canEdit={canEditInbox}
+        bulkLoading={bulkLoading}
+        onEnterSelectMode={enterSelectMode}
+        onExitSelectMode={exitSelectMode}
+        onSelectAll={handleSelectAll}
+        onBulkAction={handleBulkAction}
+      />
       <FlatList
         ref={listRef}
         data={inboxConversations}
@@ -565,7 +813,7 @@ export default function MessagesScreen() {
       <EntityActionSheet
         visible={!!menuConversation}
         title={menuConversation?.other_participant?.display_name ?? "Conversation"}
-        actions={menuConversation ? buildConversationMenuActions(menuConversation) : []}
+        actions={conversationMenuActions}
         onSelect={handleConversationMenuAction}
         onClose={closeConversationMenu}
       />
