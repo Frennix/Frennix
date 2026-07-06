@@ -6,7 +6,6 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import {
   archiveConversationForUser,
   archiveConversationsForUser,
-  deleteConversationForUser,
   deleteConversationsForUser,
   getConversations,
   getErrorMessage,
@@ -36,6 +35,7 @@ import {
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
 import { MessagesInboxToolbar, type MessagesBulkAction } from "@/components/MessagesInboxToolbar";
+import { UndoSnackbar } from "@/components/UndoSnackbar";
 import { SwipeableActionsRow } from "@/components/SwipeableActionsRow";
 import {
   buildConversationInboxMenuActions,
@@ -47,10 +47,9 @@ import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useProfilesPresence } from "@/lib/useProfilesPresence";
-import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
+import { useConversationDeleteUndo } from "@/lib/useConversationDeleteUndo";
 import {
   confirmArchiveSelectedConversations,
-  confirmDeleteConversation,
   confirmDeleteSelectedConversations,
   showAlert,
 } from "@/lib/alerts";
@@ -126,13 +125,6 @@ export default function MessagesScreen() {
   const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
   const [inviteLoadingUserId, setInviteLoadingUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isListActive) return;
-    setSelectMode(false);
-    setSelectedIds(new Set());
-    setMenuConversation(null);
-  }, [isListActive]);
-
   const { data: conversations = [], refetch, isRefetching, isLoading, isError, error } = useQuery({
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(userId),
@@ -152,24 +144,30 @@ export default function MessagesScreen() {
     [queryClient, userId]
   );
 
-  const deleteMutation = useMutation({
-    mutationFn: (conversationId: string) => deleteConversationForUser(conversationId, userId),
-    onMutate: async (conversationId) => {
-      await queryClient.cancelQueries({ queryKey: ["conversations", userId] });
-      const previous = queryClient.getQueryData<Conversation[]>(["conversations", userId]);
-      patchConversations((current) => current.filter((item) => item.id !== conversationId));
-      return { previous };
-    },
-    onError: (mutationError, _id, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["conversations", userId], context.previous);
-      }
-      showAlert("Could not delete conversation", getErrorMessage(mutationError));
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
-    },
+  const getConversationsList = useCallback(
+    () => queryClient.getQueryData<Conversation[]>(["conversations", userId]) ?? conversations,
+    [conversations, queryClient, userId]
+  );
+
+  const {
+    pendingDelete,
+    requestDelete,
+    undoDelete,
+    flushPendingDelete,
+    isDismissing,
+  } = useConversationDeleteUndo({
+    userId,
+    patchConversations,
+    getConversationsList,
   });
+
+  useEffect(() => {
+    if (isListActive) return;
+    flushPendingDelete();
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setMenuConversation(null);
+  }, [flushPendingDelete, isListActive]);
 
   const batchDeleteMutation = useMutation({
     mutationFn: (conversationIds: string[]) =>
@@ -386,17 +384,18 @@ export default function MessagesScreen() {
     },
   });
 
-  const { requestDismiss: requestDelete, isDismissing: isDeleting } = useDismissWithAnimation(
-    (conversationId) => deleteMutation.mutate(conversationId),
-    confirmDeleteConversation
-  );
-
   const handleDeleteConversation = useCallback(
     (conversation: Conversation) => {
-      requestDelete(conversation.id);
+      requestDelete(conversation);
     },
     [requestDelete]
   );
+
+  const undoSnackbarMessage = pendingDelete
+    ? `Conversation with ${
+        pendingDelete.conversation.other_participant?.display_name ?? "this person"
+      } deleted`
+    : "";
 
   const openConversationMenu = useCallback((conversation: Conversation) => {
     if (selectMode) return;
@@ -448,6 +447,7 @@ export default function MessagesScreen() {
     (action: MessagesBulkAction) => {
       const ids = [...selectedIds];
       if (!ids.length) return;
+      flushPendingDelete();
 
       if (action === "delete") {
         confirmDeleteSelectedConversations(() => {
@@ -475,6 +475,7 @@ export default function MessagesScreen() {
       batchDeleteMutation,
       batchMarkReadMutation,
       batchMarkUnreadMutation,
+      flushPendingDelete,
       selectedIds,
     ]
   );
@@ -667,8 +668,8 @@ export default function MessagesScreen() {
   );
 
   const isConversationDismissing = useCallback(
-    (id: string) => isDeleting(id),
-    [isDeleting]
+    (id: string) => isDismissing(id),
+    [isDismissing]
   );
 
   const renderListHeader = useCallback(
@@ -849,6 +850,11 @@ export default function MessagesScreen() {
             setInviteLoadingUserId(null);
           }
         }}
+      />
+      <UndoSnackbar
+        visible={!!pendingDelete}
+        message={undoSnackbarMessage}
+        onUndo={undoDelete}
       />
     </View>
   );
