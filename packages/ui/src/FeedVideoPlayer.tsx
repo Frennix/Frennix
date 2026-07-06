@@ -194,8 +194,13 @@ export function FeedVideoPlayer({
           {videoBody}
 
           {buffering ? (
-            <View style={styles.bufferingOverlay} pointerEvents="none">
-              <ActivityIndicator color={colors.accent} size="large" />
+            <View
+              style={styles.bufferingOverlay}
+              pointerEvents="none"
+              accessibilityLabel="Video loading"
+              accessibilityRole="progressbar"
+            >
+              <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
             </View>
           ) : null}
 

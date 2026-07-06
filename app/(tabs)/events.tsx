@@ -65,6 +65,7 @@ import { showAlert } from "@/lib/alerts";
 import { buildTodaysFocus } from "@/lib/training-calendar-focus";
 import { useCalendarWideLayout } from "@/lib/responsive";
 import { getCalendarViewQueryKey, getDefaultCalendarRange } from "@/lib/calendar-query-range";
+import { animateCalendarPeriodChange } from "@/lib/layout-animation";
 import { EmptyState, colors, spacing, typography } from "@frennix/ui";
 
 /** Scroll child index for native sticky Month/Week controls (see ScrollView child order). */
@@ -225,6 +226,7 @@ export default function TrainingCalendarTabScreen() {
   }
 
   function shiftPeriod(direction: -1 | 1) {
+    animateCalendarPeriodChange();
     setAnchorDate((current) =>
       viewMode === "month" ? addMonths(current, direction) : addDays(current, direction * 7)
     );
@@ -276,6 +278,7 @@ export default function TrainingCalendarTabScreen() {
               </View>
             ) : (
               <EmptyState
+                icon="📅"
                 title="Nothing scheduled"
                 description="Tap + to plan a workout, event, or partner session for this day."
                 actionLabel="Create session"

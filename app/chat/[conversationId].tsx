@@ -135,16 +135,35 @@ export default function ChatScreen() {
     }
   }, [chatReady, conversationId]);
 
-  const { data: messages = [], isLoading: messagesLoading } = useQuery({
+  const { data: messages = [], isPending: messagesPending } = useQuery({
     queryKey: ["messages", conversationId],
     queryFn: () => getMessages(conversationId!, userId),
-    enabled: chatReady && isFocused,
+    enabled: chatReady && !!conversationId,
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData,
+    initialData: () => queryClient.getQueryData<Message[]>(["messages", conversationId]),
   });
 
   const { data: participantProfiles = {} } = useQuery({
     queryKey: ["conversation-profiles", conversationId],
     queryFn: () => getConversationProfiles(conversationId!),
-    enabled: chatReady && isFocused,
+    enabled: chatReady && !!conversationId,
+    staleTime: 120_000,
+    placeholderData: (previousData) => previousData,
+    initialData: () => {
+      const cached = queryClient.getQueryData<Record<string, Profile>>([
+        "conversation-profiles",
+        conversationId,
+      ]);
+      if (cached && Object.keys(cached).length > 0) return cached;
+
+      const conversation = queryClient
+        .getQueryData<Conversation[]>(["conversations", userId])
+        ?.find((item) => item.id === conversationId);
+      const other = conversation?.other_participant;
+      if (!other) return undefined;
+      return { [other.id]: other };
+    },
   });
 
   const otherProfile = useMemo(() => {
@@ -169,7 +188,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (
-      !messagesLoading &&
+      !messagesPending &&
       conversationId &&
       !messagingPerfTrackedRef.current &&
       messagingLoadStartedRef.current != null
@@ -181,7 +200,7 @@ export default function ChatScreen() {
       );
       messagingPerfTrackedRef.current = true;
     }
-  }, [messagesLoading, conversationId, messages.length]);
+  }, [messagesPending, conversationId, messages.length]);
 
   const headerPresence = otherProfile ? formatPresenceStatus(otherProfile) : null;
   const headerOnline = otherProfile ? isProfileOnline(otherProfile) : false;
@@ -434,10 +453,10 @@ export default function ChatScreen() {
     [messages, reactionMessageId]
   );
 
-  if (loading || (chatReady && messagesLoading && messages.length === 0)) {
+  if (loading || (chatReady && messagesPending && messages.length === 0)) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading messages" />
       </View>
     );
   }

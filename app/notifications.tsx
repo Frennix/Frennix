@@ -1,9 +1,10 @@
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   View,
@@ -25,6 +26,7 @@ import { NotificationsListSkeleton } from "@/components/NotificationsListSkeleto
 import { EmptyState, QueryErrorState, ScreenSpinner, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { FrennixNotificationRow } from "@/components/FrennixNotificationRow";
+import { groupNotificationsByDate } from "@/lib/notification-groups";
 
 const SafeNotificationRow = memo(function SafeNotificationRow({
   notification,
@@ -102,8 +104,13 @@ export default function NotificationsScreen() {
     queryFn: () => getNotifications(userId),
     enabled: notificationsReady,
     staleTime: 60_000,
-    placeholderData: cachedNotifications,
+    placeholderData: (previousData) => previousData ?? cachedNotifications,
   });
+
+  const notificationSections = useMemo(
+    () => groupNotificationsByDate(notifications),
+    [notifications]
+  );
 
   const onRefresh = useGuardedRefresh(
     useCallback(() => refetch(), [refetch]),
@@ -376,15 +383,21 @@ export default function NotificationsScreen() {
         </View>
       ) : null}
 
-      <FlatList
+      <SectionList
         style={styles.listView}
-        data={notifications}
+        sections={notificationSections}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         initialNumToRender={12}
         maxToRenderPerBatch={8}
         windowSize={9}
         removeClippedSubviews={Platform.OS !== "web"}
+        stickySectionHeadersEnabled={false}
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+          </View>
+        )}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -393,6 +406,7 @@ export default function NotificationsScreen() {
         }
         ListEmptyComponent={
           <EmptyState
+            icon="🔔"
             title="All caught up"
             description="When you connect with a training partner, receive a message, or get activity on your posts, you'll see it here instantly."
           />
@@ -467,5 +481,18 @@ const styles = StyleSheet.create({
   selectCheck: { color: colors.background, fontSize: 14, fontWeight: "700", lineHeight: 16 },
   selectRowContent: { flex: 1 },
   listView: { flex: 1 },
-  list: { flexGrow: 1 },
+  list: { flexGrow: 1, paddingBottom: spacing.lg },
+  sectionHeader: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+    backgroundColor: colors.background,
+  },
+  sectionTitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
 });

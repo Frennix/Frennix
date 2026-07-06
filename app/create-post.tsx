@@ -34,6 +34,7 @@ import { showAlert } from "@/lib/alerts";
 import { logCreatePostError, logCreatePostInfo } from "@/lib/create-post-logging";
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
+import { UploadProgressBar } from "@/components/UploadProgressBar";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
@@ -136,6 +137,7 @@ export default function CreatePostScreen() {
   const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittingRef = useRef(false);
   const [loading, setLoading] = useState(false);
+  const [pickingMedia, setPickingMedia] = useState(false);
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
   const [error, setError] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<SelectedMediaItem[]>([]);
@@ -204,6 +206,8 @@ export default function CreatePostScreen() {
   async function pickMedia() {
     if (isFormLocked) return;
     setError("");
+    setPickingMedia(true);
+    try {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       const message = "Photo library access is required to add photos or videos";
@@ -277,6 +281,9 @@ export default function CreatePostScreen() {
       first.file,
       null
     );
+    } finally {
+      setPickingMedia(false);
+    }
   }
 
   function reorderMedia(fromIndex: number, toIndex: number) {
@@ -679,7 +686,9 @@ export default function CreatePostScreen() {
               title="Add photos or video"
               variant="secondary"
               onPress={pickMedia}
-              disabled={isFormLocked}
+              disabled={isFormLocked || pickingMedia}
+              loading={pickingMedia}
+              loadingTitle="Opening library…"
             />
             <Text style={styles.mediaHelper}>
               Add up to {MAX_PHOTOS} photos or one workout video up to 60 seconds.
@@ -687,19 +696,18 @@ export default function CreatePostScreen() {
           </View>
         )}
 
-        {progressLabel ? (
-          <View
-            style={[
-              styles.statusBanner,
-              isSuccess ? styles.successBanner : styles.progressBanner,
-            ]}
-          >
-            {!isSuccess ? (
-              <ActivityIndicator color={colors.accent} size="small" />
-            ) : (
-              <Text style={styles.successIcon}>✓</Text>
-            )}
-            <Text style={[styles.statusText, isSuccess && styles.successText]}>{progressLabel}</Text>
+        {progressLabel || showSubmittingUi ? (
+          <UploadProgressBar
+            active={showSubmittingUi && !isSuccess}
+            success={isSuccess}
+            label={progressLabel || (pickingMedia ? "Opening photo library…" : "Preparing…")}
+          />
+        ) : null}
+
+        {pickingMedia && !progressLabel ? (
+          <View style={styles.pickingRow}>
+            <ActivityIndicator color={colors.accent} size="small" accessibilityLabel="Loading media" />
+            <Text style={styles.pickingText}>Preparing media…</Text>
           </View>
         ) : null}
 
@@ -819,6 +827,13 @@ const styles = StyleSheet.create({
   mediaHint: { ...typography.caption, color: colors.textSecondary },
   addMediaBlock: { gap: spacing.xs },
   mediaHelper: { ...typography.caption, color: colors.textMuted, textAlign: "center" },
+  pickingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  pickingText: { ...typography.caption, color: colors.textMuted },
   statusBanner: {
     flexDirection: "row",
     alignItems: "center",

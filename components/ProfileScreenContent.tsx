@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   identityBlock: {
     paddingHorizontal: spacing.lg,
     marginTop: -AVATAR_SIZE / 2,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   avatarWrap: {
     alignSelf: "flex-start",
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
 import { DiscoverLifestyleFilters } from "@/components/DiscoverLifestyleFilters";
@@ -378,11 +378,20 @@ export default function DiscoverScreen() {
         {sharedListHeader}
         {!isSearchingPeople ? (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {lifestyleFiltersActive
-                ? LIFESTYLE_BRAND.discoverFilteredHeading
-                : FRENIX_MATCH_BRAND.sections.discoverSuggested}
-            </Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>
+                {lifestyleFiltersActive
+                  ? LIFESTYLE_BRAND.discoverFilteredHeading
+                  : FRENIX_MATCH_BRAND.sections.discoverSuggested}
+              </Text>
+              {peopleRefetching && peopleData.length > 0 ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.accent}
+                  accessibilityLabel="Updating results"
+                />
+              ) : null}
+            </View>
             <Text style={styles.sectionBody}>
               {lifestyleFiltersActive
                 ? LIFESTYLE_BRAND.discoverFilteredBody
@@ -392,7 +401,7 @@ export default function DiscoverScreen() {
         ) : null}
       </>
     ),
-    [isSearchingPeople, lifestyleFiltersActive, sharedListHeader]
+    [isSearchingPeople, lifestyleFiltersActive, peopleData.length, peopleRefetching, sharedListHeader]
   );
 
   const groupsListHeader = useMemo(
@@ -657,6 +666,7 @@ const styles = StyleSheet.create({
   tabText: { color: colors.textMuted, fontWeight: "600" },
   tabTextActive: { color: colors.accent },
   sectionHeader: { gap: 4, marginBottom: spacing.md },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   sectionTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   sectionBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   list: { paddingBottom: spacing.xxl },

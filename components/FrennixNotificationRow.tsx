@@ -36,7 +36,12 @@ export const FrennixNotificationRow = memo(function FrennixNotificationRow({
         accessibilityLabel={`${display.headline}. ${display.detail}. ${isUnread ? "Unread" : "Read"}. ${formatRelativeTime(createdAt)}`}
       >
         <View style={styles.avatarWrap}>
-          <Avatar uri={actor?.avatar_url} name={actor?.display_name ?? "Athlete"} size={48} />
+          <Avatar
+            uri={actor?.avatar_url}
+            name={actor?.display_name ?? "Athlete"}
+            size={48}
+            deferImagePlaceholder
+          />
           {isUnread ? <View style={styles.unreadDot} /> : null}
         </View>
         <View style={styles.content}>

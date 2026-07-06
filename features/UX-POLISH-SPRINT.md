@@ -28,12 +28,13 @@
 
 | Screen | Spacing | Loading | Empty | Error | PTR | Animations | Status |
 |--------|---------|---------|-------|-------|-----|------------|--------|
-| Feed | ✅ | ✅ | | | ✅ | ✅ | 🔄 |
-| Discover | | ✅ | | | ✅ | | 🔄 |
-| Calendar | | ✅ | ✅ | | ✅ | | 🔄 |
-| Messages | | ✅ | | | ✅ | | ⬜ |
-| Notifications | | ✅ | | | ✅ | | 🔄 |
-| Profile | | ✅ | | | ✅ | | 🔄 |
+| Feed | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🔄 |
+| Discover | ✅ | ✅ | ✅ | ✅ | ✅ | | 🔄 |
+| Calendar | ✅ | ✅ | ✅ | | ✅ | ✅ | 🔄 |
+| Messages | ✅ | ✅ | | | ✅ | | 🔄 |
+| Notifications | ✅ | ✅ | ✅ | | ✅ | | 🔄 |
+| Profile | ✅ | ✅ | | | ✅ | | 🔄 |
+| Post creation | ✅ | ✅ | | | | | 🔄 |
 | Post detail | | | | | | | ⬜ |
 | Posting | | | | | | | ⬜ |
 | Story viewer | | | | | | | ⬜ |
@@ -58,9 +59,14 @@
 |------|--------|--------|
 | Heart animation | Feed | Double-tap like spring animation on media |
 | Skeleton gating | Feed, Discover | No skeleton when cached data exists |
+| Image blur-up | Feed / global | Thumbnail shown instantly in ProgressiveImage |
 | Pull-to-refresh | Profile | Accent PTR added |
-| Empty day | Calendar | EmptyState + create CTA |
-| EmptyState | Global | minHeight reduces layout shift |
+| Empty day | Calendar | EmptyState + create CTA + loading spinner |
+| Notifications grouping | Notifications | Today / Yesterday / This week / Earlier |
+| Chat cache-first | Messages | Profiles from inbox; messages placeholderData |
+| Upload progress | Post creation | UploadProgressBar + picker loading state |
+| Filter refresh UX | Discover | Spinner when refetching with existing rows |
+| EmptyState polish | Global | Icon, minHeight, Dynamic Type |
 
 ---
 

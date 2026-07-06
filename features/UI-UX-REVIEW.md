@@ -1,6 +1,6 @@
 # UI/UX Review — App Store Readiness Sprint
 
-**Status:** In progress  
+**Status:** In progress (batch 2)  
 **Started:** July 6, 2026  
 **Sprint doc:** [`UX-POLISH-SPRINT.md`](UX-POLISH-SPRINT.md)  
 **Product roadmap:** [`ROADMAP.md`](../ROADMAP.md)
@@ -9,113 +9,108 @@
 
 ## Executive summary
 
-This sprint reviews every screen as if preparing for App Store submission. Focus: responsiveness, consistency, loading/empty/error states, and premium feel — **no major new features**.
+Screen-by-screen polish sprint focused on perceived performance, consistency, loading/empty/error states, accessibility, and premium feel — **no major new features**.
 
 ---
 
-## Improvements made
+## 1. Performance improvements
 
-### Performance & perceived speed
-
-| Screen | Change | Impact |
-|--------|--------|--------|
-| Feed | Skeleton only when `isLoading && posts.length === 0` (cached feed no longer flashes skeleton) | Eliminates layout shift on tab return |
-| Discover (People) | Skeleton only when loading with zero rows | Same |
-| Notifications | *(Performance Sprint)* Cache-first + skeleton gating | Near-instant revisit |
-
-### Feed experience
-
-| Item | Change |
-|------|--------|
-| Double-tap like | Heart spring animation on media double-tap (Instagram-style) |
-| Cached feed | `placeholderData` prevents skeleton flash when data exists |
-
-### Calendar
-
-| Item | Change |
-|------|--------|
-| Empty day | `EmptyState` with “Create session” action instead of plain text |
-| Loading day | Spinner + label instead of static “Loading sessions…” text |
-
-### Profile
-
-| Item | Change |
-|------|--------|
-| Pull-to-refresh | Native pull-to-refresh with accent tint (matches Feed/Discover) |
-
-### Global components
-
-| Item | Change |
-|------|--------|
-| `EmptyState` | `minHeight: 220` reduces layout jump when content loads |
+| Area | Change | Impact |
+|------|--------|--------|
+| **Feed** | Skeleton only on true cold load (`showFeedSkeleton`) | No flash when cached feed exists |
+| **Feed images** | Thumbnail blur-up in `ProgressiveImage` | Faster perceived image load |
+| **Messages inbox** | Cache-first (unchanged, verified) | Instant inbox revisit |
+| **Chat** | `placeholderData` + `initialData` for messages; profiles seeded from inbox cache | Faster conversation open; header shows immediately |
+| **Notifications** | `placeholderData` + skeleton gating | Faster revisit |
+| **Discover** | Skeleton only when empty; filter refresh spinner when data exists | No layout flash on filter change |
+| **Profile** | `placeholderData` on stats/posts (existing) + PTR | Smoother refresh |
+| **Calendar** | `placeholderData` + animated period change | Smoother month/week switch |
 
 ---
 
-## Remaining recommendations
+## 2. UI improvements
+
+| Screen | Improvement |
+|--------|-------------|
+| **Feed** | Double-tap heart spring animation; 🏋️ empty state with CTA |
+| **Feed media** | Thumbnail → full-res crossfade; video buffering a11y labels |
+| **Discover** | Inline spinner when filters refetch with existing results |
+| **Profile** | Pull-to-refresh; improved identity/stats spacing; avatar defer skeleton |
+| **Calendar** | 📅 empty day state + create CTA; loading spinner for day panel; animated month switch |
+| **Notifications** | Grouped sections (Today / Yesterday / This week / Earlier); 🔔 empty state; consistent row spacing |
+| **Post creation** | `UploadProgressBar`; media picker loading state; accessible upload labels |
+| **Global** | `EmptyState` icon + Dynamic Type scaling; `minHeight` reduces layout shift |
+
+---
+
+## 3. Screens reviewed
+
+| Screen | Reviewed | Polished this sprint |
+|--------|----------|----------------------|
+| Feed | ✅ | ✅ |
+| Messages (inbox) | ✅ | ✅ (indicators) |
+| Chat (conversation) | ✅ | ✅ |
+| Discover | ✅ | ✅ |
+| Profile (own) | ✅ | ✅ |
+| Calendar | ✅ | ✅ |
+| Notifications | ✅ | ✅ |
+| Post creation | ✅ | ✅ |
+| Events browse | ⬜ | — |
+| Story viewer | ⬜ | — |
+| Settings / Auth | ⬜ | — |
+| Post detail | ⬜ | — |
+
+---
+
+## 4. Remaining recommendations
 
 | ID | Area | Recommendation | Priority |
 |----|------|----------------|----------|
-| R-01 | Feed (web) | Virtualize `WebFeedScrollList` for long sessions | High |
-| R-02 | Post detail | Paginate comments; FlatList instead of ScrollView | High |
-| R-03 | Success UX | Replace `showSuccess` alert dialogs with bottom toast pattern | Medium |
-| R-04 | Profile | Skeleton only when `!authReady` (already good); extend PTR to other profile routes | Medium |
-| R-05 | Discover | Groups/challenges skeleton gating (mirror people tab) | Medium |
-| R-06 | Events browse | PTR + empty state audit on `/events/browse` | Medium |
-| R-07 | Settings | Spacing/typography pass vs `DESIGN_SYSTEM.md` | Low |
-| R-08 | Auth | Transition polish on login/signup success | Low |
+| R-01 | Feed (web) | Virtualize `WebFeedScrollList` | High |
+| R-02 | Post detail | Paginate comments; FlatList | High |
+| R-03 | Success UX | Bottom toast instead of `showSuccess` alert | Medium |
+| R-04 | Notifications | Group by type (likes, follows, messages) within date sections | Medium |
+| R-05 | Calendar (Safari) | BUG-003 viewport — device QA | High |
+| R-06 | Feed sheets | BUG-002 safe area — device QA | High |
+| R-07 | Settings / Auth | Spacing + typography audit | Low |
+| R-08 | Global | `touchTarget` audit on all icon buttons | Medium |
 
 ---
 
-## Areas still needing refinement
+## 5. Accessibility improvements (this sprint)
 
-| Screen | Notes |
-|--------|-------|
-| Feed (web) | Long-scroll memory; sheet safe area (BUG-002) |
-| Calendar (Safari) | Half-blocked viewport (BUG-003) — device QA |
-| Post detail | Comments load-all |
-| Story viewer | Transitions polish; viewer list UX (Feature sprint #3) |
-| Messaging | Already polished; minor spacing audit optional |
-
----
-
-## Pull-to-refresh audit
-
-| Screen | PTR | Notes |
-|--------|-----|-------|
-| Feed | ✅ | `useGuardedRefresh` |
-| Discover | ✅ | All three tabs |
-| Calendar | ✅ | |
-| Messages | ✅ | |
-| Notifications | ✅ | |
-| Profile | ✅ | **Added this sprint** |
-| Profile (other user) | ⬜ | Tab retap refresh only |
-| Events browse | ⬜ | Audit needed |
+| Item | Change |
+|------|--------|
+| Video buffering | `accessibilityLabel` + `progressbar` role |
+| Upload / loading | Labels on ActivityIndicators (chat, create-post, discover) |
+| Empty states | `allowFontScaling` + `maxFontSizeMultiplier` |
+| Upload progress | `progressbar` role on `UploadProgressBar` |
 
 ---
 
-## Before / after notes
+## 6. Before / after notes
 
-### Feed tab return (cached)
+### Feed (cached revisit)
+- **Before:** Skeleton appeared even when posts were in cache  
+- **After:** Cached posts render immediately  
 
-- **Before:** Skeleton flash even when feed data was in React Query cache  
-- **After:** Cached posts render immediately; skeleton only on true cold load  
+### Chat open
+- **Before:** Full-screen spinner until messages + profiles loaded  
+- **After:** Partner name from inbox cache; messages use cache when available  
 
-### Double-tap like
+### Notifications
+- **Before:** Flat chronological list  
+- **After:** Date-grouped sections (Instagram-style)  
 
-- **Before:** Like toggled with no visual feedback  
-- **After:** Spring heart animation centered on media  
+### Post upload
+- **Before:** Static banner with small spinner  
+- **After:** Animated progress bar + explicit media-picker loading  
 
-### Calendar empty day
+### Calendar month switch
+- **Before:** Instant swap (felt abrupt)  
+- **After:** `LayoutAnimation` ease on period change  
 
-- **Before:** Gray “No sessions scheduled” line  
-- **After:** Branded empty state + CTA to create session  
-
-### Profile
-
-- **Before:** Refresh only via tab double-tap  
-- **After:** Pull-to-refresh with consistent accent spinner  
-
-*Screenshots: capture on Founder iPhone Safari during QA pass.*
+*Capture iPhone Safari screenshots during Founder QA for visual before/after archive.*
 
 ---
 
@@ -123,4 +118,5 @@ This sprint reviews every screen as if preparing for App Store submission. Focus
 
 | Date | Change |
 |------|--------|
-| 2026-07-06 | Sprint kickoff; initial improvements documented |
+| 2026-07-06 | Sprint kickoff; batch 1 (heart animation, profile PTR, calendar empty) |
+| 2026-07-06 | Batch 2 — notifications grouping, chat cache, media blur-up, upload progress, discover filter UX |

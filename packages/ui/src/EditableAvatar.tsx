@@ -28,11 +28,15 @@ export function EditableAvatar({
       style={({ pressed }) => [pressed && onPress ? styles.pressed : null]}
     >
       <View style={[styles.ring, { width: ringSize, height: ringSize, borderRadius: ringSize / 2 }]}>
-        <Avatar uri={uri} name={name} size={size} />
+        <Avatar uri={uri} name={name} size={size} deferImagePlaceholder />
         {onPress ? (
           <View style={[styles.badge, { width: size * 0.32, height: size * 0.32, borderRadius: size * 0.16 }]}>
             {uploading ? (
-              <ActivityIndicator size="small" color={colors.black} />
+              <ActivityIndicator
+                size="small"
+                color={colors.black}
+                accessibilityLabel="Uploading profile photo"
+              />
             ) : (
               <Text style={[styles.cameraIcon, { fontSize: size * 0.14 }]}>📷</Text>
             )}

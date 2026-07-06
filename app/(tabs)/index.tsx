@@ -807,6 +807,7 @@ export default function HomeScreen() {
               ) : (
                 <View style={styles.emptyWrap}>
                   <EmptyState
+                    icon="🏋️"
                     title="Your feed is ready"
                     description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
                     actionLabel="Share a workout"
@@ -876,6 +877,7 @@ export default function HomeScreen() {
               ) : (
                 <View style={styles.emptyWrap}>
                   <EmptyState
+                    icon="🏋️"
                     title="Your feed is ready"
                     description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
                     actionLabel="Share a workout"

@@ -75,7 +75,17 @@ export function ProgressiveImage({
 
   return (
     <View style={[styles.wrap, style]} accessibilityLabel={accessibilityLabel}>
-      {!loaded && showPlaceholder ? <Skeleton style={StyleSheet.absoluteFillObject} /> : null}
+      {placeholderUri ? (
+        <CachedImage
+          uri={placeholderUri}
+          style={StyleSheet.absoluteFillObject}
+          contentFit={contentFit}
+          recyclingKey={recyclingKey ? `${recyclingKey}-thumb` : undefined}
+        />
+      ) : null}
+      {!loaded && showPlaceholder && !placeholderUri ? (
+        <Skeleton style={StyleSheet.absoluteFillObject} />
+      ) : null}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
         <CachedImage
           key={retryKey}
