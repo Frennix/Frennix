@@ -161,6 +161,21 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "Discover tab keeps chrome inside scroll surface on web",
+    run: () => {
+      const discover = read("app/(tabs)/discover.tsx");
+      assertIncludes("app/(tabs)/discover.tsx", "useTabScreenWebContainerStyle", "Discover outer shell");
+      if (discover.includes("[styles.container, webHeightStyle]")) {
+        throw new Error("Discover must not pin webHeightStyle on outer container");
+      }
+      assertIncludes(
+        "app/(tabs)/discover.tsx",
+        "ListHeaderComponent={peopleListHeader}",
+        "Discover filters must scroll with FlatList header"
+      );
+    },
+  },
+  {
     name: "Post-login shell error boundary wraps tabs",
     run: () => {
       assertIncludes("components/PostLoginShellErrorBoundary.tsx", "Something went wrong", "shell boundary required");

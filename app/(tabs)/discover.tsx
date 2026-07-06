@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState, useCallback, useRef } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
 import { DiscoverLifestyleFilters } from "@/components/DiscoverLifestyleFilters";
@@ -38,6 +38,7 @@ import {
   frennixRefreshControlProps,
   tabScreenContainer,
   tabScreenScrollSurface,
+  useTabScreenWebContainerStyle,
   useTabScreenWebHeightStyle,
 } from "@/lib/screen-shell";
 import {
@@ -66,6 +67,7 @@ function scoreProfilesForDiscover(viewer: Profile, profiles: Profile[]): Suggest
 export default function DiscoverScreen() {
   const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
+  const webContainerStyle = useTabScreenWebContainerStyle();
   const webHeightStyle = useTabScreenWebHeightStyle();
   const [tab, setTab] = useState<Tab>("people");
   const [peopleSearch, setPeopleSearch] = useState("");
@@ -295,9 +297,128 @@ export default function DiscoverScreen() {
     }, [isAtTop, onRefreshChallenges, onRefreshGroups, onRefreshPeople, tab])
   );
 
+  const sharedListHeader = useMemo(
+    () => (
+      <>
+        <Text style={styles.header}>Find your training community</Text>
+
+        <Text style={styles.matchingSectionTitle}>Matching</Text>
+        <View style={styles.matchingCards}>
+          <Pressable style={styles.matchingCard} onPress={() => pushScreen("/matching")}>
+            <View style={styles.matchingCardIcon}>
+              <AppIcon name="users" color={colors.accent} size={24} />
+            </View>
+            <View style={styles.matchingCardCopy}>
+              <Text style={styles.matchingCardTitle}>Find training partners</Text>
+              <Text style={styles.matchingCardBody}>
+                Browse athletes who share your goals and workout style — connect to train together.
+              </Text>
+            </View>
+            <AppIcon name="chevron-right" color={colors.textMuted} size={20} />
+          </Pressable>
+
+          <Pressable style={styles.matchingCard} onPress={() => pushScreen("/trainers")}>
+            <View style={styles.matchingCardIcon}>
+              <AppIcon name="dumbbell" color={colors.accent} size={24} />
+            </View>
+            <View style={styles.matchingCardCopy}>
+              <Text style={styles.matchingCardTitle}>Find a trainer</Text>
+              <Text style={styles.matchingCardBody}>
+                Connect with professional coaches for online or in-person training.
+              </Text>
+            </View>
+            <AppIcon name="chevron-right" color={colors.textMuted} size={20} />
+          </Pressable>
+        </View>
+
+        {tab === "people" ? (
+          <View style={styles.searchBlock}>
+            <Input
+              placeholder="Search by name, interests, workout type, or bio..."
+              value={peopleSearch}
+              onChangeText={setPeopleSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={styles.searchHint}>
+              Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio
+            </Text>
+            <DiscoverLifestyleFilters filters={discoverFilters} onChange={setDiscoverFilters} />
+          </View>
+        ) : tab === "groups" ? (
+          <Input placeholder="Search groups..." value={groupQuery} onChangeText={setGroupQuery} />
+        ) : null}
+
+        <View style={styles.tabRow}>
+          {tabs.map((t) => (
+            <Pressable
+              key={t.key}
+              style={[styles.tab, tab === t.key && styles.tabActive]}
+              onPress={() => setTab(t.key)}
+            >
+              <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </>
+    ),
+    [discoverFilters, groupQuery, peopleSearch, tab, tabs]
+  );
+
+  const peopleListHeader = useMemo(
+    () => (
+      <>
+        {sharedListHeader}
+        {!isSearchingPeople ? (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {lifestyleFiltersActive
+                ? LIFESTYLE_BRAND.discoverFilteredHeading
+                : FRENIX_MATCH_BRAND.sections.discoverSuggested}
+            </Text>
+            <Text style={styles.sectionBody}>
+              {lifestyleFiltersActive
+                ? LIFESTYLE_BRAND.discoverFilteredBody
+                : FRENIX_MATCH_BRAND.sections.discoverSuggestedBody}
+            </Text>
+          </View>
+        ) : null}
+      </>
+    ),
+    [isSearchingPeople, lifestyleFiltersActive, sharedListHeader]
+  );
+
+  const groupsListHeader = useMemo(
+    () => (
+      <>
+        {sharedListHeader}
+        <Pressable onPress={() => router.push("/create-group")}>
+          <Text style={styles.createLink}>+ Create a group</Text>
+        </Pressable>
+      </>
+    ),
+    [sharedListHeader]
+  );
+
+  const challengesListHeader = useMemo(
+    () => (
+      <>
+        {sharedListHeader}
+        <Pressable onPress={() => router.push("/create-challenge")}>
+          <Text style={styles.createLink}>+ Create a challenge</Text>
+        </Pressable>
+      </>
+    ),
+    [sharedListHeader]
+  );
+
+  const discoverListStyle = [tabScreenScrollSurface, webHeightStyle];
+  const discoverScrollProps =
+    Platform.OS === "web" ? ({ pointerEvents: "auto" } as const) : null;
+
   if (tab === "people" && peopleError && peopleData.length === 0) {
     return (
-      <View style={[styles.container, webHeightStyle]}>
+      <View style={[styles.container, webContainerStyle]}>
         <QueryErrorState
           title="Could not load people"
           message={getErrorMessage(peopleQueryError)}
@@ -309,7 +430,7 @@ export default function DiscoverScreen() {
 
   if (tab === "groups" && groupsError && groups.length === 0) {
     return (
-      <View style={[styles.container, webHeightStyle]}>
+      <View style={[styles.container, webContainerStyle]}>
         <QueryErrorState
           title="Could not load groups"
           message={getErrorMessage(groupsQueryError)}
@@ -321,7 +442,7 @@ export default function DiscoverScreen() {
 
   if (tab === "challenges" && challengesError && challenges.length === 0) {
     return (
-      <View style={[styles.container, webHeightStyle]}>
+      <View style={[styles.container, webContainerStyle]}>
         <QueryErrorState
           title="Could not load challenges"
           message={getErrorMessage(challengesQueryError)}
@@ -332,72 +453,13 @@ export default function DiscoverScreen() {
   }
 
   return (
-    <View style={[styles.container, webHeightStyle]}>
-      <Text style={styles.header}>Find your training community</Text>
-
-      <Text style={styles.matchingSectionTitle}>Matching</Text>
-      <View style={styles.matchingCards}>
-        <Pressable style={styles.matchingCard} onPress={() => pushScreen("/matching")}>
-          <View style={styles.matchingCardIcon}>
-            <AppIcon name="users" color={colors.accent} size={24} />
-          </View>
-          <View style={styles.matchingCardCopy}>
-            <Text style={styles.matchingCardTitle}>Find training partners</Text>
-            <Text style={styles.matchingCardBody}>
-              Browse athletes who share your goals and workout style — connect to train together.
-            </Text>
-          </View>
-          <AppIcon name="chevron-right" color={colors.textMuted} size={20} />
-        </Pressable>
-
-        <Pressable style={styles.matchingCard} onPress={() => pushScreen("/trainers")}>
-          <View style={styles.matchingCardIcon}>
-            <AppIcon name="dumbbell" color={colors.accent} size={24} />
-          </View>
-          <View style={styles.matchingCardCopy}>
-            <Text style={styles.matchingCardTitle}>Find a trainer</Text>
-            <Text style={styles.matchingCardBody}>
-              Connect with professional coaches for online or in-person training.
-            </Text>
-          </View>
-          <AppIcon name="chevron-right" color={colors.textMuted} size={20} />
-        </Pressable>
-      </View>
-
-      {tab === "people" ? (
-        <View style={styles.searchBlock}>
-          <Input
-            placeholder="Search by name, interests, workout type, or bio..."
-            value={peopleSearch}
-            onChangeText={setPeopleSearch}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={styles.searchHint}>
-            Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio
-          </Text>
-          <DiscoverLifestyleFilters filters={discoverFilters} onChange={setDiscoverFilters} />
-        </View>
-      ) : tab === "groups" ? (
-        <Input placeholder="Search groups..." value={groupQuery} onChangeText={setGroupQuery} />
-      ) : null}
-
-      <View style={styles.tabRow}>
-        {tabs.map((t) => (
-          <Pressable
-            key={t.key}
-            style={[styles.tab, tab === t.key && styles.tabActive]}
-            onPress={() => setTab(t.key)}
-          >
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-
+    <View style={[styles.container, webContainerStyle]}>
       {tab === "people" ? (
         <FlatList
           ref={peopleListRef}
-          style={[tabScreenScrollSurface, webHeightStyle]}
+          nativeID="discover-scroll"
+          {...discoverScrollProps}
+          style={discoverListStyle}
           data={peopleData}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -411,22 +473,7 @@ export default function DiscoverScreen() {
               {...frennixRefreshControlProps}
             />
           }
-          ListHeaderComponent={
-            !isSearchingPeople ? (
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>
-                  {lifestyleFiltersActive
-                    ? LIFESTYLE_BRAND.discoverFilteredHeading
-                    : FRENIX_MATCH_BRAND.sections.discoverSuggested}
-                </Text>
-                <Text style={styles.sectionBody}>
-                  {lifestyleFiltersActive
-                    ? LIFESTYLE_BRAND.discoverFilteredBody
-                    : FRENIX_MATCH_BRAND.sections.discoverSuggestedBody}
-                </Text>
-              </View>
-            ) : null
-          }
+          ListHeaderComponent={peopleListHeader}
           ListEmptyComponent={
             peopleLoading ? (
               <DiscoverPeopleSkeleton />
@@ -476,7 +523,9 @@ export default function DiscoverScreen() {
       {tab === "groups" ? (
         <FlatList
           ref={groupsListRef}
-          style={[tabScreenScrollSurface, webHeightStyle]}
+          nativeID="discover-scroll"
+          {...discoverScrollProps}
+          style={discoverListStyle}
           data={groups}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -489,11 +538,7 @@ export default function DiscoverScreen() {
               {...frennixRefreshControlProps}
             />
           }
-          ListHeaderComponent={
-            <Pressable onPress={() => router.push("/create-group")}>
-              <Text style={styles.createLink}>+ Create a group</Text>
-            </Pressable>
-          }
+          ListHeaderComponent={groupsListHeader}
           ListEmptyComponent={
             groupsLoading ? (
               <DiscoverListSkeleton />
@@ -515,7 +560,9 @@ export default function DiscoverScreen() {
       {tab === "challenges" ? (
         <FlatList
           ref={challengesListRef}
-          style={[tabScreenScrollSurface, webHeightStyle]}
+          nativeID="discover-scroll"
+          {...discoverScrollProps}
+          style={discoverListStyle}
           data={challenges}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -528,11 +575,7 @@ export default function DiscoverScreen() {
               {...frennixRefreshControlProps}
             />
           }
-          ListHeaderComponent={
-            <Pressable onPress={() => router.push("/create-challenge")}>
-              <Text style={styles.createLink}>+ Create a challenge</Text>
-            </Pressable>
-          }
+          ListHeaderComponent={challengesListHeader}
           ListEmptyComponent={
             challengesLoading ? (
               <DiscoverListSkeleton />
