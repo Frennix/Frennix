@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView } from "react-native";
 import { ProfileTabSkeleton } from "@/components/ProfileTabSkeleton";
 import { getFollowingIds, getPostsByUser, getProfileStats } from "@frennix/api";
@@ -14,6 +14,7 @@ import { scrollScrollViewToTop, handleTabRetap } from "@/lib/tab-scroll-registry
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useTabScreenWebHeightStyle } from "@/lib/screen-shell";
+import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 
 const EMPTY_STATS = {
   posts: 0,
@@ -65,6 +66,19 @@ export default function ProfileTabScreen() {
   const refreshProfile = useCallback(async () => {
     await Promise.all([refetchStats(), refetchFollowingIds(), refetchPosts()]);
   }, [refetchFollowingIds, refetchPosts, refetchStats]);
+
+  const [profileRefreshing, setProfileRefreshing] = useState(false);
+  const onPullRefresh = useGuardedRefresh(
+    useCallback(async () => {
+      setProfileRefreshing(true);
+      try {
+        await refreshProfile();
+      } finally {
+        setProfileRefreshing(false);
+      }
+    }, [refreshProfile]),
+    { errorTitle: "Could not refresh profile" }
+  );
 
   useTabScrollRegistration(
     "profile",
@@ -121,6 +135,8 @@ export default function ProfileTabScreen() {
       profileActionSheet={profileActionSheets}
       scrollViewRef={scrollRef}
       onScroll={onScroll}
+      onRefresh={() => void onPullRefresh()}
+      refreshing={profileRefreshing}
       webShellStyle={webShellStyle}
     />
   );

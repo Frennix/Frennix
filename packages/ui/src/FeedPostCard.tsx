@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo, useRef } from "react";
-import { Pressable, Text } from "react-native";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { ScalePressable } from "./ScalePressable";
@@ -107,16 +107,41 @@ export const FeedPostCard = memo(function FeedPostCard({
   const openPostDetail = onPress;
 
   const lastMediaTapAt = useRef(0);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const [heartVisible, setHeartVisible] = useState(false);
+
+  const playLikeHeart = useCallback(() => {
+    setHeartVisible(true);
+    heartScale.setValue(0);
+    Animated.sequence([
+      Animated.spring(heartScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartScale, {
+        toValue: 0,
+        duration: 240,
+        delay: 350,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setHeartVisible(false);
+    });
+  }, [heartScale]);
+
   const handleMediaAreaPress = useCallback(() => {
     if (!onDoubleTapLike) return;
     const now = Date.now();
     if (now - lastMediaTapAt.current < 280) {
       lastMediaTapAt.current = 0;
       onDoubleTapLike();
+      playLikeHeart();
       return;
     }
     lastMediaTapAt.current = now;
-  }, [onDoubleTapLike]);
+  }, [onDoubleTapLike, playLikeHeart]);
 
   return (
     <FeedLayout.Root active={interactionActive}>
@@ -163,18 +188,37 @@ export const FeedPostCard = memo(function FeedPostCard({
           />
         </FeedLayout.Media>
       ) : hasMedia ? (
-        <Pressable onPress={onDoubleTapLike ? handleMediaAreaPress : undefined} disabled={!onDoubleTapLike}>
-          <FeedMedia
-            mediaUrls={displayPost.media_urls ?? []}
-            postType={displayPost.post_type}
-            thumbnailUrl={displayPost.thumbnail_url}
-            onMediaPress={onMediaPress}
-            pageIndex={mediaPageIndex}
-            onPageIndexChange={onMediaPageIndexChange}
-            visible={mediaActive}
-            overlay={slots?.mediaOverlay}
-          />
-        </Pressable>
+        <View style={styles.mediaTapShell}>
+          <Pressable onPress={onDoubleTapLike ? handleMediaAreaPress : undefined} disabled={!onDoubleTapLike}>
+            <FeedMedia
+              mediaUrls={displayPost.media_urls ?? []}
+              postType={displayPost.post_type}
+              thumbnailUrl={displayPost.thumbnail_url}
+              onMediaPress={onMediaPress}
+              pageIndex={mediaPageIndex}
+              onPageIndexChange={onMediaPageIndexChange}
+              visible={mediaActive}
+              overlay={slots?.mediaOverlay}
+            />
+          </Pressable>
+          {heartVisible ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.likeHeartOverlay,
+                {
+                  opacity: heartScale.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [0, 1, 0.85],
+                  }),
+                  transform: [{ scale: heartScale }],
+                },
+              ]}
+            >
+              <Text style={styles.likeHeartIcon}>♥</Text>
+            </Animated.View>
+          ) : null}
+        </View>
       ) : null}
 
       <FeedLayout.BelowMedia>{slots?.belowMedia}</FeedLayout.BelowMedia>
@@ -253,3 +297,26 @@ export const FeedPostCard = memo(function FeedPostCard({
 });
 
 export { getSharedPostTargetId };
+
+const styles = {
+  mediaTapShell: {
+    position: "relative" as const,
+    width: "100%" as const,
+  },
+  likeHeartOverlay: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  likeHeartIcon: {
+    fontSize: 88,
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+};

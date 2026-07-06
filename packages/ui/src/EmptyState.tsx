@@ -28,6 +28,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.xl,
     gap: spacing.sm,
+    minHeight: 220,
   },
   title: { ...typography.heading, textAlign: "center" },
   description: { ...typography.bodySmall, textAlign: "center", lineHeight: 22 },

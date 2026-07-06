@@ -483,7 +483,7 @@ export default function DiscoverScreen() {
           }
           ListHeaderComponent={peopleListHeader}
           ListEmptyComponent={
-            peopleLoading ? (
+            peopleLoading && peopleData.length === 0 ? (
               <DiscoverPeopleSkeleton />
             ) : (
               <EmptyState
@@ -549,7 +549,7 @@ export default function DiscoverScreen() {
           }
           ListHeaderComponent={groupsListHeader}
           ListEmptyComponent={
-            groupsLoading ? (
+            groupsLoading && groups.length === 0 ? (
               <DiscoverListSkeleton />
             ) : (
               <EmptyState
@@ -587,7 +587,7 @@ export default function DiscoverScreen() {
           }
           ListHeaderComponent={challengesListHeader}
           ListEmptyComponent={
-            challengesLoading ? (
+            challengesLoading && challenges.length === 0 ? (
               <DiscoverListSkeleton />
             ) : (
               <EmptyState

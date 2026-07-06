@@ -59,6 +59,8 @@
 
 **Active sprint:** [`features/UX-POLISH-SPRINT.md`](features/UX-POLISH-SPRINT.md) — screen-by-screen UX review and polish.
 
+**UX review deliverable:** [`features/UI-UX-REVIEW.md`](features/UI-UX-REVIEW.md)
+
 **Previous sprint (complete):** [`features/PERFORMANCE-POLISH-SPRINT.md`](features/PERFORMANCE-POLISH-SPRINT.md) — performance, stability, Founder QA docs.
 
 **Operations backlog:** [`features/FOUNDER-ROADMAP.md`](features/FOUNDER-ROADMAP.md) · **Founder QA:** [`features/FOUNDER-QA.md`](features/FOUNDER-QA.md)

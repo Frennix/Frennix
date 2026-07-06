@@ -3,6 +3,7 @@ import { ReactNode, useMemo, useState, type RefObject } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,6 +47,7 @@ import {
   spacing,
   typography,
 } from "@frennix/ui";
+import { frennixRefreshControlProps } from "@/lib/screen-shell";
 
 interface ProfileScreenContentProps {
   profile: Profile;
@@ -71,6 +73,8 @@ interface ProfileScreenContentProps {
   profileActionSheet?: ReactNode;
   scrollViewRef?: RefObject<ScrollView>;
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
   /** Safari web tab scene height (pass from tab screens only). */
   webShellStyle?: ViewStyle;
   /** Frennix Match reasons (other users' profiles). */
@@ -122,6 +126,8 @@ export function ProfileScreenContent({
   profileActionSheet,
   scrollViewRef,
   onScroll,
+  onRefresh,
+  refreshing = false,
   webShellStyle,
   matchReasons,
   frennixMatchScore,
@@ -165,6 +171,15 @@ export function ProfileScreenContent({
       scrollEventThrottle={16}
       style={[styles.container, tabScreenScrollSurface, webShellStyle]}
       contentContainerStyle={styles.content}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            {...frennixRefreshControlProps}
+          />
+        ) : undefined
+      }
     >
       {postActionSheet}
       {profileActionSheet}

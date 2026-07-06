@@ -390,6 +390,7 @@ export default function HomeScreen() {
   markFeedHook("suggestions-query");
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+  const showFeedSkeleton = isLoading && posts.length === 0;
   const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
   const [feedAtTop, setFeedAtTop] = useState(true);
@@ -797,7 +798,7 @@ export default function HomeScreen() {
             renderItem={renderItem}
             ListHeaderComponent={listHeader}
             ListEmptyComponent={
-              isLoading ? (
+              showFeedSkeleton ? (
                 <View style={styles.initialSkeletons}>
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
@@ -866,7 +867,7 @@ export default function HomeScreen() {
             }}
             ListHeaderComponent={listHeader}
             ListEmptyComponent={
-              isLoading ? (
+              showFeedSkeleton ? (
                 <View style={styles.initialSkeletons}>
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />

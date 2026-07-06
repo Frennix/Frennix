@@ -22,19 +22,18 @@
 8. Buttons, menus, dialogs, navigation consistency  
 9. Remove anything unfinished or unpolished  
 
----
+**Deliverable:** [`UI-UX-REVIEW.md`](UI-UX-REVIEW.md) — improvements, recommendations, before/after notes
 
-## Screen audit checklist
+---
 
 | Screen | Spacing | Loading | Empty | Error | PTR | Animations | Status |
 |--------|---------|---------|-------|-------|-----|------------|--------|
-| Feed | | | | | | | 🔄 |
-| Discover | | | | | | | ⬜ |
-| Calendar | | | | | | | ⬜ |
-| Events | | | | | | | ⬜ |
-| Messages | | | | | | | ⬜ |
-| Notifications | | | | | | | 🔄 |
-| Profile | | | | | | | ⬜ |
+| Feed | ✅ | ✅ | | | ✅ | ✅ | 🔄 |
+| Discover | | ✅ | | | ✅ | | 🔄 |
+| Calendar | | ✅ | ✅ | | ✅ | | 🔄 |
+| Messages | | ✅ | | | ✅ | | ⬜ |
+| Notifications | | ✅ | | | ✅ | | 🔄 |
+| Profile | | ✅ | | | ✅ | | 🔄 |
 | Post detail | | | | | | | ⬜ |
 | Posting | | | | | | | ⬜ |
 | Story viewer | | | | | | | ⬜ |
@@ -57,7 +56,11 @@
 
 | Item | Screen | Change |
 |------|--------|--------|
-| | | |
+| Heart animation | Feed | Double-tap like spring animation on media |
+| Skeleton gating | Feed, Discover | No skeleton when cached data exists |
+| Pull-to-refresh | Profile | Accent PTR added |
+| Empty day | Calendar | EmptyState + create CTA |
+| EmptyState | Global | minHeight reduces layout shift |
 
 ---
 

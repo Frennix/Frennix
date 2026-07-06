@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Platform,
   Pressable,
@@ -268,10 +269,18 @@ export default function TrainingCalendarTabScreen() {
                   onPress={() => handleItemPress(item)}
                 />
               ))
+            ) : showCalendarSkeleton ? (
+              <View style={styles.dayLoading}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.dayLoadingText}>Loading sessions…</Text>
+              </View>
             ) : (
-              <Text style={styles.empty}>
-                {showCalendarSkeleton ? "Loading sessions…" : "No sessions scheduled"}
-              </Text>
+              <EmptyState
+                title="Nothing scheduled"
+                description="Tap + to plan a workout, event, or partner session for this day."
+                actionLabel="Create session"
+                onAction={() => openTrainingCalendarCreate()}
+              />
             )}
           </View>
         </>
@@ -510,5 +519,15 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textMuted,
     paddingVertical: spacing.sm,
+  },
+  dayLoading: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+  },
+  dayLoadingText: {
+    ...typography.caption,
+    color: colors.textMuted,
   },
 });
