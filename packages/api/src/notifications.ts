@@ -313,6 +313,19 @@ export async function markAllNotificationsRead(userId: string) {
   if (error) throw error;
 }
 
+/** Soft-delete multiple notifications for the current user. */
+export async function dismissNotificationsBulk(ids: string[], userId: string) {
+  if (!ids.length) return;
+  const { error } = await getSupabase()
+    .from("notifications")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", ids)
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) throw error;
+}
+
 /** Soft-delete a notification for the current user. */
 export async function dismissNotification(id: string, userId: string) {
   const { error } = await getSupabase()

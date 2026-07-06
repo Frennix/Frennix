@@ -64,6 +64,13 @@ function scoreProfilesForDiscover(viewer: Profile, profiles: Profile[]): Suggest
     .sort((a, b) => b.compatibility_score - a.compatibility_score);
 }
 
+const DISCOVER_LIST_PERF = {
+  initialNumToRender: 12,
+  maxToRenderPerBatch: 10,
+  windowSize: 9,
+  removeClippedSubviews: Platform.OS !== "web",
+} as const;
+
 export default function DiscoverScreen() {
   const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
@@ -459,6 +466,7 @@ export default function DiscoverScreen() {
           ref={peopleListRef}
           nativeID="discover-scroll"
           {...discoverScrollProps}
+          {...DISCOVER_LIST_PERF}
           style={discoverListStyle}
           data={peopleData}
           onScroll={onScroll}
@@ -525,6 +533,7 @@ export default function DiscoverScreen() {
           ref={groupsListRef}
           nativeID="discover-scroll"
           {...discoverScrollProps}
+          {...DISCOVER_LIST_PERF}
           style={discoverListStyle}
           data={groups}
           onScroll={onScroll}
@@ -562,6 +571,7 @@ export default function DiscoverScreen() {
           ref={challengesListRef}
           nativeID="discover-scroll"
           {...discoverScrollProps}
+          {...DISCOVER_LIST_PERF}
           style={discoverListStyle}
           data={challenges}
           onScroll={onScroll}

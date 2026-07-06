@@ -11,6 +11,7 @@ import {
   getWorkoutEvents,
 } from "@frennix/api";
 import { hydrateMessagesInboxCache, writeMessagesInboxCache } from "@/lib/messages-inbox-cache";
+import { getCalendarViewQueryKey, getDefaultCalendarRange } from "@/lib/calendar-query-range";
 
 const TAB_STALE_MS = 120_000;
 const TAB_GC_MS = 30 * 60 * 1000;
@@ -56,16 +57,13 @@ export async function prefetchTabData(queryClient: QueryClient, userId: string) 
       gcTime: TAB_GC_MS,
     }),
     queryClient.prefetchQuery({
-      queryKey: ["calendar-view", userId],
+      queryKey: (() => {
+        const { rangeStart, rangeEnd } = getDefaultCalendarRange();
+        return getCalendarViewQueryKey(userId, rangeStart, rangeEnd);
+      })(),
       queryFn: () => {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const padStart = new Date(start);
-        padStart.setDate(padStart.getDate() - 7);
-        const padEnd = new Date(end);
-        padEnd.setDate(padEnd.getDate() + 7);
-        return getCalendarView(userId, padStart.toISOString(), padEnd.toISOString());
+        const { rangeStart, rangeEnd } = getDefaultCalendarRange();
+        return getCalendarView(userId, rangeStart, rangeEnd);
       },
       staleTime: TAB_STALE_MS,
       gcTime: TAB_GC_MS,

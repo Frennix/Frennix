@@ -45,6 +45,24 @@ export function confirmDelete(entityLabel: string, onConfirm: () => void) {
   ]);
 }
 
+/** Dismiss multiple notifications from the user's view (soft delete). */
+export function confirmBulkDismissNotifications(count: number, onConfirm: () => void) {
+  const title = `Delete ${count} notification${count === 1 ? "" : "s"}?`;
+  const message = "They will be removed from your view. This cannot be undone.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 /** Dismiss notifications from the user's view (soft delete). */
 export function confirmDismiss(onConfirm: () => void) {
   const title = "Delete this?";

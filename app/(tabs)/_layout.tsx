@@ -89,7 +89,7 @@ const TabsShell = memo(function TabsShell() {
           ...webTabSceneShell,
           backgroundColor: colors.background,
         },
-        lazy: false,
+        lazy: true,
         freezeOnBlur: true,
         headerTitleContainerStyle: { overflow: "visible" },
       }}

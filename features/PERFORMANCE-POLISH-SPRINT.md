@@ -419,7 +419,89 @@ Add new bugs to BUG-TRACKER first, then link here.
 |------|--------|
 | 2026-07-05 | Phase 1 audit complete; living doc created |
 | 2026-07-05 | Messaging management release QA passed; inbox perf shipped (`72ff0a9`) |
+| 2026-07-06 | **Sprint 1 kickoff** — calendar cache, lazy tabs, groups batch, badge sync, indexes, Founder QA + roadmap docs |
+
+| 2026-07-06 | **Sprint 1 execution** — social quick wins, story bundle query, notifications bulk delete, double-tap like |
+
+### Sprint 1 deliverable (Phase 2 — awaiting Founder QA)
+
+**Status:** Code complete locally · **Not deployed** · Migration `20260706000001` not applied to Supabase yet
+
+#### Bugs fixed
+
+| Item | Fix |
+|------|-----|
+| Calendar double-fetch at login | `lazy: true` on tabs; removed stub `getPartnersTrainingToday` query |
+| Calendar prefetch cache miss | Shared `calendar-query-range.ts` keys aligned with tab + prefetch |
+| Discover groups N+1 | Batch member counts in `getGroups` |
+| Messages badge duplicate fetch | Badge syncs from fresh inbox cache on Messages route |
+| Feed duplicate suggestions fetch | Unified `discover-suggestions` cache key (Feed + Discover) |
+| FeedRebuildProbe stale key | Updated to `discover-suggestions` |
+
+#### UI / UX improvements
+
+| Item | Change |
+|------|--------|
+| Double-tap to like | Feed post media double-tap likes (Instagram-style) |
+| Notifications bulk delete | Edit mode → multi-select → Delete with confirmation |
+| Notifications cache-first | `placeholderData` + longer `staleTime`; skeleton only on true cold load |
+| Founder QA checklist | [`FOUNDER-QA.md`](FOUNDER-QA.md) — full production sign-off |
+| Operations roadmap | [`FOUNDER-ROADMAP.md`](FOUNDER-ROADMAP.md) — permanent backlog + release workflow |
+
+#### Performance improvements
+
+| Area | Change | Expected impact |
+|------|--------|-----------------|
+| Tab boot | Lazy tab mounting | Eliminates Calendar API at login |
+| Calendar | `initialData` / `placeholderData` from prefetch | Near-instant revisit |
+| Discover | FlatList `windowSize` / `maxToRenderPerBatch` on all tabs | Smoother scroll |
+| Story viewer | Single `getStoryInteractiveBundle` query (was 6 `useQuery`) | 1 cache key; 60s stale; skip challenge joins when no hint |
+| DB indexes | `20260706000001_app_performance_indexes.sql` | Faster inbox, follows, likes, comments, notifications |
+
+#### Benchmarks
+
+| Metric | Before (audit / prod baseline) | After (Sprint 1 — local) |
+|--------|-------------------------------|---------------------------|
+| Messages inbox (cached) | ~150ms target (shipped `72ff0a9`) | Unchanged — no regression |
+| Calendar at login | Extra `getCalendarView` fetch | **Eliminated** (lazy tabs) |
+| Story viewer open | 6 parallel React Query hooks | **1** bundled query |
+| Discover groups load | N+1 member count queries | **2** queries total |
+| Web build | `index-9ac4dc94…` (messaging perf) | `index-c4f04892…` (sprint 1) — builds clean |
+
+*Run `measure-feed-perf.ts` and `measure-messaging-perf.ts` with Founder test account before prod sign-off for numeric API timings.*
+
+#### Remaining known issues (not in this deploy)
+
+| ID | Issue | Priority |
+|----|-------|----------|
+| C-01 | Feed web ScrollView — no virtualization | Critical |
+| C-03 | Comments load-all in ScrollView | Critical |
+| H-03 | `getCalendarView` heavy aggregate | High |
+| H-04 | Notifications disk cache (memory only today) | High |
+| H-07 | Double-tap heart animation (like works; no animation yet) | Medium |
+| M-06 | Pull-to-refresh consistency audit | Medium |
+
+#### Regression testing
+
+| Area | Automated | Manual |
+|------|-----------|--------|
+| Web build | ✅ `npm run build:web` | — |
+| Messaging verify | Run `verify-message-notification-delete.ts` | Founder QA checklist |
+| Full feature matrix | — | [`FOUNDER-QA.md`](FOUNDER-QA.md) on iPhone Safari |
+
+#### Recommendations for next sprint (after Founder approval)
+
+1. Apply `20260706000001` migration to staging → prod
+2. Close **C-01** (Feed web virtualization) and **C-03** (comments pagination)
+3. Notifications disk cache + prefetch on tab boot
+4. UI polish pass: spacing audit, empty states, skeleton gating on Profile/Discover
+5. Capture numeric benchmarks with Founder account; add to `PERFORMANCE.md`
+6. **Then** begin Messaging 2.0 (blocked until this sprint signed off)
+
+#### Release process (every deploy)
+
+1. Development → 2. Automated verification → 3. Performance testing → 4. Manual QA → 5. **Founder QA** → 6. Production deploy (explicit approval) → 7. Smoke test → 8. Release summary + roadmap update
 
 ---
 
-**Next step:** Founder approval of Phase 8 priorities → begin Phase 2 implementation in Critical → High order. Update this doc as items close.
+**Next step:** Founder runs [`FOUNDER-QA.md`](FOUNDER-QA.md) on staging build → approve or log failures → then we commit, apply migration, and deploy.

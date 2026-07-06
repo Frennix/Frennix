@@ -381,8 +381,9 @@ export default function HomeScreen() {
     refetch: refetchSuggestions,
     isRefetching: isSuggestionsRefetching,
   } = useQuery({
-    queryKey: ["suggested-athletes", userId],
-    queryFn: () => getSuggestedAthletes(userId, 10),
+    queryKey: ["discover-suggestions", userId],
+    queryFn: () => getSuggestedAthletes(userId, 20),
+    select: (athletes) => athletes.slice(0, 10),
     enabled: !!userId && isFeedReady,
     staleTime: 120_000,
   });
@@ -506,6 +507,7 @@ export default function HomeScreen() {
     onAuthorPress: () => undefined,
     onCommentAuthorPress: () => undefined,
     onLike: () => undefined,
+    onDoubleTapLike: () => undefined,
     onComment: () => undefined,
     onShare: () => undefined,
     onSave: () => undefined,
@@ -530,6 +532,9 @@ export default function HomeScreen() {
     },
     onLike: (post: Post) => {
       toggleLikePost(post.id);
+    },
+    onDoubleTapLike: (post: Post) => {
+      if (!post.liked_by_me) toggleLikePost(post.id);
     },
     onComment: (post: Post) => {
       pushScreen(`/post/${getSharedPostTargetId(post)}`);
@@ -573,6 +578,7 @@ export default function HomeScreen() {
       onAuthorPress: (post) => feedActionsRef.current.onAuthorPress(post),
       onCommentAuthorPress: (username) => feedActionsRef.current.onCommentAuthorPress(username),
       onLike: (post) => feedActionsRef.current.onLike(post),
+      onDoubleTapLike: (post) => feedActionsRef.current.onDoubleTapLike?.(post),
       onComment: (post) => feedActionsRef.current.onComment(post),
       onShare: (post) => feedActionsRef.current.onShare(post),
       onSave: (post) => feedActionsRef.current.onSave(post),

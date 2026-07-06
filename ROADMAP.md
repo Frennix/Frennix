@@ -1,7 +1,7 @@
 # Frennix Product Roadmap
 
 **Status:** Official product roadmap  
-**Last updated:** July 5, 2026  
+**Last updated:** July 6, 2026  
 **Owner:** Founder  
 **Source of truth:** [`features/PRODUCT_VISION.md`](features/PRODUCT_VISION.md)  
 **Progress dashboard:** [`features/PROJECT-PROGRESS.md`](features/PROJECT-PROGRESS.md)  
@@ -48,20 +48,38 @@
 5. Performance, stability, accessibility, and interaction polish app-wide
 6. Daily-use features that reinforce motivation, accountability, and connection
 
-### Development priority order (Founder-approved — July 5, 2026)
+### Development priority order (Founder-approved — July 6, 2026)
 
-**Stabilize → Performance → Polish → Features.** Major new features wait until stability and polish are verified on a physical iPhone.
+**Current phase:** UX Polish Sprint (App Store readiness) → then Feature sprints in order below.
 
-| Tier | Focus |
-|------|-------|
-| **1 — Stabilize** | Freezes, lag, viewport, scroll, rendering, Safari regressions (BUG-002/003/004) |
-| **2 — Performance** | Feed load, messaging N+1, deferred media, recorded baselines |
-| **3 — Polish** | Phase B/C feed interaction, design system migration, haptics, animations |
-| **4 — Features** | Training Together Today, Matchmaking GA, Story Replies, Run Clubs |
+| Phase | Focus |
+|-------|-------|
+| **Now — UX Polish** | Responsiveness, spacing, typography, loading/empty/error states, pull-to-refresh, feed polish — no major new features |
+| **Next — Features** | See [Feature sprint priority order](#feature-sprint-priority-order-founder-approved--july-6-2026) |
 
-**Active sprint:** [`features/PERFORMANCE-POLISH-SPRINT.md`](features/PERFORMANCE-POLISH-SPRINT.md) — living backlog for performance, polish, bugs, and post-sprint features. Update there, not in chat.
+**Active sprint:** [`features/UX-POLISH-SPRINT.md`](features/UX-POLISH-SPRINT.md) — screen-by-screen UX review and polish.
+
+**Previous sprint (complete):** [`features/PERFORMANCE-POLISH-SPRINT.md`](features/PERFORMANCE-POLISH-SPRINT.md) — performance, stability, Founder QA docs.
+
+**Operations backlog:** [`features/FOUNDER-ROADMAP.md`](features/FOUNDER-ROADMAP.md) · **Founder QA:** [`features/FOUNDER-QA.md`](features/FOUNDER-QA.md)
+
+Update there, not in chat.
 
 See [`DEVELOPMENT_STANDARDS.md`](DEVELOPMENT_STANDARDS.md) for permanent enforcement.
+
+### Feature sprint priority order (Founder-approved — July 6, 2026)
+
+Execute **after** UX Polish Sprint is signed off. No Messaging 2.0 until items 1–6 are complete.
+
+| Order | Sprint | Scope |
+|-------|--------|-------|
+| **1** | **Feed 2.0** | Engagement, media, scroll perf, interaction polish |
+| **2** | **Comments 2.0** | Pagination, threading UX, edit/delete/reply polish |
+| **3** | **Story Viewer** | Viewer list (“who viewed”), perf, transitions, engagement |
+| **4** | **Notification Center** | Grouping, bulk actions, preferences, deep links |
+| **5** | **Discover 2.0** | Matching, search, filters, empty states |
+| **6** | **Events 2.0** | RSVP, invites, event detail polish |
+| **7** | **Messaging 2.0** | Reactions, replies, read receipts, voice, shares |
 
 ---
 

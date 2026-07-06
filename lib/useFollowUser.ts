@@ -124,7 +124,7 @@ export function useFollowUser(currentUserId: string) {
         queryClient.invalidateQueries({ queryKey: ["profile-stats", targetUserId] });
         queryClient.invalidateQueries({ queryKey: ["profile-stats", currentUserId] });
       }
-      queryClient.invalidateQueries({ queryKey: ["suggested-athletes", currentUserId] });
+      queryClient.invalidateQueries({ queryKey: ["discover-suggestions", currentUserId] });
       queryClient.invalidateQueries({ queryKey: ["discover-suggestions", currentUserId] });
     },
   });

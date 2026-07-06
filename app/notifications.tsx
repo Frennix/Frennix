@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -10,13 +10,13 @@ import {
 } from "react-native";
 import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead, dismissNotification } from "@frennix/api";
+import { getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead, dismissNotification, dismissNotificationsBulk } from "@frennix/api";
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTargetAsync } from "@/lib/notification-navigation";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
-import { showAlert } from "@/lib/alerts";
+import { showAlert, confirmBulkDismissNotifications } from "@/lib/alerts";
 import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
@@ -31,12 +31,41 @@ const SafeNotificationRow = memo(function SafeNotificationRow({
   onPress,
   onDelete,
   dismissing,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
 }: {
   notification: Notification;
   onPress: (id: string) => void;
   onDelete: (notification: Notification) => void;
   dismissing: boolean;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
+  if (selectMode) {
+    return (
+      <Pressable
+        style={[styles.selectRow, selected && styles.selectRowSelected]}
+        onPress={() => onToggleSelect?.(notification.id)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected }}
+      >
+        <View style={[styles.selectBox, selected && styles.selectBoxChecked]}>
+          {selected ? <Text style={styles.selectCheck}>✓</Text> : null}
+        </View>
+        <View style={styles.selectRowContent}>
+          <FrennixNotificationRow
+            notification={notification}
+            onPress={() => onToggleSelect?.(notification.id)}
+            onDelete={() => onToggleSelect?.(notification.id)}
+            hideDelete
+          />
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <AnimatedDismissRow dismissing={dismissing}>
       <SwipeToDeleteRow onDelete={() => onDelete(notification)}>
@@ -56,6 +85,10 @@ export default function NotificationsScreen() {
   const notificationsReady = !authLoading && !!userId;
   const queryClient = useQueryClient();
   const { unreadNotifications: unreadCount } = useTabBadges();
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+
+  const cachedNotifications = queryClient.getQueryData<Notification[]>(["notifications", userId]);
 
   const {
     data: notifications = [],
@@ -68,7 +101,8 @@ export default function NotificationsScreen() {
     queryKey: ["notifications", userId],
     queryFn: () => getNotifications(userId),
     enabled: notificationsReady,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    placeholderData: cachedNotifications,
   });
 
   const onRefresh = useGuardedRefresh(
@@ -158,6 +192,62 @@ export default function NotificationsScreen() {
   const { requestDismiss: requestNotificationDismiss, isDismissing: isNotificationDismissing } =
     useDismissWithAnimation((notificationId) => dismissMutation.mutate(notificationId));
 
+  const bulkDismissMutation = useMutation({
+    mutationFn: (ids: string[]) => dismissNotificationsBulk(ids, userId),
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications", userId] });
+      const previous = queryClient.getQueryData<Notification[]>(["notifications", userId]);
+      const idSet = new Set(ids);
+      const removedUnread = (previous ?? []).filter((item) => idSet.has(item.id) && !item.read_at).length;
+      queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
+        (current ?? []).filter((item) => !idSet.has(item.id))
+      );
+      if (removedUnread > 0) {
+        queryClient.setQueryData<number>(["unread-notifications", userId], (current) =>
+          Math.max(0, (current ?? 0) - removedUnread)
+        );
+      }
+      return { previous, removedUnread };
+    },
+    onError: (_error, _ids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications", userId], context.previous);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+    },
+    onSuccess: (_data, _ids, context) => {
+      if (context?.removedUnread) {
+        const nextUnread = Math.max(
+          0,
+          queryClient.getQueryData<number>(["unread-notifications", userId]) ?? 0
+        );
+        void syncNotificationBadgeCount(nextUnread);
+      }
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    },
+  });
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    confirmBulkDismissNotifications(ids.length, () => bulkDismissMutation.mutate(ids));
+  }, [bulkDismissMutation, selectedIds]);
+
   const handleDeleteNotification = useCallback(
     (notification: Notification) => {
       requestNotificationDismiss(notification.id);
@@ -189,9 +279,19 @@ export default function NotificationsScreen() {
         onPress={handlePressById}
         onDelete={handleDeleteNotification}
         dismissing={isNotificationDismissing(item.id)}
+        selectMode={selectMode}
+        selected={selectedIds.has(item.id)}
+        onToggleSelect={toggleSelect}
       />
     ),
-    [handleDeleteNotification, handlePressById, isNotificationDismissing]
+    [
+      handleDeleteNotification,
+      handlePressById,
+      isNotificationDismissing,
+      selectMode,
+      selectedIds,
+      toggleSelect,
+    ]
   );
 
   if (authLoading) {
@@ -206,7 +306,7 @@ export default function NotificationsScreen() {
     );
   }
 
-  if (isLoading && !notifications.length) {
+  if (isLoading && !notifications.length && !cachedNotifications?.length) {
     return <NotificationsListSkeleton />;
   }
 
@@ -233,13 +333,45 @@ export default function NotificationsScreen() {
         </Text>
       </View>
 
-      {unreadCount > 0 ? (
+      {selectMode ? (
+        <View style={styles.header}>
+          <Pressable onPress={exitSelectMode} hitSlop={8}>
+            <Text style={styles.markAll}>Cancel</Text>
+          </Pressable>
+          <Text style={styles.headerText}>
+            {selectedIds.size} selected
+          </Text>
+          <Pressable
+            onPress={handleBulkDelete}
+            disabled={!selectedIds.size || bulkDismissMutation.isPending}
+            hitSlop={8}
+          >
+            <Text style={[styles.markAll, !selectedIds.size && styles.markAllDisabled]}>
+              Delete
+            </Text>
+          </Pressable>
+        </View>
+      ) : unreadCount > 0 ? (
         <View style={styles.header}>
           <Text style={styles.headerText}>
             {unreadCount} unread notification{unreadCount === 1 ? "" : "s"}
           </Text>
-          <Pressable onPress={() => markAllMutation.mutate()} hitSlop={8}>
-            <Text style={styles.markAll}>Mark all read</Text>
+          <View style={styles.headerActions}>
+            {notifications.length > 0 ? (
+              <Pressable onPress={() => setSelectMode(true)} hitSlop={8} style={styles.headerAction}>
+                <Text style={styles.markAll}>Edit</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => markAllMutation.mutate()} hitSlop={8}>
+              <Text style={styles.markAll}>Mark all read</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : notifications.length > 0 ? (
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Notifications</Text>
+          <Pressable onPress={() => setSelectMode(true)} hitSlop={8}>
+            <Text style={styles.markAll}>Edit</Text>
           </Pressable>
         </View>
       ) : null}
@@ -265,6 +397,7 @@ export default function NotificationsScreen() {
             description="When you connect with a training partner, receive a message, or get activity on your posts, you'll see it here instantly."
           />
         }
+        extraData={selectMode ? selectedIds : null}
         renderItem={renderItem}
       />
     </View>
@@ -306,6 +439,33 @@ const styles = StyleSheet.create({
   },
   headerText: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
   markAll: { ...typography.caption, color: colors.accent, fontWeight: "700" },
+  markAllDisabled: { color: colors.textMuted },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  headerAction: { marginRight: spacing.xs },
+  selectRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    paddingLeft: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  selectRowSelected: { backgroundColor: colors.surfaceElevated },
+  selectBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginRight: spacing.xs,
+  },
+  selectBoxChecked: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  selectCheck: { color: colors.background, fontSize: 14, fontWeight: "700", lineHeight: 16 },
+  selectRowContent: { flex: 1 },
   listView: { flex: 1 },
   list: { flexGrow: 1 },
 });

@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getCalendarView,
   getErrorMessage,
-  getPartnersTrainingToday,
   respondTrainingSessionInvite,
 } from "@frennix/api";
 import type { CalendarViewItem, TrainingSessionInvite } from "@frennix/types";
@@ -64,6 +63,7 @@ import {
 import { showAlert } from "@/lib/alerts";
 import { buildTodaysFocus } from "@/lib/training-calendar-focus";
 import { useCalendarWideLayout } from "@/lib/responsive";
+import { getCalendarViewQueryKey, getDefaultCalendarRange } from "@/lib/calendar-query-range";
 import { EmptyState, colors, spacing, typography } from "@frennix/ui";
 
 /** Scroll child index for native sticky Month/Week controls (see ScrollView child order). */
@@ -124,14 +124,25 @@ export default function TrainingCalendarTabScreen() {
     return addDays(end, 7).toISOString();
   }, [anchorDate]);
 
-  const queryKey = ["calendar-view", userId, rangeStart, rangeEnd] as const;
+  const queryKey = getCalendarViewQueryKey(userId, rangeStart, rangeEnd);
 
-  const { data: calendarView, isLoading, refetch, isRefetching } = useQuery({
+  const { data: calendarView, isPending, refetch, isRefetching } = useQuery({
     queryKey,
     queryFn: () => getCalendarView(userId, rangeStart, rangeEnd),
     enabled: Boolean(userId),
     staleTime: 60_000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
+    initialData: () => {
+      const { rangeStart: defaultStart, rangeEnd: defaultEnd } = getDefaultCalendarRange();
+      if (rangeStart !== defaultStart || rangeEnd !== defaultEnd) return undefined;
+      return queryClient.getQueryData<Awaited<ReturnType<typeof getCalendarView>>>(queryKey);
+    },
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(queryKey)?.dataUpdatedAt,
   });
+
+  const showCalendarSkeleton = isPending && !calendarView;
 
   const items = calendarView?.items ?? [];
   const activityDateKeys = useMemo(
@@ -141,14 +152,8 @@ export default function TrainingCalendarTabScreen() {
   const streak = calendarView?.streak ?? 0;
   const pendingInvites = calendarView?.pending_invites ?? [];
   const weekly = calendarView?.weekly_consistency;
-  const todayKey = toDateKey(new Date());
 
-  const { data: partnersTrainingToday = [] } = useQuery({
-    queryKey: ["partners-training-today", userId, todayKey],
-    queryFn: () => getPartnersTrainingToday(userId, todayKey),
-    enabled: Boolean(userId),
-    staleTime: 60_000,
-  });
+  const partnersTrainingToday: TrainingSessionInvite[] = [];
 
   const todaysFocus = useMemo(
     () => buildTodaysFocus(items, streak, weekly, partnersTrainingToday),
@@ -265,7 +270,7 @@ export default function TrainingCalendarTabScreen() {
               ))
             ) : (
               <Text style={styles.empty}>
-                {isLoading ? "Loading sessions…" : "No sessions scheduled"}
+                {showCalendarSkeleton ? "Loading sessions…" : "No sessions scheduled"}
               </Text>
             )}
           </View>

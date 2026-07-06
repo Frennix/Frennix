@@ -25,16 +25,26 @@ export async function getGroups(filters?: { sport?: string; query?: string }): P
   if (error) throw error;
 
   const groups = (data ?? []) as Group[];
-  const withCounts = await Promise.all(
-    groups.map(async (g) => {
-      const { count } = await getSupabase()
-        .from("group_members")
-        .select("*", { count: "exact", head: true })
-        .eq("group_id", g.id);
-      return { ...g, member_count: count ?? 0 };
-    })
-  );
-  return withCounts;
+  if (!groups.length) return [];
+
+  const groupIds = groups.map((group) => group.id);
+  const { data: memberRows, error: memberError } = await getSupabase()
+    .from("group_members")
+    .select("group_id")
+    .in("group_id", groupIds);
+
+  if (memberError) throw memberError;
+
+  const memberCountByGroup = new Map<string, number>();
+  for (const row of memberRows ?? []) {
+    const groupId = row.group_id as string;
+    memberCountByGroup.set(groupId, (memberCountByGroup.get(groupId) ?? 0) + 1);
+  }
+
+  return groups.map((group) => ({
+    ...group,
+    member_count: memberCountByGroup.get(group.id) ?? 0,
+  }));
 }
 
 export async function getGroup(groupId: string): Promise<Group | null> {

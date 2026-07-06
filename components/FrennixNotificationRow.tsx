@@ -9,12 +9,14 @@ type FrennixNotificationRowProps = {
   notification: Notification;
   onPress: () => void;
   onDelete: () => void;
+  hideDelete?: boolean;
 };
 
 export const FrennixNotificationRow = memo(function FrennixNotificationRow({
   notification,
   onPress,
   onDelete,
+  hideDelete = false,
 }: FrennixNotificationRowProps) {
   const isUnread = !notification.read_at;
   const actor = notification.actor;
@@ -52,10 +54,12 @@ export const FrennixNotificationRow = memo(function FrennixNotificationRow({
           </View>
         </View>
       </Pressable>
-      <DismissTrashButton
-        onPress={onDelete}
-        accessibilityLabel="Delete notification"
-      />
+      {hideDelete ? null : (
+        <DismissTrashButton
+          onPress={onDelete}
+          accessibilityLabel="Delete notification"
+        />
+      )}
     </View>
   );
 });

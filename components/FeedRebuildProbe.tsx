@@ -379,7 +379,7 @@ export default function FeedRebuildProbe() {
   });
 
   const { data: suggestions = [] } = useQuery({
-    queryKey: ["suggested-athletes", userId],
+    queryKey: ["discover-suggestions", userId],
     queryFn: () => getSuggestedAthletes(userId, 10),
     enabled: step >= 1 && !!userId,
     staleTime: 120_000,

@@ -39,15 +39,10 @@ import { StoryCompletionBadge } from "./story/StoryCompletionBadge";
 import { StoryFooterGradient } from "./story/StoryFooterGradient";
 import { StoryQuestionAnswersModal } from "./story/StoryQuestionAnswersModal";
 import {
-  getStoryPoll,
   voteStoryPoll,
-  getStoryTrainingChallenge,
-  getStoryChallengeJoins,
-  getStoryCountdown,
+  getStoryInteractiveBundle,
   subscribeStoryCountdown,
-  getStoryQuestion,
   answerStoryQuestion,
-  getStoryWorkoutCommitment,
   getStoryQuestionAnswersForOwner,
   shareStoryQuestionAnswer,
 } from "@frennix/api";
@@ -470,44 +465,26 @@ export function WorkoutStoryViewer({
   const pollStoryId = slideContext?.storyId ?? activeStories.at(-1)?.id ?? null;
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const hasChallengeHint = Boolean(
+    currentDedicatedStory?.challenge_id || currentDedicatedStory?.challenge_prompt
+  );
 
-  const { data: storyPoll } = useQuery({
-    queryKey: ["story-poll", pollStoryId, session?.user.id],
-    queryFn: () => getStoryPoll(pollStoryId!, session?.user.id),
+  const { data: storyInteractive } = useQuery({
+    queryKey: ["story-interactive", pollStoryId, session?.user.id, hasChallengeHint],
+    queryFn: () =>
+      getStoryInteractiveBundle(pollStoryId!, session?.user.id, {
+        includeChallengeJoins: hasChallengeHint,
+      }),
     enabled: Boolean(visible && pollStoryId),
-    staleTime: 10_000,
+    staleTime: 60_000,
   });
 
-  const { data: trainingChallenge } = useQuery({
-    queryKey: ["story-training-challenge", pollStoryId],
-    queryFn: () => getStoryTrainingChallenge(pollStoryId!),
-    enabled: Boolean(visible && pollStoryId),
-  });
-
-  const { data: challengeJoins = [] } = useQuery({
-    queryKey: ["story-challenge-joins", pollStoryId],
-    queryFn: () => getStoryChallengeJoins(pollStoryId!),
-    enabled: Boolean(visible && pollStoryId),
-    staleTime: 10_000,
-  });
-
-  const { data: storyCountdown } = useQuery({
-    queryKey: ["story-countdown", pollStoryId, session?.user.id],
-    queryFn: () => getStoryCountdown(pollStoryId!, session?.user.id),
-    enabled: Boolean(visible && pollStoryId),
-  });
-
-  const { data: storyQuestion } = useQuery({
-    queryKey: ["story-question", pollStoryId, session?.user.id],
-    queryFn: () => getStoryQuestion(pollStoryId!, session?.user.id),
-    enabled: Boolean(visible && pollStoryId),
-  });
-
-  const { data: workoutCommitment } = useQuery({
-    queryKey: ["story-commitment", pollStoryId],
-    queryFn: () => getStoryWorkoutCommitment(pollStoryId!),
-    enabled: Boolean(visible && pollStoryId),
-  });
+  const storyPoll = storyInteractive?.poll ?? null;
+  const trainingChallenge = storyInteractive?.trainingChallenge ?? null;
+  const challengeJoins = storyInteractive?.challengeJoins ?? [];
+  const storyCountdown = storyInteractive?.countdown ?? null;
+  const storyQuestion = storyInteractive?.question ?? null;
+  const workoutCommitment = storyInteractive?.commitment ?? null;
 
   const { data: questionAnswers = [], isLoading: questionAnswersLoading } = useQuery({
     queryKey: ["story-question-answers", storyQuestion?.id],
@@ -528,7 +505,7 @@ export function WorkoutStoryViewer({
     async (optionId: string) => {
       if (!storyPoll || !session?.user.id) return;
       await voteStoryPoll(storyPoll.id, optionId, session.user.id);
-      await queryClient.invalidateQueries({ queryKey: ["story-poll", pollStoryId] });
+      await queryClient.invalidateQueries({ queryKey: ["story-interactive", pollStoryId] });
     },
     [pollStoryId, queryClient, session?.user.id, storyPoll]
   );
@@ -536,14 +513,14 @@ export function WorkoutStoryViewer({
   const handleCountdownSubscribe = useCallback(async () => {
     if (!storyCountdown || !session?.user.id) return;
     await subscribeStoryCountdown(storyCountdown.id, session.user.id);
-    await queryClient.invalidateQueries({ queryKey: ["story-countdown", pollStoryId] });
+    await queryClient.invalidateQueries({ queryKey: ["story-interactive", pollStoryId] });
   }, [pollStoryId, queryClient, session?.user.id, storyCountdown]);
 
   const handleQuestionAnswer = useCallback(
     async (answer: string) => {
       if (!storyQuestion || !session?.user.id) return;
       await answerStoryQuestion(storyQuestion.id, session.user.id, answer);
-      await queryClient.invalidateQueries({ queryKey: ["story-question", pollStoryId] });
+      await queryClient.invalidateQueries({ queryKey: ["story-interactive", pollStoryId] });
     },
     [pollStoryId, queryClient, session?.user.id, storyQuestion]
   );

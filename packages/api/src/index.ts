@@ -34,6 +34,7 @@ export * from "./matching";
 export * from "./trainer";
 export * from "./analytics";
 export * from "./story-polls";
+export * from "./story-interactive-bundle";
 export * from "./story-fitness";
 export * from "./story-highlights";
 export * from "./training-calendar";

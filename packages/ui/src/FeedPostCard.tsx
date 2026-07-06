@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { Pressable, Text } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
@@ -41,6 +41,8 @@ interface FeedPostCardProps {
   isOwn?: boolean;
   onOwnerActionsPress?: () => void;
   onMediaPress?: (uri: string, index: number) => void;
+  /** Double-tap media to like (Instagram-style). */
+  onDoubleTapLike?: () => void;
   /** Defer heavy media until the row is near the viewport. */
   mediaActive?: boolean;
   mediaPageIndex?: number;
@@ -64,6 +66,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   isOwn,
   onOwnerActionsPress,
   onMediaPress,
+  onDoubleTapLike,
   mediaActive = true,
   mediaPageIndex,
   onMediaPageIndexChange,
@@ -102,6 +105,18 @@ export const FeedPostCard = memo(function FeedPostCard({
   );
 
   const openPostDetail = onPress;
+
+  const lastMediaTapAt = useRef(0);
+  const handleMediaAreaPress = useCallback(() => {
+    if (!onDoubleTapLike) return;
+    const now = Date.now();
+    if (now - lastMediaTapAt.current < 280) {
+      lastMediaTapAt.current = 0;
+      onDoubleTapLike();
+      return;
+    }
+    lastMediaTapAt.current = now;
+  }, [onDoubleTapLike]);
 
   return (
     <FeedLayout.Root active={interactionActive}>
@@ -148,16 +163,18 @@ export const FeedPostCard = memo(function FeedPostCard({
           />
         </FeedLayout.Media>
       ) : hasMedia ? (
-        <FeedMedia
-          mediaUrls={displayPost.media_urls ?? []}
-          postType={displayPost.post_type}
-          thumbnailUrl={displayPost.thumbnail_url}
-          onMediaPress={onMediaPress}
-          pageIndex={mediaPageIndex}
-          onPageIndexChange={onMediaPageIndexChange}
-          visible={mediaActive}
-          overlay={slots?.mediaOverlay}
-        />
+        <Pressable onPress={onDoubleTapLike ? handleMediaAreaPress : undefined} disabled={!onDoubleTapLike}>
+          <FeedMedia
+            mediaUrls={displayPost.media_urls ?? []}
+            postType={displayPost.post_type}
+            thumbnailUrl={displayPost.thumbnail_url}
+            onMediaPress={onMediaPress}
+            pageIndex={mediaPageIndex}
+            onPageIndexChange={onMediaPageIndexChange}
+            visible={mediaActive}
+            overlay={slots?.mediaOverlay}
+          />
+        </Pressable>
       ) : null}
 
       <FeedLayout.BelowMedia>{slots?.belowMedia}</FeedLayout.BelowMedia>
