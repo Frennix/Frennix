@@ -6,8 +6,8 @@ export const FEED_FONT_SCALE_MAX = 1.35;
 
 /**
  * Accessibility defaults for feed components.
- * Safe areas: feed list uses tab shell insets; post cards do not add extra horizontal safe padding
- * (media is edge-to-edge; text uses contentPaddingX from layout tokens).
+ * Safe areas: feed list uses tab shell insets; post cards apply contentPaddingX once on Root
+ * so media and metadata share one column width.
  */
 export const feedAccessibility = {
   maxFontSizeMultiplier: FEED_FONT_SCALE_MAX,
@@ -22,12 +22,13 @@ export const feedLayout = {
   /** Max post width on large web viewports; phones use full width. */
   maxContentWidth: 640,
 
-  /** Horizontal padding for text sections (header, caption, actions, comments). */
-  contentPaddingX: spacing.sm,
+  /** Single horizontal inset for the entire post column — media and metadata share this width. */
+  contentPaddingX: 0,
 
-  /** Media is edge-to-edge within the post card. */
+  /** @deprecated Use contentPaddingX on Root — media shares the same column as metadata. */
   mediaMarginX: 0,
-  mediaMarginTop: spacing.xs,
+  /** Tight gap between compact post header and media — media leads immediately. */
+  mediaMarginTop: 0,
 
   /** Vertical rhythm between major sections inside a post. */
   sectionGap: spacing.xxs,
@@ -35,18 +36,18 @@ export const feedLayout = {
   postPaddingBottom: spacing.sm,
 
   header: {
-    avatarSize: 36,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-    gap: spacing.sm,
-    nameGap: 1,
+    avatarSize: 32,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xxs,
+    gap: spacing.xs,
+    nameGap: 0,
     usernameMarginTop: 0,
-    metaMarginTop: 2,
+    metaMarginTop: 0,
     workoutTagGap: spacing.xxs,
   },
 
   media: {
-    marginTop: spacing.xs,
+    marginTop: 0,
     marginBottom: 0,
   },
 
@@ -72,6 +73,14 @@ export const feedLayout = {
     paddingTop: spacing.xs,
     rowGap: spacing.xxs,
     commentInputMarginTop: spacing.xs,
+  },
+
+  /** Feed list chrome above first post (stories row, suggestions). */
+  feedChrome: {
+    paddingTop: spacing.xxs,
+    paddingBottom: spacing.xs,
+    sectionGap: spacing.xs,
+    storiesPaddingBottom: spacing.xxs,
   },
 
   /** Extension slots — spacing for future monetization / content overlays. */
@@ -144,21 +153,29 @@ export const feedLayoutStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingBottom: feedLayout.postPaddingBottom,
+    paddingHorizontal: feedLayout.contentPaddingX,
   },
   rootActive: {
     backgroundColor: colors.surfaceElevated,
     borderBottomColor: colors.accent,
   },
+  /** Shared content column — every section is full width of the padded post root. */
+  contentColumn: {
+    width: "100%",
+    alignSelf: "stretch" as const,
+  },
   contentInset: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
+    alignSelf: "stretch" as const,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.header.paddingTop,
     paddingBottom: feedLayout.header.paddingBottom,
     gap: feedLayout.header.gap,
+    minHeight: feedAccessibility.minTouchTarget,
   },
   headerText: {
     flex: 1,
@@ -166,36 +183,37 @@ export const feedLayoutStyles = StyleSheet.create({
   },
   media: {
     width: "100%",
-    marginHorizontal: feedLayout.mediaMarginX,
+    alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
   },
   embeddedMedia: {
-    marginHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
+    alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
     borderRadius: 8,
     overflow: "hidden",
   },
   actions: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.actions.paddingTop,
     paddingBottom: feedLayout.actions.paddingBottom,
   },
   caption: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.caption.paddingTop,
   },
   engagement: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.engagement.paddingTop,
     gap: feedLayout.engagement.gap,
   },
   comments: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.comments.paddingTop,
     gap: feedLayout.comments.rowGap,
   },
   label: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.extensions.labelPaddingTop,
     paddingBottom: feedLayout.extensions.labelPaddingBottom,
   },
@@ -204,15 +222,15 @@ export const feedLayoutStyles = StyleSheet.create({
     marginTop: 2,
   },
   belowMedia: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.extensions.belowMediaPaddingTop,
   },
   commerce: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.extensions.commercePaddingTop,
   },
   footer: {
-    paddingHorizontal: feedLayout.contentPaddingX,
+    width: "100%",
     paddingTop: feedLayout.extensions.footerPaddingTop,
   },
   mediaOverlay: {

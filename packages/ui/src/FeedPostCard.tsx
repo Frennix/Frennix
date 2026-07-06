@@ -125,20 +125,13 @@ export const FeedPostCard = memo(function FeedPostCard({
             >
               {author?.display_name ?? "Unknown"}
             </Text>
-            {author?.username ? (
-              <Text
-                style={feedLayoutTypography.username}
-                allowFontScaling
-                maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-              >
-                @{author.username}
-              </Text>
-            ) : null}
             <Text
               style={feedLayoutTypography.meta}
               allowFontScaling
               maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+              numberOfLines={2}
             >
+              {author?.username ? `@${author.username} · ` : ""}
               {headerMeta}
             </Text>
           </FeedLayout.HeaderText>

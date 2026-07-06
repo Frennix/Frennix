@@ -9,8 +9,7 @@ export function FeedPostCardSkeleton() {
         <Skeleton width={feedLayout.header.avatarSize} height={feedLayout.header.avatarSize} style={styles.avatar} />
         <FeedLayout.HeaderText>
           <Skeleton width="42%" height={14} />
-          <Skeleton width="28%" height={12} />
-          <Skeleton width="55%" height={12} />
+          <Skeleton width="72%" height={12} />
         </FeedLayout.HeaderText>
       </FeedLayout.Header>
 

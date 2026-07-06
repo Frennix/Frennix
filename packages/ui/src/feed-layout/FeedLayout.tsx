@@ -19,7 +19,7 @@ function Root({
 }) {
   return (
     <View style={[feedLayoutStyles.root, active && feedLayoutStyles.rootActive, style]}>
-      {children}
+      <View style={feedLayoutStyles.contentColumn}>{children}</View>
     </View>
   );
 }

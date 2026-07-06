@@ -163,6 +163,33 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "FeedStoriesRow imports feedLayout from feed-layout tokens",
+    run: () => {
+      const src = read("packages/ui/src/FeedStoriesRow.tsx");
+      if (/feedLayout.*from \"\.\/theme\"/.test(src)) {
+        throw new Error("FeedStoriesRow must import feedLayout from ./feed-layout, not ./theme");
+      }
+      if (!src.includes('from "./feed-layout"')) {
+        throw new Error("FeedStoriesRow must import feedLayout from ./feed-layout");
+      }
+    },
+  },
+  {
+    name: "FeedLayout uses one shared content column width",
+    run: () => {
+      const tokens = read("packages/ui/src/feed-layout/tokens.ts");
+      if (!tokens.includes("contentColumn")) {
+        throw new Error("feedLayout must define contentColumn for unified post width");
+      }
+      if (!tokens.includes("paddingHorizontal: feedLayout.contentPaddingX")) {
+        throw new Error("FeedLayout root must apply contentPaddingX once for all sections");
+      }
+      if (/paddingHorizontal: feedLayout\.contentPaddingX,\n    paddingTop: feedLayout\.header/.test(tokens)) {
+        throw new Error("Header must not use separate horizontal padding from media");
+      }
+    },
+  },
+  {
     name: "FeedPostCard uses compact workout meta instead of chip row",
     run: () => {
       const src = read("packages/ui/src/FeedPostCard.tsx");

@@ -3,6 +3,7 @@ import type { FeedStory } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { formatRelativeTime, formatStreakBadgeLabel } from "./formatRelativeTime";
 import { colors, spacing, typography } from "./theme";
+import { feedLayout } from "./feed-layout";
 
 interface FeedStoriesRowProps {
   stories: FeedStory[];
@@ -124,8 +125,8 @@ const styles = StyleSheet.create({
   container: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
+    paddingBottom: feedLayout.feedChrome.storiesPaddingBottom,
+    gap: spacing.xxs,
   },
   sectionTitle: {
     ...typography.bodySmall,
@@ -134,10 +135,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
     paddingHorizontal: spacing.md,
+    marginBottom: -2,
   },
   listContent: {
     paddingHorizontal: spacing.md,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   item: {
     width: 88,

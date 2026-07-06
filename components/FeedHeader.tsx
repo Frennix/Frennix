@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
-import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, spacing, typography } from "@frennix/ui";
+import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, feedLayout, spacing, typography } from "@frennix/ui";
 import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
 interface FeedHeaderProps {
@@ -94,9 +94,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
+    paddingTop: feedLayout.feedChrome.paddingTop,
+    paddingBottom: feedLayout.feedChrome.paddingBottom,
+    gap: feedLayout.feedChrome.sectionGap,
   },
   topRow: {
     flexDirection: "row",
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  titleBlock: { flex: 1, gap: 4 },
+  titleBlock: { flex: 1, gap: 2 },
   subtitle: { ...typography.caption, color: colors.textMuted },
   createButton: {
     width: 40,
@@ -126,8 +126,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: 999,
     backgroundColor: colors.surface,
     borderWidth: 1,

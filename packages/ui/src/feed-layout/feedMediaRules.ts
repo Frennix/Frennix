@@ -23,7 +23,7 @@ export const feedMediaRules = {
   /** Image fit inside exact-aspect frame (identical to cover when frame matches media). */
   contentFit: "contain" as const,
 
-  /** Edge-to-edge within post card (see feedLayout.mediaMarginX). */
+  /** Edge-to-edge within the unified post content column (same width as metadata). */
   edgeToEdge: true,
 
   /** Skeleton placeholder height while dimensions load (not applied after probe). */
@@ -46,17 +46,14 @@ export const feedMediaRules = {
 export const feedResponsiveRules = {
   phone: {
     maxContentWidth: "100%" as const,
-    contentPaddingX: 8,
-    mediaMarginX: 0,
+    contentPaddingX: 0,
   },
   tabletWeb: {
     maxContentWidth: 640,
-    contentPaddingX: 8,
-    mediaMarginX: 0,
+    contentPaddingX: 0,
   },
   desktopWeb: {
     maxContentWidth: 640,
-    contentPaddingX: 8,
-    mediaMarginX: 0,
+    contentPaddingX: 0,
   },
 } as const;

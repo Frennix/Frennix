@@ -95,8 +95,8 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    gap: spacing.xxs,
+    paddingBottom: spacing.xxs,
   },
   sectionTitle: {
     ...typography.bodySmall,
