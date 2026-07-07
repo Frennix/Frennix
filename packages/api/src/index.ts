@@ -27,6 +27,7 @@ export * from "./story-discovery";
 export * from "./story-engagement";
 export * from "./workout-story-utils";
 export * from "./push-tokens";
+export * from "./web-push-subscriptions";
 export * from "./suggestions";
 export * from "./achievements";
 export * from "./presence";

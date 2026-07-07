@@ -3,6 +3,11 @@ import { useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 import type { Notification } from "@frennix/types";
 import { getProfilesByIds, notificationActorId, subscribeToNotifications } from "@frennix/api";
+import {
+  prependNotificationToPages,
+  removeNotificationFromPages,
+  updateNotificationPages,
+} from "@/lib/notification-query-cache";
 
 function attachVisibilityReconnect(resubscribe: () => void): () => void {
   if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -23,15 +28,6 @@ function attachVisibilityReconnect(resubscribe: () => void): () => void {
   return () => subscription.remove();
 }
 
-function prependNotification(
-  current: Notification[] | undefined,
-  notification: Notification
-): Notification[] | undefined {
-  if (!current) return current;
-  if (current.some((item) => item.id === notification.id)) return current;
-  return [notification, ...current];
-}
-
 async function enrichNotification(notification: Notification): Promise<Notification> {
   const actorId = notificationActorId(notification);
   if (!actorId) return notification;
@@ -50,9 +46,7 @@ export function useNotificationSubscription(userId: string) {
 
     function handleInsert(notification: Notification) {
       void enrichNotification(notification).then((enriched) => {
-        queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
-          prependNotification(current, enriched)
-        );
+        prependNotificationToPages(queryClient, userId, enriched);
         queryClient.setQueryData<number>(["unread-notifications", userId], (current) =>
           (current ?? 0) + 1
         );
@@ -70,15 +64,38 @@ export function useNotificationSubscription(userId: string) {
 
     function handleUpdate(notification: Notification) {
       if (notification.deleted_at) {
-        queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
-          current?.filter((item) => item.id !== notification.id)
-        );
+        removeNotificationFromPages(queryClient, userId, notification.id);
+        void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
         return;
       }
 
-      queryClient.setQueryData<Notification[]>(["notifications", userId], (current) =>
-        current?.map((item) => (item.id === notification.id ? { ...item, ...notification } : item))
+      const cachedQueries = queryClient.getQueriesData({
+        queryKey: ["notifications", userId],
+      });
+      let prior: Notification | undefined;
+      for (const [, data] of cachedQueries) {
+        const pages = (data as { pages?: { items: Notification[] }[] } | undefined)?.pages;
+        if (!pages) continue;
+        for (const page of pages) {
+          prior = page.items.find((item) => item.id === notification.id);
+          if (prior) break;
+        }
+        if (prior) break;
+      }
+
+      updateNotificationPages(queryClient, userId, (items) =>
+        items.map((item) => (item.id === notification.id ? { ...item, ...notification } : item))
       );
+
+      if (prior && !prior.read_at && notification.read_at) {
+        queryClient.setQueryData<number>(["unread-notifications", userId], (current) =>
+          Math.max(0, (current ?? 0) - 1)
+        );
+      } else if (prior?.read_at && !notification.read_at) {
+        queryClient.setQueryData<number>(["unread-notifications", userId], (current) =>
+          (current ?? 0) + 1
+        );
+      }
     }
 
     let channel: ReturnType<typeof subscribeToNotifications> | null = null;

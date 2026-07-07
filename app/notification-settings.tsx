@@ -11,11 +11,13 @@ import {
 } from "react-native";
 import { Switch } from "react-native";
 import {
-  getNotificationPreferences,
-  NOTIFICATION_SETTING_ITEMS,
-  updateNotificationPreference,
+  getUserNotificationPreferences,
+  isCategoryEnabled,
+  updateUserNotificationCategory,
+  updateUserNotificationPreference,
+  USER_NOTIFICATION_CATEGORIES,
 } from "@frennix/api";
-import type { NotificationPreferenceKey } from "@frennix/types";
+import type { UserNotificationPreferenceKey } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   getPushPermissionStatus,
@@ -24,9 +26,13 @@ import {
   requestPushPermission,
   type PushPermissionStatus,
 } from "@/lib/notifications";
+import { getWebPushPermissionStatus, hasActiveWebPushSubscription } from "@/lib/web-push";
 import { showAlert } from "@/lib/alerts";
 import { FrennixLogo } from "@/components/FrennixLogo";
-import { Button, colors, spacing, typography } from "@frennix/ui";
+import { IosPwaInstallGuide } from "@/components/IosPwaInstallGuide";
+import { WebPushEnableCard } from "@/components/WebPushEnableCard";
+import { isWebStandalone, shouldShowIosPwaInstallGuide } from "@/lib/pwa";
+import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 function SettingRow({
   title,
@@ -79,7 +85,7 @@ function PushPermissionBanner({
       </Text>
       <Text style={styles.permissionBody}>
         {isDenied
-          ? "Training match and message alerts need permission in your device settings. In-app toggles below only apply once push is enabled."
+          ? "Alerts need permission in your device settings. In-app notifications always appear in your Notification Center."
           : "Allow alerts so you know instantly when you connect with a training partner or receive a message."}
       </Text>
       <Button
@@ -99,8 +105,19 @@ export default function NotificationSettingsScreen() {
   const queryClient = useQueryClient();
   const [permissionStatus, setPermissionStatus] = useState<PushPermissionStatus>("undetermined");
   const [enablingPush, setEnablingPush] = useState(false);
+  const [webPushGranted, setWebPushGranted] = useState(false);
+  const [webPushSubscribed, setWebPushSubscribed] = useState(false);
 
   const refreshPermissionStatus = useCallback(async () => {
+    if (Platform.OS === "web") {
+      const status = await getWebPushPermissionStatus();
+      const granted = status === "granted";
+      setWebPushGranted(granted);
+      setWebPushSubscribed(granted ? await hasActiveWebPushSubscription() : false);
+      setPermissionStatus(granted ? "granted" : status === "denied" ? "denied" : "undetermined");
+      return;
+    }
+
     const status = await getPushPermissionStatus();
     setPermissionStatus(status);
   }, []);
@@ -112,21 +129,40 @@ export default function NotificationSettingsScreen() {
   );
 
   const { data: preferences, isLoading } = useQuery({
-    queryKey: ["notification-preferences", userId],
-    queryFn: () => getNotificationPreferences(userId),
+    queryKey: ["user-notification-preferences", userId],
+    queryFn: () => getUserNotificationPreferences(userId),
     enabled: !!userId,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ key, enabled }: { key: NotificationPreferenceKey; enabled: boolean }) =>
-      updateNotificationPreference(userId, key, enabled),
+    mutationFn: ({
+      key,
+      value,
+    }: {
+      key: UserNotificationPreferenceKey;
+      value: boolean | string;
+    }) => updateUserNotificationPreference(userId, key, value),
     onSuccess: (next) => {
-      queryClient.setQueryData(["notification-preferences", userId], next);
+      queryClient.setQueryData(["user-notification-preferences", userId], next);
+      queryClient.invalidateQueries({ queryKey: ["notification-preferences", userId] });
     },
   });
 
-  function handleToggle(key: NotificationPreferenceKey, enabled: boolean) {
-    updateMutation.mutate({ key, enabled });
+  const categoryMutation = useMutation({
+    mutationFn: ({ categoryId, enabled }: { categoryId: string; enabled: boolean }) =>
+      updateUserNotificationCategory(userId, categoryId, enabled),
+    onSuccess: (next) => {
+      queryClient.setQueryData(["user-notification-preferences", userId], next);
+      queryClient.invalidateQueries({ queryKey: ["notification-preferences", userId] });
+    },
+  });
+
+  function handleToggle(key: UserNotificationPreferenceKey, enabled: boolean) {
+    updateMutation.mutate({ key, value: enabled });
+  }
+
+  function handleCategoryToggle(categoryId: string, enabled: boolean) {
+    categoryMutation.mutate({ categoryId, enabled });
   }
 
   async function handleEnablePush() {
@@ -148,10 +184,11 @@ export default function NotificationSettingsScreen() {
 
       if (nextStatus === "granted" && userId) {
         await registerForPushNotifications(userId);
+        handleToggle("push_enabled", true);
       } else if (nextStatus === "denied") {
         showAlert(
           "Notifications blocked",
-          "Enable notifications for Frennix in your device settings to receive training match alerts."
+          "Enable notifications for Frennix in your device settings to receive alerts."
         );
       }
     } finally {
@@ -159,59 +196,151 @@ export default function NotificationSettingsScreen() {
     }
   }
 
-  const togglesDisabled =
-    isLoading || updateMutation.isPending || permissionStatus !== "granted";
+  const pushControlsDisabled =
+    isLoading ||
+    updateMutation.isPending ||
+    (Platform.OS === "web"
+      ? !webPushGranted || !webPushSubscribed
+      : permissionStatus !== "granted");
+
+  const masterPushSwitchValue =
+    Platform.OS === "web"
+      ? webPushGranted && webPushSubscribed && (preferences?.push_enabled ?? false)
+      : (preferences?.push_enabled ?? true);
+
+  function handleMasterPushToggle(enabled: boolean) {
+    if (Platform.OS === "web" && enabled && (!webPushGranted || !webPushSubscribed)) {
+      showAlert(
+        webPushGranted ? "Complete push setup" : "Enable push on iPhone first",
+        webPushGranted
+          ? "iOS permission is granted. Tap Complete Push Setup above to create and save your push subscription. The master switch turns on only after the subscription is saved."
+          : "Tap Enable Push Notifications above and allow the iOS system dialog. The master switch turns on only after permission is granted and a subscription is saved."
+      );
+      return;
+    }
+    handleToggle("push_enabled", enabled);
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
 
       <Text style={styles.intro}>
-        Choose which alerts Frennix sends to your device. Training match alerts fire when you and
-        another athlete connect. Partner messages use the Messages toggle below.
+        Control which alerts Frennix sends to your device. Notifications always remain in your
+        Notification Center — even when push is off or during quiet hours.
       </Text>
 
-      {Platform.OS !== "web" ? (
+      {Platform.OS === "web" ? (
+        shouldShowIosPwaInstallGuide() ? (
+          <IosPwaInstallGuide />
+        ) : (
+          <WebPushEnableCard
+            readyForPush={isWebStandalone()}
+            onSetupChange={() => void refreshPermissionStatus()}
+          />
+        )
+      ) : (
         <PushPermissionBanner
           status={permissionStatus}
           enabling={enablingPush}
           onEnable={() => void handleEnablePush()}
         />
-      ) : (
-        <View style={styles.webNotice}>
-          <Text style={styles.webNoticeText}>
-            Push notifications are available on the iOS and Android apps only.
-          </Text>
-        </View>
       )}
 
-      {permissionStatus === "granted" ? (
-        <View style={styles.enabledBadge}>
-          <View style={styles.enabledDot} />
-          <Text style={styles.enabledText}>Push notifications enabled on this device</Text>
-        </View>
-      ) : null}
+      <SettingRow
+        title="Push notifications"
+        description={
+          Platform.OS === "web"
+            ? "Turns on only after iOS permission is granted and push subscription is saved."
+            : "Master switch for device alerts. In-app history is always kept."
+        }
+        value={masterPushSwitchValue}
+        onChange={handleMasterPushToggle}
+        disabled={isLoading || updateMutation.isPending}
+      />
 
-      <Text style={styles.sectionTitle}>Alert types</Text>
+      <Text style={styles.sectionTitle}>Notification categories</Text>
+      <Text style={styles.sectionHint}>
+        Control which types of alerts Frennix sends. In-app history is always kept in your
+        Notification Center.
+      </Text>
 
       {isLoading && !preferences ? (
         <ActivityIndicator color={colors.accent} style={styles.loader} />
       ) : (
-        NOTIFICATION_SETTING_ITEMS.map((item) => (
+        USER_NOTIFICATION_CATEGORIES.map((category) => (
           <SettingRow
-            key={item.key}
-            title={item.title}
-            description={item.description}
-            value={preferences?.[item.key] ?? true}
-            onChange={(enabled) => handleToggle(item.key, enabled)}
-            disabled={togglesDisabled}
+            key={category.id}
+            title={category.title}
+            description={category.description}
+            value={preferences ? isCategoryEnabled(preferences, category.id) : true}
+            onChange={(enabled) => handleCategoryToggle(category.id, enabled)}
+            disabled={
+              pushControlsDisabled ||
+              !preferences?.push_enabled ||
+              categoryMutation.isPending ||
+              updateMutation.isPending
+            }
           />
         ))
       )}
 
-      {permissionStatus !== "granted" && Platform.OS !== "web" ? (
+      <Text style={styles.sectionTitle}>Quiet hours</Text>
+      <Text style={styles.sectionHint}>
+        Off by default. During quiet hours, push is suppressed but notifications still appear in
+        your Notification Center.
+      </Text>
+
+      <SettingRow
+        title="Enable quiet hours"
+        description="Pause push notifications during your chosen window"
+        value={preferences?.quiet_hours_enabled ?? false}
+        onChange={(enabled) => handleToggle("quiet_hours_enabled", enabled)}
+        disabled={isLoading || updateMutation.isPending}
+      />
+
+      {preferences?.quiet_hours_enabled ? (
+        <View style={styles.quietHoursFields}>
+          <Input
+            label="Start (HH:MM)"
+            value={preferences.quiet_hours_start}
+            onChangeText={(value) => updateMutation.mutate({ key: "quiet_hours_start", value })}
+            autoCapitalize="none"
+            placeholder="22:00"
+          />
+          <Input
+            label="End (HH:MM)"
+            value={preferences.quiet_hours_end}
+            onChangeText={(value) => updateMutation.mutate({ key: "quiet_hours_end", value })}
+            autoCapitalize="none"
+            placeholder="07:00"
+          />
+          <Input
+            label="Timezone (IANA)"
+            value={preferences.timezone}
+            onChangeText={(value) => updateMutation.mutate({ key: "timezone", value })}
+            autoCapitalize="none"
+            placeholder="America/Los_Angeles"
+          />
+        </View>
+      ) : null}
+
+      {Platform.OS === "web" && webPushGranted && !webPushSubscribed ? (
         <Text style={styles.toggleHint}>
-          Turn on push notifications above to control these alert types.
+          iOS permission is granted. Tap Complete Push Setup above to save your push subscription.
+        </Text>
+      ) : null}
+
+      {Platform.OS === "web" && !webPushGranted ? (
+        <Text style={styles.toggleHint}>
+          Tap Enable Push Notifications above and allow the iOS system dialog before using the
+          master switch or category toggles.
+        </Text>
+      ) : null}
+
+      {Platform.OS !== "web" && permissionStatus !== "granted" ? (
+        <Text style={styles.toggleHint}>
+          Enable push notifications above to control alert types on this device.
         </Text>
       ) : null}
     </ScrollView>
@@ -262,24 +391,24 @@ const styles = StyleSheet.create({
   permissionButton: {
     alignSelf: "flex-start",
   },
-  enabledBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
+  webNotice: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
   },
-  enabledDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
+  webNoticeTitle: {
+    ...typography.body,
+    fontWeight: "700",
+    color: colors.text,
   },
-  enabledText: {
-    ...typography.caption,
-    color: colors.accent,
-    fontWeight: "600",
+  webNoticeText: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
   sectionTitle: {
     ...typography.bodySmall,
@@ -290,18 +419,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },
-  webNotice: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  webNoticeText: {
-    ...typography.bodySmall,
+  sectionHint: {
+    ...typography.caption,
     color: colors.textMuted,
-    lineHeight: 20,
+    lineHeight: 18,
+    marginBottom: spacing.xs,
   },
   row: {
     flexDirection: "row",
@@ -315,6 +437,11 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 4 },
   rowTitle: { ...typography.body, fontWeight: "600", color: colors.text },
   rowDescription: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
+  quietHoursFields: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   toggleHint: {
     ...typography.caption,
     color: colors.textMuted,

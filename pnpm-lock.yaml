@@ -17,6 +17,9 @@ importers:
       '@frennix/matching':
         specifier: workspace:*
         version: link:packages/matching
+      '@frennix/notifications':
+        specifier: workspace:*
+        version: link:packages/notifications
       '@frennix/types':
         specifier: workspace:*
         version: link:packages/types
@@ -165,6 +168,16 @@ importers:
         version: 5.9.3
 
   packages/matching:
+    dependencies:
+      '@frennix/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/notifications:
     dependencies:
       '@frennix/types':
         specifier: workspace:*

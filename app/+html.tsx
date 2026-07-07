@@ -18,6 +18,11 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <meta name="theme-color" content={FRENNIX_WEB_BACKGROUND} />
         <meta name="color-scheme" content="dark" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Frennix" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <ScrollViewStyleReset />
         <style id="frennix-web-scroll">{frennixWebDocumentCss}</style>
       </head>

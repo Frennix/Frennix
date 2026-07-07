@@ -15,6 +15,8 @@ import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners, invalidateQueriesForPushNotification } from "@/lib/notifications";
 import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
+import { PwaBootstrap } from "@/components/PwaBootstrap";
+import { WebPushListener } from "@/components/WebPushListener";
 import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
@@ -63,7 +65,7 @@ function NotificationBootstrap() {
     });
   }, [queryClient, userId]);
 
-  return null;
+  return <WebPushListener userId={userId} queryClient={queryClient} />;
 }
 
 export default function RootLayout() {
@@ -98,6 +100,7 @@ export default function RootLayout() {
                             <NotificationBootstrap />
                             <StartupMountMarker id="push-registration-bootstrap" />
                             <PushRegistrationBootstrap />
+                            <PwaBootstrap />
                             <StartupMountMarker id="product-analytics-bootstrap" />
                             <ProductAnalyticsBootstrap />
                             <StartupMountMarker id="presence-coordinator" />

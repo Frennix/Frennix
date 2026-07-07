@@ -6,6 +6,7 @@
       "@/*": ["./*"],
       "@frennix/api": ["./packages/api/src"],
       "@frennix/matching": ["./packages/matching/src"],
+      "@frennix/notifications": ["./packages/notifications/src"],
       "@frennix/types": ["./packages/types/src"],
       "@frennix/ui": ["./packages/ui/src"]
     }

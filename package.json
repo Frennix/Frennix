@@ -33,12 +33,19 @@
     "verify:matching-scoring": "npx tsx scripts/verify-matching-scoring.ts",
     "verify:online-status-privacy": "npx tsx scripts/verify-online-status-privacy.ts",
     "verify:post-workout-types": "npx tsx scripts/verify-post-workout-types.ts",
-    "build:web": "expo export -p web && node scripts/patch-web-html.js"
+    "verify:notification-engine-phase0": "npx tsx scripts/verify-notification-engine-phase0.ts",
+    "verify:notification-engine-phase1": "npx tsx scripts/verify-notification-engine-phase1.ts",
+    "verify:notification-engine-phase2": "npx tsx scripts/verify-notification-engine-phase2.ts",
+    "verify:notification-engine-phase3": "npx tsx scripts/verify-notification-engine-phase3.ts",
+    "verify:notification-engine-phase4": "npx tsx scripts/verify-notification-engine-phase4.ts",
+    "setup:iphone-web-push": "node scripts/setup-iphone-web-push.mjs",
+    "build:web": "expo export -p web && node scripts/copy-pwa-assets.mjs && node scripts/patch-web-html.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",
     "@frennix/api": "workspace:*",
     "@frennix/matching": "workspace:*",
+    "@frennix/notifications": "workspace:*",
     "@frennix/types": "workspace:*",
     "@frennix/ui": "workspace:*",
     "@hookform/resolvers": "^3.9.1",

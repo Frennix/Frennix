@@ -159,6 +159,72 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   post_share: true,
 };
 
+/** Dedicated notification_preferences table (engine v2). */
+export type UserNotificationPreferenceKey =
+  | "push_enabled"
+  | "messages"
+  | "likes"
+  | "comments"
+  | "replies"
+  | "mentions"
+  | "followers"
+  | "matches"
+  | "events"
+  | "challenges"
+  | "stories"
+  | "run_clubs"
+  | "groups"
+  | "system_announcements"
+  | "marketing"
+  | "quiet_hours_enabled"
+  | "quiet_hours_start"
+  | "quiet_hours_end"
+  | "timezone";
+
+export interface UserNotificationPreferences {
+  push_enabled: boolean;
+  messages: boolean;
+  likes: boolean;
+  comments: boolean;
+  replies: boolean;
+  mentions: boolean;
+  followers: boolean;
+  matches: boolean;
+  events: boolean;
+  challenges: boolean;
+  stories: boolean;
+  run_clubs: boolean;
+  groups: boolean;
+  system_announcements: boolean;
+  marketing: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  timezone: string;
+}
+
+export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences = {
+  push_enabled: true,
+  messages: true,
+  likes: true,
+  comments: true,
+  replies: true,
+  mentions: true,
+  followers: true,
+  matches: true,
+  events: true,
+  challenges: true,
+  stories: true,
+  run_clubs: true,
+  groups: true,
+  system_announcements: true,
+  marketing: false,
+  quiet_hours_enabled: false,
+  quiet_hours_start: "22:00",
+  quiet_hours_end: "07:00",
+  timezone: "UTC",
+};
+
 export interface Profile {
   id: string;
   username: string;
@@ -421,8 +487,20 @@ export interface Notification {
   payload: Record<string, unknown>;
   read_at: string | null;
   created_at: string;
-  /** Soft-delete — set when user dismisses from notification center. */
+  /** Soft-delete — set when user dismisses from notification center. History row retained. */
   deleted_at?: string | null;
+  /** Engine v2 — denormalized for fast center render and push deep links. */
+  actor_id?: string | null;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  title?: string;
+  body?: string;
+  deep_link?: string;
+  category?: string;
+  dedupe_key?: string | null;
+  delivered_at?: string | null;
+  expires_at?: string | null;
+  metadata?: Record<string, unknown>;
   actor?: Profile;
 }
 

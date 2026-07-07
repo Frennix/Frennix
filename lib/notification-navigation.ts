@@ -1,6 +1,11 @@
 import { router } from "expo-router";
 import type { Notification } from "@frennix/types";
-import { getOrCreateConversation, markNotificationRead, safeNotificationPayload } from "@frennix/api";
+import {
+  getOrCreateConversation,
+  markNotificationRead,
+  recordNotificationEngagement,
+  safeNotificationPayload,
+} from "@frennix/api";
 import { pushScreen } from "@/lib/press-utils";
 
 export type NotificationNavResult =
@@ -62,6 +67,13 @@ export async function openNotificationTargetAsync(
   notification: Notification,
   userId: string
 ): Promise<NotificationNavResult> {
+  if (notification.deep_link?.startsWith("/")) {
+    if (notification.type === "match") {
+      return openTrainingMatchDestination(notification, userId);
+    }
+    return pushHref(notification.deep_link);
+  }
+
   const { type } = notification;
   const payload = safeNotificationPayload(notification.payload);
 
@@ -83,6 +95,10 @@ export async function openNotificationTargetAsync(
 }
 
 export function openNotificationTarget(notification: Notification): NotificationNavResult {
+  if (notification.deep_link?.startsWith("/")) {
+    return pushHref(notification.deep_link);
+  }
+
   const { type } = notification;
   const payload = safeNotificationPayload(notification.payload);
 
@@ -214,6 +230,11 @@ export async function openNotificationFromPushDataAsync(
 }
 
 export function openNotificationFromPushData(data: Record<string, unknown>): NotificationNavResult {
+  const deepLink = asString(data.deep_link);
+  if (deepLink?.startsWith("/")) {
+    return pushHref(deepLink);
+  }
+
   const type = asString(data.type);
   const actorUsername = asString(data.actor_username);
   const payload = safeNotificationPayload(data);
@@ -300,6 +321,7 @@ export async function handlePushNotificationOpen(
   if (notificationId) {
     try {
       await markNotificationRead(notificationId);
+      await recordNotificationEngagement(notificationId, "clicked");
     } catch {
       // Non-blocking — navigation still proceeds
     }

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@frennix/matching": "workspace:*",
+    "@frennix/notifications": "workspace:*",
     "@frennix/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
     "@tanstack/react-query": "^5.62.8"

@@ -11,6 +11,7 @@ import { FrennixLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
+import { WebPushPermissionPrompt } from "@/components/WebPushPermissionPrompt";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
@@ -68,6 +69,7 @@ const TabsShell = memo(function TabsShell() {
   return (
     <>
       <WhatsNewLaunchPrompt />
+      <WebPushPermissionPrompt />
       <TabPrefetchCoordinator />
       <View
         style={[flexFill, webTabSceneShell]}

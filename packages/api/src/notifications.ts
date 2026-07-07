@@ -1,9 +1,57 @@
 import type { Notification, NotificationType, Profile } from "@frennix/types";
+import {
+  buildDeepLink,
+  buildNotificationCopy,
+  notificationTypesForCategory,
+  type NotificationCategory,
+} from "@frennix/notifications";
 import { getBlockedIds } from "./moderation";
 import { getProfilesByIds } from "./profiles";
 import { getSupabase } from "./supabase";
 
 const NOTIFICATIONS_LIMIT = 50;
+const NOTIFICATIONS_PAGE_SIZE = 30;
+
+export type NotificationListCategory = NotificationCategory | "all";
+
+export type NotificationPageParams = {
+  cursor?: string | null;
+  limit?: number;
+  category?: NotificationListCategory;
+};
+
+export type NotificationPageResult = {
+  items: Notification[];
+  nextCursor: string | null;
+};
+
+function encodeNotificationCursor(createdAt: string, id: string): string {
+  return `${createdAt}|${id}`;
+}
+
+function decodeNotificationCursor(cursor: string): { createdAt: string; id: string } | null {
+  const separator = cursor.indexOf("|");
+  if (separator <= 0) return null;
+  const createdAt = cursor.slice(0, separator);
+  const id = cursor.slice(separator + 1);
+  if (!createdAt || !id) return null;
+  return { createdAt, id };
+}
+
+async function filterAndEnrichNotifications(
+  userId: string,
+  rows: Notification[]
+): Promise<Notification[]> {
+  if (!rows.length) return [];
+
+  const blockedIds = new Set(await getBlockedIds(userId));
+  const filtered = rows.filter((notification) => {
+    const actorId = notificationActorId(notification);
+    return !actorId || !blockedIds.has(actorId);
+  });
+
+  return enrichNotifications(filtered);
+}
 
 export function safeNotificationPayload(payload: unknown): Record<string, unknown> {
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -236,10 +284,13 @@ export function notificationText(notification: Notification, actorName = "Someon
 }
 
 export function buildNotificationRowText(notification: Notification): string {
+  if (notification.title?.trim() && notification.body?.trim()) {
+    return `${notification.title} — ${notification.body}`;
+  }
   try {
     return notificationText(notification, getNotificationActorName(notification.actor));
   } catch {
-    return "New activity on Frennix";
+    return notification.title?.trim() || "New activity on Frennix";
   }
 }
 
@@ -247,14 +298,14 @@ async function enrichNotifications(notifications: Notification[]): Promise<Notif
   if (!notifications.length) return [];
 
   const actorIds = notifications
-    .map(notificationActorId)
+    .map((n) => n.actor_id ?? notificationActorId(n))
     .filter((id): id is string => Boolean(id));
 
   const profiles = await getProfilesByIds(actorIds);
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
   return notifications.map((notification) => {
-    const actorId = notificationActorId(notification);
+    const actorId = notification.actor_id ?? notificationActorId(notification);
     return {
       ...notification,
       actor: actorId ? profileById.get(actorId) : undefined,
@@ -262,23 +313,59 @@ async function enrichNotifications(notifications: Notification[]): Promise<Notif
   });
 }
 
-export async function getNotifications(userId: string): Promise<Notification[]> {
-  const { data, error } = await getSupabase()
+export async function getNotificationsPage(
+  userId: string,
+  params: NotificationPageParams = {}
+): Promise<NotificationPageResult> {
+  const limit = params.limit ?? NOTIFICATIONS_PAGE_SIZE;
+  const category = params.category ?? "all";
+
+  let query = getSupabase()
     .from("notifications")
     .select("*")
     .eq("user_id", userId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(NOTIFICATIONS_LIMIT);
+    .order("id", { ascending: false })
+    .limit(limit);
 
+  if (category !== "all") {
+    const types = notificationTypesForCategory(category);
+    if (!types.length) {
+      return { items: [], nextCursor: null };
+    }
+    query = query.in("type", types);
+  }
+
+  if (params.cursor) {
+    const decoded = decodeNotificationCursor(params.cursor);
+    if (decoded) {
+      query = query.or(
+        `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`
+      );
+    }
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
 
-  const blockedIds = new Set(await getBlockedIds(userId));
-  const filtered = ((data ?? []) as Notification[]).filter((notification) => {
-    const actorId = notificationActorId(notification);
-    return !actorId || !blockedIds.has(actorId);
-  });
+  const rows = (data ?? []) as Notification[];
+  const items = await filterAndEnrichNotifications(userId, rows);
+  const last = rows[rows.length - 1];
+  const nextCursor =
+    rows.length === limit && last?.created_at && last.id
+      ? encodeNotificationCursor(last.created_at, last.id)
+      : null;
 
-  return enrichNotifications(filtered);
+  return { items, nextCursor };
+}
+
+export async function getNotifications(userId: string): Promise<Notification[]> {
+  const { items } = await getNotificationsPage(userId, {
+    limit: NOTIFICATIONS_LIMIT,
+    category: "all",
+  });
+  return items;
 }
 
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
@@ -326,6 +413,17 @@ export async function dismissNotificationsBulk(ids: string[], userId: string) {
   if (error) throw error;
 }
 
+/** Soft-delete all notifications for the current user. */
+export async function dismissAllNotifications(userId: string) {
+  const { error } = await getSupabase()
+    .from("notifications")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) throw error;
+}
+
 /** Soft-delete a notification for the current user. */
 export async function dismissNotification(id: string, userId: string) {
   const { error } = await getSupabase()
@@ -342,9 +440,59 @@ export async function createNotification(input: {
   user_id: string;
   type: NotificationType;
   payload: Record<string, unknown>;
+  actor_id?: string;
 }) {
-  const { error } = await getSupabase().from("notifications").insert(input);
+  const actorId =
+    input.actor_id ??
+    (typeof input.payload.reactor_id === "string"
+      ? input.payload.reactor_id
+      : typeof input.payload.replier_id === "string"
+        ? input.payload.replier_id
+        : typeof input.payload.sender_id === "string"
+          ? input.payload.sender_id
+          : null);
+
+  if (!actorId) {
+    throw new Error("Notification actor is required");
+  }
+
+  const copy = buildNotificationCopy({
+    type: input.type,
+    actorName: "Someone",
+    payload: input.payload,
+  });
+
+  const deepLink = buildDeepLink({ type: input.type, payload: input.payload });
+
+  let dedupeKey: string | null = null;
+  if (input.type === "story_reaction" && typeof input.payload.story_id === "string") {
+    dedupeKey = `story_reaction:${input.payload.story_id}:${actorId}:${String(input.payload.reaction ?? "❤️")}`;
+  } else if (input.type === "story_reply" && typeof input.payload.story_id === "string") {
+    dedupeKey = `story_reply:${input.payload.story_id}:${actorId}:${input.user_id}`;
+  }
+
+  const entityId =
+    typeof input.payload.story_id === "string"
+      ? input.payload.story_id
+      : typeof input.payload.conversation_id === "string"
+        ? input.payload.conversation_id
+        : null;
+
+  const { data, error } = await getSupabase().rpc("create_app_notification", {
+    p_user_id: input.user_id,
+    p_type: input.type,
+    p_actor_id: actorId,
+    p_entity_type: input.type.startsWith("story") ? "story" : "conversation",
+    p_entity_id: entityId,
+    p_title: copy.title,
+    p_body: copy.body,
+    p_deep_link: deepLink,
+    p_payload: input.payload,
+    p_dedupe_key: dedupeKey,
+  });
+
   if (error) throw error;
+  return data as string | null;
 }
 
 export function subscribeToNotifications(

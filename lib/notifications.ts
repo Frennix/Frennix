@@ -5,6 +5,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { getUnreadNotificationCount, removePushTokens, savePushToken, type PushPlatform } from "@frennix/api";
 import { handlePushNotificationOpen } from "@/lib/notification-navigation";
 import { logMatchmakingError } from "@/lib/matchmaking-observability";
+import { syncAppBadgeCount } from "@/lib/badge-sync";
 
 const isNative = Platform.OS !== "web";
 
@@ -171,8 +172,10 @@ export async function unregisterPushNotifications(userId: string) {
 }
 
 export async function syncNotificationBadgeCount(count: number) {
-  if (!isNative) return;
-  await Notifications.setBadgeCountAsync(Math.max(0, count)).catch(() => undefined);
+  if (isNative) {
+    await Notifications.setBadgeCountAsync(Math.max(0, count)).catch(() => undefined);
+  }
+  await syncAppBadgeCount(count);
 }
 
 export function handleNotificationResponse(

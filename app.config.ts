@@ -67,6 +67,7 @@ const config: ExpoConfig = {
     privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "https://frennix.app/privacy",
     termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? "https://frennix.app/terms",
     appUrl: process.env.EXPO_PUBLIC_APP_URL ?? "https://frennix.vercel.app",
+    vapidPublicKey: process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY ?? "",
   },
 };
 
