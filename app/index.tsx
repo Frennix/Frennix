@@ -1,12 +1,18 @@
 import { Redirect } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { StartupRetryScreen } from "@/components/StartupRetryScreen";
 import { useAuth } from "@/providers/AuthProvider";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic } from "@/lib/client-diagnostics";
+import { trackAppStartup } from "@/lib/beta-health-analytics";
+import { reportStartupStall } from "@/lib/startup-diagnostics";
+import { describeAuthBootstrapPhase } from "@/lib/startup-mount-trace";
 
-const AUTH_BOOTSTRAP_TIMEOUT_MS = 12_000;
+const APP_BOOT_MARK =
+  typeof performance !== "undefined" ? performance.now() : Date.now();
+
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
 
 export default function Index() {
   const { session, profile, authReady, passwordRecovery, loading, profileLoading } = useAuth();
@@ -41,21 +47,40 @@ function IndexGate({
   profileLoading: boolean;
 }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
+  const reportedStallRef = useRef(false);
 
   useEffect(() => {
     if (authReady) {
       setAuthTimedOut(false);
+      const elapsed =
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) - APP_BOOT_MARK;
+      trackAppStartup(elapsed);
       return;
     }
+
     const timer = setTimeout(() => {
+      if (reportedStallRef.current) return;
+      reportedStallRef.current = true;
+
       logDiagnostic("auth", "index gate timed out waiting for authReady", "error", {
         loading,
         profileLoading,
         hasSession: Boolean(session),
         hasProfile: Boolean(profile),
       });
+
+      reportStartupStall("Index gate timed out waiting for authReady", {
+        loading,
+        profileLoading,
+        hasSession: Boolean(session),
+        hasProfile: Boolean(profile),
+        userId: session?.user.id,
+        email: session?.user.email ?? undefined,
+      });
+
       setAuthTimedOut(true);
     }, AUTH_BOOTSTRAP_TIMEOUT_MS);
+
     return () => clearTimeout(timer);
   }, [authReady, loading, profileLoading, profile, session]);
 
@@ -64,21 +89,26 @@ function IndexGate({
   }
 
   if (!authReady || (passwordRecovery && !session)) {
+    const bootstrapMessage = describeAuthBootstrapPhase({
+      loading,
+      profileLoading,
+      hasSession: Boolean(session),
+    });
+
     if (authTimedOut) {
       return (
         <StartupRetryScreen
           title="Signing you in"
-          message="Account setup is taking longer than expected. Check your connection and try again."
+          message="Account setup is taking longer than expected. You can retry or continue with a limited connection."
           detail={
             session
               ? profileLoading
-                ? "Still loading your profile…"
+                ? "Profile load timed out — we'll try again in the app."
                 : loading
-                  ? "Still restoring your session…"
+                  ? "Session restore timed out."
                   : undefined
-              : "No active session yet."
+              : "No active session yet — try signing in again."
           }
-          loading={!authTimedOut}
           onRetry={() => {
             if (typeof window !== "undefined") window.location.reload();
           }}
@@ -89,15 +119,10 @@ function IndexGate({
     return (
       <StartupRetryScreen
         title="Signing you in"
-        message={
-          session
-            ? profileLoading
-              ? "Loading your profile…"
-              : "Restoring your session…"
-            : "Starting Frennix…"
-        }
+        message={bootstrapMessage}
         loading
         showDiagnostics={false}
+        showMountTrace={false}
       />
     );
   }

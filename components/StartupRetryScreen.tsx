@@ -11,6 +11,8 @@ type StartupRetryScreenProps = {
   loading?: boolean;
   onRetry?: () => void;
   showDiagnostics?: boolean;
+  /** When false, hide mount trace (misleading during first render before effects flush). */
+  showMountTrace?: boolean;
 };
 
 /** Visible fallback when auth bootstrap or startup stalls — never leave a blank black screen. */
@@ -21,9 +23,10 @@ export function StartupRetryScreen({
   loading = false,
   onRetry,
   showDiagnostics = true,
+  showMountTrace = true,
 }: StartupRetryScreenProps) {
-  const gap = getStartupMountGap();
-  const traceSummary = formatStartupMountSummary(6);
+  const gap = showMountTrace ? getStartupMountGap() : null;
+  const traceSummary = showMountTrace ? formatStartupMountSummary(6) : null;
 
   return (
     <View style={styles.container} nativeID="startup-retry-screen">
@@ -32,7 +35,7 @@ export function StartupRetryScreen({
       <Text style={styles.message}>{message}</Text>
       {detail ? <Text style={styles.detail}>{detail}</Text> : null}
       {gap ? <Text style={styles.trace}>Startup paused before: {gap}</Text> : null}
-      <Text style={styles.traceMuted}>{traceSummary}</Text>
+      {traceSummary ? <Text style={styles.traceMuted}>{traceSummary}</Text> : null}
       <View style={styles.actions}>
         {onRetry ? (
           <Pressable

@@ -6,8 +6,9 @@ import {
   subscribeStartupMount,
 } from "@/lib/startup-mount-trace";
 import { logDiagnostic } from "@/lib/client-diagnostics";
+import { reportStartupStall } from "@/lib/startup-diagnostics";
 
-const STARTUP_STALL_MS = 18_000;
+const STARTUP_STALL_MS = 10_000;
 
 function hideHtmlBootShell() {
   if (typeof document === "undefined") return;
@@ -47,6 +48,9 @@ export function StartupWatchdog() {
       if (!isStartupComplete()) {
         const gap = getStartupMountGap();
         logDiagnostic("startup", `stall detected before ${gap ?? "unknown"}`, "error");
+        reportStartupStall(`Startup watchdog stall before ${gap ?? "unknown"}`, {
+          authForced: false,
+        });
         setStalled(true);
       }
     }, STARTUP_STALL_MS);

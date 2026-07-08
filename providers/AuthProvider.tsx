@@ -24,12 +24,20 @@ import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
+import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
+import { reportStartupStall } from "@/lib/startup-diagnostics";
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
 const SESSION_RECOVERY_MS = 1500;
 
 /** Minimum time hidden before treating the next show as a resume (ms). */
 const RESUME_HIDDEN_MS = 2000;
+
+/** Hard caps — auth bootstrap must never hang forever. */
+const AUTH_SESSION_TIMEOUT_MS = 8_000;
+const AUTH_PROFILE_TIMEOUT_MS = 8_000;
+const AUTH_LINKING_TIMEOUT_MS = 3_000;
+const AUTH_FORCE_READY_MS = 10_000;
 
 interface AuthContextValue {
   session: Session | null;
@@ -40,6 +48,8 @@ interface AuthContextValue {
   profileLoading: boolean;
   /** Session is known and profile fetch (if needed) has finished — safe for routing. */
   authReady: boolean;
+  /** True when bootstrap was force-unblocked after a timeout (degraded path). */
+  authBootstrapTimedOut: boolean;
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
   refreshProfile: (userIdOrProfile?: string | Profile) => Promise<void>;
@@ -55,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [authBootstrapTimedOut, setAuthBootstrapTimedOut] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(() => isWebRecoveryHash());
   const passwordRecoveryRef = useRef(passwordRecovery);
   const authEpochRef = useRef(0);
@@ -99,7 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileFetchUserIdRef.current = userId;
       const task = (async () => {
         try {
-          const nextProfile = await getProfile(userId);
+          const nextProfile = await withTimeout(
+            getProfile(userId),
+            AUTH_PROFILE_TIMEOUT_MS,
+            "auth.getProfile"
+          );
           if (epoch !== authEpochRef.current) return;
           setProfile(nextProfile);
           resolvedProfileUserIdRef.current = userId;
@@ -116,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             logDiagnostic("auth", "kept cached profile after getProfile failure", "warn", {
               hadCache: Boolean(cached),
               onboarding_complete: cached?.onboarding_complete ?? null,
+              timedOut: error instanceof AsyncTimeoutError,
             });
           });
         } finally {
@@ -278,7 +294,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function bootstrapAuth() {
       if (typeof window !== "undefined" && isWebRecoveryHash()) {
         try {
-          const isRecovery = await establishSessionFromUrl(window.location.href);
+          const isRecovery = await withTimeout(
+            establishSessionFromUrl(window.location.href),
+            AUTH_SESSION_TIMEOUT_MS,
+            "auth.recoveryUrl"
+          );
           if (isRecovery) {
             setPasswordRecovery(true);
             clearWebRecoveryHash();
@@ -288,10 +308,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const initialUrl = await Linking.getInitialURL();
+      let initialUrl: string | null = null;
+      try {
+        initialUrl = await withTimeout(
+          Linking.getInitialURL(),
+          AUTH_LINKING_TIMEOUT_MS,
+          "Linking.getInitialURL"
+        );
+      } catch {
+        initialUrl = null;
+      }
       if (initialUrl) await handleRecoveryUrl(initialUrl);
 
-      const initialSession = await getSession();
+      let initialSession: Session | null = null;
+      try {
+        initialSession = await withTimeout(
+          getSession(),
+          AUTH_SESSION_TIMEOUT_MS,
+          "auth.getSession"
+        );
+      } catch (error) {
+        console.error("[auth] getSession failed during bootstrap", error);
+        void import("@/lib/client-diagnostics").then(({ logDiagnostic }) => {
+          logDiagnostic("auth", "getSession failed during bootstrap", "error", {
+            timedOut: error instanceof AsyncTimeoutError,
+          });
+        });
+      }
+
       if (initialSession?.user.id) {
         const cached = readCachedProfile(initialSession.user.id);
         if (cached) {
@@ -393,7 +437,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [refreshAuthOnResume]);
 
-  const authReady = !loading && !(session?.user.id && profileLoading);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading || profileLoading) {
+        const userId = sessionRef.current?.user?.id;
+        reportStartupStall("Auth bootstrap force-ready after timeout", {
+          loading,
+          profileLoading,
+          hasSession: Boolean(sessionRef.current),
+          hasProfile: Boolean(profileRef.current),
+          authForced: true,
+          userId,
+          email: sessionRef.current?.user.email ?? undefined,
+        });
+        setAuthBootstrapTimedOut(true);
+        setLoading(false);
+        setProfileLoading(false);
+      }
+    }, AUTH_FORCE_READY_MS);
+
+    return () => clearTimeout(timer);
+  }, [loading, profileLoading]);
+
+  const authReady =
+    authBootstrapTimedOut || (!loading && !(session?.user.id && profileLoading));
 
   const value = useMemo(
     () => ({
@@ -402,6 +469,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       profileLoading,
       authReady,
+      authBootstrapTimedOut,
       passwordRecovery,
       clearPasswordRecovery,
       refreshProfile,
@@ -414,6 +482,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       profileLoading,
       authReady,
+      authBootstrapTimedOut,
       passwordRecovery,
       clearPasswordRecovery,
       refreshProfile,

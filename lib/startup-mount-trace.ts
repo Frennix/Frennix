@@ -82,10 +82,40 @@ export function subscribeStartupMount(listener: () => void) {
 /** First expected phase that never fired — likely hang/crash location. */
 export function getStartupMountGap(): string | null {
   const seen = new Set(events.map((event) => event.id));
-  for (const expected of STARTUP_MOUNT_EXPECTED) {
-    if (!seen.has(expected)) return expected;
+
+  for (let i = 0; i < STARTUP_MOUNT_EXPECTED.length; i += 1) {
+    const expected = STARTUP_MOUNT_EXPECTED[i];
+    if (seen.has(expected)) continue;
+
+    // During the first commit, `:render` marks fire synchronously but `:mounted`
+    // effects have not run yet — not a stall (avoids false "gesture-handler:mounted").
+    if (expected.endsWith(":mounted")) {
+      const renderId = expected.replace(":mounted", ":render");
+      const hasLaterMounted = STARTUP_MOUNT_EXPECTED.slice(i + 1).some(
+        (phase) => phase.endsWith(":mounted") && seen.has(phase)
+      );
+      if (seen.has(renderId) && !hasLaterMounted) {
+        return null;
+      }
+    }
+
+    return expected;
   }
+
   return null;
+}
+
+/** Human-readable auth bootstrap phase for the index loading screen. */
+export function describeAuthBootstrapPhase(input: {
+  loading: boolean;
+  profileLoading: boolean;
+  hasSession: boolean;
+}): string {
+  if (input.loading && !input.hasSession) return "Restoring session…";
+  if (input.loading) return "Finishing sign-in…";
+  if (input.profileLoading) return "Loading your profile…";
+  if (!input.hasSession) return "Starting Frennix…";
+  return "Almost ready…";
 }
 
 export function formatStartupMountSummary(limit = 10): string {
