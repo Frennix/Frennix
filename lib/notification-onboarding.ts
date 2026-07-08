@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { QueryClient } from "@tanstack/react-query";
-import { canPromptForWebPush } from "@/lib/pwa";
 import {
+  canPromptForWebPush,
   getWebPushPermissionStatus,
   hasActiveWebPushSubscription,
   isWebPushFeatureEnabled,

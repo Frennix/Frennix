@@ -472,14 +472,20 @@ async function main() {
 
   // 6. Regression spot-check — key screens reachable (bundle contains tab routes)
   {
-    const bundleFile = useLocal
-      ? fs
-          .readdirSync(path.join(DIST, "_expo/static/js/web"))
-          .find((f) => f.startsWith("index-") && f.endsWith(".js") && !f.includes("8aa354"))
-      : null;
-    const bundleText = bundleFile
-      ? fs.readFileSync(path.join(DIST, "_expo/static/js/web", bundleFile), "utf8")
-      : await (await fetch(`${url}/_expo/static/js/web/index-802c76bd3a5df632a0c738499f5c2f68.js`)).text();
+    const bundleMatch = html.match(/index-[a-f0-9]+\.js/);
+    const bundleUrl = bundleMatch ? `${url.replace(/\/$/, "")}/_expo/static/js/web/${bundleMatch[0]}` : null;
+    const bundleText = bundleUrl
+      ? await (await fetch(bundleUrl)).text()
+      : useLocal
+        ? fs.readFileSync(
+            path.join(
+              DIST,
+              "_expo/static/js/web",
+              fs.readdirSync(path.join(DIST, "_expo/static/js/web")).find((f) => f.startsWith("index-") && f.endsWith(".js") && !f.includes("8aa354")) ?? ""
+            ),
+            "utf8"
+          )
+        : "";
 
     const checks = [
       ["push/WebPush", /WebPush|web-push|registerForPush/i.test(bundleText)],

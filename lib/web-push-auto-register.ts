@@ -5,11 +5,11 @@ import {
   getWebPushPermissionStatus,
   hasActiveWebPushSubscription,
   isWebPushFeatureEnabled,
+  canPromptForWebPush,
   prewarmWebPushRegistration,
   type WebPushSubscribeFailureReason,
   type WebPushSubscribeResult,
 } from "@/lib/web-push";
-import { canPromptForWebPush } from "@/lib/pwa";
 import { pushLog, logPushSetupFunnel } from "@/lib/web-push-diagnostics";
 import { shouldShowPwaReopenNotice } from "@/lib/pwa-update-prompt";
 import { showPwaReopenNotice } from "@/components/PwaReopenNotice";
