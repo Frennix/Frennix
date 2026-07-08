@@ -17,16 +17,25 @@ const WEB_BOTTOM_TAB_BAR_PX = 56;
 const WEB_TAB_CHROME_FALLBACK_PX = 140;
 
 function measureTabSceneHeight(layoutHeight: number): number {
-  if (Platform.OS !== "web" || layoutHeight <= 0) return 0;
+  if (Platform.OS !== "web") return 0;
+
+  const effectiveLayout =
+    layoutHeight > 0
+      ? layoutHeight
+      : typeof window !== "undefined"
+        ? window.innerHeight
+        : 0;
+  if (effectiveLayout <= 0) return 320;
 
   const snap = measureSafariVisualViewport();
   const appChrome = WEB_APP_HEADER_PX + WEB_BOTTOM_TAB_BAR_PX;
 
   if (isMobileWeb() && typeof window !== "undefined" && window.visualViewport) {
-    return Math.max(Math.round(snap.visualHeight - appChrome), 240);
+    const visual = snap.visualHeight > 0 ? snap.visualHeight : effectiveLayout;
+    return Math.max(Math.round(visual - appChrome), 240);
   }
 
-  return Math.max(Math.round(layoutHeight - WEB_TAB_CHROME_FALLBACK_PX), 240);
+  return Math.max(Math.round(effectiveLayout - WEB_TAB_CHROME_FALLBACK_PX), 240);
 }
 
 /**
@@ -52,7 +61,12 @@ export function useWebTabSceneHeight(): number | undefined {
     setSceneHeight(measureTabSceneHeight(layoutHeight));
   }, [layoutHeight, viewportTick]);
 
-  if (Platform.OS !== "web" || layoutHeight <= 0) return undefined;
+  if (Platform.OS !== "web") return undefined;
+  if (layoutHeight <= 0) {
+    return measureTabSceneHeight(
+      typeof window !== "undefined" ? window.innerHeight : 0
+    );
+  }
   return sceneHeight ?? measureTabSceneHeight(layoutHeight);
 }
 

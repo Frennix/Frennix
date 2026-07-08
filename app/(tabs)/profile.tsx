@@ -3,7 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { ProfileTabSkeleton } from "@/components/ProfileTabSkeleton";
-import { getFollowingIds, getPostsByUser, getProfileStats } from "@frennix/api";
+import { getPostsByUser, getProfileStats } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
 import { useAvatarUpload } from "@/lib/useAvatarUpload";
@@ -49,14 +49,6 @@ export default function ProfileTabScreen() {
     placeholderData: (previousData) => previousData,
   });
 
-  const { data: followingIds = [], refetch: refetchFollowingIds } = useQuery({
-    queryKey: ["following-ids", userId],
-    queryFn: () => getFollowingIds(userId),
-    enabled: !!userId,
-    staleTime: 120_000,
-    placeholderData: (previousData) => previousData,
-  });
-
   const { data: postsPage, refetch: refetchPosts } = useQuery({
     queryKey: ["user-posts", userId, userId],
     queryFn: () => getPostsByUser(userId, userId),
@@ -66,8 +58,8 @@ export default function ProfileTabScreen() {
   });
 
   const refreshProfile = useCallback(async () => {
-    await Promise.all([refetchStats(), refetchFollowingIds(), refetchPosts()]);
-  }, [refetchFollowingIds, refetchPosts, refetchStats]);
+    await Promise.all([refetchStats(), refetchPosts()]);
+  }, [refetchPosts, refetchStats]);
 
   const [profileRefreshing, setProfileRefreshing] = useState(false);
   const onPullRefresh = useGuardedRefresh(
@@ -124,11 +116,7 @@ export default function ProfileTabScreen() {
     );
   }
 
-  const baseStats = stats ?? EMPTY_STATS;
-  const displayStats = {
-    ...baseStats,
-    following: Math.max(baseStats.following, followingIds.length),
-  };
+  const displayStats = stats ?? EMPTY_STATS;
 
   return (
     <TabScreenBoundary label="profile">

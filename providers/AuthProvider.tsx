@@ -205,16 +205,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const sameUser = profileRef.current?.id === userId;
         const resolvedForUser = resolvedProfileUserIdRef.current === userId;
 
+        const cached = readCachedProfile(userId);
         if (!sameUser && !resolvedForUser) {
-          const cached = readCachedProfile(userId);
           if (cached) {
             setProfile(cached);
+            resolvedProfileUserIdRef.current = userId;
           } else {
             setProfile(null);
           }
         }
 
-        await loadProfileForUser(userId, { epoch });
+        // Returning users: unblock tabs immediately with cached profile; refresh in background.
+        if (cached) {
+          setProfileLoading(false);
+          void loadProfileForUser(userId, { background: true, epoch });
+        } else {
+          await loadProfileForUser(userId, { epoch });
+        }
 
         if (epoch !== authEpochRef.current) return;
         if (!passwordRecoveryRef.current) {

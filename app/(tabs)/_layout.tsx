@@ -12,6 +12,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
 import { NotificationOnboardingPrompt } from "@/components/NotificationOnboardingPrompt";
+import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
@@ -98,7 +99,7 @@ const TabsShell = memo(function TabsShell() {
           ...webTabSceneShell,
           backgroundColor: colors.background,
         },
-        lazy: true,
+        lazy: false,
         freezeOnBlur: true,
         headerTitleContainerStyle: { overflow: "visible" },
       }}
@@ -184,7 +185,11 @@ const TabsShell = memo(function TabsShell() {
 });
 
 export default function TabsLayout() {
-  return <TabsShell />;
+  return (
+    <StartupMountProbe id="tabs-layout">
+      <TabsShell />
+    </StartupMountProbe>
+  );
 }
 
 const styles = StyleSheet.create({

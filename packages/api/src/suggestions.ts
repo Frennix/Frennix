@@ -54,13 +54,21 @@ function rankCandidate(
   };
 }
 
+export type SuggestedAthletesOptions = {
+  /** Skip getProfile when the viewer is already in memory (AuthProvider). */
+  viewer?: Profile | null;
+  /** Skip getFollowingIds when React Query already warmed the cache. */
+  followingIds?: string[];
+};
+
 export async function getSuggestedAthletes(
   viewerId: string,
-  limit = 12
+  limit = 12,
+  options?: SuggestedAthletesOptions
 ): Promise<SuggestedAthlete[]> {
   const [viewerRow, followingIds, blockedIds] = await Promise.all([
-    getProfile(viewerId),
-    getFollowingIds(viewerId),
+    options?.viewer ? Promise.resolve(options.viewer) : getProfile(viewerId),
+    options?.followingIds ? Promise.resolve(options.followingIds) : getFollowingIds(viewerId),
     getBlockedIds(viewerId),
   ]);
 

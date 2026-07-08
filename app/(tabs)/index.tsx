@@ -14,6 +14,7 @@ import {
   getFeed,
   getFeedStories,
   getSuggestedAthletes,
+  peekFeedFollowingIds,
   getErrorMessage,
   getDedicatedStoryInsights,
   getDedicatedStoryAnalytics,
@@ -86,11 +87,12 @@ import { markFeedRender } from "@/lib/feed-render-trace";
 import { markFeedHook } from "@/lib/feed-hook-trace";
 import { useFeedRenderStateTrace } from "@/lib/useFeedRenderStateTrace";
 import { FeedRenderTraceProbe } from "@/components/FeedRenderTraceProbe";
+import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
-  const { session } = useAuth();
+  const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
@@ -117,6 +119,7 @@ export default function HomeScreen() {
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
   const [storiesDeferred, setStoriesDeferred] = useState(false);
+  const [deferFeedSecondary, setDeferFeedSecondary] = useState(false);
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
   }, []);
@@ -181,6 +184,11 @@ export default function HomeScreen() {
     staleTime: 60_000,
   });
   markFeedHook("stories-query");
+
+  const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId, {
+    enabled: deferFeedSecondary,
+  });
+  markFeedHook("suggested-follow");
 
   const handleStoryReact = useCallback(
     async (
@@ -391,26 +399,27 @@ export default function HomeScreen() {
   });
   markFeedHook("feed-query");
 
-  const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId, {
-    enabled: isFeedReady,
-  });
-  markFeedHook("suggested-follow");
-
   const {
     data: suggestions = [],
     refetch: refetchSuggestions,
     isRefetching: isSuggestionsRefetching,
   } = useQuery({
     queryKey: ["discover-suggestions", userId],
-    queryFn: () => getSuggestedAthletes(userId, 20),
+    queryFn: () => {
+      const cachedFollowing = queryClient.getQueryData<string[]>(["following-ids", userId]);
+      return getSuggestedAthletes(userId, 20, {
+        viewer: viewerProfile,
+        followingIds: cachedFollowing,
+      });
+    },
     select: (athletes) => athletes.slice(0, 10),
-    enabled: !!userId && isFeedReady,
+    enabled: !!userId && deferFeedSecondary,
     staleTime: 120_000,
   });
   markFeedHook("suggestions-query");
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
-  const showFeedSkeleton = posts.length === 0 && (isLoading || isFetching);
+  const showFeedSkeleton = posts.length === 0 && (!isFeedReady || isLoading || isFetching);
   const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
   const [feedAtTop, setFeedAtTop] = useState(true);
@@ -455,6 +464,9 @@ export default function HomeScreen() {
     (event: Parameters<typeof handleFeedScroll>[0]) => {
       handleFeedScroll(event);
       const { contentOffset } = event.nativeEvent;
+      if (contentOffset.y > 120) {
+        setDeferFeedSecondary(true);
+      }
       reportFeedDebugScroll(contentOffset.y);
       const atTop = contentOffset.y <= 8;
       setFeedAtTop((prev) => (prev === atTop ? prev : atTop));
@@ -526,6 +538,23 @@ export default function HomeScreen() {
     if (!userId || !data?.pages.length) return;
     void writeFeedCache(userId, data.pages);
   }, [data?.pages, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    setDeferFeedSecondary(false);
+    const timer = setTimeout(() => setDeferFeedSecondary(true), 3_000);
+    return () => clearTimeout(timer);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !isFeedReady) return;
+    const peeked = peekFeedFollowingIds(userId);
+    if (!peeked?.length) return;
+    const key = ["following-ids", userId] as const;
+    if (!queryClient.getQueryData(key)) {
+      queryClient.setQueryData(key, peeked);
+    }
+  }, [isFeedReady, queryClient, userId]);
 
   useEffect(() => {
     if (!isFeedReady) return;
@@ -712,7 +741,11 @@ export default function HomeScreen() {
   const { data: storyInsights } = useQuery({
     queryKey: ["story-insights", userId, activeInsightStoryIdResolved],
     queryFn: () => getDedicatedStoryInsights(activeInsightStoryIdResolved!),
-    enabled: Boolean(activeStory?.is_self && activeInsightStoryIdResolved && activeStoryIndex !== null),
+    enabled: Boolean(
+      (viewersModalVisible || analyticsModalVisible || reactionsModalVisible) &&
+        activeStory?.is_self &&
+        activeInsightStoryIdResolved
+    ),
     staleTime: 30_000,
   });
   markFeedHook("story-insights-query");
@@ -823,6 +856,7 @@ export default function HomeScreen() {
   markFeedRender("feed:branch:main");
 
   return (
+    <StartupMountProbe id="feed-route">
     <TabScreenBoundary label="feed">
     <FeedRenderTraceProbe id="feed:ui:container">
       <View
@@ -950,10 +984,11 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:share-sheet">{shareSheet}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:lightbox">{lightbox}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:story-viewer">
+      {activeStoryIndex !== null ? (
       <FeedStoryViewer
         stories={stories}
-        visible={activeStoryIndex !== null}
-        initialStoryIndex={activeStoryIndex ?? 0}
+        visible
+        initialStoryIndex={activeStoryIndex}
         onClose={() => setActiveStoryIndex(null)}
         onViewProfile={(username) => {
           setActiveStoryIndex(null);
@@ -1014,16 +1049,20 @@ export default function HomeScreen() {
           storyInviteUserId !== null && storyInviteUserId === activeStory?.user_id
         }
       />
+      ) : null}
       </FeedRenderTraceProbe>
+      {viewersModalVisible ? (
       <StoryViewersModal
-        visible={viewersModalVisible}
+        visible
         viewers={storyViewers}
         loading={storyViewersLoading}
         onClose={() => setViewersModalVisible(false)}
         onViewerAction={handleStoryViewerAction}
       />
+      ) : null}
+      {analyticsModalVisible ? (
       <StoryAnalyticsModal
-        visible={analyticsModalVisible}
+        visible
         analytics={storyAnalytics ?? storyInsights ?? null}
         onClose={() => setAnalyticsModalVisible(false)}
         onOpenViewers={() => {
@@ -1035,12 +1074,15 @@ export default function HomeScreen() {
           setReactionsModalVisible(true);
         }}
       />
+      ) : null}
+      {reactionsModalVisible ? (
       <StoryReactionsModal
-        visible={reactionsModalVisible}
+        visible
         reactions={storyReactions}
         loading={storyReactionsLoading}
         onClose={() => setReactionsModalVisible(false)}
       />
+      ) : null}
       {feedDebugEnabled ? (
         <FeedScrollDebugOverlay
           snapshot={feedDebugSnapshot}
@@ -1051,6 +1093,7 @@ export default function HomeScreen() {
       </View>
     </FeedRenderTraceProbe>
     </TabScreenBoundary>
+    </StartupMountProbe>
   );
 }
 

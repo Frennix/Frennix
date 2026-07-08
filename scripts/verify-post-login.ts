@@ -55,15 +55,22 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const layout = read("app/_layout.tsx");
       const rootSection = layout.slice(layout.indexOf("export default function RootLayout"));
+      const rootBoundaryIdx = rootSection.indexOf('<AppErrorBoundary scope="root">');
       const queryIdx = rootSection.indexOf("<QueryProvider");
       const authIdx = rootSection.indexOf("<AuthProvider");
       const tabsIdx = rootSection.indexOf("<TabBadgeRoot");
       const boundaryIdx = rootSection.indexOf('scope="navigation"');
-      if (queryIdx < 0 || authIdx < 0 || tabsIdx < 0 || boundaryIdx < 0) {
-        throw new Error("Expected QueryProvider, AuthProvider, TabBadgeRoot, navigation boundary");
+      if (rootBoundaryIdx < 0 || queryIdx < 0 || authIdx < 0 || tabsIdx < 0 || boundaryIdx < 0) {
+        throw new Error("Expected AppErrorBoundary root, QueryProvider, AuthProvider, TabBadgeRoot, navigation boundary");
       }
       if (!(queryIdx < authIdx && authIdx < tabsIdx)) {
         throw new Error("Provider order must be QueryProvider → AuthProvider → TabBadgeRoot");
+      }
+      assertIncludes("app/_layout.tsx", "StartupMountProbe", "root layout mount probes required");
+      assertIncludes("app/_layout.tsx", "StartupMountMarker", "root layout mount markers required");
+      assertIncludes("app/_layout.tsx", 'import { StartupMountMarker, StartupMountProbe }', "StartupMountProbe import required");
+      if (rootSection.indexOf("AuthAwareErrorBoundary scope=\"root\"") >= 0) {
+        throw new Error("Root AuthAwareErrorBoundary must not wrap AuthProvider (useAuth crash)");
       }
     },
   },
@@ -131,6 +138,20 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "Feed followMutation declared before story handlers",
+    run: () => {
+      const feed = read("app/(tabs)/index.tsx");
+      const followDecl = feed.indexOf("useSuggestedFollow(userId");
+      const storyFollowDecl = feed.indexOf("handleStoryFollow");
+      if (followDecl < 0 || storyFollowDecl < 0) {
+        throw new Error("feed follow hooks missing");
+      }
+      if (followDecl > storyFollowDecl) {
+        throw new Error("followMutation must be declared before handleStoryFollow (post-login crash)");
+      }
+    },
+  },
+  {
     name: "Feed stories query declared before story handlers",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
@@ -157,7 +178,7 @@ const checks: Array<{ name: string; run: () => void }> = [
         'html.replace(/\\s*<div id="frennix-emergency-html"',
         "patch must strip legacy emergency banner from dist HTML"
       );
-      assertIncludes("lib/web-document-styles.js", "pointer-events: none", "#root pointer pass-through required");
+      assertIncludes("lib/web-document-styles.js", "pointer-events: auto", "#root must receive pointer events");
     },
   },
   {

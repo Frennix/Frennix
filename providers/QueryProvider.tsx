@@ -9,7 +9,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,
+            staleTime: 60_000,
             gcTime: 30 * 60 * 1000,
             retry: (failureCount) => failureCount < MAX_QUERY_RETRIES,
             retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8_000),

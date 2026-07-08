@@ -6,7 +6,6 @@ import {
   getPostsByUser,
   getProfileStats,
   getCalendarView,
-  getWorkoutEvents,
 } from "@frennix/api";
 import { hydrateMessagesInboxCache, writeMessagesInboxCache } from "@/lib/messages-inbox-cache";
 import { getCalendarViewQueryKey, getDefaultCalendarRange } from "@/lib/calendar-query-range";
@@ -16,20 +15,19 @@ const TAB_GC_MS = 30 * 60 * 1000;
 
 /** Warm caches for non-Feed tabs after the app settles — instant tab switches without refetch storms. */
 export async function prefetchTabData(queryClient: QueryClient, userId: string) {
-  await hydrateMessagesInboxCache(queryClient, userId);
-
-  await queryClient.prefetchQuery({
-    queryKey: ["conversations", userId],
-    queryFn: async () => {
-      const conversations = await getConversations(userId);
-      void writeMessagesInboxCache(userId, conversations);
-      return conversations;
-    },
-    staleTime: 60_000,
-    gcTime: TAB_GC_MS,
-  });
-
   await Promise.allSettled([
+    hydrateMessagesInboxCache(queryClient, userId).then(() =>
+      queryClient.prefetchQuery({
+        queryKey: ["conversations", userId],
+        queryFn: async () => {
+          const conversations = await getConversations(userId);
+          void writeMessagesInboxCache(userId, conversations);
+          return conversations;
+        },
+        staleTime: 60_000,
+        gcTime: TAB_GC_MS,
+      })
+    ),
     queryClient.prefetchQuery({
       queryKey: ["discover-groups", ""],
       queryFn: () => getGroups({}),
@@ -39,12 +37,6 @@ export async function prefetchTabData(queryClient: QueryClient, userId: string) 
     queryClient.prefetchQuery({
       queryKey: ["discover-challenges"],
       queryFn: getChallenges,
-      staleTime: TAB_STALE_MS,
-      gcTime: TAB_GC_MS,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["workout-events", userId],
-      queryFn: () => getWorkoutEvents(userId),
       staleTime: TAB_STALE_MS,
       gcTime: TAB_GC_MS,
     }),

@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import { usePathname } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import {
+  getDiagnosticContext,
   logDiagnostic,
   markDiagnosticFailure,
   setDiagnosticContext,
@@ -46,7 +47,7 @@ function patchFetchLogging() {
   };
 }
 
-function installGlobalErrorHandlers(userId?: string, email?: string) {
+function installGlobalErrorHandlers() {
   if (Platform.OS !== "web" || typeof window === "undefined") return;
   const globalWindow = window as Window & { __frennixGlobalErrorsInstalled?: boolean };
   if (globalWindow.__frennixGlobalErrorsInstalled) return;
@@ -54,6 +55,7 @@ function installGlobalErrorHandlers(userId?: string, email?: string) {
 
   window.addEventListener("error", (event) => {
     const error = event.error ?? new Error(event.message);
+    const { userId, email } = getDiagnosticContext();
     markDiagnosticFailure("window.error", error, { filename: event.filename, lineno: event.lineno });
     void reportClientError({
       source: "window.error",
@@ -66,6 +68,7 @@ function installGlobalErrorHandlers(userId?: string, email?: string) {
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    const { userId, email } = getDiagnosticContext();
     markDiagnosticFailure("unhandledrejection", event.reason);
     void reportClientError({
       source: "unhandledrejection",
@@ -86,9 +89,9 @@ export function ClientDiagnosticsBootstrap() {
 
   useEffect(() => {
     patchFetchLogging();
-    installGlobalErrorHandlers(userId, email);
+    installGlobalErrorHandlers();
     logDiagnostic("bootstrap", "client diagnostics initialized", "info");
-  }, [userId, email]);
+  }, []);
 
   useEffect(() => {
     setDiagnosticContext({ userId, email, online: true });

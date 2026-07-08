@@ -26,6 +26,7 @@ import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ClientDiagnosticsBootstrap } from "@/components/ClientDiagnosticsBootstrap";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
+import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
@@ -116,10 +117,11 @@ export default function RootLayout() {
         {...(Platform.OS === "web" ? ({ nativeID: "app-root-shell" } as object) : null)}
       >
         <StartupMountProbe id="app-error-boundary-root">
-          <AuthAwareErrorBoundary scope="root">
+          <AppErrorBoundary scope="root">
             <StartupMountProbe id="query-provider">
               <QueryProvider>
                 <AppResumeCoordinator />
+                <StartupWatchdog />
                 <StartupMountProbe id="auth-provider">
                   <AuthProvider>
                     <ClientDiagnosticsBootstrap />
@@ -249,7 +251,7 @@ export default function RootLayout() {
                 </StartupMountProbe>
               </QueryProvider>
             </StartupMountProbe>
-          </AuthAwareErrorBoundary>
+          </AppErrorBoundary>
         </StartupMountProbe>
       </GestureHandlerRootView>
     </StartupMountProbe>

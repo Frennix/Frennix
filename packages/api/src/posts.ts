@@ -55,6 +55,13 @@ export function clearFeedScopeCache(userId?: string) {
   else feedScopeCache.clear();
 }
 
+/** Reuse following ids from a recent getFeed scope lookup — avoids duplicate follows queries. */
+export function peekFeedFollowingIds(userId: string): string[] | undefined {
+  const cached = feedScopeCache.get(userId);
+  if (!cached || Date.now() - cached.fetchedAt >= FEED_SCOPE_CACHE_MS) return undefined;
+  return cached.authorIds.filter((id) => id !== userId);
+}
+
 export async function enrichPostsWithSharedPosts(posts: Post[]): Promise<Post[]> {
   return attachSharedPosts(posts);
 }

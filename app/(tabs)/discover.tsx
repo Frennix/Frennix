@@ -121,7 +121,7 @@ export default function DiscoverScreen() {
     isRefetching: suggestionsRefetching,
   } = useQuery({
     queryKey: ["discover-suggestions", userId],
-    queryFn: () => getSuggestedAthletes(userId, 20),
+    queryFn: () => getSuggestedAthletes(userId, 20, { viewer: viewerProfile }),
     enabled: tab === "people" && !isSearchingPeople && !lifestyleFiltersActive && !!userId,
     staleTime: 120_000,
     placeholderData: (previousData) => previousData,

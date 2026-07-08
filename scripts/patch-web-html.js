@@ -39,6 +39,70 @@ const pwaBootScript = `
       }
     </script>`;
 
+const bootShellCss = `
+  #frennix-boot-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: ${FRENNIX_WEB_BACKGROUND};
+    color: #f5f5f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  #frennix-boot-shell .spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: #c8ff00;
+    border-radius: 50%;
+    animation: frennix-spin 0.9s linear infinite;
+  }
+  @keyframes frennix-spin { to { transform: rotate(360deg); } }
+`;
+
+const bootShellHtml = `
+    <div id="frennix-boot-shell" aria-live="polite" aria-busy="true">
+      <div class="spinner"></div>
+      <div>Loading Frennix…</div>
+      <div id="frennix-boot-shell-stalled" style="display:none;font-size:13px;opacity:0.75">
+        Still loading — check your connection or reopen the app.
+      </div>
+    </div>`;
+
+const bootShellScript = `
+    <script id="frennix-boot-shell-script">
+(function () {
+  function hideBootShell() {
+    var el = document.getElementById("frennix-boot-shell");
+    if (el) el.style.display = "none";
+  }
+  function startupReady() {
+    var trace = window.__FRENNIX_MOUNT_TRACE__;
+    if (!trace || !trace.length) return false;
+    return trace.some(function (e) {
+      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "entry:createRoot:render:end";
+    });
+  }
+  var iv = setInterval(function () {
+    if (startupReady()) {
+      hideBootShell();
+      clearInterval(iv);
+    }
+  }, 150);
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (!startupReady()) {
+        var stalled = document.getElementById("frennix-boot-shell-stalled");
+        if (stalled) stalled.style.display = "block";
+      }
+    }, 15000);
+  });
+})();</script>`;
+
 const indexPath = join(__dirname, "..", "dist", "index.html");
 let html = readFileSync(indexPath, "utf8");
 
@@ -83,6 +147,18 @@ const vapidPublicKey =
 if (vapidPublicKey && !html.includes('name="frennix-vapid-public-key"')) {
   const vapidMeta = `    <meta name="frennix-vapid-public-key" content="${vapidPublicKey}" />\n`;
   html = html.replace("</head>", `${vapidMeta}  </head>`);
+}
+
+if (!html.includes('id="frennix-boot-shell"')) {
+  html = html.replace("<body>", `<body>\n${bootShellHtml}`);
+  html = html.replace(
+    "</head>",
+    `    <style id="frennix-boot-shell-css">${bootShellCss}\n    </style>\n  </head>`
+  );
+}
+
+if (!html.includes('id="frennix-boot-shell-script"')) {
+  html = html.replace("</body>", `${bootShellScript}\n  </body>`);
 }
 
 // Remove legacy pre-JS emergency banner if present from an older export.
