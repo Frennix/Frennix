@@ -29,12 +29,16 @@ function assertIncludes(haystack, needle, label) {
 
 function loadEnv() {
   const envPath = path.join(root, ".env");
-  if (!fs.existsSync(envPath)) return {};
   const out = {};
-  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-    const idx = line.indexOf("=");
-    if (idx <= 0) continue;
-    out[line.slice(0, idx)] = line.slice(idx + 1).trim();
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+      const idx = line.indexOf("=");
+      if (idx <= 0) continue;
+      out[line.slice(0, idx)] = line.slice(idx + 1).trim();
+    }
+  }
+  for (const key of ["EXPO_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "EXPO_PUBLIC_SUPABASE_ANON_KEY"]) {
+    if (process.env[key]) out[key] = process.env[key];
   }
   return out;
 }
