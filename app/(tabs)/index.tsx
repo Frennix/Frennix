@@ -86,6 +86,7 @@ import { markFeedRender } from "@/lib/feed-render-trace";
 import { markFeedHook } from "@/lib/feed-hook-trace";
 import { useFeedRenderStateTrace } from "@/lib/useFeedRenderStateTrace";
 import { FeedRenderTraceProbe } from "@/components/FeedRenderTraceProbe";
+import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -822,6 +823,7 @@ export default function HomeScreen() {
   markFeedRender("feed:branch:main");
 
   return (
+    <TabScreenBoundary label="feed">
     <FeedRenderTraceProbe id="feed:ui:container">
       <View
         style={[styles.container, webContainerStyle]}
@@ -1048,6 +1050,7 @@ export default function HomeScreen() {
       ) : null}
       </View>
     </FeedRenderTraceProbe>
+    </TabScreenBoundary>
   );
 }
 

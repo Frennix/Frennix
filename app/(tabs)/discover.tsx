@@ -41,6 +41,7 @@ import {
   useTabScreenWebContainerStyle,
   useTabScreenWebHeightStyle,
 } from "@/lib/screen-shell";
+import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import {
   DiscoverProfileCard,
   EmptyState,
@@ -432,43 +433,41 @@ export default function DiscoverScreen() {
   const discoverScrollProps =
     Platform.OS === "web" ? ({ pointerEvents: "auto" } as const) : null;
 
-  if (tab === "people" && peopleError && peopleData.length === 0) {
-    return (
-      <View style={[styles.container, webContainerStyle]}>
-        <QueryErrorState
-          title="Could not load people"
-          message={getErrorMessage(peopleQueryError)}
-          onRetry={() => void (isSearchingPeople ? refetchSearch() : lifestyleFiltersActive ? refetchLifestyle() : refetchSuggestions())}
-        />
-      </View>
-    );
-  }
+  const peopleErrorState =
+    tab === "people" && peopleError && peopleData.length === 0 ? (
+      <QueryErrorState
+        title="Could not load people"
+        message={getErrorMessage(peopleQueryError)}
+        onRetry={() =>
+          void (isSearchingPeople
+            ? refetchSearch()
+            : lifestyleFiltersActive
+              ? refetchLifestyle()
+              : refetchSuggestions())
+        }
+      />
+    ) : null;
 
-  if (tab === "groups" && groupsError && groups.length === 0) {
-    return (
-      <View style={[styles.container, webContainerStyle]}>
-        <QueryErrorState
-          title="Could not load groups"
-          message={getErrorMessage(groupsQueryError)}
-          onRetry={() => void refetchGroups()}
-        />
-      </View>
-    );
-  }
+  const groupsErrorState =
+    tab === "groups" && groupsError && groups.length === 0 ? (
+      <QueryErrorState
+        title="Could not load groups"
+        message={getErrorMessage(groupsQueryError)}
+        onRetry={() => void refetchGroups()}
+      />
+    ) : null;
 
-  if (tab === "challenges" && challengesError && challenges.length === 0) {
-    return (
-      <View style={[styles.container, webContainerStyle]}>
-        <QueryErrorState
-          title="Could not load challenges"
-          message={getErrorMessage(challengesQueryError)}
-          onRetry={() => void refetchChallenges()}
-        />
-      </View>
-    );
-  }
+  const challengesErrorState =
+    tab === "challenges" && challengesError && challenges.length === 0 ? (
+      <QueryErrorState
+        title="Could not load challenges"
+        message={getErrorMessage(challengesQueryError)}
+        onRetry={() => void refetchChallenges()}
+      />
+    ) : null;
 
   return (
+    <TabScreenBoundary label="discover">
     <View style={[styles.container, webContainerStyle]}>
       {tab === "people" ? (
         <FlatList
@@ -492,7 +491,8 @@ export default function DiscoverScreen() {
           }
           ListHeaderComponent={peopleListHeader}
           ListEmptyComponent={
-            peopleLoading && peopleData.length === 0 ? (
+            peopleErrorState ??
+            (peopleLoading && peopleData.length === 0 ? (
               <DiscoverPeopleSkeleton />
             ) : (
               <EmptyState
@@ -505,7 +505,7 @@ export default function DiscoverScreen() {
                       : "Complete your profile with activities and city to get better athlete recommendations."
                 }
               />
-            )
+            ))
           }
           renderItem={({ item }) => {
             const profile = item.profile;
@@ -558,7 +558,8 @@ export default function DiscoverScreen() {
           }
           ListHeaderComponent={groupsListHeader}
           ListEmptyComponent={
-            groupsLoading && groups.length === 0 ? (
+            groupsErrorState ??
+            (groupsLoading && groups.length === 0 ? (
               <DiscoverListSkeleton />
             ) : (
               <EmptyState
@@ -567,7 +568,7 @@ export default function DiscoverScreen() {
                 actionLabel="Create group"
                 onAction={() => router.push("/create-group")}
               />
-            )
+            ))
           }
           renderItem={({ item }) => (
             <GroupCard group={item} onPress={() => router.push(`/group/${item.id}`)} />
@@ -596,7 +597,8 @@ export default function DiscoverScreen() {
           }
           ListHeaderComponent={challengesListHeader}
           ListEmptyComponent={
-            challengesLoading && challenges.length === 0 ? (
+            challengesErrorState ??
+            (challengesLoading && challenges.length === 0 ? (
               <DiscoverListSkeleton />
             ) : (
               <EmptyState
@@ -605,7 +607,7 @@ export default function DiscoverScreen() {
                 actionLabel="Create challenge"
                 onAction={() => router.push("/create-challenge")}
               />
-            )
+            ))
           }
           renderItem={({ item }) => <DiscoverChallengeRow challenge={item} userId={userId} />}
         />
@@ -616,6 +618,7 @@ export default function DiscoverScreen() {
         onClose={() => setFrennixMatchExplainerVisible(false)}
       />
     </View>
+    </TabScreenBoundary>
   );
 }
 

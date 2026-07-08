@@ -22,8 +22,8 @@ import { WebPushSuccessToastHost } from "@/components/WebPushSuccessToast";
 import { PwaReopenNoticeHost } from "@/components/PwaReopenNotice";
 import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
-import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
+import { ClientDiagnosticsBootstrap } from "@/components/ClientDiagnosticsBootstrap";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
 import { markStartupMount } from "@/lib/startup-mount-trace";
@@ -47,6 +47,26 @@ const stackDefaults = {
   animation: "fade" as const,
   animationDuration: animation.stackFadeMs,
 } as const;
+
+function AuthAwareErrorBoundary({
+  children,
+  scope,
+}: {
+  children: ReactNode;
+  scope?: string;
+}) {
+  const { session } = useAuth();
+  return (
+    <AppErrorBoundary
+      scope={scope}
+      userId={session?.user.id}
+      email={session?.user.email ?? undefined}
+      screen={scope}
+    >
+      {children}
+    </AppErrorBoundary>
+  );
+}
 
 function TabBadgeRoot({ children }: { children: ReactNode }) {
   const { session } = useAuth();
@@ -96,16 +116,17 @@ export default function RootLayout() {
         {...(Platform.OS === "web" ? ({ nativeID: "app-root-shell" } as object) : null)}
       >
         <StartupMountProbe id="app-error-boundary-root">
-          <AppErrorBoundary scope="root">
+          <AuthAwareErrorBoundary scope="root">
             <StartupMountProbe id="query-provider">
               <QueryProvider>
                 <AppResumeCoordinator />
                 <StartupMountProbe id="auth-provider">
                   <AuthProvider>
+                    <ClientDiagnosticsBootstrap />
                     <StartupMountProbe id="tab-badge-root">
                       <TabBadgeRoot>
                         <StartupMountProbe id="navigation-error-boundary">
-                          <AppErrorBoundary scope="navigation">
+                          <AuthAwareErrorBoundary scope="navigation">
                             <StartupMountMarker id="notification-bootstrap" />
                             <NotificationBootstrap />
                             <StartupMountMarker id="push-registration-bootstrap" />
@@ -208,6 +229,7 @@ export default function RootLayout() {
             <Stack.Screen name="blocked-users" options={backScreen("Blocked users")} />
             <Stack.Screen name="admin-moderation" options={backScreen("Moderation")} />
             <Stack.Screen name="beta-feedback" options={backScreen("Beta Feedback")} />
+            <Stack.Screen name="beta-diagnostics" options={backScreen("Beta Diagnostics")} />
             <Stack.Screen name="admin-feedback" options={backScreen("Feedback Dashboard")} />
             <Stack.Screen name="matching" options={{ headerShown: false }} />
             <Stack.Screen name="trainers" options={{ headerShown: false }} />
@@ -219,7 +241,7 @@ export default function RootLayout() {
             <Stack.Screen name="staff/join" options={{ headerShown: false, title: "Staff invite" }} />
                               </Stack>
                             </StartupMountProbe>
-                          </AppErrorBoundary>
+                          </AuthAwareErrorBoundary>
                         </StartupMountProbe>
                       </TabBadgeRoot>
                     </StartupMountProbe>
@@ -227,7 +249,7 @@ export default function RootLayout() {
                 </StartupMountProbe>
               </QueryProvider>
             </StartupMountProbe>
-          </AppErrorBoundary>
+          </AuthAwareErrorBoundary>
         </StartupMountProbe>
       </GestureHandlerRootView>
     </StartupMountProbe>

@@ -66,7 +66,8 @@ import { buildTodaysFocus } from "@/lib/training-calendar-focus";
 import { useCalendarWideLayout } from "@/lib/responsive";
 import { getCalendarViewQueryKey, getDefaultCalendarRange } from "@/lib/calendar-query-range";
 import { animateCalendarPeriodChange } from "@/lib/layout-animation";
-import { EmptyState, colors, spacing, typography } from "@frennix/ui";
+import { TabScreenBoundary } from "@/components/TabScreenBoundary";
+import { EmptyState, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
 
 /** Scroll child index for native sticky Month/Week controls (see ScrollView child order). */
 const STICKY_CONTROLS_INDEX = 3;
@@ -128,7 +129,7 @@ export default function TrainingCalendarTabScreen() {
 
   const queryKey = getCalendarViewQueryKey(userId, rangeStart, rangeEnd);
 
-  const { data: calendarView, isPending, refetch, isRefetching } = useQuery({
+  const { data: calendarView, isPending, isError, error, refetch, isRefetching } = useQuery({
     queryKey,
     queryFn: () => getCalendarView(userId, rangeStart, rangeEnd),
     enabled: Boolean(userId),
@@ -293,6 +294,18 @@ export default function TrainingCalendarTabScreen() {
     return <TrainingCalendarWeekList days={weekDays} onItemPress={handleItemPress} />;
   }
 
+  if (isError && !calendarView && userId) {
+    return (
+      <View style={[styles.centered, webContainerStyle]}>
+        <QueryErrorState
+          title="Could not load calendar"
+          message={getErrorMessage(error)}
+          onRetry={() => void refetch()}
+        />
+      </View>
+    );
+  }
+
   if (!userId) {
     return (
       <View style={[styles.centered, webContainerStyle]}>
@@ -307,6 +320,7 @@ export default function TrainingCalendarTabScreen() {
   }
 
   return (
+    <TabScreenBoundary label="events">
     <View style={[styles.container, webContainerStyle]}>
       <Animated.ScrollView
         ref={scrollRef}
@@ -388,6 +402,7 @@ export default function TrainingCalendarTabScreen() {
         onPress={() => openTrainingCalendarCreate()}
       />
     </View>
+    </TabScreenBoundary>
   );
 }
 

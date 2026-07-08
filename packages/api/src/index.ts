@@ -20,6 +20,7 @@ export * from "./share";
 export * from "./saved-posts";
 export * from "./referrals";
 export * from "./feedback";
+export * from "./crash-reports";
 export * from "./reactions";
 export * from "./stories";
 export * from "./story-publish";

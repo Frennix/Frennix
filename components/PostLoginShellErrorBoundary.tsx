@@ -1,10 +1,14 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { webAppShell } from "@/lib/flex-layout";
+import { pushScreen } from "@/lib/press-utils";
+import { reportClientError } from "@/lib/report-client-error";
 
 interface Props {
   children: ReactNode;
   label?: string;
+  userId?: string;
+  email?: string;
 }
 
 interface State {
@@ -13,7 +17,7 @@ interface State {
   resetKey: number;
 }
 
-/** Catches post-login shell failures with user-friendly copy (technical detail logged only). */
+/** Catches prompt/bootstrap failures without blocking tab navigation. */
 export class PostLoginShellErrorBoundary extends Component<Props, State> {
   state: State = { error: null, componentStack: null, resetKey: 0 };
 
@@ -24,6 +28,14 @@ export class PostLoginShellErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     this.setState({ componentStack: info.componentStack ?? null });
     console.error(`[post-login-shell:${this.props.label ?? "shell"}]`, error, info.componentStack);
+    void reportClientError({
+      source: `post-login-shell:${this.props.label ?? "shell"}`,
+      error,
+      componentStack: info.componentStack,
+      userId: this.props.userId,
+      email: this.props.email,
+      screen: this.props.label ?? "post-login-shell",
+    });
   }
 
   private handleRetry = () => {
@@ -35,62 +47,79 @@ export class PostLoginShellErrorBoundary extends Component<Props, State> {
   };
 
   render() {
-    const { error, componentStack, resetKey } = this.state;
+    const { error, resetKey } = this.state;
 
     if (error) {
       return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.label}>
-            Frennix hit a problem loading this screen. Your account is safe — try again.
-          </Text>
-          <Pressable style={styles.button} onPress={this.handleRetry}>
-            <Text style={styles.buttonText}>Try again</Text>
-          </Pressable>
+        <View style={styles.flex}>
+          <View style={styles.banner}>
+            <Text style={styles.bannerTitle}>A startup prompt failed to load</Text>
+            <Text style={styles.bannerBody}>
+              Frennix will keep working — only an optional prompt was affected.
+            </Text>
+            <View style={styles.bannerActions}>
+              <Pressable style={styles.button} onPress={this.handleRetry}>
+                <Text style={styles.buttonText}>Retry prompt</Text>
+              </Pressable>
+              <Pressable style={styles.linkButton} onPress={() => pushScreen("/beta-diagnostics")}>
+                <Text style={styles.linkButtonText}>Diagnostics</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       );
     }
 
-    return <View key={resetKey} pointerEvents="box-none" style={styles.flex}>{this.props.children}</View>;
+    return (
+      <View key={resetKey} pointerEvents="box-none" style={styles.flex}>
+        {this.props.children}
+      </View>
+    );
   }
 }
 
 const styles = StyleSheet.create({
   flex: { ...{ flex: 1, minHeight: 0, backgroundColor: "#0A0A0B" }, ...webAppShell },
-  container: {
-    flex: 1,
+  banner: {
     backgroundColor: "#1a0000",
-    paddingTop: Platform.OS === "web" ? 120 : 24,
     paddingHorizontal: 16,
-    paddingBottom: 24,
-    gap: 10,
+    paddingVertical: 12,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3f1d1d",
   },
-  title: {
+  bannerTitle: {
     color: "#ffea00",
-    fontSize: 20,
-    fontWeight: "900",
+    fontSize: 14,
+    fontWeight: "800",
   },
-  label: {
+  bannerBody: {
     color: "#ffb4b4",
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
   },
-  scroll: { flex: 1 },
-  scrollContent: { gap: 8, paddingBottom: 16 },
-  errorName: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  errorMessage: { color: "#fff", fontSize: 15, lineHeight: 22 },
-  stack: {
-    color: "#ccc",
-    fontSize: 11,
-    lineHeight: 15,
-    fontFamily: Platform.OS === "web" ? "monospace" : undefined,
+  bannerActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
   },
   button: {
     alignSelf: "flex-start",
     backgroundColor: "#ffea00",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
   },
-  buttonText: { color: "#1a0000", fontWeight: "800", fontSize: 15 },
+  buttonText: { color: "#1a0000", fontWeight: "800", fontSize: 13 },
+  linkButton: {
+    alignSelf: "center",
+    paddingVertical: 8,
+  },
+  linkButtonText: {
+    color: "#ffb4b4",
+    fontWeight: "700",
+    fontSize: 13,
+    textDecorationLine: "underline",
+  },
 });

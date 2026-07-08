@@ -107,9 +107,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           if (epoch !== authEpochRef.current) return;
           console.error("[auth] getProfile failed", error);
-          setProfile(null);
+          const cached = readCachedProfile(userId);
+          setProfile(cached);
           resolvedProfileUserIdRef.current = userId;
-          writeCachedProfile(userId, null);
+          writeCachedProfile(userId, cached);
+          void import("@/lib/client-diagnostics").then(({ markDiagnosticFailure, logDiagnostic }) => {
+            markDiagnosticFailure("auth.getProfile", error, { userId: userId.slice(0, 8) });
+            logDiagnostic("auth", "kept cached profile after getProfile failure", "warn", {
+              hadCache: Boolean(cached),
+              onboarding_complete: cached?.onboarding_complete ?? null,
+            });
+          });
         } finally {
           if (!options?.background && epoch === authEpochRef.current) {
             setProfileLoading(false);

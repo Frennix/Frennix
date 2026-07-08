@@ -9,6 +9,7 @@ import { showAlert } from "@/lib/alerts";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { isSupabaseConfigured } from "@/lib/config";
+import { logDiagnostic, markDiagnosticFailure, markDiagnosticSuccess } from "@/lib/client-diagnostics";
 
 export default function LoginScreen() {
   const { applySession } = useAuth();
@@ -45,9 +46,12 @@ export default function LoginScreen() {
     try {
       console.info("[sign-in] applying session", { userId: session.user.id });
       await applySession(session);
+      markDiagnosticSuccess("auth.login", { userId: session.user.id.slice(0, 8) });
+      logDiagnostic("auth", "login session applied", "info", { email: session.user.email });
       router.replace("/");
     } catch (e) {
       console.error("[sign-in] post-auth applySession failed", e);
+      markDiagnosticFailure("auth.applySession", e, { userId: session.user.id.slice(0, 8) });
       const detail = formatAuthErrorForDisplay(e);
       showAlert("Signed in, but setup failed", detail);
       setError(`Signed in, but could not load your profile. ${detail}`);

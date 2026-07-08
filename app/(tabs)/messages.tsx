@@ -62,6 +62,11 @@ import { hydrateMessagesInboxCache, writeMessagesInboxCache } from "@/lib/messag
 import { mergeInboxConversations } from "@/lib/messages-inbox-merge";
 import { logInboxPerf, markInboxVisible } from "@/lib/messages-inbox-perf";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import {
+  tabScreenScrollSurface,
+  useTabScreenWebHeightStyle,
+} from "@/lib/screen-shell";
+import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { EmptyState, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
 
 const INBOX_ROW_HEIGHT = 84;
@@ -157,6 +162,7 @@ export default function MessagesScreen() {
   const pathname = usePathname();
   const isListActive = isFocused && !pathname.startsWith("/chat/");
   const queryClient = useQueryClient();
+  const webHeightStyle = useTabScreenWebHeightStyle();
   const [menuConversation, setMenuConversation] = useState<Conversation | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -867,6 +873,7 @@ export default function MessagesScreen() {
   }
 
   return (
+    <TabScreenBoundary label="messages">
     <View style={styles.container}>
       {realtimeUnavailable ? (
         <View style={styles.realtimeBanner}>
@@ -889,6 +896,7 @@ export default function MessagesScreen() {
       />
       <FlatList
         ref={listRef}
+        style={[tabScreenScrollSurface, webHeightStyle]}
         data={inboxConversations}
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -903,11 +911,6 @@ export default function MessagesScreen() {
           minIndexForVisible: 0,
           autoscrollToTopThreshold: 24,
         }}
-        getItemLayout={(_, index) => ({
-          length: INBOX_ROW_HEIGHT,
-          offset: INBOX_ROW_HEIGHT * index,
-          index,
-        })}
         extraData={selectMode ? selectedIds : null}
         ListHeaderComponent={renderListHeader}
         refreshControl={
@@ -978,12 +981,13 @@ export default function MessagesScreen() {
         onUndo={undoDelete}
       />
     </View>
+    </TabScreenBoundary>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  list: { flexGrow: 1 },
+  list: { flexGrow: 1, paddingBottom: spacing.xxl },
   realtimeBanner: {
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,

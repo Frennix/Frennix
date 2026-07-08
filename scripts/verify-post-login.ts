@@ -178,8 +178,13 @@ const checks: Array<{ name: string; run: () => void }> = [
   {
     name: "Post-login shell error boundary wraps tabs",
     run: () => {
-      assertIncludes("components/PostLoginShellErrorBoundary.tsx", "Something went wrong", "shell boundary required");
+      assertIncludes(
+        "components/PostLoginShellErrorBoundary.tsx",
+        "startup prompt failed",
+        "shell boundary required"
+      );
       assertIncludes("app/(tabs)/_layout.tsx", "PostLoginShellErrorBoundary", "tabs must use shell boundary");
+      assertIncludes("components/TabScreenBoundary.tsx", "SectionErrorBoundary", "per-tab isolation");
     },
   },
   {

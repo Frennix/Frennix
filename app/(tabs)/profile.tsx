@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { ScrollView } from "react-native";
+import { ScrollView, View } from "react-native";
 import { ProfileTabSkeleton } from "@/components/ProfileTabSkeleton";
 import { getFollowingIds, getPostsByUser, getProfileStats } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
@@ -15,6 +15,8 @@ import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useTabScreenWebHeightStyle } from "@/lib/screen-shell";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
+import { TabScreenBoundary } from "@/components/TabScreenBoundary";
+import { EmptyState, colors, spacing } from "@frennix/ui";
 
 const EMPTY_STATS = {
   posts: 0,
@@ -25,7 +27,7 @@ const EMPTY_STATS = {
 } as const;
 
 export default function ProfileTabScreen() {
-  const { session, profile, authReady } = useAuth();
+  const { session, profile, authReady, loading } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
@@ -105,8 +107,21 @@ export default function ProfileTabScreen() {
     }, [queryClient, userId])
   );
 
-  if (!authReady || !profile) {
+  if (!profile && (loading || !authReady)) {
     return <ProfileTabSkeleton />;
+  }
+
+  if (!profile) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, padding: spacing.lg }}>
+        <EmptyState
+          title="Profile unavailable"
+          description="We couldn't load your profile. Pull to refresh or try signing in again."
+          actionLabel="Go to settings"
+          onAction={() => router.push("/settings")}
+        />
+      </View>
+    );
   }
 
   const baseStats = stats ?? EMPTY_STATS;
@@ -116,6 +131,7 @@ export default function ProfileTabScreen() {
   };
 
   return (
+    <TabScreenBoundary label="profile">
     <ProfileScreenContent
       profile={profile}
       stats={displayStats}
@@ -139,6 +155,7 @@ export default function ProfileTabScreen() {
       refreshing={profileRefreshing}
       webShellStyle={webShellStyle}
     />
+    </TabScreenBoundary>
   );
 }
 

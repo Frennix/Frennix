@@ -2,14 +2,18 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
+import { pushScreen } from "@/lib/press-utils";
+import { reportClientError } from "@/lib/report-client-error";
 
 const FRIENDLY_CRASH_MESSAGE =
   "Something went wrong while loading Frennix. Please try again.";
 
 interface Props {
   children: ReactNode;
-  /** Optional label for error reporting context. */
   scope?: string;
+  userId?: string;
+  email?: string;
+  screen?: string;
 }
 
 interface State {
@@ -27,6 +31,14 @@ export class AppErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     const scope = this.props.scope ?? "app";
     console.error(`[error-boundary:${scope}]`, error, info.componentStack);
+    void reportClientError({
+      source: `error-boundary:${scope}`,
+      error,
+      componentStack: info.componentStack,
+      userId: this.props.userId,
+      email: this.props.email,
+      screen: this.props.screen ?? scope,
+    });
   }
 
   private handleRetry = () => {
@@ -41,14 +53,24 @@ export class AppErrorBoundary extends Component<Props, State> {
         <View style={styles.container}>
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.message}>{FRIENDLY_CRASH_MESSAGE}</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Retry"
-            onPress={this.handleRetry}
-            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-          >
-            <Text style={styles.buttonText}>Retry</Text>
-          </Pressable>
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry"
+              onPress={this.handleRetry}
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.buttonText}>Retry</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open diagnostics"
+              onPress={() => pushScreen("/beta-diagnostics")}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.secondaryButtonText}>Diagnostics</Text>
+            </Pressable>
+          </View>
         </View>
       );
     }
@@ -84,24 +106,32 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 320,
   },
-  stack: {
-    color: colors.textMuted,
-    fontSize: 11,
-    lineHeight: 15,
-    maxWidth: 340,
-    textAlign: "left",
-    fontFamily: Platform.OS === "web" ? "monospace" : undefined,
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
   },
   button: {
-    marginTop: 8,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
     backgroundColor: colors.accent,
   },
+  secondaryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   buttonPressed: { opacity: 0.85 },
   buttonText: {
     color: colors.background,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButtonText: {
+    color: colors.text,
     fontSize: 16,
     fontWeight: "600",
   },

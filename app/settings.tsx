@@ -179,6 +179,10 @@ export default function SettingsScreen() {
           <Text style={styles.linkHint}>Report bugs, suggest features, or share general feedback</Text>
         </Pressable>
       </Link>
+      <Pressable onPress={() => pushScreen("/beta-diagnostics")}>
+        <Text style={styles.link}>Beta diagnostics</Text>
+        <Text style={styles.linkHint}>Copy logs for crashes, API failures, and notification setup issues</Text>
+      </Pressable>
 
       <Text style={styles.section}>Privacy</Text>
       <Pressable onPress={() => pushScreen("/privacy-settings")}>

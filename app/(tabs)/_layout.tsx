@@ -44,6 +44,7 @@ const ProfileHeaderActions = memo(function ProfileHeaderActions() {
 });
 
 const TabsShell = memo(function TabsShell() {
+  const { session } = useAuth();
   const { unreadMessages } = useTabBadges();
   const messagesBadge =
     unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
@@ -68,8 +69,14 @@ const TabsShell = memo(function TabsShell() {
 
   return (
     <>
-      <WhatsNewLaunchPrompt />
-      <NotificationOnboardingPrompt />
+      <PostLoginShellErrorBoundary
+        label="prompts"
+        userId={session?.user.id}
+        email={session?.user.email ?? undefined}
+      >
+        <WhatsNewLaunchPrompt />
+        <NotificationOnboardingPrompt />
+      </PostLoginShellErrorBoundary>
       <TabPrefetchCoordinator />
       <View
         style={[flexFill, webTabSceneShell]}
@@ -177,11 +184,7 @@ const TabsShell = memo(function TabsShell() {
 });
 
 export default function TabsLayout() {
-  return (
-    <PostLoginShellErrorBoundary label="tabs layout">
-      <TabsShell />
-    </PostLoginShellErrorBoundary>
-  );
+  return <TabsShell />;
 }
 
 const styles = StyleSheet.create({
