@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "expo-router";
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getUnreadMessageCount, getUnreadNotificationCount } from "@frennix/api";
 import type { Conversation } from "@frennix/types";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
@@ -24,8 +24,15 @@ function sumUnreadFromConversations(conversations: Conversation[] | undefined) {
 export function TabBadgeProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const [deferHeavyBadges, setDeferHeavyBadges] = useState(true);
   const messagesRouteActive =
     pathname === "/messages" || pathname.startsWith("/chat/") || pathname.includes("/messages");
+
+  useEffect(() => {
+    if (!userId) return;
+    const timer = setTimeout(() => setDeferHeavyBadges(false), 2_000);
+    return () => clearTimeout(timer);
+  }, [userId]);
 
   const { data: unreadNotifications = 0 } = useQuery({
     queryKey: ["unread-notifications", userId],
@@ -39,7 +46,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
   const { data: unreadMessages = 0 } = useQuery({
     queryKey: ["unread-messages", userId],
     queryFn: () => getUnreadMessageCount(userId),
-    enabled: !!userId,
+    enabled: !!userId && (!deferHeavyBadges || messagesRouteActive),
     staleTime: 45_000,
     networkMode: "offlineFirst",
     refetchInterval: (query) => {

@@ -7,8 +7,10 @@ import { prefetchPostImages } from "@/lib/prefetch-post-images";
 /** Start fetching the next page this many viewport-heights before the list end. */
 const PREFETCH_VIEWPORT_MULTIPLIER = 3;
 /** Activate media for rows this many indices ahead of the last visible post. */
-const MEDIA_LOOKAHEAD_ITEMS = 12;
+const MEDIA_LOOKAHEAD_ITEMS = 8;
 const MEDIA_LOOKBEHIND_ITEMS = 2;
+/** Wait before auto-fetching page 2 so the first screen can render first. */
+const AUTO_PAGE_TWO_DELAY_MS = 2500;
 
 type UseFeedInfiniteScrollOptions = {
   posts: Post[];
@@ -37,6 +39,7 @@ export function useFeedInfiniteScroll({
   const nearEndRef = useRef(false);
   const fetchInFlightRef = useRef(false);
   const seededInitialPostsRef = useRef(false);
+  const autoPageTwoRequestedRef = useRef(false);
 
   // FlatList viewability often does not fire on first paint (especially Safari web).
   // Seed the first screen of posts so feed media mounts immediately.
@@ -62,10 +65,16 @@ export function useFeedInfiniteScroll({
     });
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // Buffer a second page as soon as the first page arrives.
+  // Buffer a second page after the first page renders — not immediately on fetch success.
   useEffect(() => {
-    if (!isFeedReady || !hasNextPage || pageCount !== 1) return;
-    requestNextPage();
+    if (!isFeedReady || !hasNextPage || pageCount !== 1 || autoPageTwoRequestedRef.current) return;
+
+    const timer = setTimeout(() => {
+      autoPageTwoRequestedRef.current = true;
+      requestNextPage();
+    }, AUTO_PAGE_TWO_DELAY_MS);
+
+    return () => clearTimeout(timer);
   }, [hasNextPage, isFeedReady, pageCount, requestNextPage]);
 
   // Keep fetching while the user is near the bottom and more pages exist.
@@ -79,8 +88,8 @@ export function useFeedInfiniteScroll({
   useEffect(() => {
     if (pageCount <= prefetchedPageCountRef.current) return;
     prefetchedPageCountRef.current = pageCount;
-    const tail = posts.slice(-20);
-    prefetchPostImages(tail, 20);
+    const tail = posts.slice(-12);
+    prefetchPostImages(tail, 8);
   }, [pageCount, posts]);
 
   const handleScroll = useCallback(
@@ -100,6 +109,7 @@ export function useFeedInfiniteScroll({
       }
 
       if (isNearEnd) {
+        autoPageTwoRequestedRef.current = true;
         requestNextPage();
       }
     },
@@ -140,7 +150,7 @@ export function useFeedInfiniteScroll({
         .map((entry) => (entry.item as Extract<FeedListRow, { kind: "post" }>).post);
 
       if (visiblePosts.length) {
-        prefetchPostImages(visiblePosts, 10);
+        prefetchPostImages(visiblePosts, 6);
       }
     }
   ).current;

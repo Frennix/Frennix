@@ -28,6 +28,7 @@ export * from "./story-engagement";
 export * from "./workout-story-utils";
 export * from "./push-tokens";
 export * from "./web-push-subscriptions";
+export * from "./feature-flags";
 export * from "./suggestions";
 export * from "./achievements";
 export * from "./presence";

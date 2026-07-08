@@ -13,11 +13,20 @@ export function TabPrefetchCoordinator() {
   useEffect(() => {
     if (!userId) return;
 
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     const task = InteractionManager.runAfterInteractions(() => {
-      void prefetchTabData(queryClient, userId);
+      timer = setTimeout(() => {
+        if (!cancelled) void prefetchTabData(queryClient, userId);
+      }, 3_000);
     });
 
-    return () => task.cancel();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      task.cancel();
+    };
   }, [queryClient, userId]);
 
   return null;

@@ -5,7 +5,7 @@ export type WebPushLogEntry = {
   data?: unknown;
 };
 
-const MAX_LOGS = 60;
+const MAX_LOGS = 120;
 const logs: WebPushLogEntry[] = [];
 const listeners = new Set<() => void>();
 

@@ -31,13 +31,13 @@ if (!recipientId) {
 
 const env = loadEnv();
 const url = env.EXPO_PUBLIC_SUPABASE_URL;
-const anonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-if (!url || !anonKey) {
-  console.error("Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY in .env");
+const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+if (!url || !serviceKey) {
+  console.error("Missing EXPO_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
   process.exit(1);
 }
 
-const supabase = createClient(url, anonKey);
+const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
 
 const ACTOR_ID = "54c6b173-ee3f-45c7-a530-656e50e3d95c";
 const CONVERSATION_ID = "b172c1f6-7a3f-43ea-936e-9b9b5c895f45";
@@ -154,11 +154,12 @@ async function waitForDelivery(notificationId, timeoutMs = 12000) {
 }
 
 async function invokeDispatch(record) {
+  const authKey = env.SUPABASE_SERVICE_ROLE_KEY ?? env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
   const res = await fetch(`${url}/functions/v1/send-push`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${anonKey}`,
+      Authorization: `Bearer ${authKey}`,
     },
     body: JSON.stringify({ record }),
   });
@@ -180,7 +181,7 @@ let failed = 0;
 for (const event of EVENTS) {
   process.stdout.write(`• ${event.name} ... `);
 
-  const { data: notificationId, error } = await supabase.rpc("create_app_notification", {
+  const { data: notificationId, error } = await supabase.rpc("create_notification", {
     p_user_id: recipientId,
     p_type: event.type,
     p_actor_id: ACTOR_ID,
@@ -225,7 +226,7 @@ for (const event of EVENTS) {
     continue;
   }
 
-  const { data: dupId } = await supabase.rpc("create_app_notification", {
+  const { data: dupId } = await supabase.rpc("create_notification", {
     p_user_id: recipientId,
     p_type: event.type,
     p_actor_id: ACTOR_ID,

@@ -65,7 +65,13 @@ import { useFeedInfiniteScroll } from "@/lib/useFeedInfiniteScroll";
 import { useFeedNewPostsBanner } from "@/lib/useFeedNewPostsBanner";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import type { FeedListRow } from "@/lib/feed-list-rows";
-import { trackFeedLoad } from "@/lib/product-analytics";
+import { hydrateFeedCache, writeFeedCache } from "@/lib/feed-cache";
+import {
+  markFeedCacheHydrated,
+  markFeedPerf,
+  reportFeedPerfReady,
+  startFeedPerfSession,
+} from "@/lib/feed-performance";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import { NewPostsBanner } from "@/components/NewPostsBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
@@ -103,14 +109,13 @@ export default function HomeScreen() {
   markFeedHook("save-post");
   const postReaction = usePostReaction(userId);
   markFeedHook("post-reaction");
-  const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId);
-  markFeedHook("suggested-follow");
   const { toggleLikePost } = useFeedLike(userId);
   markFeedHook("feed-like");
   const { openGallery, lightbox, lightboxVisible } = useImageLightbox();
   markFeedHook("image-lightbox");
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
+  const [storiesDeferred, setStoriesDeferred] = useState(false);
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
   }, []);
@@ -171,7 +176,7 @@ export default function HomeScreen() {
   } = useQuery({
     queryKey: ["feed-stories", userId],
     queryFn: () => getFeedStories(userId),
-    enabled: !!userId,
+    enabled: !!userId && storiesDeferred,
     staleTime: 60_000,
   });
   markFeedHook("stories-query");
@@ -344,6 +349,7 @@ export default function HomeScreen() {
 
   const feedLoadStartedRef = useRef<number | null>(null);
   const feedPerfTrackedRef = useRef(false);
+
   const listRef = useRef<FlatList<FeedListRow>>(null);
   const webScrollRef = useRef<ScrollView>(null);
   const useWebScroll = Platform.OS === "web";
@@ -357,6 +363,7 @@ export default function HomeScreen() {
   const {
     data,
     isLoading,
+    isFetching,
     isError,
     error,
     isSuccess: isFeedReady,
@@ -367,7 +374,14 @@ export default function HomeScreen() {
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ["feed", userId],
-    queryFn: ({ pageParam }) => getFeed(userId, pageParam),
+    queryFn: async ({ pageParam }) => {
+      markFeedPerf(pageParam ? "feed_page_next_start" : "feed_page_1_start");
+      const page = await getFeed(userId, pageParam);
+      markFeedPerf(pageParam ? "feed_page_next_ready" : "feed_page_1_ready", {
+        post_count: page.posts.length,
+      });
+      return page;
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!userId,
@@ -375,6 +389,11 @@ export default function HomeScreen() {
     placeholderData: (previousData) => previousData,
   });
   markFeedHook("feed-query");
+
+  const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId, {
+    enabled: isFeedReady,
+  });
+  markFeedHook("suggested-follow");
 
   const {
     data: suggestions = [],
@@ -390,7 +409,7 @@ export default function HomeScreen() {
   markFeedHook("suggestions-query");
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
-  const showFeedSkeleton = isLoading && posts.length === 0;
+  const showFeedSkeleton = posts.length === 0 && (isLoading || isFetching);
   const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
   const [feedAtTop, setFeedAtTop] = useState(true);
@@ -490,17 +509,41 @@ export default function HomeScreen() {
   markFeedHook("tab-scroll");
 
   useEffect(() => {
+    if (!userId) return;
+    startFeedPerfSession(userId);
+    void hydrateFeedCache(queryClient, userId).then((hydrated) => {
+      if (!hydrated) return;
+      const cachedPosts =
+        queryClient.getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])?.pages.flatMap(
+          (page) => page.posts
+        ) ?? [];
+      markFeedCacheHydrated(cachedPosts.length);
+    });
+  }, [queryClient, userId]);
+
+  useEffect(() => {
+    if (!userId || !data?.pages.length) return;
+    void writeFeedCache(userId, data.pages);
+  }, [data?.pages, userId]);
+
+  useEffect(() => {
+    if (!isFeedReady) return;
+    const timer = setTimeout(() => setStoriesDeferred(true), 400);
+    return () => clearTimeout(timer);
+  }, [isFeedReady]);
+
+  useEffect(() => {
+    if (!isFeedReady || feedPerfTrackedRef.current || feedLoadStartedRef.current == null) return;
+    reportFeedPerfReady(posts.length);
+    feedPerfTrackedRef.current = true;
+  }, [isFeedReady, posts.length]);
+
+  useEffect(() => {
     if (userId) {
       feedLoadStartedRef.current = performance.now();
       feedPerfTrackedRef.current = false;
     }
   }, [userId]);
-
-  useEffect(() => {
-    if (!isFeedReady || feedPerfTrackedRef.current || feedLoadStartedRef.current == null) return;
-    trackFeedLoad(performance.now() - feedLoadStartedRef.current, posts.length);
-    feedPerfTrackedRef.current = true;
-  }, [isFeedReady, posts.length]);
 
   const feedActionsRef = useRef<FeedListItemActions>({
     onPress: () => undefined,
@@ -619,6 +662,7 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <FeedHeader
           showTopRow={false}
+          showStories={storiesDeferred}
           stories={stories}
           suggestions={suggestions}
           followingIds={followingIds}
@@ -636,6 +680,7 @@ export default function HomeScreen() {
     ),
     [
       stories,
+      storiesDeferred,
       suggestions,
       followingIds,
       followMutation.isPending,
@@ -803,6 +848,8 @@ export default function HomeScreen() {
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
                 </View>
               ) : (
                 <View style={styles.emptyWrap}>
@@ -841,8 +888,8 @@ export default function HomeScreen() {
             contentContainerStyle={styles.list}
             scrollEnabled={feedScrollEnabled}
             nestedScrollEnabled
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
             windowSize={21}
             updateCellsBatchingPeriod={16}
             removeClippedSubviews={false}
@@ -870,6 +917,8 @@ export default function HomeScreen() {
             ListEmptyComponent={
               showFeedSkeleton ? (
                 <View style={styles.initialSkeletons}>
+                  <FeedPostCardSkeleton />
+                  <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />

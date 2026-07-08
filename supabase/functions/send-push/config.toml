@@ -1,0 +1,2 @@
+# Invoked by DB trigger via pg_net (no JWT in trigger payload).
+verify_jwt = false

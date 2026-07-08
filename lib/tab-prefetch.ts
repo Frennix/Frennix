@@ -2,11 +2,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import {
   getChallenges,
   getConversations,
-  getFollowingIds,
   getGroups,
   getPostsByUser,
   getProfileStats,
-  getSuggestedAthletes,
   getCalendarView,
   getWorkoutEvents,
 } from "@frennix/api";
@@ -32,12 +30,6 @@ export async function prefetchTabData(queryClient: QueryClient, userId: string) 
   });
 
   await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: ["discover-suggestions", userId],
-      queryFn: () => getSuggestedAthletes(userId, 20),
-      staleTime: TAB_STALE_MS,
-      gcTime: TAB_GC_MS,
-    }),
     queryClient.prefetchQuery({
       queryKey: ["discover-groups", ""],
       queryFn: () => getGroups({}),
@@ -71,12 +63,6 @@ export async function prefetchTabData(queryClient: QueryClient, userId: string) 
     queryClient.prefetchQuery({
       queryKey: ["profile-stats", userId],
       queryFn: () => getProfileStats(userId),
-      staleTime: TAB_STALE_MS,
-      gcTime: TAB_GC_MS,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["following-ids", userId],
-      queryFn: () => getFollowingIds(userId),
       staleTime: TAB_STALE_MS,
       gcTime: TAB_GC_MS,
     }),

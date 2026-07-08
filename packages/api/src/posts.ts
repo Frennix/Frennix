@@ -11,7 +11,49 @@ import {
 import { enrichPostsWithReactions } from "./reactions";
 import { getSupabase } from "./supabase";
 
-const FEED_PAGE_SIZE = 20;
+export const FEED_INITIAL_PAGE_SIZE = 12;
+export const FEED_PAGE_SIZE = 20;
+
+type FeedScope = {
+  authorIds: string[];
+  groupIds: string[];
+  challengeIds: string[];
+  fetchedAt: number;
+};
+
+const feedScopeCache = new Map<string, FeedScope>();
+const FEED_SCOPE_CACHE_MS = 5 * 60 * 1000;
+
+async function getFeedScope(userId: string): Promise<FeedScope> {
+  const cached = feedScopeCache.get(userId);
+  if (cached && Date.now() - cached.fetchedAt < FEED_SCOPE_CACHE_MS) {
+    return cached;
+  }
+
+  const [{ data: following }, { data: groups }, { data: challenges }] = await Promise.all([
+    getSupabase().from("follows").select("following_id").eq("follower_id", userId),
+    getSupabase().from("group_members").select("group_id").eq("user_id", userId),
+    getSupabase()
+      .from("challenge_participants")
+      .select("challenge_id")
+      .eq("user_id", userId)
+      .eq("status", "active"),
+  ]);
+
+  const scope: FeedScope = {
+    authorIds: [...new Set([userId, ...(following ?? []).map((f) => f.following_id)])],
+    groupIds: [...new Set((groups ?? []).map((g) => g.group_id))],
+    challengeIds: [...new Set((challenges ?? []).map((c) => c.challenge_id))],
+    fetchedAt: Date.now(),
+  };
+  feedScopeCache.set(userId, scope);
+  return scope;
+}
+
+export function clearFeedScopeCache(userId?: string) {
+  if (userId) feedScopeCache.delete(userId);
+  else feedScopeCache.clear();
+}
 
 export async function enrichPostsWithSharedPosts(posts: Post[]): Promise<Post[]> {
   return attachSharedPosts(posts);
@@ -213,21 +255,9 @@ export async function enrichPostsWithInteractions(
 export async function getFeed(
   userId: string,
   cursor?: string,
-  limit = FEED_PAGE_SIZE
+  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
 ): Promise<FeedPage> {
-  const [{ data: following }, { data: groups }, { data: challenges }] = await Promise.all([
-    getSupabase().from("follows").select("following_id").eq("follower_id", userId),
-    getSupabase().from("group_members").select("group_id").eq("user_id", userId),
-    getSupabase()
-      .from("challenge_participants")
-      .select("challenge_id")
-      .eq("user_id", userId)
-      .eq("status", "active"),
-  ]);
-
-  const authorIds = [...new Set([userId, ...(following ?? []).map((f) => f.following_id)])];
-  const groupIds = [...new Set((groups ?? []).map((g) => g.group_id))];
-  const challengeIds = [...new Set((challenges ?? []).map((c) => c.challenge_id))];
+  const { authorIds, groupIds, challengeIds } = await getFeedScope(userId);
 
   const orParts = [`author_id.in.(${authorIds.join(",")})`];
   if (groupIds.length) orParts.push(`group_id.in.(${groupIds.join(",")})`);

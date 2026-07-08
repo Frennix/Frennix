@@ -17,7 +17,7 @@ BEGIN
   v_notification_id := public.create_notification(
     p_user_id := v_user_id,
     p_type := 'system_announcement',
-    p_actor_id := v_user_id,
+    p_actor_id := NULL,
     p_entity_type := 'system',
     p_entity_id := v_user_id,
     p_title := 'Frennix push test',
