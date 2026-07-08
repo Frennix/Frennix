@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { colors, spacing, typography } from "@frennix/ui";
 
+import { WEB_PUSH_SUCCESS_MESSAGE } from "@/lib/web-push-messages";
+
 let showToastHandler: ((message: string) => void) | null = null;
 
-export function showWebPushSuccessToast(
-  message = "✅ Notifications are enabled. You're all set!"
-) {
+export function showWebPushSuccessToast(message = WEB_PUSH_SUCCESS_MESSAGE) {
   showToastHandler?.(message);
 }
 

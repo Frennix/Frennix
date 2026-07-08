@@ -10,7 +10,7 @@ import {
   type WebPushSubscribeResult,
 } from "@/lib/web-push";
 import { canPromptForWebPush } from "@/lib/pwa";
-import { pushLog } from "@/lib/web-push-diagnostics";
+import { pushLog, logPushSetupFunnel } from "@/lib/web-push-diagnostics";
 import { shouldShowPwaReopenNotice } from "@/lib/pwa-update-prompt";
 import { showPwaReopenNotice } from "@/components/PwaReopenNotice";
 import {
@@ -144,6 +144,7 @@ export async function runAutoWebPushRegistration(
     }
 
     await applyWebPushPreferenceOnSuccess(userId, queryClient);
+    logPushSetupFunnel("preference_enabled", "push_enabled set to true", { source });
     pushLog("auto_register.success", result.endpoint.slice(0, 72), { source, hadSubscription });
 
     return {

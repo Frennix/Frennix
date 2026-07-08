@@ -16,16 +16,26 @@ import {
   webPushFailureMessage,
 } from "@/lib/web-push";
 import { runAutoWebPushRegistration } from "@/lib/web-push-auto-register";
+import { WEB_PUSH_SUCCESS_MESSAGE } from "@/lib/web-push-messages";
 import { showWebPushSuccessToast } from "@/components/WebPushSuccessToast";
 import { WebPushNativeButton } from "@/components/WebPushNativeButton";
+import {
+  logPushSetupFailure,
+  logPushSetupFunnel,
+} from "@/lib/web-push-diagnostics";
 
 type Props = {
   readyForPush?: boolean;
   onSetupChange?: () => void;
+  onSuccess?: () => void;
 };
 
 /** Push enable UI for notification settings — always shows a clear next step. */
-export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupChange }: Props) {
+export function WebPushEnableCard({
+  readyForPush = isWebStandalone(),
+  onSetupChange,
+  onSuccess,
+}: Props) {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
@@ -53,23 +63,35 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
     async (source: "permission" | "resume") => {
       if (!userId) return;
       setEnabling(true);
+      logPushSetupFunnel("register_start", source, { userId: userId.slice(0, 8) });
       try {
         const outcome = await runAutoWebPushRegistration(userId, queryClient, { source });
         await refreshStatus();
         if (outcome.status === "success") {
-          showWebPushSuccessToast();
+          logPushSetupFunnel("register_success", outcome.endpoint.slice(0, 72), {
+            justRegistered: outcome.justRegistered,
+          });
+          logPushSetupFunnel("preference_enabled", "push_enabled set to true");
+          showWebPushSuccessToast(WEB_PUSH_SUCCESS_MESSAGE);
+          onSuccess?.();
           return;
         }
         if (outcome.status === "failed") {
+          logPushSetupFunnel("register_failed", outcome.result.reason, {
+            message: outcome.result.message,
+          });
           const message = webPushFailureMessage(outcome.result);
           if (message) showAlert("Could not enable notifications", message);
         }
+      } catch (error) {
+        logPushSetupFailure("register", error, { source });
+        showAlert("Could not enable notifications", "Something went wrong. Please try again.");
       } finally {
         setEnabling(false);
         setAutoRegistering(false);
       }
     },
-    [queryClient, refreshStatus, userId]
+    [onSuccess, queryClient, refreshStatus, userId]
   );
 
   useEffect(() => {
@@ -95,6 +117,8 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
   );
 
   async function handleEnableClick(_event: MouseEvent<HTMLButtonElement>) {
+    logPushSetupFunnel("enable_tap", "settings enable notifications");
+
     if (!userId) {
       showAlert("Sign in required", "Log in to enable push notifications.");
       return;
@@ -119,8 +143,10 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
     setEnabling(true);
     try {
       if (Notification.permission !== "granted") {
+        logPushSetupFunnel("permission_request", "Notification.requestPermission()");
         const result = await requestWebPushPermissionFromUserGesture();
         if (result === "denied") {
+          logPushSetupFunnel("permission_denied", "user denied iOS permission dialog");
           showAlert(
             "Notifications blocked",
             "Open iPhone Settings → Notifications → Frennix and allow notifications. Frennix will finish setup automatically when you reopen the app."
@@ -129,6 +155,7 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
           return;
         }
         if (result !== "granted") return;
+        logPushSetupFunnel("permission_granted", "user allowed iOS permission dialog");
       }
       await finishRegistration("permission");
     } finally {
@@ -141,7 +168,7 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
   if (isWebPushFullyEnabled(permission, subscribed)) {
     return (
       <View style={[styles.container, styles.containerSuccess]}>
-        <Text style={styles.enabledText}>Push Notifications: Enabled ✅</Text>
+        <Text style={styles.enabledText}>{WEB_PUSH_SUCCESS_MESSAGE}</Text>
       </View>
     );
   }
@@ -226,9 +253,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   enabledText: {
-    ...typography.body,
-    fontWeight: "700",
+    ...typography.bodySmall,
+    fontWeight: "600",
     color: colors.text,
+    lineHeight: 20,
   },
   title: {
     ...typography.body,

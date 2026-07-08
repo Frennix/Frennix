@@ -19,10 +19,11 @@ import {
   registerNotificationOnboardingHandler,
 } from "@/lib/notification-onboarding";
 import { showWebPushSuccessToast } from "@/components/WebPushSuccessToast";
+import { WEB_PUSH_SUCCESS_MESSAGE } from "@/lib/web-push-messages";
 import { WebPushNativeButton } from "@/components/WebPushNativeButton";
 import { colors, spacing, typography } from "@frennix/ui";
 
-const SUCCESS_MESSAGE = "✅ Notifications are enabled. You're all set!";
+const SUCCESS_MESSAGE = WEB_PUSH_SUCCESS_MESSAGE;
 
 export function NotificationOnboardingPrompt() {
   const { session } = useAuth();

@@ -38,6 +38,7 @@
     "verify:notification-engine-phase2": "npx tsx scripts/verify-notification-engine-phase2.ts",
     "verify:notification-engine-phase3": "npx tsx scripts/verify-notification-engine-phase3.ts",
     "verify:notification-engine-phase4": "npx tsx scripts/verify-notification-engine-phase4.ts",
+    "verify:push-settings-flow": "node scripts/verify-push-settings-flow.mjs",
     "setup:iphone-web-push": "node scripts/setup-iphone-web-push.mjs",
     "build:web": "expo export -p web && node scripts/copy-pwa-assets.mjs && node scripts/patch-web-html.js"
   },

@@ -219,9 +219,9 @@ export function logWebPushEnvironment(): void {
     })
     .catch((error) => pushLog("env.sw_js_error", String(error)));
 
-  const expectedOrigin = "https://mobile-beta-blond.vercel.app";
+  const expectedOrigin = config.appUrl.replace(/\/$/, "");
   if (window.location.origin !== expectedOrigin) {
-    pushLog("env.origin_warning", `expected ${expectedOrigin}`);
+    pushLog("env.origin_warning", `running on ${window.location.origin}, expected ${expectedOrigin}`);
   }
 }
 

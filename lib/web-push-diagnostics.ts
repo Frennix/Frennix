@@ -40,6 +40,46 @@ export function formatPushLogEntry(entry: WebPushLogEntry): string {
   return `${time} [${entry.step}] ${entry.detail}${data}`;
 }
 
+export type PushSetupFunnelStep =
+  | "settings_open"
+  | "status_snapshot"
+  | "enable_tap"
+  | "permission_request"
+  | "permission_granted"
+  | "permission_denied"
+  | "register_start"
+  | "register_success"
+  | "register_failed"
+  | "preference_enabled"
+  | "install_guide_open";
+
+export type PushSetupSnapshot = {
+  userId?: string;
+  status: string;
+  permission: string;
+  subscribed: boolean;
+  standalone: boolean;
+  featureEnabled?: boolean;
+  pushEnabledPref?: boolean;
+  screen?: string;
+};
+
+export function logPushSetupFunnel(step: PushSetupFunnelStep, detail: string, data?: unknown) {
+  pushLog(`funnel.${step}`, detail, data);
+}
+
+export function logPushSetupSnapshot(snapshot: PushSetupSnapshot) {
+  logPushSetupFunnel("status_snapshot", snapshot.status, snapshot);
+}
+
+export function logPushSetupFailure(step: string, error: unknown, context?: Record<string, unknown>) {
+  const formatted = formatPushError(error);
+  pushLog(`funnel.failure.${step}`, formatted.message ? String(formatted.message) : String(error), {
+    ...formatted,
+    ...context,
+  });
+}
+
 export function formatPushError(error: unknown): Record<string, unknown> {
   if (error instanceof DOMException) {
     return {

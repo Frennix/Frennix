@@ -26,12 +26,21 @@ import {
   requestPushPermission,
   type PushPermissionStatus,
 } from "@/lib/notifications";
-import { getWebPushPermissionStatus, hasActiveWebPushSubscription } from "@/lib/web-push";
+import { getWebPushPermissionStatus, hasActiveWebPushSubscription, logWebPushEnvironment } from "@/lib/web-push";
 import { showAlert } from "@/lib/alerts";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { IosPwaInstallGuide } from "@/components/IosPwaInstallGuide";
 import { WebPushEnableCard } from "@/components/WebPushEnableCard";
+import { WebPushStatusIndicator } from "@/components/WebPushStatusIndicator";
 import { isWebStandalone, shouldShowPwaInstallGuideForWeb } from "@/lib/pwa";
+import {
+  logPushSetupFunnel,
+  logPushSetupSnapshot,
+} from "@/lib/web-push-diagnostics";
+import {
+  resolveWebPushSetupStatus,
+  WEB_PUSH_STATUS_LABELS,
+} from "@/lib/web-push-status";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 function SettingRow({
@@ -107,26 +116,61 @@ export default function NotificationSettingsScreen() {
   const [enablingPush, setEnablingPush] = useState(false);
   const [webPushGranted, setWebPushGranted] = useState(false);
   const [webPushSubscribed, setWebPushSubscribed] = useState(false);
+  const [webPushStatusLoading, setWebPushStatusLoading] = useState(Platform.OS === "web");
+  const [featureEnabled, setFeatureEnabled] = useState(true);
 
   const refreshPermissionStatus = useCallback(async () => {
     if (Platform.OS === "web") {
-      const status = await getWebPushPermissionStatus();
-      const granted = status === "granted";
-      setWebPushGranted(granted);
-      setWebPushSubscribed(granted ? await hasActiveWebPushSubscription() : false);
-      setPermissionStatus(granted ? "granted" : status === "denied" ? "denied" : "undetermined");
+      setWebPushStatusLoading(true);
+      try {
+        const status = await getWebPushPermissionStatus();
+        const granted = status === "granted";
+        const subscribed = granted ? await hasActiveWebPushSubscription() : false;
+        setWebPushGranted(granted);
+        setWebPushSubscribed(subscribed);
+        setPermissionStatus(granted ? "granted" : status === "denied" ? "denied" : "undetermined");
+        const { isWebPushFeatureEnabled } = await import("@/lib/web-push");
+        const nextFeatureEnabled = await isWebPushFeatureEnabled();
+        setFeatureEnabled(nextFeatureEnabled);
+
+        const setupStatus = resolveWebPushSetupStatus({
+          permission: status,
+          subscribed,
+        });
+        logPushSetupSnapshot({
+          userId: userId || undefined,
+          screen: "notification-settings",
+          status: WEB_PUSH_STATUS_LABELS[setupStatus],
+          permission: status,
+          subscribed,
+          standalone: isWebStandalone(),
+          featureEnabled: nextFeatureEnabled,
+        });
+      } finally {
+        setWebPushStatusLoading(false);
+      }
       return;
     }
 
     const status = await getPushPermissionStatus();
     setPermissionStatus(status);
-  }, []);
+  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
+      if (Platform.OS === "web") {
+        logWebPushEnvironment();
+        logPushSetupFunnel("settings_open", "notification settings focused");
+      }
       void refreshPermissionStatus();
     }, [refreshPermissionStatus])
   );
+
+  function handleWebPushSetupSuccess() {
+    void refreshPermissionStatus();
+    queryClient.invalidateQueries({ queryKey: ["user-notification-preferences", userId] });
+    queryClient.invalidateQueries({ queryKey: ["notification-preferences", userId] });
+  }
 
   const { data: preferences, isLoading } = useQuery({
     queryKey: ["user-notification-preferences", userId],
@@ -227,6 +271,16 @@ export default function NotificationSettingsScreen() {
             ? "Add Frennix to your Home Screen first, then tap Enable Notifications above."
             : "Tap Enable Notifications above to turn on push alerts on this device.";
 
+  const webPushPermission: NotificationPermission | "unsupported" =
+    permissionStatus === "granted"
+      ? "granted"
+      : permissionStatus === "denied"
+        ? "denied"
+        : "default";
+
+  const needsHomeScreen = shouldShowPwaInstallGuideForWeb();
+  const showEnableCard = Platform.OS === "web" && !needsHomeScreen && !webPushFullyEnabled;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
@@ -237,14 +291,23 @@ export default function NotificationSettingsScreen() {
       </Text>
 
       {Platform.OS === "web" ? (
-        shouldShowPwaInstallGuideForWeb() ? (
-          <IosPwaInstallGuide />
-        ) : (
+        <WebPushStatusIndicator
+          permission={webPushPermission}
+          subscribed={webPushSubscribed}
+          loading={webPushStatusLoading}
+        />
+      ) : null}
+
+      {Platform.OS === "web" ? (
+        needsHomeScreen ? (
+          <IosPwaInstallGuide collapsible />
+        ) : showEnableCard ? (
           <WebPushEnableCard
             readyForPush={isWebStandalone()}
             onSetupChange={() => void refreshPermissionStatus()}
+            onSuccess={handleWebPushSetupSuccess}
           />
-        )
+        ) : null
       ) : (
         <PushPermissionBanner
           status={permissionStatus}
@@ -271,6 +334,12 @@ export default function NotificationSettingsScreen() {
 
       {webPushSetupHint ? (
         <Text style={styles.toggleHint}>{webPushSetupHint}</Text>
+      ) : Platform.OS === "web" && !webPushFullyEnabled ? (
+        <Text style={styles.toggleHint}>
+          {needsHomeScreen
+            ? "The toggle below activates after you install Frennix to your Home Screen and enable notifications."
+            : "Use the Enable Notifications button above first. The toggle turns on automatically after setup."}
+        </Text>
       ) : null}
 
       <Text style={styles.sectionTitle}>Notification categories</Text>
