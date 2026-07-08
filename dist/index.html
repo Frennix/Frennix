@@ -51,7 +51,7 @@
     min-height: 100%;
     min-height: 0;
     background-color: #0A0A0B;
-    pointer-events: none;
+    pointer-events: auto;
   }
   /* Tab bar + home-indicator safe area — never show default white. */
   [role="tablist"] {
@@ -69,16 +69,49 @@
     <meta name="apple-mobile-web-app-title" content="Frennix" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       <meta name="frennix-vapid-public-key" content="BIveW-l6AKdTigzSsBZEnykS_noURsQIKEBxaEvaeBiuQcYNVEuxCjgBoyUkrp7sE3KRd8K3v7ZY3jNwcEF4zi4" />
+      <style id="frennix-boot-shell-css">
+  #frennix-boot-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: #0A0A0B;
+    color: #f5f5f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  #frennix-boot-shell .spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: #c8ff00;
+    border-radius: 50%;
+    animation: frennix-spin 0.9s linear infinite;
+  }
+  @keyframes frennix-spin { to { transform: rotate(360deg); } }
+
+    </style>
   </head>
 
   <body>
+
+    <div id="frennix-boot-shell" aria-live="polite" aria-busy="true">
+      <div class="spinner"></div>
+      <div>Loading Frennix…</div>
+      <div id="frennix-boot-shell-stalled" style="display:none;font-size:13px;opacity:0.75">
+        Still loading — check your connection or reopen the app.
+      </div>
+    </div>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-802c76bd3a5df632a0c738499f5c2f68.js" defer></script>
+  <script src="/_expo/static/js/web/index-af0feb62d9cb5c77c61bc00fcc53eb0e.js" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
@@ -89,5 +122,34 @@
         });
       }
     </script>
+  
+    <script id="frennix-boot-shell-script">
+(function () {
+  function hideBootShell() {
+    var el = document.getElementById("frennix-boot-shell");
+    if (el) el.style.display = "none";
+  }
+  function startupReady() {
+    var trace = window.__FRENNIX_MOUNT_TRACE__;
+    if (!trace || !trace.length) return false;
+    return trace.some(function (e) {
+      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "entry:createRoot:render:end";
+    });
+  }
+  var iv = setInterval(function () {
+    if (startupReady()) {
+      hideBootShell();
+      clearInterval(iv);
+    }
+  }, 150);
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (!startupReady()) {
+        var stalled = document.getElementById("frennix-boot-shell-stalled");
+        if (stalled) stalled.style.display = "block";
+      }
+    }, 15000);
+  });
+})();</script>
   </body>
 </html>
