@@ -211,10 +211,8 @@ export default function NotificationSettingsScreen() {
   function handleMasterPushToggle(enabled: boolean) {
     if (Platform.OS === "web" && enabled && (!webPushGranted || !webPushSubscribed)) {
       showAlert(
-        webPushGranted ? "Complete push setup" : "Enable push on iPhone first",
-        webPushGranted
-          ? "iOS permission is granted. Tap Complete Push Setup above to create and save your push subscription. The master switch turns on only after the subscription is saved."
-          : "Tap Enable Push Notifications above and allow the iOS system dialog. The master switch turns on only after permission is granted and a subscription is saved."
+        "Turn on notifications",
+        "Tap Turn on notifications above and allow the iOS dialog. Frennix will enable push automatically."
       );
       return;
     }
@@ -250,9 +248,11 @@ export default function NotificationSettingsScreen() {
       <SettingRow
         title="Push notifications"
         description={
-          Platform.OS === "web"
-            ? "Turns on only after iOS permission is granted and push subscription is saved."
-            : "Master switch for device alerts. In-app history is always kept."
+          Platform.OS === "web" && webPushGranted && webPushSubscribed
+            ? "Device alerts are enabled on this iPhone."
+            : Platform.OS === "web"
+              ? "Allow notifications on this device to receive alerts."
+              : "Master switch for device alerts. In-app history is always kept."
         }
         value={masterPushSwitchValue}
         onChange={handleMasterPushToggle}
@@ -323,19 +323,6 @@ export default function NotificationSettingsScreen() {
             placeholder="America/Los_Angeles"
           />
         </View>
-      ) : null}
-
-      {Platform.OS === "web" && webPushGranted && !webPushSubscribed ? (
-        <Text style={styles.toggleHint}>
-          iOS permission is granted. Tap Complete Push Setup above to save your push subscription.
-        </Text>
-      ) : null}
-
-      {Platform.OS === "web" && !webPushGranted ? (
-        <Text style={styles.toggleHint}>
-          Tap Enable Push Notifications above and allow the iOS system dialog before using the
-          master switch or category toggles.
-        </Text>
       ) : null}
 
       {Platform.OS !== "web" && permissionStatus !== "granted" ? (

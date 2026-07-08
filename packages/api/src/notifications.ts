@@ -450,25 +450,41 @@ export async function createNotification(input: {
         ? input.payload.replier_id
         : typeof input.payload.sender_id === "string"
           ? input.payload.sender_id
-          : null);
+          : typeof input.payload.mentioner_id === "string"
+            ? input.payload.mentioner_id
+            : null);
 
   if (!actorId) {
     throw new Error("Notification actor is required");
   }
 
+  let actorName = "Someone";
+  let actorUsername: string | undefined;
+  const profiles = await getProfilesByIds([actorId]);
+  if (profiles[0]) {
+    actorName = profiles[0].display_name ?? actorName;
+    actorUsername = profiles[0].username ?? undefined;
+  }
+
   const copy = buildNotificationCopy({
     type: input.type,
-    actorName: "Someone",
+    actorName,
     payload: input.payload,
   });
 
-  const deepLink = buildDeepLink({ type: input.type, payload: input.payload });
+  const deepLink = buildDeepLink({
+    type: input.type,
+    payload: input.payload,
+    actorUsername,
+  });
 
   let dedupeKey: string | null = null;
   if (input.type === "story_reaction" && typeof input.payload.story_id === "string") {
     dedupeKey = `story_reaction:${input.payload.story_id}:${actorId}:${String(input.payload.reaction ?? "❤️")}`;
   } else if (input.type === "story_reply" && typeof input.payload.story_id === "string") {
     dedupeKey = `story_reply:${input.payload.story_id}:${actorId}:${input.user_id}`;
+  } else if (input.type === "story_mention" && typeof input.payload.story_id === "string") {
+    dedupeKey = `story_mention:${input.payload.story_id}:${actorId}:${input.user_id}`;
   }
 
   const entityId =

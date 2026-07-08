@@ -17,6 +17,9 @@ import { useNotificationSubscription } from "@/lib/useNotificationSubscription";
 import { PushRegistrationBootstrap } from "@/components/PushRegistrationBootstrap";
 import { PwaBootstrap } from "@/components/PwaBootstrap";
 import { WebPushListener } from "@/components/WebPushListener";
+import { WebPushAutoRegistration } from "@/components/WebPushAutoRegistration";
+import { WebPushSuccessToastHost } from "@/components/WebPushSuccessToast";
+import { PwaReopenNoticeHost } from "@/components/PwaReopenNotice";
 import { PresenceCoordinator } from "@/components/PresenceCoordinator";
 import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstrap";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
@@ -65,7 +68,14 @@ function NotificationBootstrap() {
     });
   }, [queryClient, userId]);
 
-  return <WebPushListener userId={userId} queryClient={queryClient} />;
+  return (
+    <>
+      <WebPushAutoRegistration />
+      <WebPushListener userId={userId} queryClient={queryClient} />
+      <WebPushSuccessToastHost />
+      <PwaReopenNoticeHost />
+    </>
+  );
 }
 
 export default function RootLayout() {

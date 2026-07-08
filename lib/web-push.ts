@@ -8,7 +8,7 @@ import {
 } from "@frennix/api";
 import { config } from "@/lib/config";
 import { isWebPushEnvironmentReady, isWebStandalone } from "@/lib/pwa";
-import { registerPwaServiceWorker } from "@/lib/register-pwa-service-worker";
+import { registerPwaServiceWorker, ensurePwaServiceWorkerReady, type ServiceWorkerEnsureResult } from "@/lib/register-pwa-service-worker";
 import { pushLog, formatPushError } from "@/lib/web-push-diagnostics";
 
 export const WEB_PUSH_FLAG_KEY = "web_push_notifications";
@@ -58,19 +58,17 @@ async function subscribeWithPushManager(
   vapidKey: string
 ): Promise<PushSubscription> {
   const applicationServerKey = urlBase64ToUint8Array(vapidKey);
-  pushLog("subscribe.options", "pushManager.subscribe()", {
+  const existing = await registration.pushManager.getSubscription();
+  if (existing?.endpoint) {
+    pushLog("subscribe.result", "reused existing subscription", maskSubscriptionJson(existing.toJSON()));
+    return existing;
+  }
+
+  pushLog("subscribe.calling_pushManager_subscribe", "pushManager.subscribe()", {
     userVisibleOnly: true,
     vapidBytes: applicationServerKey.byteLength,
     vapidPrefix: vapidKey.slice(0, 12),
   });
-
-  const existing = await registration.pushManager.getSubscription();
-  if (existing?.endpoint) {
-    pushLog("subscribe.existing", existing.endpoint.slice(0, 72), maskSubscriptionJson(existing.toJSON()));
-    return existing;
-  }
-
-  pushLog("subscribe.calling", "pushManager.subscribe() — awaiting result");
   try {
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
@@ -89,34 +87,26 @@ async function subscribeWithPushManager(
         logPushError("subscribe.cleanup_error", unsubscribeError);
       }
     }
-    pushLog("subscribe.retry", "pushManager.subscribe() after cleanup");
+    pushLog("subscribe.calling_pushManager_subscribe", "retry after cleanup");
     try {
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey,
       });
-      pushLog("subscribe.retry_result", "success", maskSubscriptionJson(subscription.toJSON()));
+      pushLog("subscribe.result", "success after retry", maskSubscriptionJson(subscription.toJSON()));
       return subscription;
     } catch (retryError) {
-      logPushError("subscribe.retry_error", retryError);
+      logPushError("subscribe.error", retryError);
       throw retryError;
     }
   }
 }
 
 /** Warm service worker registration before subscribe (call on screen mount). */
-export async function prewarmWebPushRegistration(): Promise<void> {
-  if (!isWebPushApiAvailable()) return;
-  pushLog("prewarm", "registerPwaServiceWorker()");
-  await registerPwaServiceWorker();
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    pushLog("prewarm.ready", registration.scope, {
-      controller: navigator.serviceWorker.controller?.scriptURL ?? null,
-    });
-  } catch (error) {
-    logPushError("prewarm.error", error);
-  }
+export async function prewarmWebPushRegistration(): Promise<ServiceWorkerEnsureResult> {
+  if (!isWebPushApiAvailable()) return { ok: false, reason: "unsupported" };
+  pushLog("prewarm", "ensurePwaServiceWorkerReady()");
+  return ensurePwaServiceWorkerReady();
 }
 
 function waitForServiceWorkerController(timeoutMs: number): Promise<void> {
@@ -160,10 +150,13 @@ export async function getWebPushPermissionStatus(): Promise<NotificationPermissi
   return Notification.permission;
 }
 
-export async function hasActiveWebPushSubscription(): Promise<boolean> {
+export async function hasActiveWebPushSubscription(options?: {
+  logStep?: "subscribe.check" | "subscribe.post_check";
+}): Promise<boolean> {
+  const logStep = options?.logStep ?? "subscribe.check";
   if (!isWebPushApiAvailable()) return false;
   if (Notification.permission !== "granted") {
-    pushLog("subscribe.check", "skipped — permission not granted");
+    pushLog(logStep, "skipped — permission not granted");
     return false;
   }
 
@@ -172,14 +165,14 @@ export async function hasActiveWebPushSubscription(): Promise<boolean> {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
     const active = Boolean(subscription?.endpoint);
-    pushLog("subscribe.check", active ? "browser subscription present" : "no browser subscription", {
+    pushLog(logStep, active ? "browser subscription present" : "no browser subscription", {
       endpoint: subscription?.endpoint?.slice(0, 48) ?? null,
       scope: registration.scope,
       controller: navigator.serviceWorker.controller?.scriptURL ?? null,
     });
     return active;
   } catch (error) {
-    pushLog("subscribe.check_error", String(error));
+    pushLog(`${logStep}_error`, String(error));
     return false;
   }
 }
@@ -236,7 +229,7 @@ function failure(
   reason: WebPushSubscribeFailureReason,
   message: string
 ): WebPushSubscribeResult {
-  pushLog("result.failure", reason, message);
+  pushLog("subscribe.stopped", reason, message);
   return { ok: false, reason, message };
 }
 
@@ -268,7 +261,7 @@ export function requestWebPushPermissionFromUserGesture(): Promise<NotificationP
 export async function completeWebPushSubscription(
   userId: string
 ): Promise<WebPushSubscribeResult> {
-  pushLog("subscribe.flow_start", userId.slice(0, 8));
+  pushLog("subscribe.start", "completeWebPushSubscription", { userId: userId.slice(0, 8) });
 
   if (!userId) {
     return failure("not_signed_in", "Sign in to enable push notifications.");
@@ -278,7 +271,7 @@ export async function completeWebPushSubscription(
     return failure("unsupported", "Push notifications are not supported in this browser.");
   }
 
-  pushLog("subscribe.permission", Notification.permission);
+  pushLog("subscribe.gate_permission", Notification.permission);
   if (Notification.permission !== "granted") {
     return failure(
       "denied",
@@ -286,6 +279,7 @@ export async function completeWebPushSubscription(
     );
   }
 
+  pushLog("subscribe.gate_standalone", String(isWebStandalone()));
   if (!isWebStandalone()) {
     return failure(
       "not_standalone",
@@ -294,12 +288,13 @@ export async function completeWebPushSubscription(
   }
 
   const featureEnabled = await isWebPushFeatureEnabled();
-  pushLog("subscribe.feature_flag", String(featureEnabled));
+  pushLog("subscribe.gate_feature_flag", String(featureEnabled));
   if (!featureEnabled) {
     return failure("flag_off", "Push notifications are not enabled for your account yet.");
   }
 
   const vapidKey = config.vapidPublicKey;
+  pushLog("subscribe.gate_vapid", vapidKey ? `${vapidKey.slice(0, 12)}…` : "MISSING");
   if (!vapidKey) {
     return failure(
       "vapid_missing",
@@ -307,40 +302,36 @@ export async function completeWebPushSubscription(
     );
   }
 
-  pushLog("sw.register", "registerPwaServiceWorker()");
-  const registered = await registerPwaServiceWorker();
-  if (!registered) {
-    pushLog("sw.register", "returned null");
+  pushLog("subscribe.service_worker_register", "ensurePwaServiceWorkerReady()");
+  const swReady = await ensurePwaServiceWorkerReady();
+  if (!swReady.ok) {
+    const message =
+      swReady.reason === "needs_reopen"
+        ? "Frennix is updating. Close and reopen the app to finish push setup."
+        : "Could not start the notification service. Reload and try again.";
+    return failure("sw_failed", message);
   }
 
-  let registration: ServiceWorkerRegistration;
-  try {
-    registration = await navigator.serviceWorker.ready;
-    pushLog("sw.ready", "resolved", {
-      scope: registration.scope,
-      scriptURL: registration.active?.scriptURL ?? registration.installing?.scriptURL ?? null,
-      controller: navigator.serviceWorker.controller?.scriptURL ?? null,
-    });
-  } catch (error) {
-    logPushError("sw.ready_error", error);
-    return failure("sw_failed", "Could not start the notification service. Reload and try again.");
-  }
+  const registration = swReady.registration;
+  pushLog("subscribe.service_worker_ready", "resolved", {
+    scope: registration.scope,
+    scriptURL: registration.active?.scriptURL ?? registration.installing?.scriptURL ?? null,
+    controller: navigator.serviceWorker.controller?.scriptURL ?? null,
+    pushManager: Boolean(registration.pushManager),
+  });
 
   if (!navigator.serviceWorker.controller) {
-    pushLog("sw.controller", "missing — waiting up to 5s");
+    pushLog("subscribe.service_worker_controller", "missing — waiting up to 5s");
     await waitForServiceWorkerController(5000);
     pushLog(
-      "sw.controller.after_wait",
-      navigator.serviceWorker.controller?.scriptURL ?? "still missing"
+      "subscribe.service_worker_controller",
+      navigator.serviceWorker.controller?.scriptURL ?? "still missing after wait"
     );
   }
 
   if (!registration.pushManager) {
-    pushLog("push_manager", "missing on registration");
     return failure("sw_failed", "PushManager is not available on this iPhone / browser.");
   }
-
-  pushLog("push_manager", "available on service worker registration");
 
   let subscription: PushSubscription;
   try {
@@ -352,14 +343,13 @@ export async function completeWebPushSubscription(
   }
 
   const json = subscription.toJSON();
-  pushLog("subscribe.json", "full subscription payload", maskSubscriptionJson(json));
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-    pushLog("subscribe.invalid_json", "missing endpoint or keys");
+    pushLog("subscribe.error", "subscription JSON missing endpoint or keys", maskSubscriptionJson(json));
     return failure("subscribe_failed", "Push subscription was incomplete. Try again.");
   }
 
   try {
-    pushLog("db.upsert", "upsert_web_push_subscription", {
+    pushLog("db.upsert_start", "upsert_web_push_subscription", {
       endpoint: json.endpoint.slice(0, 72),
       p256dhLen: json.keys.p256dh.length,
       authLen: json.keys.auth.length,
@@ -381,7 +371,7 @@ export async function completeWebPushSubscription(
     return failure("save_failed", `Saving push subscription to Supabase failed: ${detail}`);
   }
 
-  pushLog("result.success", "push registration complete", { endpoint: json.endpoint.slice(0, 72) });
+  pushLog("subscribe.complete", "success", { endpoint: json.endpoint.slice(0, 72) });
   return { ok: true, endpoint: json.endpoint };
 }
 

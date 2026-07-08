@@ -26,7 +26,8 @@ function testPublicAssets() {
   const sw = read("public/sw.js");
   assertIncludes(sw, "skipWaiting", "sw install");
   assertIncludes(sw, "clients.claim", "sw activate");
-  assertIncludes(sw, "frennix-shell-v2", "sw cache version phase 2+");
+  assertIncludes(sw, "frennix-shell-v3", "sw cache version");
+  assertIncludes(sw, "FRENNIX_SW_VERSION", "sw version constant");
 }
 
 function testBuildPipeline() {
@@ -51,6 +52,8 @@ function testPwaModules() {
 
   const register = read("lib/register-pwa-service-worker.ts");
   assertIncludes(register, "/sw.js", "register sw path");
+  assertIncludes(register, "ensurePwaServiceWorkerReady", "sw ensure helper");
+  assertIncludes(register, "PWA_SW_VERSION", "sw version export");
 }
 
 function testComponents() {
@@ -61,7 +64,7 @@ function testComponents() {
   assertIncludes(webPush, "subscribeToWebPush", "web push subscribe");
 
   const bootstrap = read("components/PwaBootstrap.tsx");
-  assertIncludes(bootstrap, "registerPwaServiceWorker", "pwa bootstrap");
+  assertIncludes(bootstrap, "ensurePwaServiceWorkerReady", "pwa bootstrap");
 
   const layout = read("app/_layout.tsx");
   assertIncludes(layout, "PwaBootstrap", "layout pwa bootstrap");

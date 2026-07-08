@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 import type { Notification } from "@frennix/types";
 import { getProfilesByIds, notificationActorId, subscribeToNotifications } from "@frennix/api";
+import { maybeRequestNotificationOnboardingFromActivity } from "@/lib/notification-onboarding";
 import {
   prependNotificationToPages,
   removeNotificationFromPages,
@@ -59,6 +60,11 @@ export function useNotificationSubscription(userId: string) {
           queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
           queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] });
         }
+
+        void maybeRequestNotificationOnboardingFromActivity(enriched.type, {
+          userId,
+          queryClient,
+        });
       });
     }
 

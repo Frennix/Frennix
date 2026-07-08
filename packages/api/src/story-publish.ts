@@ -160,6 +160,7 @@ export async function publishStory(input: PublishStoryInput): Promise<FrennixSto
       await createNotification({
         user_id: mentionedUserId,
         type: "story_mention",
+        actor_id: input.user_id,
         payload: {
           story_id: storyId,
           mentioner_id: input.user_id,

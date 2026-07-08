@@ -62,6 +62,13 @@
   }
 
     </style>
+      
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Frennix" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+      <meta name="frennix-vapid-public-key" content="BIveW-l6AKdTigzSsBZEnykS_noURsQIKEBxaEvaeBiuQcYNVEuxCjgBoyUkrp7sE3KRd8K3v7ZY3jNwcEF4zi4" />
   </head>
 
   <body>
@@ -71,6 +78,16 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-8bb8834bb7a48d781259ebd28ef5a729.js" defer></script>
-</body>
+  <script src="/_expo/static/js/web/index-00c9e1f4ffa6250264619c747895e4ac.js" defer></script>
+    
+    <script id="frennix-pwa-shell">
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/sw.js").catch(function (err) {
+            console.warn("[frennix-pwa] SW register failed", err);
+          });
+        });
+      }
+    </script>
+  </body>
 </html>

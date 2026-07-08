@@ -165,7 +165,7 @@ export function openNotificationTarget(notification: Notification): Notification
     return { ok: false, message: "This event is no longer available." };
   }
 
-  if (type === "challenge_join" || type === "challenge_reminder" || type === "challenge_invite") {
+  if (type === "challenge_join" || type === "challenge_reminder" || type === "challenge_invite" || type === "challenge_progress") {
     const challengeId = asString(payload.challenge_id);
     if (challengeId) return pushHref(`/challenge/${challengeId}`);
     return { ok: false, message: "This challenge is no longer available." };
@@ -230,14 +230,19 @@ export async function openNotificationFromPushDataAsync(
 }
 
 export function openNotificationFromPushData(data: Record<string, unknown>): NotificationNavResult {
+  const type = asString(data.type);
   const deepLink = asString(data.deep_link);
+  const actorUsername = asString(data.actor_username);
+  const payload = safeNotificationPayload(data);
+
+  if (type === "comment" || type === "comment_reply" || type === "mention") {
+    const href = deepLink?.startsWith("/") ? deepLink : postHref(payload);
+    if (href) return pushHref(href);
+  }
+
   if (deepLink?.startsWith("/")) {
     return pushHref(deepLink);
   }
-
-  const type = asString(data.type);
-  const actorUsername = asString(data.actor_username);
-  const payload = safeNotificationPayload(data);
 
   if (type === "message") {
     const conversationId = asString(data.conversation_id) ?? asString(payload.conversation_id);
@@ -275,7 +280,7 @@ export function openNotificationFromPushData(data: Record<string, unknown>): Not
     return { ok: false, message: "This event is no longer available." };
   }
 
-  if (type === "challenge_join" || type === "challenge_reminder" || type === "challenge_invite") {
+  if (type === "challenge_join" || type === "challenge_reminder" || type === "challenge_invite" || type === "challenge_progress") {
     const challengeId = asString(data.challenge_id) ?? asString(payload.challenge_id);
     if (challengeId) return pushHref(`/challenge/${challengeId}`);
     return { ok: false, message: "This challenge is no longer available." };

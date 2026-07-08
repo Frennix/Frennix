@@ -113,6 +113,36 @@ async function shouldGroupMessagePush(
   return (count ?? 0) > 0;
 }
 
+/** Resolve the deep link included in push payload (enriches match → DM chat). */
+async function resolvePushDeepLink(
+  supabase: ReturnType<typeof createClient>,
+  record: Record<string, unknown>
+): Promise<string> {
+  const stored =
+    typeof record.deep_link === "string" && record.deep_link.startsWith("/")
+      ? record.deep_link
+      : "/notifications";
+
+  if (record.type !== "match") return stored;
+
+  const payload = (record.payload ?? {}) as Record<string, unknown>;
+  const partnerId = payload.matched_user_id as string | undefined;
+  const userId = record.user_id as string | undefined;
+  if (!partnerId || !userId) return stored;
+
+  const { data: conversationId, error } = await supabase.rpc("create_or_get_dm_conversation", {
+    user_a: userId,
+    user_b: partnerId,
+  });
+
+  if (error || !conversationId) {
+    console.warn("[send-push] match chat deep link fallback", error?.message ?? "no conversation");
+    return stored;
+  }
+
+  return `/chat/${conversationId}`;
+}
+
 function configureWebPush() {
   const publicKey = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
   const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
@@ -127,10 +157,17 @@ async function sendWebPush(
   title: string,
   body: string,
   data: Record<string, unknown>
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; statusCode?: number; responseBody?: string }> {
   if (!subscription.p256dh || !subscription.auth) {
     return { ok: false, error: "missing_subscription_keys" };
   }
+
+  const vapidPublic = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
+  console.log("[send-push] web_push attempt", {
+    endpoint: subscription.endpoint.slice(0, 72),
+    vapidPrefix: vapidPublic.slice(0, 12),
+    title,
+  });
 
   try {
     await webpush.sendNotification(
@@ -140,9 +177,27 @@ async function sendWebPush(
       },
       JSON.stringify({ title, body, data })
     );
+    console.log("[send-push] web_push sent", { endpoint: subscription.endpoint.slice(0, 72) });
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    const statusCode =
+      error && typeof error === "object" && "statusCode" in error
+        ? Number((error as { statusCode?: number }).statusCode)
+        : undefined;
+    const responseBody =
+      error && typeof error === "object" && "body" in error
+        ? String((error as { body?: string }).body ?? "")
+        : undefined;
+    const message = error instanceof Error ? error.message : String(error);
+    const detail = [
+      statusCode ? `status=${statusCode}` : null,
+      responseBody ? `body=${responseBody.slice(0, 500)}` : null,
+      message,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    console.error("[send-push] web_push failed", detail);
+    return { ok: false, error: detail, statusCode, responseBody };
   }
 }
 
@@ -325,6 +380,12 @@ async function dispatchWebPush(
   const sentAt = new Date().toISOString();
   let anySent = false;
 
+  console.log("[send-push] web_push subscriptions", {
+    userId: record.user_id,
+    count: subscriptions?.length ?? 0,
+    endpoints: (subscriptions ?? []).map((s) => (s as SubscriptionRow).endpoint.slice(0, 72)),
+  });
+
   for (const sub of subscriptions as SubscriptionRow[]) {
     const idempotencyKey = `${record.id}:web_push:${sub.endpoint}`;
     const result = await sendWebPush(sub, title, body, pushData);
@@ -444,10 +505,7 @@ export async function dispatchNotificationRecord(
     typeof record.body === "string" && record.body.trim()
       ? record.body
       : "You have a new notification";
-  const deepLink =
-    typeof record.deep_link === "string" && record.deep_link.startsWith("/")
-      ? record.deep_link
-      : "/notifications";
+  const deepLink = await resolvePushDeepLink(supabase, record);
 
   const actorId = actorIdFromRecord(record);
   let actorUsername: string | null = null;
