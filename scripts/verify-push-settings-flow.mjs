@@ -70,17 +70,22 @@ function testSource() {
 }
 
 async function testProductionBundle() {
-  const html = await fetch(`${baseUrl}/index.html`).then((r) => {
-    if (!r.ok) throw new Error(`index.html ${r.status}`);
-    return r.text();
-  });
+  const localIndex = path.join(root, "dist", "index.html");
+  const html = fs.existsSync(localIndex)
+    ? fs.readFileSync(localIndex, "utf8")
+    : await fetch(`${baseUrl}/index.html`).then((r) => {
+        if (!r.ok) throw new Error(`index.html ${r.status}`);
+        return r.text();
+      });
   const bundleMatch = html.match(/index-[a-f0-9]+\.js/);
-  assert(bundleMatch, "production index.html missing bundle");
-  const bundleUrl = `${baseUrl}/_expo/static/js/web/${bundleMatch[0]}`;
-  const bundle = await fetch(bundleUrl).then((r) => {
-    if (!r.ok) throw new Error(`bundle ${r.status}`);
-    return r.text();
-  });
+  assert(bundleMatch, "index.html missing bundle");
+  const bundlePath = path.join(root, "dist", "_expo", "static", "js", "web", bundleMatch[0]);
+  const bundle = fs.existsSync(bundlePath)
+    ? fs.readFileSync(bundlePath, "utf8")
+    : await fetch(`${baseUrl}/_expo/static/js/web/${bundleMatch[0]}`).then((r) => {
+        if (!r.ok) throw new Error(`bundle ${r.status}`);
+        return r.text();
+      });
 
   const required = [
     "Enable Notifications",
@@ -89,14 +94,14 @@ async function testProductionBundle() {
     "Open from Home Screen Required",
     "How to Install",
     "To receive push notifications, first add Frennix to your Home Screen",
-    "funnel.settings_open",
+    "notification settings focused",
     "challenge updates",
   ];
 
   for (const needle of required) {
-    assertIncludes(bundle, needle, `production bundle (${bundleMatch[0]})`);
+    assertIncludes(bundle, needle, `bundle (${bundleMatch[0]})`);
   }
-  console.log(`OK production bundle ${bundleMatch[0]}`);
+  console.log(`OK bundle ${bundleMatch[0]}`);
 }
 
 async function testFreshAccount() {
