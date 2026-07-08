@@ -1,6 +1,7 @@
 import { router, useRouter, useSegments, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
 import { getSession } from "@frennix/api";
+import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { useAuth } from "@/providers/AuthProvider";
 
 const LOGIN_HREF = "/(auth)/login" as Href;
@@ -60,7 +61,8 @@ export function AuthNavigationGuard() {
 
     async function redirectIfStillSignedOut() {
       // Session can briefly appear null while Supabase refreshes after tab resume.
-      if (hadSessionRef.current) {
+      // Skip grace when auth storage was cleared (logout / expired session).
+      if (hadSessionRef.current && hasPersistedAuthToken()) {
         await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
         if (cancelled) return;
 

@@ -25,6 +25,7 @@ import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
+import { hasPersistedAuthToken, clearExpiredPersistedAuth, isPersistedSessionExpired } from "@/lib/auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
@@ -197,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (nextSession: Session | null) => {
       const epoch = authEpochRef.current;
 
-      if (!nextSession && sessionRef.current?.user?.id && !signOutInProgressRef.current) {
+      if (!nextSession && sessionRef.current?.user?.id && !signOutInProgressRef.current && hasPersistedAuthToken()) {
         await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
         if (epoch !== authEpochRef.current) return;
         if (signOutInProgressRef.current) return;
@@ -320,6 +321,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (initialUrl) await handleRecoveryUrl(initialUrl);
 
+      if (clearExpiredPersistedAuth()) {
+        try {
+          await supabaseSignOut();
+        } catch {
+          // Storage already cleared — continue signed out.
+        }
+      }
+
       let initialSession: Session | null = null;
       try {
         initialSession = await withTimeout(
@@ -334,6 +343,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             timedOut: error instanceof AsyncTimeoutError,
           });
         });
+      }
+
+      if (initialSession && isPersistedSessionExpired()) {
+        clearExpiredPersistedAuth();
+        initialSession = null;
       }
 
       if (initialSession?.user.id) {

@@ -135,7 +135,19 @@ function IndexGate({
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (!profile?.onboarding_complete) {
+  if (!profile) {
+    return (
+      <StartupRetryScreen
+        title="Loading your profile"
+        message="Finishing account setup before opening the app."
+        loading={profileLoading}
+        showDiagnostics={false}
+        showMountTrace={false}
+      />
+    );
+  }
+
+  if (!profile.onboarding_complete) {
     return <Redirect href="/onboarding" />;
   }
 

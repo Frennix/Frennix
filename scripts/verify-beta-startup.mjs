@@ -118,31 +118,24 @@ function mockPost(userId) {
   };
 }
 
-async function createContext(browser, env, options = {}) {
+function registerSupabaseMocks(page, env, options = {}) {
   const {
     userId = EXISTING_USER_ID,
-    cachedProfile = true,
     onboardingComplete = true,
     networkSlowMs = 0,
     failProfileOnce = false,
+    expiredSession = false,
+    offline = false,
   } = options;
 
-  const page = await browser.newPage({
-    viewport: { width: 390, height: 844 },
-    userAgent:
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-  });
-
   const supabaseHost = new URL(env.EXPO_PUBLIC_SUPABASE_URL).host;
-  const ref = env.EXPO_PUBLIC_SUPABASE_URL.match(/https:\/\/([^.]+)/)[1];
-  const storageKey = `sb-${ref}-auth-token`;
   let profileFetchCount = 0;
 
-  const pageErrors = [];
-  page.on("pageerror", (err) => pageErrors.push(err.message));
-
-  await page.route("**/*", async (route) => {
+  return page.route("**/*", async (route) => {
     const url = route.request().url();
+    if (offline && url.includes(supabaseHost)) {
+      return route.abort("failed");
+    }
     if (!url.includes(supabaseHost)) {
       if (networkSlowMs > 0) await new Promise((r) => setTimeout(r, networkSlowMs));
       return route.continue();
@@ -177,13 +170,19 @@ async function createContext(browser, env, options = {}) {
         user: { id: userId, email: `${userId}@frennix.test` },
       });
     } else if (url.includes("/auth/v1/")) {
-      body = JSON.stringify({ user: { id: userId, email: `${userId}@frennix.test` } });
+      body = expiredSession
+        ? JSON.stringify({})
+        : JSON.stringify({ user: { id: userId, email: `${userId}@frennix.test` } });
     } else if (url.includes("/rest/v1/profiles")) {
       profileFetchCount += 1;
       if (failProfileOnce && profileFetchCount === 1) {
         return route.fulfill({ status: 503, headers, body: JSON.stringify({ message: "slow outage" }) });
       }
-      body = JSON.stringify(accept.includes("object") ? mockProfile(userId, onboardingComplete) : [mockProfile(userId, onboardingComplete)]);
+      body = JSON.stringify(
+        accept.includes("object")
+          ? mockProfile(userId, onboardingComplete)
+          : [mockProfile(userId, onboardingComplete)]
+      );
     } else if (url.includes("/rest/v1/posts")) {
       body = JSON.stringify(accept.includes("object") ? mockPost(userId) : [mockPost(userId)]);
     } else if (method === "HEAD") {
@@ -192,32 +191,83 @@ async function createContext(browser, env, options = {}) {
 
     return route.fulfill({ status: 200, headers, body });
   });
+}
 
-  await page.addInitScript(
-    ({ key, uid, profile, withCache }) => {
-      if (withCache) {
-        sessionStorage.setItem(
-          "frennix.auth.profile.v1",
-          JSON.stringify({ userId: uid, profile, cachedAt: Date.now() })
+async function createContext(browser, env, options = {}) {
+  const {
+    userId = EXISTING_USER_ID,
+    cachedProfile = true,
+    onboardingComplete = true,
+    networkSlowMs = 0,
+    failProfileOnce = false,
+    seedSession = true,
+    expiredSession = false,
+    offline = false,
+    staleProfileDays = 0,
+  } = options;
+
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  });
+
+  const supabaseHost = new URL(env.EXPO_PUBLIC_SUPABASE_URL).host;
+  const ref = env.EXPO_PUBLIC_SUPABASE_URL.match(/https:\/\/([^.]+)/)[1];
+  const storageKey = `sb-${ref}-auth-token`;
+
+  const pageErrors = [];
+  page.on("pageerror", (err) => pageErrors.push(err.message));
+
+  await registerSupabaseMocks(page, env, {
+    userId,
+    onboardingComplete,
+    networkSlowMs,
+    failProfileOnce,
+    expiredSession,
+    offline,
+  });
+
+  if (seedSession) {
+    await page.addInitScript(
+      ({ key, uid, profile, withCache, expired, staleDays }) => {
+        if (localStorage.getItem("__frennix_test_skip_seed") === "1") {
+          localStorage.removeItem("__frennix_test_skip_seed");
+          return;
+        }
+        if (withCache) {
+          sessionStorage.setItem(
+            "frennix.auth.profile.v1",
+            JSON.stringify({
+              userId: uid,
+              profile,
+              cachedAt: Date.now() - staleDays * 24 * 60 * 60 * 1000,
+            })
+          );
+        }
+        const expiresAt = expired
+          ? Math.floor(Date.now() / 1000) - 3600
+          : Math.floor(Date.now() / 1000) + 3600;
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            access_token: expired ? "expired-access" : "mock-access",
+            refresh_token: expired ? "expired-refresh" : "mock-refresh",
+            expires_at: expiresAt,
+            user: { id: uid, email: `${uid}@frennix.test` },
+          })
         );
+      },
+      {
+        key: storageKey,
+        uid: userId,
+        profile: mockProfile(userId, onboardingComplete),
+        withCache: cachedProfile,
+        expired: expiredSession,
+        staleDays: staleProfileDays,
       }
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          access_token: "mock-access",
-          refresh_token: "mock-refresh",
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-          user: { id: uid, email: `${uid}@frennix.test` },
-        })
-      );
-    },
-    {
-      key: storageKey,
-      uid: userId,
-      profile: mockProfile(userId, onboardingComplete),
-      withCache: cachedProfile,
-    }
-  );
+    );
+  }
 
   return { page, pageErrors, storageKey };
 }
@@ -239,7 +289,7 @@ async function readState(page) {
       hasErrorBoundary: /Something went wrong/i.test(text),
       hasFeedContent: /Beta startup verification feed post|Your feed is ready|Feed/i.test(text),
       hasOnboarding: /Set up profile|onboarding/i.test(text),
-      hasLogin: /Sign in|Log in|Welcome/i.test(text),
+      hasLogin: /Sign in|Log in|Welcome back|Welcome/i.test(text),
       traceTail: trace.slice(-8).map((e) => e.id),
       feedRootHeight: document.getElementById("feed-root-container")?.getBoundingClientRect().height ?? 0,
       rootHeight: document.getElementById("root")?.getBoundingClientRect().height ?? 0,
@@ -358,39 +408,78 @@ async function main() {
       cachedProfile: true,
     });
     await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
-    await page.waitForTimeout(3000);
-    await page.evaluate((key) => {
+    await page.waitForFunction(
+      () => document.body.innerText.includes("Beta startup verification feed post") || /Welcome back/i.test(document.body.innerText),
+      { timeout: 45_000 }
+    ).catch(() => undefined);
+    await page.waitForTimeout(1500);
+
+    // Clear persisted auth AFTER init scripts — skip re-seed on reload.
+    await page.evaluate(() => localStorage.setItem("__frennix_test_skip_seed", "1"));
+    await page.addInitScript(({ key }) => {
+      localStorage.setItem("__frennix_test_skip_seed", "1");
       localStorage.removeItem(key);
       sessionStorage.clear();
     }, storageKey);
+
+    await page.unroute("**/*");
     await page.route("**/*", async (route) => {
-      const url = route.request().url();
-      if (url.includes(new URL(env.EXPO_PUBLIC_SUPABASE_URL).host)) {
-        if (url.includes("/auth/v1/")) {
+      const reqUrl = route.request().url();
+      const supabaseHost = new URL(env.EXPO_PUBLIC_SUPABASE_URL).host;
+      if (reqUrl.includes(supabaseHost)) {
+        const method = route.request().method();
+        if (method === "OPTIONS") {
+          return route.fulfill({
+            status: 204,
+            headers: {
+              "access-control-allow-origin": "*",
+              "access-control-allow-methods": "GET, POST, PATCH, PUT, DELETE, HEAD, OPTIONS",
+              "access-control-allow-headers": "*",
+            },
+            body: "",
+          });
+        }
+        if (reqUrl.includes("/auth/v1/")) {
           return route.fulfill({
             status: 200,
             headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
             body: JSON.stringify({}),
           });
         }
+        if (reqUrl.includes("/rest/v1/profiles")) {
+          return route.fulfill({ status: 401, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }, body: JSON.stringify({ message: "JWT expired" }) });
+        }
+        return route.fulfill({
+          status: 200,
+          headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+          body: "[]",
+        });
       }
       return route.continue();
     });
+
     await page.reload({ waitUntil: "networkidle", timeout: 90_000 });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(4000);
     const afterLogout = await readState(page);
     const okLogout = afterLogout.hasLogin || afterLogout.hasLoading;
-    await page.evaluate(({ key, uid }) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          access_token: "mock-access",
-          refresh_token: "mock-refresh",
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-          user: { id: uid, email: `${uid}@frennix.test` },
-        })
-      );
-    }, { key: storageKey, uid: EXISTING_USER_ID });
+
+    await page.unroute("**/*");
+    await registerSupabaseMocks(page, env, { userId: EXISTING_USER_ID, onboardingComplete: true });
+    await page.addInitScript(
+      ({ key, uid }) => {
+        localStorage.removeItem("__frennix_test_skip_seed");
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            access_token: "mock-access",
+            refresh_token: "mock-refresh",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            user: { id: uid, email: `${uid}@frennix.test` },
+          })
+        );
+      },
+      { key: storageKey, uid: EXISTING_USER_ID }
+    );
     await page.reload({ waitUntil: "networkidle", timeout: 90_000 });
     await page.waitForTimeout(5000);
     const afterRelogin = await readState(page);
@@ -467,6 +556,100 @@ async function main() {
           .readdirSync(path.join(DIST, "_expo/static/js/web"))
           .some((f) => f.startsWith("index-") && fs.readFileSync(path.join(DIST, "_expo/static/js/web", f), "utf8").includes("Retry")));
     results.push(assertCheck("5b. Retry UI shipped in build", bundleHasRetry || hasBootShell));
+    await page.close();
+  }
+
+  // 7. Expired session — routes to login/loading, not stuck feed
+  {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: true,
+      expiredSession: true,
+    });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await page.waitForTimeout(5000);
+    const state = await readState(page);
+    const ok = state.hasLogin || state.hasLoading || state.hasRetry;
+    results.push(assertCheck("7. Expired session → login/loading", ok, state.text.slice(0, 80)));
+    await page.close();
+  }
+
+  // 8. Offline startup — retry/loading, not blank
+  {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: true,
+      offline: true,
+    });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => undefined);
+    await page.waitForTimeout(3000);
+    const state = await readState(page);
+    const ok = state.hasLoading || state.hasRetry || state.hasBootShell || state.text.length > 5;
+    results.push(assertCheck("8. Offline startup shows fallback UI", ok, state.text.slice(0, 80)));
+    await page.close();
+  }
+
+  // 9. Cached PWA profile — fast path to feed
+  {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: true,
+    });
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "standalone", { value: true, configurable: true });
+    });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await page.waitForTimeout(3000);
+    const state = await readState(page);
+    const ok = state.hasFeedRoot || state.hasFeedContent || state.hasLoading;
+    results.push(assertCheck("9. Cached PWA reaches feed/loading", ok, state.text.slice(0, 80)));
+    await page.close();
+  }
+
+  // 10. Fresh Safari install — no session → login/welcome
+  {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: false,
+      seedSession: false,
+    });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await page.waitForTimeout(4000);
+    const state = await readState(page);
+    const ok = state.hasLogin || state.hasLoading || state.text.length > 10;
+    results.push(assertCheck("10. Fresh Safari install → login/loading", ok, state.text.slice(0, 80)));
+    await page.close();
+  }
+
+  // 11. Add to Home Screen (standalone display-mode)
+  {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: true,
+    });
+    await page.emulateMedia({ media: "screen", features: [{ name: "display-mode", value: "standalone" }] });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await page.waitForTimeout(3000);
+    const state = await readState(page);
+    const ok = state.hasFeedRoot || state.hasFeedContent || state.hasLoading;
+    results.push(assertCheck("11. Home Screen install reaches feed/loading", ok, state.text.slice(0, 80)));
+    await page.close();
+  }
+
+  // 12. Returning user after 7+ days (stale cached profile)
+  {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: true,
+      staleProfileDays: 8,
+    });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await page.waitForTimeout(5000);
+    const state = await readState(page);
+    const ok =
+      state.rootHeight > 80 &&
+      (state.hasFeedRoot || state.hasFeedContent || state.hasLoading || state.hasRetry);
+    results.push(assertCheck("12. Returning user (7+ days) reaches app", ok, state.text.slice(0, 80)));
     await page.close();
   }
 

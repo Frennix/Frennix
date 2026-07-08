@@ -19,6 +19,7 @@ const SUBSYSTEM_EMOJI: Record<string, string> = {
   notifications: "🔔",
   deployment: "🚀",
   app: "📱",
+  startup: "🚀",
 };
 
 function statusEmoji(status: string): string {
@@ -71,10 +72,26 @@ export default function PlatformHealthScreen() {
 
   const computedAt = query.data?.computed_at ? new Date(query.data.computed_at) : null;
   const overall = query.data?.overall_status ?? "unknown";
+  const startupSubsystem = query.data?.subsystems?.find((sub) => sub.key === "startup");
+  const startupAlert = Boolean(startupSubsystem?.details?.alert_active);
 
   return (
     <FounderShell title="Platform Health">
       <ScrollView contentContainerStyle={styles.scroll}>
+        {startupAlert ? (
+          <View style={styles.alertBanner}>
+            <Text style={styles.alertTitle}>Startup failure rate alert</Text>
+            <Text style={styles.alertBody}>
+              Startup stalls exceeded{" "}
+              {String(startupSubsystem?.details?.alert_threshold_pct ?? 0.5)}% in the last{" "}
+              {String(startupSubsystem?.details?.window_hours ?? 24)} hours (
+              {String(startupSubsystem?.details?.failures ?? 0)} failures /{" "}
+              {String(startupSubsystem?.details?.attempts ?? 0)} launches ={" "}
+              {String(startupSubsystem?.error_rate ?? startupSubsystem?.details?.failure_rate_pct ?? 0)}%).
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.overallBanner}>
           <Text style={styles.overallEmoji}>{statusEmoji(overall)}</Text>
           <View>
@@ -135,6 +152,16 @@ export default function PlatformHealthScreen() {
 
 const styles = StyleSheet.create({
   scroll: { gap: spacing.md, paddingBottom: spacing.xl },
+  alertBanner: {
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: "#3b1f1f",
+    borderWidth: 1,
+    borderColor: "#ef4444",
+    gap: 4,
+  },
+  alertTitle: { ...typography.body, fontWeight: "700", color: "#fecaca" },
+  alertBody: { ...typography.caption, color: "#fecaca" },
   overallBanner: {
     flexDirection: "row",
     alignItems: "center",
