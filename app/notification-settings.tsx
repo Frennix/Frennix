@@ -31,7 +31,7 @@ import { showAlert } from "@/lib/alerts";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { IosPwaInstallGuide } from "@/components/IosPwaInstallGuide";
 import { WebPushEnableCard } from "@/components/WebPushEnableCard";
-import { isWebStandalone, shouldShowIosPwaInstallGuide } from "@/lib/pwa";
+import { isWebStandalone, shouldShowPwaInstallGuideForWeb } from "@/lib/pwa";
 import { Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 function SettingRow({
@@ -196,28 +196,36 @@ export default function NotificationSettingsScreen() {
     }
   }
 
+  const webPushFullyEnabled =
+    Platform.OS === "web" ? webPushGranted && webPushSubscribed : permissionStatus === "granted";
+
   const pushControlsDisabled =
     isLoading ||
     updateMutation.isPending ||
-    (Platform.OS === "web"
-      ? !webPushGranted || !webPushSubscribed
-      : permissionStatus !== "granted");
+    (Platform.OS === "web" ? !webPushFullyEnabled : permissionStatus !== "granted");
 
   const masterPushSwitchValue =
     Platform.OS === "web"
-      ? webPushGranted && webPushSubscribed && (preferences?.push_enabled ?? false)
+      ? webPushFullyEnabled && (preferences?.push_enabled ?? false)
       : (preferences?.push_enabled ?? true);
 
   function handleMasterPushToggle(enabled: boolean) {
-    if (Platform.OS === "web" && enabled && (!webPushGranted || !webPushSubscribed)) {
-      showAlert(
-        "Turn on notifications",
-        "Tap Turn on notifications above and allow the iOS dialog. Frennix will enable push automatically."
-      );
+    if (Platform.OS === "web" && !webPushFullyEnabled) {
       return;
     }
     handleToggle("push_enabled", enabled);
   }
+
+  const webPushSetupHint =
+    Platform.OS !== "web"
+      ? null
+      : webPushFullyEnabled
+        ? null
+        : permissionStatus === "denied"
+          ? "Notifications are blocked in iPhone Settings. Allow Frennix there, then reopen the app."
+          : shouldShowPwaInstallGuideForWeb()
+            ? "Add Frennix to your Home Screen first, then tap Enable Notifications above."
+            : "Tap Enable Notifications above to turn on push alerts on this device.";
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -229,7 +237,7 @@ export default function NotificationSettingsScreen() {
       </Text>
 
       {Platform.OS === "web" ? (
-        shouldShowIosPwaInstallGuide() ? (
+        shouldShowPwaInstallGuideForWeb() ? (
           <IosPwaInstallGuide />
         ) : (
           <WebPushEnableCard
@@ -248,16 +256,22 @@ export default function NotificationSettingsScreen() {
       <SettingRow
         title="Push notifications"
         description={
-          Platform.OS === "web" && webPushGranted && webPushSubscribed
+          Platform.OS === "web" && webPushFullyEnabled
             ? "Device alerts are enabled on this iPhone."
             : Platform.OS === "web"
-              ? "Allow notifications on this device to receive alerts."
+              ? "Use Enable Notifications above first. This switch turns on after setup is complete."
               : "Master switch for device alerts. In-app history is always kept."
         }
         value={masterPushSwitchValue}
         onChange={handleMasterPushToggle}
-        disabled={isLoading || updateMutation.isPending}
+        disabled={
+          isLoading || updateMutation.isPending || (Platform.OS === "web" && !webPushFullyEnabled)
+        }
       />
+
+      {webPushSetupHint ? (
+        <Text style={styles.toggleHint}>{webPushSetupHint}</Text>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Notification categories</Text>
       <Text style={styles.sectionHint}>

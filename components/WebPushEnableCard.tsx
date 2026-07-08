@@ -5,12 +5,15 @@ import { useFocusEffect } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { colors, spacing, typography } from "@frennix/ui";
 import { useAuth } from "@/providers/AuthProvider";
+import { showAlert } from "@/lib/alerts";
 import { isWebStandalone } from "@/lib/pwa";
 import {
   getWebPushPermissionStatus,
   hasActiveWebPushSubscription,
+  isWebPushFeatureEnabled,
   isWebPushFullyEnabled,
   requestWebPushPermissionFromUserGesture,
+  webPushFailureMessage,
 } from "@/lib/web-push";
 import { runAutoWebPushRegistration } from "@/lib/web-push-auto-register";
 import { showWebPushSuccessToast } from "@/components/WebPushSuccessToast";
@@ -21,7 +24,7 @@ type Props = {
   onSetupChange?: () => void;
 };
 
-/** Minimal push status for notification settings — no manual setup steps when enabled. */
+/** Push enable UI for notification settings — always shows a clear next step. */
 export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupChange }: Props) {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
@@ -29,6 +32,8 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const [subscribed, setSubscribed] = useState(false);
   const [enabling, setEnabling] = useState(false);
+  const [featureEnabled, setFeatureEnabled] = useState(true);
+  const [autoRegistering, setAutoRegistering] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     if (Platform.OS !== "web") return;
@@ -39,8 +44,33 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
         ? await hasActiveWebPushSubscription({ logStep: "subscribe.check" })
         : false;
     setSubscribed(active);
+    setFeatureEnabled(await isWebPushFeatureEnabled());
     onSetupChange?.();
+    return { permission: nextPermission, subscribed: active };
   }, [onSetupChange]);
+
+  const finishRegistration = useCallback(
+    async (source: "permission" | "resume") => {
+      if (!userId) return;
+      setEnabling(true);
+      try {
+        const outcome = await runAutoWebPushRegistration(userId, queryClient, { source });
+        await refreshStatus();
+        if (outcome.status === "success") {
+          showWebPushSuccessToast();
+          return;
+        }
+        if (outcome.status === "failed") {
+          const message = webPushFailureMessage(outcome.result);
+          if (message) showAlert("Could not enable notifications", message);
+        }
+      } finally {
+        setEnabling(false);
+        setAutoRegistering(false);
+      }
+    },
+    [queryClient, refreshStatus, userId]
+  );
 
   useEffect(() => {
     void refreshStatus();
@@ -48,24 +78,59 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
 
   useFocusEffect(
     useCallback(() => {
-      void refreshStatus();
-    }, [refreshStatus])
+      void (async () => {
+        const status = await refreshStatus();
+        if (
+          !userId ||
+          !readyForPush ||
+          status?.permission !== "granted" ||
+          status?.subscribed
+        ) {
+          return;
+        }
+        setAutoRegistering(true);
+        await finishRegistration("resume");
+      })();
+    }, [finishRegistration, readyForPush, refreshStatus, userId])
   );
 
   async function handleEnableClick(_event: MouseEvent<HTMLButtonElement>) {
-    if (!userId || !readyForPush) return;
+    if (!userId) {
+      showAlert("Sign in required", "Log in to enable push notifications.");
+      return;
+    }
+
+    if (!readyForPush) {
+      showAlert(
+        "Open Frennix from your Home Screen",
+        "On iPhone, add Frennix to your Home Screen and open it from the home screen icon — not Safari — to enable notifications."
+      );
+      return;
+    }
+
+    if (!featureEnabled) {
+      showAlert(
+        "Notifications unavailable",
+        "Push notifications are not enabled for your account yet. Try again later."
+      );
+      return;
+    }
 
     setEnabling(true);
     try {
       if (Notification.permission !== "granted") {
         const result = await requestWebPushPermissionFromUserGesture();
+        if (result === "denied") {
+          showAlert(
+            "Notifications blocked",
+            "Open iPhone Settings → Notifications → Frennix and allow notifications. Frennix will finish setup automatically when you reopen the app."
+          );
+          await refreshStatus();
+          return;
+        }
         if (result !== "granted") return;
       }
-      const outcome = await runAutoWebPushRegistration(userId, queryClient, { source: "permission" });
-      await refreshStatus();
-      if (outcome.status === "success") {
-        showWebPushSuccessToast();
-      }
+      await finishRegistration("permission");
     } finally {
       setEnabling(false);
     }
@@ -93,17 +158,51 @@ export function WebPushEnableCard({ readyForPush = isWebStandalone(), onSetupCha
     );
   }
 
-  if (!readyForPush) return null;
+  if (!readyForPush) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Open Frennix from your Home Screen</Text>
+        <Text style={styles.body}>
+          Push notifications only work when Frennix is installed to your Home Screen. Open Frennix
+          from the home screen icon, then return here and tap Enable Notifications.
+        </Text>
+      </View>
+    );
+  }
+
+  if (!featureEnabled) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Push notifications unavailable</Text>
+        <Text style={styles.body}>
+          Push alerts are not enabled for your account yet. In-app notifications still appear in
+          your Notification Center.
+        </Text>
+      </View>
+    );
+  }
+
+  const permissionGranted = permission === "granted";
+  const buttonLabel = permissionGranted
+    ? autoRegistering || enabling
+      ? "Finishing setup…"
+      : "Complete notification setup"
+    : "Enable Notifications";
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Turn on notifications</Text>
       <Text style={styles.body}>
-        Tap below and allow notifications on the iOS dialog. Frennix will set everything up
-        automatically.
+        {permissionGranted
+          ? "iOS permission is granted. Tap below to finish registering this device for push alerts."
+          : "Tap below and allow notifications on the iOS dialog. Frennix will set everything up automatically."}
       </Text>
-      <WebPushNativeButton onClick={handleEnableClick} loading={enabling} disabled={enabling}>
-        Turn on notifications
+      <WebPushNativeButton
+        onClick={handleEnableClick}
+        loading={enabling || autoRegistering}
+        disabled={enabling || autoRegistering}
+      >
+        {buttonLabel}
       </WebPushNativeButton>
     </View>
   );

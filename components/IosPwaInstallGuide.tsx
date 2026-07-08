@@ -6,7 +6,7 @@ const STEPS = [
   'Scroll down and tap "Add to Home Screen"',
   'Tap "Add" in the top-right corner',
   "Open Frennix from your Home Screen icon",
-  "Return here to enable push notifications (Phase 3)",
+  "Go to Settings → Notifications and tap Enable Notifications",
 ] as const;
 
 export function IosPwaInstallGuide() {
@@ -14,8 +14,8 @@ export function IosPwaInstallGuide() {
     <View style={styles.container}>
       <Text style={styles.title}>Add Frennix to your Home Screen</Text>
       <Text style={styles.body}>
-        On iPhone, web push notifications only work when Frennix is installed as a Home Screen
-        app — not in a Safari tab.
+        On iPhone, notifications only work when Frennix is installed as a Home Screen app — not in
+        a Safari or browser tab.
       </Text>
       <View style={styles.steps}>
         {STEPS.map((step, index) => (
@@ -37,6 +37,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   title: {
     ...typography.body,

@@ -47,7 +47,7 @@ function testBuildPipeline() {
 function testPwaModules() {
   const pwa = read("lib/pwa.ts");
   assertIncludes(pwa, "isWebStandalone", "pwa standalone detect");
-  assertIncludes(pwa, "shouldShowIosPwaInstallGuide", "pwa ios guide gate");
+  assertIncludes(pwa, "shouldShowPwaInstallGuideForWeb", "pwa ios guide gate");
   assertIncludes(pwa, "WEB_PUSH_ENABLED = false", "push disabled Phase 2");
 
   const register = read("lib/register-pwa-service-worker.ts");

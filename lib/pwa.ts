@@ -14,12 +14,17 @@ export function isWebStandalone(): boolean {
   );
 }
 
+export function isIosWebDevice(): boolean {
+  if (Platform.OS !== "web" || typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 /** iOS Safari in a browser tab (not Chrome iOS, not standalone). */
 export function isIosSafariBrowser(): boolean {
   if (Platform.OS !== "web" || typeof navigator === "undefined") return false;
 
   const ua = navigator.userAgent;
-  const isIos = /iPad|iPhone|iPod/.test(ua);
+  const isIos = isIosWebDevice();
   const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
   return isIos && isSafari;
 }
@@ -28,8 +33,14 @@ export function isWebPushEnvironmentReady(): boolean {
   return Platform.OS === "web" && isWebStandalone();
 }
 
+/** Any iOS browser tab — push requires installing to Home Screen first. */
+export function shouldShowPwaInstallGuideForWeb(): boolean {
+  return Platform.OS === "web" && isIosWebDevice() && !isWebStandalone();
+}
+
+/** @deprecated Use shouldShowPwaInstallGuideForWeb */
 export function shouldShowIosPwaInstallGuide(): boolean {
-  return Platform.OS === "web" && isIosSafariBrowser() && !isWebStandalone();
+  return shouldShowPwaInstallGuideForWeb();
 }
 
 /** @deprecated Use isWebPushFeatureEnabled() — gated by web_push_notifications flag. */
