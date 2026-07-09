@@ -41,11 +41,24 @@ export function isPersistedSessionExpired(): boolean {
 /** Remove expired Supabase auth entries from browser storage. */
 export function clearExpiredPersistedAuth(): boolean {
   if (!isPersistedSessionExpired() || typeof localStorage === "undefined") return false;
+  return clearAllPersistedAuth();
+}
+
+/** Remove all Supabase auth entries from browser storage. */
+export function clearAllPersistedAuth(): boolean {
+  if (typeof localStorage === "undefined") return false;
   const keys: string[] = [];
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
-    if (key?.startsWith("sb-") && key.endsWith("-auth-token")) keys.push(key);
+    if (key?.startsWith("sb-")) keys.push(key);
   }
+  if (keys.length === 0) return false;
   for (const key of keys) localStorage.removeItem(key);
   return true;
+}
+
+/** Drop in-memory session when browser storage no longer has a token. */
+export function sessionMatchesPersistedAuth(session: { access_token?: string } | null): boolean {
+  if (!session) return true;
+  return hasPersistedAuthToken();
 }

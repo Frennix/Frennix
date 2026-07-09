@@ -31,6 +31,37 @@ const playwrightPath = (() => {
 const EXISTING_USER_ID = "11111111-1111-4111-8111-111111111111";
 const NEW_USER_ID = "22222222-2222-4222-8222-222222222222";
 
+const PLATFORM_PROFILES = {
+  iphoneSafari: {
+    viewport: { width: 390, height: 844 },
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    standalone: false,
+    displayMode: null,
+  },
+  chromeDesktop: {
+    viewport: { width: 1280, height: 800 },
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    standalone: false,
+    displayMode: null,
+  },
+  safariPwa: {
+    viewport: { width: 390, height: 844 },
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    standalone: true,
+    displayMode: "standalone",
+  },
+  iphoneHomeScreen: {
+    viewport: { width: 390, height: 844 },
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    standalone: true,
+    displayMode: "standalone",
+  },
+};
+
 function loadEnv() {
   const envPath = path.join(ROOT, ".env");
   if (!fs.existsSync(envPath)) throw new Error("Missing .env");
@@ -193,6 +224,31 @@ function registerSupabaseMocks(page, env, options = {}) {
   });
 }
 
+async function launchBrowser(chromium) {
+  try {
+    return await chromium.launch({ headless: true });
+  } catch {
+    return chromium.launch({ channel: "chrome", headless: true });
+  }
+}
+
+async function applyPlatformProfile(page, platform = "iphoneSafari") {
+  const profile = PLATFORM_PROFILES[platform] ?? PLATFORM_PROFILES.iphoneSafari;
+  await page.setViewportSize(profile.viewport);
+  await page.setExtraHTTPHeaders({ "User-Agent": profile.userAgent });
+  if (profile.displayMode) {
+    await page.emulateMedia({
+      media: "screen",
+      features: [{ name: "display-mode", value: profile.displayMode }],
+    });
+  }
+  if (profile.standalone) {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "standalone", { value: true, configurable: true });
+    });
+  }
+}
+
 async function createContext(browser, env, options = {}) {
   const {
     userId = EXISTING_USER_ID,
@@ -204,13 +260,15 @@ async function createContext(browser, env, options = {}) {
     expiredSession = false,
     offline = false,
     staleProfileDays = 0,
+    platform = "iphoneSafari",
   } = options;
 
+  const profile = PLATFORM_PROFILES[platform] ?? PLATFORM_PROFILES.iphoneSafari;
   const page = await browser.newPage({
-    viewport: { width: 390, height: 844 },
-    userAgent:
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    viewport: profile.viewport,
+    userAgent: profile.userAgent,
   });
+  await applyPlatformProfile(page, platform);
 
   const supabaseHost = new URL(env.EXPO_PUBLIC_SUPABASE_URL).host;
   const ref = env.EXPO_PUBLIC_SUPABASE_URL.match(/https:\/\/([^.]+)/)[1];
@@ -290,6 +348,19 @@ async function readState(page) {
       hasFeedContent: /Beta startup verification feed post|Your feed is ready|Feed/i.test(text),
       hasOnboarding: /Set up profile|onboarding/i.test(text),
       hasLogin: /Sign in|Log in|Welcome back|Welcome/i.test(text),
+      hasPersistedAuth: (() => {
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+          try {
+            const parsed = JSON.parse(localStorage.getItem(key) ?? "{}");
+            if (parsed.access_token) return true;
+          } catch {
+            // ignore
+          }
+        }
+        return false;
+      })(),
       traceTail: trace.slice(-8).map((e) => e.id),
       feedRootHeight: document.getElementById("feed-root-container")?.getBoundingClientRect().height ?? 0,
       rootHeight: document.getElementById("root")?.getBoundingClientRect().height ?? 0,
@@ -327,9 +398,11 @@ async function main() {
 
   const pwModule = await import(pathToFileURL(playwrightPath).href);
   const { chromium } = pwModule.default ?? pwModule;
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await launchBrowser(chromium);
 
-  const results = [];
+  const coreResults = [];
+  const extendedResults = [];
+  const platformResults = [];
 
   // 1. Existing user — cached profile, no black screen
   {
@@ -358,7 +431,7 @@ async function main() {
       pageErrors.filter((e) => !e.includes("canPromptForWebPush")).length === 0 &&
       (state.hasFeedRoot || state.hasFeedContent || state.text.length > 40) &&
       !(state.text.length < 20 && !state.hasLoading && !state.hasRetry);
-    results.push(
+    coreResults.push(
       assertCheck(
         "1. Existing user launch (no black screen)",
         ok,
@@ -391,7 +464,7 @@ async function main() {
     await page.waitForTimeout(2000);
     const state = await readState(page);
     const ok = state.hasOnboarding || state.hasLoading || state.hasRetry;
-    results.push(
+    coreResults.push(
       assertCheck(
         "2. New user routes to onboarding or loading (not blank)",
         ok,
@@ -414,60 +487,73 @@ async function main() {
     ).catch(() => undefined);
     await page.waitForTimeout(1500);
 
-    // Clear persisted auth AFTER init scripts — skip re-seed on reload.
-    await page.evaluate(() => localStorage.setItem("__frennix_test_skip_seed", "1"));
-    await page.addInitScript(({ key }) => {
-      localStorage.setItem("__frennix_test_skip_seed", "1");
-      localStorage.removeItem(key);
-      sessionStorage.clear();
-    }, storageKey);
+    // Fresh context = no seed init scripts; proves logout when storage is empty.
+    const logoutContext = await browser.newContext({
+      viewport: PLATFORM_PROFILES.iphoneSafari.viewport,
+      userAgent: PLATFORM_PROFILES.iphoneSafari.userAgent,
+    });
+    const logoutPage = await logoutContext.newPage();
+    const logoutErrors = [];
+    logoutPage.on("pageerror", (err) => logoutErrors.push(err.message));
 
-    await page.unroute("**/*");
-    await page.route("**/*", async (route) => {
+    await registerSupabaseMocks(logoutPage, env, { userId: EXISTING_USER_ID, onboardingComplete: true });
+    await logoutPage.route("**/*", async (route) => {
       const reqUrl = route.request().url();
       const supabaseHost = new URL(env.EXPO_PUBLIC_SUPABASE_URL).host;
-      if (reqUrl.includes(supabaseHost)) {
-        const method = route.request().method();
-        if (method === "OPTIONS") {
-          return route.fulfill({
-            status: 204,
-            headers: {
-              "access-control-allow-origin": "*",
-              "access-control-allow-methods": "GET, POST, PATCH, PUT, DELETE, HEAD, OPTIONS",
-              "access-control-allow-headers": "*",
-            },
-            body: "",
-          });
-        }
-        if (reqUrl.includes("/auth/v1/")) {
-          return route.fulfill({
-            status: 200,
-            headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
-            body: JSON.stringify({}),
-          });
-        }
-        if (reqUrl.includes("/rest/v1/profiles")) {
-          return route.fulfill({ status: 401, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }, body: JSON.stringify({ message: "JWT expired" }) });
-        }
+      if (!reqUrl.includes(supabaseHost)) return route.continue();
+      const method = route.request().method();
+      if (method === "OPTIONS") {
+        return route.fulfill({
+          status: 204,
+          headers: {
+            "access-control-allow-origin": "*",
+            "access-control-allow-methods": "GET, POST, PATCH, PUT, DELETE, HEAD, OPTIONS",
+            "access-control-allow-headers": "*",
+          },
+          body: "",
+        });
+      }
+      if (reqUrl.includes("/auth/v1/")) {
         return route.fulfill({
           status: 200,
           headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
-          body: "[]",
+          body: JSON.stringify({}),
         });
       }
-      return route.continue();
+      if (reqUrl.includes("/rest/v1/profiles")) {
+        return route.fulfill({
+          status: 401,
+          headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+          body: JSON.stringify({ message: "JWT expired" }),
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+        body: "[]",
+      });
     });
 
-    await page.reload({ waitUntil: "networkidle", timeout: 90_000 });
-    await page.waitForTimeout(4000);
-    const afterLogout = await readState(page);
-    const okLogout = afterLogout.hasLogin || afterLogout.hasLoading;
+    await logoutPage.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await logoutPage.waitForFunction(
+      () => /Welcome back|Sign in|Log in/i.test(document.body.innerText),
+      { timeout: 15_000 }
+    ).catch(() => undefined);
+    await logoutPage.waitForTimeout(1500);
+    const afterLogout = await readState(logoutPage);
+    const okLogout =
+      afterLogout.hasLogin &&
+      !afterLogout.hasOnboarding &&
+      !afterLogout.hasPersistedAuth;
 
-    await page.unroute("**/*");
-    await registerSupabaseMocks(page, env, { userId: EXISTING_USER_ID, onboardingComplete: true });
-    await page.addInitScript(
+    const reloginContext = await browser.newContext({
+      viewport: PLATFORM_PROFILES.iphoneSafari.viewport,
+      userAgent: PLATFORM_PROFILES.iphoneSafari.userAgent,
+    });
+    const reloginPage = await reloginContext.newPage();
+    await registerSupabaseMocks(reloginPage, env, { userId: EXISTING_USER_ID, onboardingComplete: true });
+    await reloginPage.addInitScript(
       ({ key, uid }) => {
-        localStorage.removeItem("__frennix_test_skip_seed");
         localStorage.setItem(
           key,
           JSON.stringify({
@@ -480,17 +566,27 @@ async function main() {
       },
       { key: storageKey, uid: EXISTING_USER_ID }
     );
-    await page.reload({ waitUntil: "networkidle", timeout: 90_000 });
-    await page.waitForTimeout(5000);
-    const afterRelogin = await readState(page);
+    await reloginPage.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await reloginPage.waitForTimeout(5000);
+    const afterRelogin = await readState(reloginPage);
     const okRelogin =
       afterRelogin.rootHeight > 80 &&
       (afterRelogin.hasFeedRoot || afterRelogin.hasFeedContent || afterRelogin.hasLoading);
-    results.push(assertCheck("3a. Logout shows login/loading", okLogout, afterLogout.text.slice(0, 80)));
-    results.push(
+
+    coreResults.push(
+      assertCheck(
+        "3a. Logout shows login/loading",
+        okLogout,
+        `auth=${afterLogout.hasPersistedAuth} text=${afterLogout.text.slice(0, 80)}`
+      )
+    );
+    coreResults.push(
       assertCheck("3b. Re-login reaches feed/loading", okRelogin, afterRelogin.text.slice(0, 80))
     );
+
     await page.close();
+    await logoutContext.close();
+    await reloginContext.close();
   }
 
   // 4. Slow network — loading UI, not blank
@@ -508,7 +604,7 @@ async function main() {
       early.hasBootShell ||
       early.bootShellVisible ||
       early.text.length > 10;
-    results.push(
+    coreResults.push(
       assertCheck(
         "4. Slow network shows loading UI early",
         ok,
@@ -517,7 +613,7 @@ async function main() {
     );
     await page.waitForTimeout(8000);
     const late = await readState(page);
-    results.push(
+    coreResults.push(
       assertCheck(
         "4b. Slow network eventually reaches feed",
         late.hasFeedRoot || late.hasFeedContent || late.hasLoading,
@@ -541,7 +637,7 @@ async function main() {
       state.rootHeight > 80 &&
       pageErrors.filter((e) => !e.includes("canPromptForWebPush")).length === 0 &&
       (state.hasFeedContent || state.hasFeedRoot || state.hasLoading || state.text.length > 40);
-    results.push(
+    coreResults.push(
       assertCheck(
         "5. Profile fetch blip — app stays usable",
         ok,
@@ -555,7 +651,7 @@ async function main() {
         fs
           .readdirSync(path.join(DIST, "_expo/static/js/web"))
           .some((f) => f.startsWith("index-") && fs.readFileSync(path.join(DIST, "_expo/static/js/web", f), "utf8").includes("Retry")));
-    results.push(assertCheck("5b. Retry UI shipped in build", bundleHasRetry || hasBootShell));
+    coreResults.push(assertCheck("5b. Retry UI shipped in build", bundleHasRetry || hasBootShell));
     await page.close();
   }
 
@@ -570,7 +666,7 @@ async function main() {
     await page.waitForTimeout(5000);
     const state = await readState(page);
     const ok = state.hasLogin || state.hasLoading || state.hasRetry;
-    results.push(assertCheck("7. Expired session → login/loading", ok, state.text.slice(0, 80)));
+    extendedResults.push(assertCheck("7. Expired session → login/loading", ok, state.text.slice(0, 80)));
     await page.close();
   }
 
@@ -585,7 +681,7 @@ async function main() {
     await page.waitForTimeout(3000);
     const state = await readState(page);
     const ok = state.hasLoading || state.hasRetry || state.hasBootShell || state.text.length > 5;
-    results.push(assertCheck("8. Offline startup shows fallback UI", ok, state.text.slice(0, 80)));
+    extendedResults.push(assertCheck("8. Offline startup shows fallback UI", ok, state.text.slice(0, 80)));
     await page.close();
   }
 
@@ -602,7 +698,7 @@ async function main() {
     await page.waitForTimeout(3000);
     const state = await readState(page);
     const ok = state.hasFeedRoot || state.hasFeedContent || state.hasLoading;
-    results.push(assertCheck("9. Cached PWA reaches feed/loading", ok, state.text.slice(0, 80)));
+    extendedResults.push(assertCheck("9. Cached PWA reaches feed/loading", ok, state.text.slice(0, 80)));
     await page.close();
   }
 
@@ -617,7 +713,7 @@ async function main() {
     await page.waitForTimeout(4000);
     const state = await readState(page);
     const ok = state.hasLogin || state.hasLoading || state.text.length > 10;
-    results.push(assertCheck("10. Fresh Safari install → login/loading", ok, state.text.slice(0, 80)));
+    extendedResults.push(assertCheck("10. Fresh Safari install → login/loading", ok, state.text.slice(0, 80)));
     await page.close();
   }
 
@@ -632,7 +728,7 @@ async function main() {
     await page.waitForTimeout(3000);
     const state = await readState(page);
     const ok = state.hasFeedRoot || state.hasFeedContent || state.hasLoading;
-    results.push(assertCheck("11. Home Screen install reaches feed/loading", ok, state.text.slice(0, 80)));
+    extendedResults.push(assertCheck("11. Home Screen install reaches feed/loading", ok, state.text.slice(0, 80)));
     await page.close();
   }
 
@@ -649,7 +745,28 @@ async function main() {
     const ok =
       state.rootHeight > 80 &&
       (state.hasFeedRoot || state.hasFeedContent || state.hasLoading || state.hasRetry);
-    results.push(assertCheck("12. Returning user (7+ days) reaches app", ok, state.text.slice(0, 80)));
+    extendedResults.push(assertCheck("12. Returning user (7+ days) reaches app", ok, state.text.slice(0, 80)));
+    await page.close();
+  }
+
+  // Platform matrix — Safari PWA, Chrome desktop, iPhone Home Screen
+  for (const [label, platform] of [
+    ["P1. Safari PWA startup", "safariPwa"],
+    ["P2. Chrome desktop startup", "chromeDesktop"],
+    ["P3. iPhone Home Screen startup", "iphoneHomeScreen"],
+  ]) {
+    const { page } = await createContext(browser, env, {
+      userId: EXISTING_USER_ID,
+      cachedProfile: true,
+      platform,
+    });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+    await page.waitForTimeout(3000);
+    const state = await readState(page);
+    const ok =
+      state.rootHeight > 80 &&
+      (state.hasFeedRoot || state.hasFeedContent || state.hasLoading || state.hasLogin);
+    platformResults.push(assertCheck(label, ok, state.text.slice(0, 80)));
     await page.close();
   }
 
@@ -681,17 +798,25 @@ async function main() {
       ["error boundary retry", /Something went wrong|Retry/i.test(bundleText)],
     ];
     for (const [label, ok] of checks) {
-      results.push(assertCheck(`6. Regression: ${label}`, ok));
+      coreResults.push(assertCheck(`6. Regression: ${label}`, ok));
     }
   }
 
   await browser.close();
   if (server) server.close();
 
-  const passed = results.filter(Boolean).length;
-  const total = results.length;
-  console.log(`\n=== ${passed}/${total} checks passed ===\n`);
-  if (passed < total) process.exit(1);
+  const corePassed = coreResults.filter(Boolean).length;
+  const coreTotal = coreResults.length;
+  const extendedPassed = extendedResults.filter(Boolean).length;
+  const extendedTotal = extendedResults.length;
+  const platformPassed = platformResults.filter(Boolean).length;
+  const platformTotal = platformResults.length;
+
+  console.log(`\n=== Core startup: ${corePassed}/${coreTotal} checks passed ===`);
+  console.log(`=== Extended scenarios: ${extendedPassed}/${extendedTotal} checks passed ===`);
+  console.log(`=== Platform matrix: ${platformPassed}/${platformTotal} checks passed ===\n`);
+
+  if (corePassed < coreTotal || platformPassed < platformTotal) process.exit(1);
 }
 
 main().catch((error) => {

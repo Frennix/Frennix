@@ -25,7 +25,7 @@ import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
-import { hasPersistedAuthToken, clearExpiredPersistedAuth, isPersistedSessionExpired } from "@/lib/auth-storage";
+import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
@@ -182,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await stopPresenceTracking(true, "auth-signOut", userId);
       resetMessagingRealtimeState();
       await supabaseSignOut();
+      clearAllPersistedAuth();
       setSession(null);
       setProfile(null);
       resolvedProfileUserIdRef.current = null;
@@ -197,6 +198,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback(
     async (nextSession: Session | null) => {
       const epoch = authEpochRef.current;
+
+      if (nextSession && !sessionMatchesPersistedAuth(nextSession)) {
+        try {
+          await supabaseSignOut();
+        } catch {
+          clearAllPersistedAuth();
+        }
+        nextSession = null;
+      }
+
+      if (!nextSession && !hasPersistedAuthToken()) {
+        if (epoch !== authEpochRef.current) return;
+        setSession(null);
+        setProfile(null);
+        resolvedProfileUserIdRef.current = null;
+        clearCachedProfile();
+        setProfileLoading(false);
+        if (epoch === authEpochRef.current) {
+          setLoading(false);
+        }
+        return;
+      }
 
       if (!nextSession && sessionRef.current?.user?.id && !signOutInProgressRef.current && hasPersistedAuthToken()) {
         await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
@@ -329,6 +352,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (!hasPersistedAuthToken()) {
+        try {
+          await supabaseSignOut();
+        } catch {
+          clearAllPersistedAuth();
+        }
+      }
+
       let initialSession: Session | null = null;
       try {
         initialSession = await withTimeout(
@@ -345,8 +376,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      if (initialSession && isPersistedSessionExpired()) {
-        clearExpiredPersistedAuth();
+      if (initialSession && !sessionMatchesPersistedAuth(initialSession)) {
+        try {
+          await supabaseSignOut();
+        } catch {
+          clearAllPersistedAuth();
+        }
         initialSession = null;
       }
 
@@ -391,6 +426,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const signedOutUserId = sessionRef.current?.user?.id ?? null;
 
         void (async () => {
+          if (!hasPersistedAuthToken()) {
+            await stopPresenceTracking(true, "auth-signed-out", signedOutUserId);
+            return;
+          }
+
           await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
           if (signOutInProgressRef.current) return;
 

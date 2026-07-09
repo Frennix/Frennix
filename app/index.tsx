@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { StartupRetryScreen } from "@/components/StartupRetryScreen";
 import { useAuth } from "@/providers/AuthProvider";
+import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAppStartup } from "@/lib/beta-health-analytics";
@@ -131,7 +132,7 @@ function IndexGate({
     return <Redirect href="/reset-password" />;
   }
 
-  if (!session) {
+  if (!session || !hasPersistedAuthToken()) {
     return <Redirect href="/(auth)/login" />;
   }
 
