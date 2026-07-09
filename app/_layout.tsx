@@ -26,6 +26,7 @@ import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ClientDiagnosticsBootstrap } from "@/components/ClientDiagnosticsBootstrap";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
 import { StartupSnapshotBootstrap } from "@/components/StartupSnapshotBootstrap";
@@ -73,7 +74,11 @@ function AuthAwareErrorBoundary({
 function TabBadgeRoot({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  return <TabBadgeProvider userId={userId}>{children}</TabBadgeProvider>;
+  return (
+    <SectionErrorBoundary label="tab-badges" userId={userId} email={session?.user.email ?? undefined}>
+      <TabBadgeProvider userId={userId}>{children}</TabBadgeProvider>
+    </SectionErrorBoundary>
+  );
 }
 
 function NotificationBootstrap() {

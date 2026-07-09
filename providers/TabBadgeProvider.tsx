@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { getUnreadMessageCount, getUnreadNotificationCount } from "@frennix/api";
 import type { Conversation } from "@frennix/types";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
+import { isMessagesRoute } from "@/lib/safe-pathname";
 
 type TabBadgeContextValue = {
   unreadNotifications: number;
@@ -25,8 +26,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const [deferHeavyBadges, setDeferHeavyBadges] = useState(true);
-  const messagesRouteActive =
-    pathname === "/messages" || pathname.startsWith("/chat/") || pathname.includes("/messages");
+  const messagesRouteActive = isMessagesRoute(pathname);
 
   useEffect(() => {
     if (!userId) return;

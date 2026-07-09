@@ -42,6 +42,7 @@ import {
   buildConversationInboxMenuActions,
   buildFavoritePartnerConversationMenuActions,
 } from "@/lib/conversation-menu-actions";
+import { isChatRoute } from "@/lib/safe-pathname";
 import { pushScreen, switchTab } from "@/lib/press-utils";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
@@ -160,7 +161,7 @@ export default function MessagesScreen() {
   const userId = session?.user.id ?? "";
   const isFocused = useIsFocused();
   const pathname = usePathname();
-  const isListActive = isFocused && !pathname.startsWith("/chat/");
+  const isListActive = isFocused && !isChatRoute(pathname);
   const queryClient = useQueryClient();
   const webHeightStyle = useTabScreenWebHeightStyle();
   const [menuConversation, setMenuConversation] = useState<Conversation | null>(null);

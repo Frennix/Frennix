@@ -147,6 +147,9 @@ importers:
       '@frennix/matching':
         specifier: workspace:*
         version: link:../matching
+      '@frennix/notifications':
+        specifier: workspace:*
+        version: link:../notifications
       '@frennix/types':
         specifier: workspace:*
         version: link:../types

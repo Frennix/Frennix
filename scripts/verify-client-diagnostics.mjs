@@ -19,6 +19,8 @@ function assertIncludes(haystack, needle, label) {
 
 assertIncludes(read("lib/client-diagnostics.ts"), "logApiDiagnostic", "diagnostics api logging");
 assertIncludes(read("lib/startup-snapshot-log.ts"), "frennix-startup-snapshot", "startup snapshot logging");
+assertIncludes(read("lib/safe-pathname.ts"), "isMessagesRoute", "safe pathname helper");
+assertIncludes(read("providers/TabBadgeProvider.tsx"), "isMessagesRoute", "tab badge pathname guard");
 assertIncludes(read("components/StartupSnapshotBootstrap.tsx"), "snapshot:interval", "startup snapshot bootstrap");
 assertIncludes(read("lib/report-client-error.ts"), "submitCrashReport", "auto crash report");
 assertIncludes(read("components/SectionErrorBoundary.tsx"), "This section could not load", "section boundary");

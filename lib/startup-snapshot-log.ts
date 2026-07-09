@@ -7,6 +7,7 @@ import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAnalyticsEvent } from "@/lib/product-analytics";
 import { Sentry } from "@/lib/sentry";
 import { isIosSafariBrowser, isIosWebDevice, isWebStandalone } from "@/lib/pwa";
+import { safePathname } from "@/lib/safe-pathname";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { getStartupMountEvents } from "@/lib/startup-mount-trace";
 
@@ -206,8 +207,8 @@ export function collectDomStartupState(route = ""): StartupDomState {
     (root?.childElementCount ?? 0) <= 1;
 
   return {
-    route: route || window.location.pathname,
-    href: window.location.href,
+    route: route || safePathname(typeof window !== "undefined" ? window.location.pathname : ""),
+    href: typeof window !== "undefined" ? window.location.href : safePathname(route),
     bootOverlayPresent: Boolean(shell),
     bootOverlayVisible,
     loginScreenPresent: Boolean(login),

@@ -86,7 +86,8 @@
     transition: background-color 99999s ease-out 0s;
   }
   #auth-login-screen,
-  #startup-retry-screen {
+  #startup-retry-screen,
+  #login-failure-screen {
     min-height: 100dvh;
     min-height: -webkit-fill-available;
   }
@@ -141,7 +142,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-0ff6118b47ff3a13b6391a2e714c5e7a.js" defer></script>
+  <script src="/_expo/static/js/web/index-38439aad9cf47c82ae4cc2e1151236e1.js" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
@@ -162,10 +163,11 @@
   function startupReady() {
     if (document.getElementById("auth-login-screen")) return true;
     if (document.getElementById("startup-retry-screen")) return true;
+    if (document.getElementById("login-failure-screen")) return true;
     var trace = window.__FRENNIX_MOUNT_TRACE__;
     if (!trace || !trace.length) return false;
     return trace.some(function (e) {
-      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "entry:createRoot:render:end" || e.id === "auth-login:mounted";
+      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "auth-login:mounted";
     });
   }
   var iv = setInterval(function () {
@@ -174,10 +176,6 @@
       clearInterval(iv);
     }
   }, 150);
-  setTimeout(function () {
-    hideBootShell();
-    clearInterval(iv);
-  }, 6000);
   window.addEventListener("load", function () {
     setTimeout(function () {
       if (!startupReady()) {
