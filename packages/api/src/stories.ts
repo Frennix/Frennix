@@ -1,5 +1,6 @@
 import type { FeedStory, FrennixStory, Profile, StoryLocationType, StoryPrivacy, StorySlide } from "@frennix/types";
 import { getFollowing } from "./follows";
+import { normalizeProfile } from "./profile-normalize";
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
 
@@ -116,7 +117,13 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
 
   if (selfProfile.error) throw selfProfile.error;
 
-  const profiles: Profile[] = [selfProfile.data as Profile, ...following];
+  const self = normalizeProfile(selfProfile.data as Profile);
+  if (!self) return [];
+
+  const profiles: Profile[] = [
+    self,
+    ...following.map((row) => normalizeProfile(row)).filter((row): row is Profile => Boolean(row)),
+  ];
   const userIds = profiles.map((profile) => profile.id);
   if (!userIds.length) return [];
 

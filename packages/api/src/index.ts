@@ -3,6 +3,7 @@ export * from "./profile-utils";
 export * from "./media-utils";
 export * from "./auth";
 export * from "./profiles";
+export * from "./profile-normalize";
 export * from "./posts";
 export * from "./comments";
 export * from "./follows";

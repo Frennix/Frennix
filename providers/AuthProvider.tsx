@@ -11,7 +11,7 @@ import {
 import { AppState, Platform } from "react-native";
 import * as Linking from "expo-linking";
 import type { Profile } from "@frennix/types";
-import { getProfile, getSession, getSupabase, onAuthStateChange, resetMessagingRealtimeState, signOut as supabaseSignOut } from "@frennix/api";
+import { getProfile, getSession, getSupabase, onAuthStateChange, resetMessagingRealtimeState, signOut as supabaseSignOut, normalizeProfile } from "@frennix/api";
 import type { Session } from "@supabase/supabase-js";
 import { isWebRecoveryHash, clearWebRecoveryHash } from "@/lib/auth-redirect";
 import {
@@ -139,10 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileFetchUserIdRef.current = userId;
       const task = (async () => {
         try {
-          const nextProfile = await withTimeout(
-            getProfile(userId),
-            AUTH_PROFILE_TIMEOUT_MS,
-            "auth.getProfile"
+          const nextProfile = normalizeProfile(
+            await withTimeout(getProfile(userId), AUTH_PROFILE_TIMEOUT_MS, "auth.getProfile")
           );
           if (epoch !== authEpochRef.current) return;
           setProfile(nextProfile);
@@ -152,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           if (epoch !== authEpochRef.current) return;
           console.error("[auth] getProfile failed", error);
-          const cached = readCachedProfile(userId);
+          const cached = normalizeProfile(readCachedProfile(userId));
           const status =
             error && typeof error === "object" && "status" in error
               ? (error as { status?: number }).status
@@ -199,9 +197,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(
     async (userIdOrProfile?: string | Profile) => {
       if (userIdOrProfile && typeof userIdOrProfile === "object") {
-        setProfile(userIdOrProfile);
+        const normalized = normalizeProfile(userIdOrProfile);
+        setProfile(normalized);
         resolvedProfileUserIdRef.current = userIdOrProfile.id;
-        writeCachedProfile(userIdOrProfile.id, userIdOrProfile);
+        writeCachedProfile(userIdOrProfile.id, normalized);
         return;
       }
 

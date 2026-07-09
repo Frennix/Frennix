@@ -11,6 +11,7 @@ import { trackAppStartup } from "@/lib/beta-health-analytics";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { describeAuthBootstrapPhase } from "@/lib/startup-mount-trace";
 import { logStartupStep } from "@/lib/startup-step-log";
+import { profileNeedsOnboardingRepair, describeProfileRepairReason } from "@frennix/api";
 
 const APP_BOOT_MARK =
   typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -205,7 +206,11 @@ function IndexGate({
     return <Redirect href="/onboarding" />;
   }
 
-  if (!profile.onboarding_complete) {
+  if (!profile.onboarding_complete || profileNeedsOnboardingRepair(profile)) {
+    const repairReason = describeProfileRepairReason(profile);
+    if (repairReason) {
+      logStartupStep("auth:session:loaded", { hasProfile: true, route: "onboarding", repairReason });
+    }
     return <Redirect href="/onboarding" />;
   }
 

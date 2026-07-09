@@ -10,6 +10,7 @@ import {
 } from "./profile-utils";
 import { getWorkoutStreak } from "./workout-activity";
 import { getSupabase } from "./supabase";
+import { normalizeProfile } from "./profile-normalize";
 
 /** PostgREST view that masks presence fields for other users. Writes use `profiles`. */
 const PROFILES_READ = "profiles_reader";
@@ -21,7 +22,7 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .eq("id", userId)
     .single();
   if (error && error.code !== "PGRST116") throw error;
-  return data as Profile | null;
+  return normalizeProfile(data as Profile | null);
 }
 
 export async function getProfileByUsername(username: string): Promise<Profile | null> {
@@ -31,7 +32,7 @@ export async function getProfileByUsername(username: string): Promise<Profile | 
     .eq("username", username)
     .single();
   if (error && error.code !== "PGRST116") throw error;
-  return data as Profile | null;
+  return normalizeProfile(data as Profile | null);
 }
 
 export async function upsertProfile(profile: Partial<Profile> & { id: string }) {

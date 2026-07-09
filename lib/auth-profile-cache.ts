@@ -1,4 +1,5 @@
 import type { Profile } from "@frennix/types";
+import { normalizeProfile } from "@frennix/api";
 
 const CACHE_KEY = "frennix.auth.profile.v1";
 
@@ -18,7 +19,7 @@ export function readCachedProfile(userId: string): Profile | null {
 
     const parsed = JSON.parse(raw) as CachedProfileEntry;
     if (parsed.userId !== userId || !parsed.profile) return null;
-    return parsed.profile;
+    return normalizeProfile(parsed.profile);
   } catch {
     return null;
   }
@@ -35,7 +36,7 @@ export function writeCachedProfile(userId: string, profile: Profile | null) {
 
     const entry: CachedProfileEntry = {
       userId,
-      profile,
+      profile: normalizeProfile(profile) ?? profile,
       cachedAt: Date.now(),
     };
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(entry));
