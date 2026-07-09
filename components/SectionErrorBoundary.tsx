@@ -64,10 +64,12 @@ export class SectionErrorBoundary extends Component<Props, State> {
             The rest of Frennix is still available. Try again, or send diagnostics if this keeps
             happening.
           </Text>
-          {__DEV__ ? (
+          <Text style={styles.errorDetail} numberOfLines={8}>
+            {error.message}
+          </Text>
+          {__DEV__ && componentStack ? (
             <Text style={styles.devDetail} numberOfLines={6}>
-              {error.message}
-              {componentStack ? `\n${componentStack}` : ""}
+              {componentStack}
             </Text>
           ) : null}
           <View style={styles.actions}>
@@ -108,6 +110,12 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textMuted,
     lineHeight: 20,
+  },
+  errorDetail: {
+    ...typography.caption,
+    color: colors.danger,
+    lineHeight: 18,
+    fontFamily: Platform.OS === "web" ? "monospace" : undefined,
   },
   devDetail: {
     ...typography.caption,

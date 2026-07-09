@@ -18,7 +18,16 @@ const APP_BOOT_MARK =
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
 
 export default function Index() {
-  const { session, profile, authReady, passwordRecovery, loading, profileLoading, signOut } = useAuth();
+  const {
+    session,
+    profile,
+    authReady,
+    passwordRecovery,
+    loading,
+    profileLoading,
+    profileFetchFailed,
+    refreshProfile,
+  } = useAuth();
 
   return (
     <StartupMountProbe id="index-route">
@@ -29,7 +38,8 @@ export default function Index() {
         passwordRecovery={passwordRecovery}
         loading={loading}
         profileLoading={profileLoading}
-        signOut={signOut}
+        profileFetchFailed={profileFetchFailed}
+        refreshProfile={refreshProfile}
       />
     </StartupMountProbe>
   );
@@ -42,7 +52,8 @@ function IndexGate({
   passwordRecovery,
   loading,
   profileLoading,
-  signOut,
+  profileFetchFailed,
+  refreshProfile,
 }: {
   session: ReturnType<typeof useAuth>["session"];
   profile: ReturnType<typeof useAuth>["profile"];
@@ -50,27 +61,17 @@ function IndexGate({
   passwordRecovery: boolean;
   loading: boolean;
   profileLoading: boolean;
-  signOut: ReturnType<typeof useAuth>["signOut"];
+  profileFetchFailed: boolean;
+  refreshProfile: ReturnType<typeof useAuth>["refreshProfile"];
 }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const reportedStallRef = useRef(false);
-  const clearedStaleSessionRef = useRef(false);
 
   useEffect(() => {
-    if (!authReady || !session || profile || profileLoading || clearedStaleSessionRef.current) {
-      return;
-    }
-
-    clearedStaleSessionRef.current = true;
-    logStartupStep("auth:session:invalid", { reason: "profile-unresolved" });
-    void signOut();
-  }, [authReady, session, profile, profileLoading, signOut]);
-
-  useEffect(() => {
-    if (authReady && (!session || !hasPersistedAuthToken())) {
+    if (authReady) {
       hideFrennixBootShell();
     }
-  }, [authReady, session]);
+  }, [authReady]);
 
   useEffect(() => {
     if (authReady) {
@@ -159,19 +160,33 @@ function IndexGate({
   }
 
   if (!profile) {
-    if (!profileLoading) {
-      return <Redirect href="/(auth)/login" />;
+    if (profileLoading) {
+      return (
+        <StartupRetryScreen
+          title="Loading your profile"
+          message="Finishing account setup before opening the app."
+          loading
+          showDiagnostics={false}
+          showMountTrace={false}
+        />
+      );
     }
 
-    return (
-      <StartupRetryScreen
-        title="Loading your profile"
-        message="Finishing account setup before opening the app."
-        loading={profileLoading}
-        showDiagnostics={false}
-        showMountTrace={false}
-      />
-    );
+    if (profileFetchFailed) {
+      return (
+        <StartupRetryScreen
+          title="Could not load your profile"
+          message="You're signed in, but profile data did not load. Check your connection and try again."
+          detail="If this keeps happening, open Diagnostics and share the report."
+          onRetry={() => {
+            void refreshProfile(session.user.id);
+          }}
+        />
+      );
+    }
+
+    logStartupStep("auth:session:loaded", { hasProfile: false, route: "onboarding" });
+    return <Redirect href="/onboarding" />;
   }
 
   if (!profile.onboarding_complete) {

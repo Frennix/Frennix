@@ -12,7 +12,8 @@ interface FeedStoriesRowProps {
 }
 
 function storyLabel(item: FeedStory): string {
-  const latest = item.active_stories.at(-1);
+  const stories = item.active_stories ?? [];
+  const latest = stories.at(-1);
   if (!latest) return item.is_self ? "Your Story" : "No story yet";
   const time = formatRelativeTime(latest.created_at);
   if (latest.workout_tag) return `${latest.workout_tag} · ${time}`;
@@ -28,7 +29,8 @@ function StoryAvatar({
   story: FeedStory;
   onAddStoryPress?: () => void;
 }) {
-  const hasStoryContent = story.active_stories.length > 0 || story.is_self;
+  const activeStories = story.active_stories ?? [];
+  const hasStoryContent = activeStories.length > 0 || story.is_self;
   const ringStyle = !hasStoryContent
     ? styles.avatarRingMuted
     : story.viewed
@@ -77,7 +79,8 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
           const isSelf = item.is_self;
           const label = storyLabel(item);
           const streakLabel = formatStreakBadgeLabel(item.workout_streak);
-          const hasActiveStory = item.active_stories.length > 0;
+          const activeStories = item.active_stories ?? [];
+          const hasActiveStory = activeStories.length > 0;
 
           return (
             <Pressable

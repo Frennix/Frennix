@@ -52,6 +52,8 @@ interface AuthContextValue {
   authReady: boolean;
   /** True when bootstrap was force-unblocked after a timeout (degraded path). */
   authBootstrapTimedOut: boolean;
+  /** Profile fetch failed without cache — show retry, do not sign out. */
+  profileFetchFailed: boolean;
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
   refreshProfile: (userIdOrProfile?: string | Profile) => Promise<void>;
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [authBootstrapTimedOut, setAuthBootstrapTimedOut] = useState(false);
+  const [profileFetchFailed, setProfileFetchFailed] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(() => isWebRecoveryHash());
   const passwordRecoveryRef = useRef(passwordRecovery);
   const authEpochRef = useRef(0);
@@ -105,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPasswordRecovery(false);
     setProfileLoading(false);
     setLoading(false);
+    setProfileFetchFailed(false);
   }, []);
 
   const invalidatePersistedSession = useCallback(async (reason: string) => {
@@ -130,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!options?.background) {
         setProfileLoading(true);
       }
+      setProfileFetchFailed(false);
 
       profileFetchUserIdRef.current = userId;
       const task = (async () => {
@@ -143,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(nextProfile);
           resolvedProfileUserIdRef.current = userId;
           writeCachedProfile(userId, nextProfile);
+          setProfileFetchFailed(false);
         } catch (error) {
           if (epoch !== authEpochRef.current) return;
           console.error("[auth] getProfile failed", error);
@@ -161,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(cached);
           resolvedProfileUserIdRef.current = userId;
           writeCachedProfile(userId, cached);
+          setProfileFetchFailed(!cached);
           void import("@/lib/client-diagnostics").then(({ markDiagnosticFailure, logDiagnostic }) => {
             markDiagnosticFailure("auth.getProfile", error, { userId: userId.slice(0, 8) });
             logDiagnostic("auth", "kept cached profile after getProfile failure", "warn", {
@@ -589,6 +596,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileLoading,
       authReady,
       authBootstrapTimedOut,
+      profileFetchFailed,
       passwordRecovery,
       clearPasswordRecovery,
       refreshProfile,
@@ -602,6 +610,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileLoading,
       authReady,
       authBootstrapTimedOut,
+      profileFetchFailed,
       passwordRecovery,
       clearPasswordRecovery,
       refreshProfile,

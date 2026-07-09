@@ -12,6 +12,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
 import { NotificationOnboardingPrompt } from "@/components/NotificationOnboardingPrompt";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
@@ -185,9 +186,18 @@ const TabsShell = memo(function TabsShell() {
 });
 
 export default function TabsLayout() {
+  const { session } = useAuth();
+
   return (
     <StartupMountProbe id="tabs-layout">
-      <TabsShell />
+      <SectionErrorBoundary
+        label="tabs-shell"
+        screen="/(tabs)"
+        userId={session?.user.id}
+        email={session?.user.email ?? undefined}
+      >
+        <TabsShell />
+      </SectionErrorBoundary>
     </StartupMountProbe>
   );
 }
