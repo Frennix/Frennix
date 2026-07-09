@@ -10,11 +10,7 @@ import { reportStartupStall } from "@/lib/startup-diagnostics";
 
 const STARTUP_STALL_MS = 10_000;
 
-function hideHtmlBootShell() {
-  if (typeof document === "undefined") return;
-  const shell = document.getElementById("frennix-boot-shell");
-  if (shell) shell.style.display = "none";
-}
+import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 function isStartupComplete(): boolean {
   const gap = getStartupMountGap();
@@ -23,7 +19,12 @@ function isStartupComplete(): boolean {
   const events = (typeof window !== "undefined"
     ? (window as Window & { __FRENNIX_MOUNT_TRACE__?: { id: string }[] }).__FRENNIX_MOUNT_TRACE__
     : undefined) ?? [];
-  return events.some((event) => event.id === "stack:mounted" || event.id === "index-route:mounted");
+  return events.some(
+    (event) =>
+      event.id === "stack:mounted" ||
+      event.id === "index-route:mounted" ||
+      event.id === "auth-login:mounted"
+  );
 }
 
 /** Hides the HTML boot shell and surfaces a retry UI if React startup stalls. */
@@ -31,11 +32,11 @@ export function StartupWatchdog() {
   const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
-    hideHtmlBootShell();
+    hideFrennixBootShell();
 
     const check = () => {
       if (isStartupComplete()) {
-        hideHtmlBootShell();
+        hideFrennixBootShell();
         setStalled(false);
       }
     };

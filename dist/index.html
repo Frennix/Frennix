@@ -60,6 +60,36 @@
   [data-testid="tab-bar-background"] {
     background-color: #141416 !important;
   }
+  /* Auth inputs — Safari dark mode + autofill must stay readable. */
+  input,
+  textarea,
+  [contenteditable="true"] {
+    color: #fafafa !important;
+    background-color: #141416 !important;
+    -webkit-text-fill-color: #fafafa !important;
+    caret-color: #fafafa;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #71717a !important;
+    opacity: 1;
+  }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: #fafafa !important;
+    -webkit-box-shadow: 0 0 0 1000px #141416 inset !important;
+    box-shadow: 0 0 0 1000px #141416 inset !important;
+    transition: background-color 99999s ease-out 0s;
+  }
+  #auth-login-screen,
+  #startup-retry-screen {
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
 
     </style>
       
@@ -111,7 +141,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-a3b9ed32af9d64eb8628d3d0b55d4682.js" defer></script>
+  <script src="/_expo/static/js/web/index-0ff6118b47ff3a13b6391a2e714c5e7a.js" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
@@ -130,10 +160,12 @@
     if (el) el.style.display = "none";
   }
   function startupReady() {
+    if (document.getElementById("auth-login-screen")) return true;
+    if (document.getElementById("startup-retry-screen")) return true;
     var trace = window.__FRENNIX_MOUNT_TRACE__;
     if (!trace || !trace.length) return false;
     return trace.some(function (e) {
-      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "entry:createRoot:render:end";
+      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "entry:createRoot:render:end" || e.id === "auth-login:mounted";
     });
   }
   var iv = setInterval(function () {
@@ -142,6 +174,10 @@
       clearInterval(iv);
     }
   }, 150);
+  setTimeout(function () {
+    hideBootShell();
+    clearInterval(iv);
+  }, 6000);
   window.addEventListener("load", function () {
     setTimeout(function () {
       if (!startupReady()) {

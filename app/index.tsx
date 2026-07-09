@@ -4,6 +4,7 @@ import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { StartupRetryScreen } from "@/components/StartupRetryScreen";
 import { useAuth } from "@/providers/AuthProvider";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
+import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAppStartup } from "@/lib/beta-health-analytics";
@@ -49,6 +50,12 @@ function IndexGate({
 }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const reportedStallRef = useRef(false);
+
+  useEffect(() => {
+    if (authReady && (!session || !hasPersistedAuthToken())) {
+      hideFrennixBootShell();
+    }
+  }, [authReady, session]);
 
   useEffect(() => {
     if (authReady) {

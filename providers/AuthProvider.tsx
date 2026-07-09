@@ -358,6 +358,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await applySession(null);
+        return;
       }
 
       let initialSession: Session | null = null;

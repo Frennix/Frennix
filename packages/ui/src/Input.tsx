@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
+import { StyleSheet, Text, TextInput, View, Platform, type TextInputProps } from "react-native";
 import { colors, radius, spacing, typography } from "./theme";
 
 interface InputProps extends TextInputProps {
@@ -32,6 +32,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     color: colors.text,
     fontSize: 16,
+    ...(Platform.OS === "web"
+      ? ({
+          outlineStyle: "none",
+          WebkitTextFillColor: colors.text,
+          caretColor: colors.text,
+        } as object)
+      : null),
   },
   inputError: { borderColor: colors.danger },
   error: { ...typography.caption, color: colors.danger },
