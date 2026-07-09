@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, feedLayout, spacing, typography } from "@frennix/ui";
 import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
@@ -51,24 +52,29 @@ export const FeedHeader = memo(function FeedHeader({
       ) : null}
 
       {showSuggestions ? (
-        <PeopleYouMayKnowCarousel
-          suggestions={suggestions}
-          followingIds={followingIds}
-          onProfilePress={(username) => pushScreen(`/user/${username}`)}
-          onFollowPress={onFollowPress}
-          followLoadingId={followLoadingId}
-        />
+        <SectionErrorBoundary label="feed-suggestions-carousel" compact>
+          <PeopleYouMayKnowCarousel
+            suggestions={suggestions}
+            followingIds={followingIds}
+            onProfilePress={(username) => pushScreen(`/user/${username}`)}
+            onFollowPress={onFollowPress}
+            followLoadingId={followLoadingId}
+          />
+        </SectionErrorBoundary>
       ) : null}
 
       {showStories ? (
-        <FeedStoriesRow
-          stories={stories}
-          onStoryPress={onStoryPress}
-          onAddStoryPress={openCreateStory}
-        />
+        <SectionErrorBoundary label="feed-stories-carousel" compact>
+          <FeedStoriesRow
+            stories={stories}
+            onStoryPress={onStoryPress}
+            onAddStoryPress={openCreateStory}
+          />
+        </SectionErrorBoundary>
       ) : null}
 
       {showQuickActions ? (
+        <SectionErrorBoundary label="feed-quick-actions" compact>
         <View style={styles.quickActions}>
           <Pressable style={styles.chip} onPress={openCreatePost}>
             <Text style={styles.chipText}>Share workout</Text>
@@ -83,6 +89,7 @@ export const FeedHeader = memo(function FeedHeader({
             <Text style={styles.chipText}>Events</Text>
           </Pressable>
         </View>
+        </SectionErrorBoundary>
       ) : null}
     </View>
   );

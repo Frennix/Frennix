@@ -6,6 +6,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Text,
   View,
   useWindowDimensions,
 } from "react-native";
@@ -80,7 +81,7 @@ import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
 import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
-import { useWebTabSceneHeight, webTabSceneHeightStyle, webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
+import { webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
 import { useFeedScrollDebug } from "@/lib/useFeedScrollDebug";
 import { markFeedRender } from "@/lib/feed-render-trace";
@@ -89,11 +90,18 @@ import { useFeedRenderStateTrace } from "@/lib/useFeedRenderStateTrace";
 import { FeedRenderTraceProbe } from "@/components/FeedRenderTraceProbe";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
+import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
   const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
+  const isolateStories = isFeedIsolateDisabled("stories");
+  const isolateFeedList = isFeedIsolateDisabled("feed-list");
+  const isolatePostCards = isFeedIsolateDisabled("post-cards");
+  const isolateVideo = isFeedIsolateDisabled("video");
+  const isolatePullRefresh = isFeedIsolateDisabled("pull-to-refresh");
   const queryClient = useQueryClient();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyInviteUserId, setStoryInviteUserId] = useState<string | null>(null);
@@ -180,7 +188,7 @@ export default function HomeScreen() {
   } = useQuery({
     queryKey: ["feed-stories", userId],
     queryFn: () => getFeedStories(userId),
-    enabled: !!userId && storiesDeferred,
+    enabled: !!userId && storiesDeferred && !isolateStories,
     staleTime: 60_000,
   });
   markFeedHook("stories-query");
@@ -362,8 +370,6 @@ export default function HomeScreen() {
   const listRef = useRef<FlatList<FeedListRow>>(null);
   const webScrollRef = useRef<ScrollView>(null);
   const useWebScroll = Platform.OS === "web";
-  const webTabSceneHeight = useWebTabSceneHeight();
-  const webScrollHeightStyle = webTabSceneHeightStyle(webTabSceneHeight);
   const webContainerStyle = webTabSceneContainerStyle();
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
@@ -670,29 +676,51 @@ export default function HomeScreen() {
         return <FeedPostCardSkeleton />;
       }
 
+      if (isolatePostCards) {
+        return (
+          <View style={styles.isolatePlaceholder}>
+            <Text style={styles.isolatePlaceholderText}>Post card isolated (bisection)</Text>
+          </View>
+        );
+      }
+
       markFeedRender("feed:ui:first-post-card", "data", item.post.id.slice(0, 8));
 
+      const mediaActive = !isolateVideo && visiblePostIds.has(item.post.id);
+
       return (
-        <AnimatedFeedListItem
-          post={item.post}
-          userId={userId}
-          actions={feedActions}
-          interactionActive={activePost?.id === item.post.id}
-          mediaActive={visiblePostIds.has(item.post.id)}
-          mediaPageIndex={carouselIndices[item.post.id] ?? 0}
-          onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
-        />
+        <SectionErrorBoundary label={`feed-post:${item.post.id.slice(0, 8)}`} compact>
+          <AnimatedFeedListItem
+            post={item.post}
+            userId={userId}
+            actions={feedActions}
+            interactionActive={activePost?.id === item.post.id}
+            mediaActive={mediaActive}
+            mediaPageIndex={carouselIndices[item.post.id] ?? 0}
+            onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
+          />
+        </SectionErrorBoundary>
       );
     },
-    [feedActions, userId, visiblePostIds, carouselIndices, setCarouselIndex, activePost?.id]
+    [
+      feedActions,
+      userId,
+      visiblePostIds,
+      carouselIndices,
+      setCarouselIndex,
+      activePost?.id,
+      isolatePostCards,
+      isolateVideo,
+    ]
   );
 
   const listHeader = useMemo(
     () => (
       <FeedRenderTraceProbe id="feed:ui:list-header">
+        <SectionErrorBoundary label="feed-stories-header" compact>
         <FeedHeader
           showTopRow={false}
-          showStories={storiesDeferred}
+          showStories={storiesDeferred && !isolateStories}
           stories={stories}
           suggestions={suggestions}
           followingIds={followingIds}
@@ -706,11 +734,13 @@ export default function HomeScreen() {
           }}
           onFollowPress={(profileId) => toggleFollow(profileId)}
         />
+        </SectionErrorBoundary>
       </FeedRenderTraceProbe>
     ),
     [
       stories,
       storiesDeferred,
+      isolateStories,
       suggestions,
       followingIds,
       followMutation.isPending,
@@ -855,6 +885,31 @@ export default function HomeScreen() {
 
   markFeedRender("feed:branch:main");
 
+  if (isolateFeedList) {
+    return (
+      <StartupMountProbe id="feed-route">
+        <TabScreenBoundary label="feed">
+          <View
+            style={[styles.container, webContainerStyle]}
+            nativeID="feed-root-container"
+          >
+            <View style={styles.isolatePlaceholder}>
+              <Text style={styles.isolatePlaceholderText}>Feed list isolated (bisection)</Text>
+            </View>
+          </View>
+        </TabScreenBoundary>
+      </StartupMountProbe>
+    );
+  }
+
+  const refreshControl = isolatePullRefresh ? undefined : (
+    <RefreshControl
+      refreshing={isRefetching || isStoriesRefetching || isSuggestionsRefetching}
+      onRefresh={() => void handleRefresh()}
+      {...frennixRefreshControlProps}
+    />
+  );
+
   return (
     <StartupMountProbe id="feed-route">
     <TabScreenBoundary label="feed">
@@ -864,13 +919,23 @@ export default function HomeScreen() {
         pointerEvents="box-none"
         nativeID="feed-root-container"
       >
-        <View style={styles.feedScrollShell} collapsable={false} nativeID="feed-scroll-shell">
+        <View
+          style={styles.feedScrollShell}
+          collapsable={false}
+          nativeID="feed-scroll-shell"
+        >
+          <SectionErrorBoundary
+            label="feed-scroll-list"
+            screen="/(tabs)"
+            userId={userId}
+            email={session?.user.email ?? undefined}
+          >
           {useWebScroll ? (
             <FeedRenderTraceProbe id="feed:ui:scroll-list" detail="WebFeedScrollList">
               <WebFeedScrollList
             scrollRef={webScrollRef}
             nativeID="feed-scroll-list"
-            style={[styles.feedList, webScrollHeightStyle]}
+            style={styles.feedList}
             contentContainerStyle={styles.list}
             scrollEnabled={feedScrollEnabled}
             touchLock={storyVisible}
@@ -899,14 +964,7 @@ export default function HomeScreen() {
                 </View>
               )
             }
-            refreshControl={
-              <RefreshControl
-                refreshing={
-                  isRefetching || isStoriesRefetching || isSuggestionsRefetching
-                }
-                onRefresh={() => void handleRefresh()} {...frennixRefreshControlProps}
-              />
-            }
+            refreshControl={refreshControl}
             onLayout={(height) => handleListLayout(height)}
             onContentSizeChange={handleContentSizeChange}
             onScroll={handleScroll}
@@ -937,14 +995,7 @@ export default function HomeScreen() {
             onScrollEndDrag={handleScrollEnd}
             onMomentumScrollEnd={handleScrollEnd}
             scrollEventThrottle={16}
-            refreshControl={
-              <RefreshControl
-                refreshing={
-                  isRefetching || isStoriesRefetching || isSuggestionsRefetching
-                }
-                onRefresh={() => void handleRefresh()} {...frennixRefreshControlProps}
-              />
-            }
+            refreshControl={refreshControl}
             onEndReachedThreshold={2}
             onEndReached={() => {
               if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
@@ -975,6 +1026,7 @@ export default function HomeScreen() {
           />
           </FeedRenderTraceProbe>
         )}
+          </SectionErrorBoundary>
       </View>
       {showBanner && !storyVisible ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
@@ -1099,7 +1151,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.background },
-  feedScrollShell: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.background },
+  feedScrollShell: { ...flexFill, backgroundColor: colors.background },
   feedList: { ...flexFill, ...webScrollSurface },
   list: {
     flexGrow: 1,
@@ -1107,4 +1159,16 @@ const styles = StyleSheet.create({
   },
   emptyWrap: { padding: spacing.lg },
   initialSkeletons: { gap: 0 },
+  isolatePlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
+  isolatePlaceholderText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    textAlign: "center",
+  },
 });

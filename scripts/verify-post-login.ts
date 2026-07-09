@@ -179,6 +179,22 @@ const checks: Array<{ name: string; run: () => void }> = [
         "patch must strip legacy emergency banner from dist HTML"
       );
       assertIncludes("lib/web-document-styles.js", "pointer-events: auto", "#root must receive pointer events");
+      assertIncludes("lib/web-document-styles.js", "#feed-tab-scene", "resilient tab scene CSS required");
+      assertIncludes("lib/web-document-styles.js", "--frennix-tab-scene-min-h", "tab scene min-height token required");
+      assertExcludes("lib/web-tab-scene-layout.ts", "useSafariTabSceneHeightPin", "DOM height pin removed");
+      assertIncludes("lib/tab-scene-layout-guard.ts", "feed-tab-scene", "production layout guard required");
+      assertIncludes("app/(tabs)/_layout.tsx", "useTabSceneLayoutGuard", "tabs must monitor layout collapse");
+    },
+  },
+  {
+    name: "Feed post-login layout regression script exists",
+    run: () => {
+      assertIncludes(
+        "scripts/verify-feed-post-login-layout.mjs",
+        "webkit-iphone-safari",
+        "Safari regression required"
+      );
+      assertIncludes("package.json", "verify:feed-post-login-layout", "npm script required");
     },
   },
   {

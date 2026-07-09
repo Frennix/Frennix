@@ -5,6 +5,7 @@ import { getUnreadMessageCount, getUnreadNotificationCount } from "@frennix/api"
 import type { Conversation } from "@frennix/types";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
 import { isMessagesRoute } from "@/lib/safe-pathname";
+import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 
 type TabBadgeContextValue = {
   unreadNotifications: number;
@@ -27,6 +28,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
   const queryClient = useQueryClient();
   const [deferHeavyBadges, setDeferHeavyBadges] = useState(true);
   const messagesRouteActive = isMessagesRoute(pathname);
+  const badgesEnabled = !isFeedIsolateDisabled("notification-badge");
 
   useEffect(() => {
     if (!userId) return;
@@ -44,7 +46,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
         return 0;
       }
     },
-    enabled: !!userId,
+    enabled: !!userId && badgesEnabled,
     staleTime: 60_000,
     networkMode: "offlineFirst",
     retry: 1,
@@ -61,7 +63,7 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
         return 0;
       }
     },
-    enabled: !!userId && (!deferHeavyBadges || messagesRouteActive),
+    enabled: !!userId && badgesEnabled && (!deferHeavyBadges || messagesRouteActive),
     staleTime: 45_000,
     networkMode: "offlineFirst",
     retry: 1,

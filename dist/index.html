@@ -26,6 +26,13 @@
       }
     </style>
       <style id="frennix-web-scroll">
+  :root {
+    --frennix-tab-header-h: 52px;
+    --frennix-tab-bar-h: 56px;
+    --frennix-tab-chrome-h: 108px;
+    --frennix-tab-scene-min-h: max(240px, calc(100dvh - var(--frennix-tab-chrome-h)));
+    --frennix-tab-scene-min-h-svh: max(240px, calc(100svh - var(--frennix-tab-chrome-h)));
+  }
   html {
     height: 100%;
     height: -webkit-fill-available;
@@ -52,6 +59,38 @@
     min-height: 0;
     background-color: #0A0A0B;
     pointer-events: auto;
+  }
+  /* Resilient authenticated tab shell — cannot collapse to 0px on WebKit/PWA. */
+  #app-root-shell,
+  #feed-tab-scene {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-height: var(--frennix-tab-scene-min-h) !important;
+    min-height: var(--frennix-tab-scene-min-h-svh) !important;
+    overflow: hidden !important;
+    background-color: #0A0A0B !important;
+  }
+  #feed-root-container,
+  #feed-scroll-shell {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background-color: #0A0A0B !important;
+  }
+  #feed-scroll-list,
+  #discover-scroll,
+  #calendar-scroll {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    background-color: #0A0A0B !important;
   }
   /* Tab bar + home-indicator safe area — never show default white. */
   [role="tablist"] {
@@ -142,7 +181,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-8a2d0ec74e76128fdd47e81468d6c227.js" defer></script>
+  <script src="/_expo/static/js/web/index-c2894fa15d9b9790a9b1aeec152e247b.js" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {

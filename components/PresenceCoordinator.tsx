@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { attachPresenceLifecycle, setPresenceSharingEnabled } from "@/lib/presence";
+import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 
 /**
  * Mount once near the app root for foreground presence refresh (tab resume, AppState).
@@ -9,6 +10,10 @@ import { attachPresenceLifecycle, setPresenceSharingEnabled } from "@/lib/presen
 export function PresenceCoordinator() {
   const { session, passwordRecovery, profile } = useAuth();
   const userId = session?.user.id;
+
+  if (isFeedIsolateDisabled("online-status")) {
+    return null;
+  }
 
   useEffect(() => {
     setPresenceSharingEnabled(profile?.show_online_status !== false);

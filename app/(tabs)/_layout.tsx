@@ -17,6 +17,8 @@ import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
 import { colors } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
+import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
+import { useTabSceneLayoutGuard } from "@/lib/tab-scene-layout-guard";
 
 const HeaderBell = memo(function HeaderBell() {
   const { session } = useAuth();
@@ -48,25 +50,39 @@ const ProfileHeaderActions = memo(function ProfileHeaderActions() {
 const TabsShell = memo(function TabsShell() {
   const { session } = useAuth();
   const { unreadMessages } = useTabBadges();
+  const isolateFab = isFeedIsolateDisabled("fab");
+  const isolateBottomTabs = isFeedIsolateDisabled("bottom-tabs");
+  const isolateNotificationBadge = isFeedIsolateDisabled("notification-badge");
+  useTabSceneLayoutGuard();
   const messagesBadge =
     unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
 
   const tabBarStyle = {
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
+    ...(isolateBottomTabs ? { display: "none" as const } : null),
   };
 
   const renderFeedHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
   const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
   const renderProfileHeaderTitle = useCallback(() => <FrennixLogo variant="icon" height={24} />, []);
-  const renderHeaderBell = useCallback(() => <HeaderBell />, []);
+  const renderHeaderBell = useCallback(
+    () => (isolateNotificationBadge ? null : <HeaderBell />),
+    [isolateNotificationBadge]
+  );
   const renderProfileHeader = useCallback(
     () => (
       <View style={styles.profileHeaderWrap}>
-        <ProfileHeaderActions />
+        {isolateNotificationBadge ? (
+          <Pressable onPress={() => pushScreen("/settings")} hitSlop={8}>
+            <AppIcon name="settings" color={colors.text} size={24} />
+          </Pressable>
+        ) : (
+          <ProfileHeaderActions />
+        )}
       </View>
     ),
-    []
+    [isolateNotificationBadge]
   );
 
   return (
@@ -146,7 +162,8 @@ const TabsShell = memo(function TabsShell() {
           title: "Post",
           tabBarLabel: "Post",
           tabBarIcon: ({ color, size }) => <AppIcon name="post" color={color} size={size} />,
-          tabBarButton: (props) => <CreateTabBarButton {...props} />,
+          tabBarButton: (props) =>
+            isolateFab ? null : <CreateTabBarButton {...props} />,
         }}
         listeners={{
           tabPress: (e) => {

@@ -1,7 +1,7 @@
 import { type ViewStyle } from "react-native";
 import { colors } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
-import { useWebTabSceneHeight, webTabSceneContainerStyle, webTabSceneHeightStyle } from "@/lib/web-tab-scene-layout";
+import { webTabSceneContainerStyle, webTabSceneScrollStyle } from "@/lib/web-tab-scene-layout";
 
 /** Pull-to-refresh chrome — avoids Android white progress disk. */
 export const frennixRefreshControlProps = {
@@ -10,24 +10,25 @@ export const frennixRefreshControlProps = {
   progressBackgroundColor: colors.surface,
 } as const;
 
-/** Full-screen tab scene wrapper (native + Safari web). */
+/** Full-screen tab scene wrapper (native + web). Document CSS pins min-height on web. */
 export const tabScreenContainer: ViewStyle = {
   ...flexFill,
   ...webTabSceneShell,
   backgroundColor: colors.background,
 };
 
-/** Scroll/list surface inside a tab scene on Safari web. */
+/** Scroll/list surface inside a tab scene on web. */
 export const tabScreenScrollSurface: ViewStyle = {
   ...flexFill,
   ...webScrollSurface,
 };
 
+/** @deprecated Use tabScreenScrollSurface — document CSS bounds scroll height. */
 export function useTabScreenWebHeightStyle(): ViewStyle {
-  return webTabSceneHeightStyle(useWebTabSceneHeight());
+  return { ...tabScreenScrollSurface, ...webTabSceneScrollStyle() };
 }
 
-/** Flex wrapper for tab screens on web — no fixed pixel height on the outer shell. */
+/** Flex wrapper for tab screens on web. */
 export function useTabScreenWebContainerStyle(): ViewStyle {
   return webTabSceneContainerStyle();
 }
