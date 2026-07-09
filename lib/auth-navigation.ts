@@ -1,6 +1,6 @@
 import { router, useRouter, useSegments, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
-import { getSession } from "@frennix/api";
+import { getSession, profileNeedsOnboardingRepair } from "@frennix/api";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -45,7 +45,7 @@ export function AuthNavigationGuard() {
     const root = segments[0];
     if (!root || root === "index") return;
 
-    if (root === "onboarding" && session && profile?.onboarding_complete) {
+    if (root === "onboarding" && session && profile?.onboarding_complete && !profileNeedsOnboardingRepair(profile)) {
       if (navigationRouter.canDismiss()) {
         navigationRouter.dismissAll();
       }
