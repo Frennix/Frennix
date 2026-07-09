@@ -2,8 +2,8 @@
  * Frennix PWA service worker — push + click + shell cache.
  * Bump FRENNIX_SW_VERSION on deploy to refresh installed PWAs.
  */
-const FRENNIX_SW_VERSION = "20260709-login-fix-v2";
-const SHELL_CACHE = "frennix-shell-v3";
+const FRENNIX_SW_VERSION = "20260709-diag-v1";
+const SHELL_CACHE = "frennix-shell-v4";
 const SHELL_ASSETS = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("message", (event) => {

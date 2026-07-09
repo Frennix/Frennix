@@ -203,16 +203,17 @@ export function collectDomStartupState(route = ""): StartupDomState {
   );
 
   const blackScreenSuspected =
-    !bootOverlayVisible &&
-    !login &&
-    !retry &&
-    !failure &&
-    !authFallback &&
-    !feedTab &&
-    !feedRoot &&
-    !onboarding &&
-    bodyText.length < 20 &&
-    (root?.childElementCount ?? 0) <= 1;
+    (!bootOverlayVisible &&
+      !login &&
+      !retry &&
+      !failure &&
+      !authFallback &&
+      !onboarding &&
+      bodyText.length < 20 &&
+      (root?.childElementCount ?? 0) <= 1) ||
+    (Boolean(feedTab) &&
+      (feedRoot?.getBoundingClientRect().height ?? 0) <= 1 &&
+      !/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText));
 
   return {
     route: route || safePathname(typeof window !== "undefined" ? window.location.pathname : ""),

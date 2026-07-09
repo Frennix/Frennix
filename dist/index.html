@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix</title>
+    <title>Frennix · f8b500d9</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+<!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
       html,
@@ -25,6 +25,11 @@
         flex: 1;
       }
     </style>
+  
+    <meta name="frennix-build-sha" content="f8b500d99b18bb67720aab902075a4918eeb79e2" />
+    <meta name="frennix-build-bundle" content="index-f0b208157711c99bf800c1a99b854b2a.js" />
+    <meta name="frennix-build-at" content="2026-07-09T18:24:27.955Z" />
+    <meta name="frennix-sw-version" content="20260709-diag-v1" />
       <style id="frennix-web-scroll">
   :root {
     --frennix-tab-header-h: 52px;
@@ -167,6 +172,7 @@
   </head>
 
   <body>
+    <div id="frennix-build-stamp" style="display:none" data-sha="f8b500d99b18bb67720aab902075a4918eeb79e2" data-bundle="index-f0b208157711c99bf800c1a99b854b2a.js" data-sw="20260709-diag-v1"></div>
 
     <div id="frennix-boot-shell" aria-live="polite" aria-busy="true">
       <div class="spinner"></div>
@@ -181,12 +187,12 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-c2894fa15d9b9790a9b1aeec152e247b.js" defer></script>
+  <script src="/_expo/static/js/web/index-f0b208157711c99bf800c1a99b854b2a.js?v=f8b500d9" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js").catch(function (err) {
+          navigator.serviceWorker.register("/sw.js?v=f8b500d9", { scope: "/", updateViaCache: "none" }).catch(function (err) {
             console.warn("[frennix-pwa] SW register failed", err);
           });
         });
@@ -219,16 +225,27 @@
     return { hasToken: false };
   }
 
+  function feedDestinationReady() {
+    var feedRoot = document.getElementById("feed-root-container");
+    var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    if (feedRootH > 80) return true;
+    var bodyText = String(document.body.innerText || "").replace(/\s+/g, " ").trim();
+    if (/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load|Post-login diagnostics/i.test(bodyText)) {
+      return true;
+    }
+    return false;
+  }
+
   function visibleDestination() {
+    if (feedDestinationReady()) return true;
     var ids = [
       "auth-login-screen",
       "startup-retry-screen",
       "login-failure-screen",
       "authenticated-startup-fallback",
       "startup-diagnostic-panel",
-      "feed-tab-scene",
-      "feed-root-container",
-      "onboarding-screen"
+      "onboarding-screen",
+      "post-login-diagnostic-overlay"
     ];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);

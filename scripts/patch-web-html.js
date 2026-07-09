@@ -4,6 +4,7 @@
  */
 const { readFileSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
+const { execSync } = require("node:child_process");
 const {
   frennixWebDocumentCss,
   FRENNIX_WEB_BACKGROUND,
@@ -21,6 +22,17 @@ function loadEnvVar(name) {
 }
 
 const PWA_PATCH_ID = "frennix-pwa-shell";
+const SW_VERSION = "20260709-diag-v1";
+
+function resolveBuildSha() {
+  try {
+    return execSync("git rev-parse HEAD", { cwd: join(__dirname, ".."), encoding: "utf8" }).trim();
+  } catch {
+    return process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "unknown";
+  }
+}
+
+const buildSha = resolveBuildSha();
 const pwaHeadTags = `
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -32,7 +44,7 @@ const pwaBootScript = `
     <script id="${PWA_PATCH_ID}">
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js").catch(function (err) {
+          navigator.serviceWorker.register("/sw.js?v=${buildSha.slice(0, 8)}", { scope: "/", updateViaCache: "none" }).catch(function (err) {
             console.warn("[frennix-pwa] SW register failed", err);
           });
         });
@@ -100,16 +112,27 @@ const bootShellScript = `
     return { hasToken: false };
   }
 
+  function feedDestinationReady() {
+    var feedRoot = document.getElementById("feed-root-container");
+    var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    if (feedRootH > 80) return true;
+    var bodyText = String(document.body.innerText || "").replace(/\\s+/g, " ").trim();
+    if (/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load|Post-login diagnostics/i.test(bodyText)) {
+      return true;
+    }
+    return false;
+  }
+
   function visibleDestination() {
+    if (feedDestinationReady()) return true;
     var ids = [
       "auth-login-screen",
       "startup-retry-screen",
       "login-failure-screen",
       "authenticated-startup-fallback",
       "startup-diagnostic-panel",
-      "feed-tab-scene",
-      "feed-root-container",
-      "onboarding-screen"
+      "onboarding-screen",
+      "post-login-diagnostic-overlay"
     ];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
@@ -235,19 +258,65 @@ const bootShellScript = `
 const indexPath = join(__dirname, "..", "dist", "index.html");
 let html = readFileSync(indexPath, "utf8");
 
+const bundleMatch = html.match(/\/_expo\/static\/js\/web\/(index-[a-f0-9]+\.js)/);
+const buildBundle = bundleMatch?.[1] ?? "unknown";
+const buildAt = new Date().toISOString();
+const swVersion = SW_VERSION;
+
+const buildMetaTags = `
+    <meta name="frennix-build-sha" content="${buildSha}" />
+    <meta name="frennix-build-bundle" content="${buildBundle}" />
+    <meta name="frennix-build-at" content="${buildAt}" />
+    <meta name="frennix-sw-version" content="${swVersion}" />`;
+
+if (html.includes('name="frennix-build-sha"')) {
+  html = html.replace(/<meta name="frennix-build-sha" content="[^"]*" \/>/g, `<meta name="frennix-build-sha" content="${buildSha}" />`);
+  html = html.replace(/<meta name="frennix-build-bundle" content="[^"]*" \/>/g, `<meta name="frennix-build-bundle" content="${buildBundle}" />`);
+  html = html.replace(/<meta name="frennix-build-at" content="[^"]*" \/>/g, `<meta name="frennix-build-at" content="${buildAt}" />`);
+  html = html.replace(/<meta name="frennix-sw-version" content="[^"]*" \/>/g, `<meta name="frennix-sw-version" content="${swVersion}" />`);
+} else {
+  html = html.replace("</head>", `${buildMetaTags}\n  </head>`);
+}
+
+if (bundleMatch) {
+  const shortSha = buildSha.slice(0, 8);
+  html = html.replace(
+    new RegExp(`/_expo/static/js/web/${buildBundle.replace(".", "\\.")}(?![?])`, "g"),
+    `/_expo/static/js/web/${buildBundle}?v=${shortSha}`
+  );
+}
+
+html = html.replace(
+  /\s*<div id="frennix-build-stamp"[^>]*><\/div>\s*/g,
+  "\n"
+);
+
+html = html.replace(/<title>[^<]*<\/title>/, `<title>Frennix · ${buildSha.slice(0, 8)}</title>`);
+
+const buildStampHtml = `<div id="frennix-build-stamp" style="display:none" data-sha="${buildSha}" data-bundle="${buildBundle}" data-sw="${swVersion}"></div>`;
+if (!html.includes("frennix-build-stamp")) {
+  html = html.replace("<body>", `<body>\n    ${buildStampHtml}`);
+} else {
+  html = html.replace(
+    /<div id="frennix-build-stamp"[^>]*><\/div>/,
+    buildStampHtml
+  );
+}
+
+if (!html.includes('name="theme-color"')) {
+  html = html.replace(
+    /<title>[^<]*<\/title>/,
+    (title) =>
+      `${title}\n    <meta name="theme-color" content="${FRENNIX_WEB_BACKGROUND}" />\n    <meta name="color-scheme" content="dark" />`
+  );
+}
+
 const viewport =
   'content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"';
 if (!html.includes("viewport-fit=cover")) {
   html = html.replace(
     /content="width=device-width, initial-scale=1, shrink-to-fit=no"/,
     viewport
-  );
-}
-
-if (!html.includes('name="theme-color"')) {
-  html = html.replace(
-    "<title>Frennix</title>",
-    `<title>Frennix</title>\n    <meta name="theme-color" content="${FRENNIX_WEB_BACKGROUND}" />\n    <meta name="color-scheme" content="dark" />`
   );
 }
 
@@ -269,6 +338,11 @@ if (!html.includes('rel="manifest"')) {
 
 if (!html.includes(`id="${PWA_PATCH_ID}"`)) {
   html = html.replace("</body>", `    ${pwaBootScript}\n  </body>`);
+} else {
+  html = html.replace(
+    new RegExp(`<script id="${PWA_PATCH_ID}">[\\s\\S]*?</script>`),
+    pwaBootScript.trim()
+  );
 }
 
 const vapidPublicKey =
@@ -299,4 +373,4 @@ if (!html.includes('id="frennix-boot-shell-script"')) {
 html = html.replace(/\s*<div id="frennix-emergency-html"[\s\S]*?<\/div>\s*/g, "\n");
 
 writeFileSync(indexPath, html);
-console.log("[patch-web-html] dist/index.html updated for Safari scroll shell + PWA");
+console.log(`[patch-web-html] dist/index.html updated — sha ${buildSha.slice(0, 8)} bundle ${buildBundle} sw ${swVersion}`);
