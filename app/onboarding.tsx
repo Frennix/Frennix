@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Redirect, router } from "expo-router";
 import { Controller, useForm, type FieldErrors } from "react-hook-form";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 import { getSession, getErrorMessage, upsertProfile, uploadAvatar, claimReferral } from "@frennix/api";
 import { ACTIVITIES, FITNESS_GOALS } from "@frennix/types";
@@ -15,6 +15,9 @@ import {
   formatTrainingPartnerGender,
 } from "@/lib/matching-preferences";
 import { SubmitStatusBanner } from "@/components/SubmitStatusBanner";
+import { StartupMountProbe } from "@/components/StartupMountProbe";
+import { StartupRetryScreen } from "@/components/StartupRetryScreen";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { claimPendingReferral } from "@/lib/referral-storage";
 import { pickAdjustedAvatar } from "@/lib/pick-adjusted-avatar";
 import { LifestyleProfileSection } from "@/components/LifestyleProfileSection";
@@ -46,6 +49,22 @@ const onboardingSchema = z.object({
 type OnboardingForm = z.infer<typeof onboardingSchema>;
 
 export default function OnboardingScreen() {
+  const { session } = useAuth();
+  return (
+    <StartupMountProbe id="onboarding-route">
+      <SectionErrorBoundary
+        label="onboarding"
+        screen="/onboarding"
+        userId={session?.user.id}
+        email={session?.user.email ?? undefined}
+      >
+        <OnboardingContent />
+      </SectionErrorBoundary>
+    </StartupMountProbe>
+  );
+}
+
+function OnboardingContent() {
   const { session, authReady, passwordRecovery, profile, refreshProfile, applySession } = useAuth();
   const [step, setStep] = useState(0);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -207,9 +226,13 @@ export default function OnboardingScreen() {
 
   if (!authReady) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
+      <StartupRetryScreen
+        title="Set up profile"
+        message="Preparing your account setup…"
+        loading
+        showDiagnostics={false}
+        showMountTrace={false}
+      />
     );
   }
 
@@ -226,8 +249,13 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{stepTitles[step]}</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      nativeID="onboarding-screen"
+    >
+      <Text style={styles.title}>Set up profile</Text>
+      <Text style={styles.stepHeading}>{stepTitles[step]}</Text>
 
       <View style={step === 0 ? styles.stepPanel : styles.hiddenStep} pointerEvents={step === 0 ? "auto" : "none"}>
           <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
@@ -413,6 +441,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxl },
   title: { ...typography.title, marginBottom: spacing.sm },
+  stepHeading: { ...typography.body, color: colors.textMuted, marginBottom: spacing.md },
   stepPanel: { gap: spacing.md },
   hiddenStep: { height: 0, overflow: "hidden", opacity: 0 },
   sectionLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },

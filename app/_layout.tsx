@@ -29,6 +29,7 @@ import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMount
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
+import { AuthenticatedStartupWatchdog } from "@/components/AuthenticatedStartupWatchdog";
 import { StartupSnapshotBootstrap } from "@/components/StartupSnapshotBootstrap";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
@@ -132,6 +133,7 @@ export default function RootLayout() {
                   <AuthProvider>
                     <ClientDiagnosticsBootstrap />
                     <StartupSnapshotBootstrap />
+                    <AuthenticatedStartupWatchdog />
                     <StartupMountProbe id="tab-badge-root">
                       <TabBadgeRoot>
                         <StartupMountProbe id="navigation-error-boundary">

@@ -15,7 +15,10 @@ import { logStartupStep } from "@/lib/startup-step-log";
 const APP_BOOT_MARK =
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
-const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 5_000;
+
+const ACCOUNT_LOAD_STALL_MESSAGE =
+  "We're having trouble loading your account. Please retry or log out.";
 
 export default function Index() {
   const {
@@ -27,6 +30,7 @@ export default function Index() {
     profileLoading,
     profileFetchFailed,
     refreshProfile,
+    signOut,
   } = useAuth();
 
   return (
@@ -40,6 +44,7 @@ export default function Index() {
         profileLoading={profileLoading}
         profileFetchFailed={profileFetchFailed}
         refreshProfile={refreshProfile}
+        signOut={signOut}
       />
     </StartupMountProbe>
   );
@@ -54,6 +59,7 @@ function IndexGate({
   profileLoading,
   profileFetchFailed,
   refreshProfile,
+  signOut,
 }: {
   session: ReturnType<typeof useAuth>["session"];
   profile: ReturnType<typeof useAuth>["profile"];
@@ -63,9 +69,16 @@ function IndexGate({
   profileLoading: boolean;
   profileFetchFailed: boolean;
   refreshProfile: ReturnType<typeof useAuth>["refreshProfile"];
+  signOut: ReturnType<typeof useAuth>["signOut"];
 }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const reportedStallRef = useRef(false);
+
+  const handleLogout = () => {
+    void signOut().finally(() => {
+      if (typeof window !== "undefined") window.location.replace("/(auth)/login");
+    });
+  };
 
   useEffect(() => {
     if (authReady) {
@@ -102,6 +115,7 @@ function IndexGate({
         email: session?.user.email ?? undefined,
       });
 
+      hideFrennixBootShell();
       setAuthTimedOut(true);
     }, AUTH_BOOTSTRAP_TIMEOUT_MS);
 
@@ -123,11 +137,11 @@ function IndexGate({
       return (
         <StartupRetryScreen
           title="Signing you in"
-          message="Account setup is taking longer than expected. You can retry or continue with a limited connection."
+          message={ACCOUNT_LOAD_STALL_MESSAGE}
           detail={
             session
               ? profileLoading
-                ? "Profile load timed out — we'll try again in the app."
+                ? "Profile load timed out."
                 : loading
                   ? "Session restore timed out."
                   : undefined
@@ -136,6 +150,7 @@ function IndexGate({
           onRetry={() => {
             if (typeof window !== "undefined") window.location.reload();
           }}
+          onLogout={session ? handleLogout : undefined}
         />
       );
     }
@@ -176,11 +191,12 @@ function IndexGate({
       return (
         <StartupRetryScreen
           title="Could not load your profile"
-          message="You're signed in, but profile data did not load. Check your connection and try again."
-          detail="If this keeps happening, open Diagnostics and share the report."
+          message={ACCOUNT_LOAD_STALL_MESSAGE}
+          detail="Profile data did not load. Check your connection and try again."
           onRetry={() => {
             void refreshProfile(session.user.id);
           }}
+          onLogout={handleLogout}
         />
       );
     }

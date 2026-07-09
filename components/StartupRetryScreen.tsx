@@ -10,6 +10,7 @@ type StartupRetryScreenProps = {
   detail?: string;
   loading?: boolean;
   onRetry?: () => void;
+  onLogout?: () => void;
   showDiagnostics?: boolean;
   /** When false, hide mount trace (misleading during first render before effects flush). */
   showMountTrace?: boolean;
@@ -22,6 +23,7 @@ export function StartupRetryScreen({
   detail,
   loading = false,
   onRetry,
+  onLogout,
   showDiagnostics = true,
   showMountTrace = true,
 }: StartupRetryScreenProps) {
@@ -45,6 +47,16 @@ export function StartupRetryScreen({
             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
           >
             <Text style={styles.buttonText}>Retry</Text>
+          </Pressable>
+        ) : null}
+        {onLogout ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+            onPress={onLogout}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.secondaryButtonText}>Log out</Text>
           </Pressable>
         ) : null}
         {showDiagnostics ? (

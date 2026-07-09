@@ -36,19 +36,36 @@ export function TabBadgeProvider({ userId, children }: { userId: string; childre
 
   const { data: unreadNotifications = 0 } = useQuery({
     queryKey: ["unread-notifications", userId],
-    queryFn: () => getUnreadNotificationCount(userId),
+    queryFn: async () => {
+      try {
+        return await getUnreadNotificationCount(userId);
+      } catch (error) {
+        console.warn("[tab-badges] unread notifications failed", error);
+        return 0;
+      }
+    },
     enabled: !!userId,
     staleTime: 60_000,
     networkMode: "offlineFirst",
-    // Realtime subscription patches this cache; no polling interval.
+    retry: 1,
+    throwOnError: false,
   });
 
   const { data: unreadMessages = 0 } = useQuery({
     queryKey: ["unread-messages", userId],
-    queryFn: () => getUnreadMessageCount(userId),
+    queryFn: async () => {
+      try {
+        return await getUnreadMessageCount(userId);
+      } catch (error) {
+        console.warn("[tab-badges] unread messages failed", error);
+        return 0;
+      }
+    },
     enabled: !!userId && (!deferHeavyBadges || messagesRouteActive),
     staleTime: 45_000,
     networkMode: "offlineFirst",
+    retry: 1,
+    throwOnError: false,
     refetchInterval: (query) => {
       if (!messagesRouteActive) return false;
       const inboxState = queryClient.getQueryState(["conversations", userId]);

@@ -8,6 +8,9 @@ type PostLoginFailureScreenProps = {
   message: string;
   detail?: string;
   onRetry?: () => void;
+  onLogout?: () => void;
+  /** Full-screen overlay above app chrome (post-login watchdog). */
+  overlay?: boolean;
 };
 
 /** Visible fallback when post-login startup fails — never leave a black screen. */
@@ -16,9 +19,14 @@ export function PostLoginFailureScreen({
   message,
   detail,
   onRetry,
+  onLogout,
+  overlay = false,
 }: PostLoginFailureScreenProps) {
   return (
-    <View style={styles.container} nativeID="post-login-failure-screen">
+    <View
+      style={[styles.container, overlay && styles.overlay]}
+      nativeID="authenticated-startup-fallback"
+    >
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
       {detail ? <Text style={styles.detail}>{detail}</Text> : null}
@@ -31,6 +39,16 @@ export function PostLoginFailureScreen({
             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
           >
             <Text style={styles.buttonText}>Retry</Text>
+          </Pressable>
+        ) : null}
+        {onLogout ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+            onPress={onLogout}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.secondaryButtonText}>Log out</Text>
           </Pressable>
         ) : null}
         <Pressable
@@ -56,6 +74,20 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  overlay: Platform.select({
+    web: {
+      position: "fixed" as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 2147483645,
+    },
+    default: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 9999,
+    },
+  }),
   title: {
     color: colors.text,
     fontSize: 20,
