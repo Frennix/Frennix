@@ -103,6 +103,7 @@ function snapshot() {
       }
       return null;
     })(),
+    startupSnapshots: (window.__FRENNIX_STARTUP_SNAPSHOTS__ ?? []).slice(-2),
     hasWelcome: /Welcome back/i.test(bodyText),
     hasPasswordLabel: /Password/i.test(bodyText),
     hasEmailLabel: /Email/i.test(bodyText),
@@ -142,12 +143,17 @@ async function runScenario(browser, name, options = {}) {
 
   const page = await context.newPage();
   const consoleLogs = [];
+  const startupSnapshotLogs = [];
   const pageErrors = [];
   const requestFailures = [];
 
   page.on("console", (msg) => {
+    const text = msg.text();
     if (msg.type() === "error" || msg.type() === "warning") {
-      consoleLogs.push(`[${msg.type()}] ${msg.text()}`);
+      consoleLogs.push(`[${msg.type()}] ${text}`);
+    }
+    if (text.includes("[frennix-startup-snapshot]")) {
+      startupSnapshotLogs.push(text);
     }
   });
   page.on("pageerror", (e) => pageErrors.push(e.message));
@@ -213,6 +219,7 @@ async function runScenario(browser, name, options = {}) {
     passwordInvisible,
     pageErrors,
     consoleLogs: consoleLogs.slice(0, 20),
+    startupSnapshotLogs: startupSnapshotLogs.slice(-5),
     requestFailures: requestFailures.slice(0, 15),
     timeline,
   };
@@ -233,6 +240,19 @@ function printScenario(result) {
   if (result.consoleLogs.length) {
     console.log("\nCONSOLE (errors/warnings):");
     result.consoleLogs.forEach((e) => console.log(`  • ${e}`));
+  }
+
+  const startupSnapshots = result.timeline
+    .flatMap((snap) => snap.startupSnapshots ?? [])
+    .slice(-3);
+  if (startupSnapshots.length) {
+    console.log("\nSTARTUP SNAPSHOTS (last 3):");
+    startupSnapshots.forEach((s) => console.log(`  • ${JSON.stringify(s).slice(0, 200)}`));
+  }
+
+  if (result.startupSnapshotLogs?.length) {
+    console.log("\nSTARTUP SNAPSHOT LOGS:");
+    result.startupSnapshotLogs.forEach((line) => console.log(`  • ${line.slice(0, 220)}`));
   }
 
   if (result.requestFailures.length) {

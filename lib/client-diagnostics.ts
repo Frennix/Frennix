@@ -213,6 +213,16 @@ export function buildDiagnosticReport(extra?: Record<string, unknown>) {
       typeof globalThis !== "undefined"
         ? (globalThis as { __FRENNIX_MOUNT_TRACE__?: unknown }).__FRENNIX_MOUNT_TRACE__
         : undefined,
+    startup_snapshots:
+      typeof globalThis !== "undefined"
+        ? (globalThis as { __FRENNIX_STARTUP_SNAPSHOTS__?: unknown }).__FRENNIX_STARTUP_SNAPSHOTS__
+        : undefined,
+    startup_errors:
+      typeof globalThis !== "undefined"
+        ? (globalThis as { __FRENNIX_STARTUP_SNAPSHOTS__?: Array<{ uncaughtErrors?: unknown }> })
+            .__FRENNIX_STARTUP_SNAPSHOTS__
+            ?.flatMap((snapshot) => snapshot.uncaughtErrors ?? [])
+        : undefined,
     feed_trace:
       typeof globalThis !== "undefined"
         ? (globalThis as { __FRENNIX_FEED_RENDER_TRACE__?: unknown }).__FRENNIX_FEED_RENDER_TRACE__

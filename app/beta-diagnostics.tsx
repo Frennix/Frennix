@@ -9,6 +9,7 @@ import {
   getDiagnosticEntries,
   subscribeClientDiagnostics,
 } from "@/lib/client-diagnostics";
+import { getStartupSnapshots } from "@/lib/startup-snapshot-log";
 import { getWebPushPermissionStatus, hasActiveWebPushSubscription } from "@/lib/web-push";
 import { isWebStandalone } from "@/lib/pwa";
 import { showAlert, showSuccess } from "@/lib/alerts";
@@ -42,6 +43,7 @@ export default function BetaDiagnosticsScreen() {
   const context = getDiagnosticContext();
   const entries = getDiagnosticEntries().slice(0, 40);
   const apiEntries = getApiDiagnosticEntries().slice(0, 30);
+  const startupSnapshots = getStartupSnapshots().slice(-12);
   const reportText = useMemo(
     () =>
       formatDiagnosticReportText(
@@ -83,6 +85,29 @@ export default function BetaDiagnosticsScreen() {
       <View style={styles.actions}>
         <Button title="Copy full report" onPress={() => void copyReport()} />
       </View>
+
+      <Text style={styles.sectionTitle}>Startup snapshots</Text>
+      {startupSnapshots.length === 0 ? (
+        <Text style={styles.empty}>No startup snapshots recorded yet.</Text>
+      ) : (
+        startupSnapshots.map((snapshot) => (
+          <View key={snapshot.id} style={styles.eventRow}>
+            <Text style={styles.eventMeta}>
+              {snapshot.phase} · {snapshot.elapsedMs}ms · {snapshot.environment.displayMode}
+            </Text>
+            <Text style={styles.eventMessage}>
+              route={snapshot.dom.route} login={snapshot.dom.loginMounted ? "yes" : "no"} boot=
+              {snapshot.dom.bootOverlayVisible ? "visible" : "hidden"} black=
+              {snapshot.dom.blackScreenSuspected ? "yes" : "no"}
+            </Text>
+            <Text style={styles.eventMeta}>
+              {snapshot.environment.deviceType}/{snapshot.environment.browser} iOS=
+              {snapshot.environment.iosVersion ?? "n/a"} authReady=
+              {snapshot.auth?.authReady ? "yes" : "no"}
+            </Text>
+          </View>
+        ))
+      )}
 
       <Text style={styles.sectionTitle}>Recent events</Text>
       {entries.length === 0 ? (

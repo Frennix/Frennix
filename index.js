@@ -7,6 +7,12 @@ trace.markStartupMount("entry:module-load", "sync");
 
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   try {
+    require("./lib/startup-snapshot-log").installStartupSnapshotCapture();
+  } catch {
+    // Snapshot logging is best-effort during entry bootstrap.
+  }
+
+  try {
     const ReactDOM = require("react-dom/client");
     const originalCreateRoot = ReactDOM.createRoot;
 
