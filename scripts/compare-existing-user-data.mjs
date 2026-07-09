@@ -119,7 +119,7 @@ function seedSession(page, env, userId, profileRow, { corruptCache } = {}) {
   );
 }
 
-async function testLogin(page, label) {
+async function testLogin(page, label, { expectOnboarding = false } = {}) {
   const state = await page.evaluate(() => ({
     text: document.body.innerText.replace(/\s+/g, " ").trim().slice(0, 180),
     hasFeed: /Share workout|STORIES/i.test(document.body.innerText),
@@ -133,7 +133,11 @@ async function testLogin(page, label) {
     },
     errors: window.__FRENNIX_PAGE_ERRORS__ ?? [],
   }));
-  const ok = !state.blackOnly && (state.hasFeed || state.hasOnboarding || state.hasFallback);
+  const ok = !state.blackOnly && (
+    expectOnboarding
+      ? state.hasOnboarding
+      : state.hasFeed || state.hasOnboarding || state.hasFallback
+  );
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}`);
   console.log(`       ${state.text.slice(0, 90)} | markers=${JSON.stringify(state.markers)}`);
   if (state.errors.length) console.log(`       errors: ${state.errors.slice(0, 2).join(" | ")}`);
@@ -159,12 +163,13 @@ async function main() {
     console.log(`@${name}: ${p ? "found" : "MISSING"} ${issues.length ? `ISSUES=[${issues.join(", ")}]` : "ok"}`);
   }
 
-  const pw = await import(pathToFileURL(playwrightPath).href);
+  const pwModule = await import(pathToFileURL(playwrightPath).href);
+  const chromium = (pwModule.default ?? pwModule).chromium;
   const browser = await (async () => {
     try {
-      return pw.chromium.launch({ headless: true });
+      return await chromium.launch({ headless: true });
     } catch {
-      return pw.chromium.launch({ channel: "chrome", headless: true });
+      return chromium.launch({ channel: "chrome", headless: true });
     }
   })();
 
@@ -198,6 +203,28 @@ async function main() {
     await page.waitForTimeout(6000);
     results.push(
       await testLogin(page, `Corrupt cache @${name} (${Object.keys(corrupt).join(",")}) → repair path`)
+    );
+    await page.close();
+  }
+
+  // Corrupt API + cache (legacy client-only shapes)
+  const corruptApiCases = [
+    { name: "jaimacneil", corrupt: { fitness_goals: [], activities: [], onboarding_complete: true } },
+    { name: "agabrielle", corrupt: { fitness_goals: null, activities: null, onboarding_complete: true } },
+  ];
+  for (const { name, corrupt } of corruptApiCases) {
+    const base = byName[name];
+    if (!base) continue;
+    const corruptProfile = { ...base, ...corrupt };
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await registerMocks(page, env, { userId: corruptProfile.id, profileRow: corruptProfile });
+    await seedSession(page, env, corruptProfile.id, corruptProfile, { corruptCache: corrupt });
+    await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 60_000 });
+    await page.waitForTimeout(6000);
+    results.push(
+      await testLogin(page, `Corrupt API @${name} (${Object.keys(corrupt).join(",")}) → onboarding repair`, {
+        expectOnboarding: true,
+      })
     );
     await page.close();
   }
