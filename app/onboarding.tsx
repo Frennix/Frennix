@@ -4,7 +4,14 @@ import { Controller, useForm, type FieldErrors } from "react-hook-form";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
-import { getSession, getErrorMessage, upsertProfile, uploadAvatar, claimReferral } from "@frennix/api";
+import {
+  getSession,
+  getErrorMessage,
+  upsertProfile,
+  uploadAvatar,
+  claimReferral,
+  profileNeedsOnboardingRepair,
+} from "@frennix/api";
 import { ACTIVITIES, FITNESS_GOALS } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
@@ -244,7 +251,7 @@ function OnboardingContent() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (profile?.onboarding_complete) {
+  if (profile?.onboarding_complete && !profileNeedsOnboardingRepair(profile)) {
     return <Redirect href="/(tabs)" />;
   }
 

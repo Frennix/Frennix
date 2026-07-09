@@ -1,6 +1,6 @@
 /** DOM markers that mean post-login startup reached a visible destination. */
 const DESTINATION_MARKERS = [
-  "  feed-tab-scene",
+  "feed-tab-scene",
   "feed-root-container",
   "onboarding-screen",
   "startup-retry-screen",
