@@ -1,6 +1,6 @@
 /** True when a Supabase auth token is still present in browser storage. */
 export function hasPersistedAuthToken(): boolean {
-  if (typeof localStorage === "undefined") return true;
+  if (typeof localStorage === "undefined") return false;
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
     if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;

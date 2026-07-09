@@ -10,6 +10,7 @@ import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAppStartup } from "@/lib/beta-health-analytics";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { describeAuthBootstrapPhase } from "@/lib/startup-mount-trace";
+import { logStartupStep } from "@/lib/startup-step-log";
 
 const APP_BOOT_MARK =
   typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -17,7 +18,7 @@ const APP_BOOT_MARK =
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
 
 export default function Index() {
-  const { session, profile, authReady, passwordRecovery, loading, profileLoading } = useAuth();
+  const { session, profile, authReady, passwordRecovery, loading, profileLoading, signOut } = useAuth();
 
   return (
     <StartupMountProbe id="index-route">
@@ -28,6 +29,7 @@ export default function Index() {
         passwordRecovery={passwordRecovery}
         loading={loading}
         profileLoading={profileLoading}
+        signOut={signOut}
       />
     </StartupMountProbe>
   );
@@ -40,6 +42,7 @@ function IndexGate({
   passwordRecovery,
   loading,
   profileLoading,
+  signOut,
 }: {
   session: ReturnType<typeof useAuth>["session"];
   profile: ReturnType<typeof useAuth>["profile"];
@@ -47,9 +50,21 @@ function IndexGate({
   passwordRecovery: boolean;
   loading: boolean;
   profileLoading: boolean;
+  signOut: ReturnType<typeof useAuth>["signOut"];
 }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const reportedStallRef = useRef(false);
+  const clearedStaleSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (!authReady || !session || profile || profileLoading || clearedStaleSessionRef.current) {
+      return;
+    }
+
+    clearedStaleSessionRef.current = true;
+    logStartupStep("auth:session:invalid", { reason: "profile-unresolved" });
+    void signOut();
+  }, [authReady, session, profile, profileLoading, signOut]);
 
   useEffect(() => {
     if (authReady && (!session || !hasPersistedAuthToken())) {
@@ -144,6 +159,10 @@ function IndexGate({
   }
 
   if (!profile) {
+    if (!profileLoading) {
+      return <Redirect href="/(auth)/login" />;
+    }
+
     return (
       <StartupRetryScreen
         title="Loading your profile"

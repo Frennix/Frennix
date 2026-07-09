@@ -32,8 +32,6 @@ export function StartupWatchdog() {
   const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
-    hideFrennixBootShell();
-
     const check = () => {
       if (isStartupComplete()) {
         hideFrennixBootShell();

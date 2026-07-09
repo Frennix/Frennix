@@ -28,6 +28,7 @@ import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
 import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
+import { logStartupStep } from "@/lib/startup-step-log";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
@@ -101,6 +102,7 @@ function NotificationBootstrap() {
 
 export default function RootLayout() {
   markStartupMount("root-layout:render", "sync");
+  logStartupStep("app:mount");
 
   useEffect(() => {
     if (Platform.OS === "web") return;

@@ -83,10 +83,11 @@ const bootShellScript = `
   function startupReady() {
     if (document.getElementById("auth-login-screen")) return true;
     if (document.getElementById("startup-retry-screen")) return true;
+    if (document.getElementById("login-failure-screen")) return true;
     var trace = window.__FRENNIX_MOUNT_TRACE__;
     if (!trace || !trace.length) return false;
     return trace.some(function (e) {
-      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "entry:createRoot:render:end" || e.id === "auth-login:mounted";
+      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "auth-login:mounted";
     });
   }
   var iv = setInterval(function () {
@@ -95,10 +96,6 @@ const bootShellScript = `
       clearInterval(iv);
     }
   }, 150);
-  setTimeout(function () {
-    hideBootShell();
-    clearInterval(iv);
-  }, 6000);
   window.addEventListener("load", function () {
     setTimeout(function () {
       if (!startupReady()) {

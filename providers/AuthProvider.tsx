@@ -11,7 +11,7 @@ import {
 import { AppState, Platform } from "react-native";
 import * as Linking from "expo-linking";
 import type { Profile } from "@frennix/types";
-import { getProfile, getSession, onAuthStateChange, resetMessagingRealtimeState, signOut as supabaseSignOut } from "@frennix/api";
+import { getProfile, getSession, getSupabase, onAuthStateChange, resetMessagingRealtimeState, signOut as supabaseSignOut } from "@frennix/api";
 import type { Session } from "@supabase/supabase-js";
 import { isWebRecoveryHash, clearWebRecoveryHash } from "@/lib/auth-redirect";
 import {
@@ -27,6 +27,7 @@ import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
 import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
+import { logStartupStep } from "@/lib/startup-step-log";
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
 const SESSION_RECOVERY_MS = 1500;
@@ -95,6 +96,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPasswordRecovery(false);
   }, []);
 
+  const clearSignedOutState = useCallback(() => {
+    authEpochRef.current += 1;
+    setSession(null);
+    setProfile(null);
+    resolvedProfileUserIdRef.current = null;
+    clearCachedProfile();
+    setPasswordRecovery(false);
+    setProfileLoading(false);
+    setLoading(false);
+  }, []);
+
+  const invalidatePersistedSession = useCallback(async (reason: string) => {
+    logStartupStep("auth:session:invalid", { reason });
+    try {
+      await supabaseSignOut();
+    } catch {
+      clearAllPersistedAuth();
+    }
+    clearAllPersistedAuth();
+    clearSignedOutState();
+  }, [clearSignedOutState]);
+
   const loadProfileForUser = useCallback(
     async (userId: string, options?: { background?: boolean; epoch?: number }) => {
       const epoch = options?.epoch ?? authEpochRef.current;
@@ -124,6 +147,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (epoch !== authEpochRef.current) return;
           console.error("[auth] getProfile failed", error);
           const cached = readCachedProfile(userId);
+          const status =
+            error && typeof error === "object" && "status" in error
+              ? (error as { status?: number }).status
+              : undefined;
+          const isAuthError = status === 401 || status === 403;
+
+          if (!cached && isAuthError) {
+            await invalidatePersistedSession("getProfile-auth");
+            return;
+          }
+
           setProfile(cached);
           resolvedProfileUserIdRef.current = userId;
           writeCachedProfile(userId, cached);
@@ -152,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    []
+    [invalidatePersistedSession]
   );
 
   const refreshProfile = useCallback(
@@ -316,6 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     async function bootstrapAuth() {
+      logStartupStep("auth:init:start", { phase: "bootstrap" });
       if (typeof window !== "undefined" && isWebRecoveryHash()) {
         try {
           const isRecovery = await withTimeout(
@@ -359,6 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clearAllPersistedAuth();
         }
         await applySession(null);
+        logStartupStep("auth:init:end", { signedOut: true, reason: "no-persisted-token" });
         return;
       }
 
@@ -378,6 +414,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
 
+      if (initialSession?.user.id) {
+        try {
+          const { data, error } = await withTimeout(
+            getSupabase().auth.getUser(),
+            AUTH_SESSION_TIMEOUT_MS,
+            "auth.getUser"
+          );
+          if (error || !data.user) {
+            await invalidatePersistedSession("getUser");
+            logStartupStep("auth:init:end", { signedOut: true, reason: "invalid-session" });
+            return;
+          }
+        } catch (error) {
+          console.error("[auth] getUser failed during bootstrap", error);
+          await invalidatePersistedSession(
+            error instanceof AsyncTimeoutError ? "getUser-timeout" : "getUser-error"
+          );
+          logStartupStep("auth:init:end", { signedOut: true, reason: "getUser-failed" });
+          return;
+        }
+      }
+
+      logStartupStep("auth:session:loaded", {
+        hasSession: Boolean(initialSession?.user.id),
+      });
+
       if (initialSession && !sessionMatchesPersistedAuth(initialSession)) {
         try {
           await supabaseSignOut();
@@ -395,6 +457,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await applySession(initialSession);
+      logStartupStep("auth:init:end", { hasSession: Boolean(initialSession?.user.id) });
     }
 
     const linkSub = Linking.addEventListener("url", ({ url }) => {
@@ -460,7 +523,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       linkSub.remove();
       sub.subscription.unsubscribe();
     };
-  }, [applySession]);
+  }, [applySession, invalidatePersistedSession]);
 
   useEffect(() => {
     function onVisible() {

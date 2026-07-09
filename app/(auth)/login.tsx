@@ -17,6 +17,7 @@ import { FrennixLogo } from "@/components/FrennixLogo";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic, markDiagnosticFailure, markDiagnosticSuccess } from "@/lib/client-diagnostics";
+import { logStartupStep } from "@/lib/startup-step-log";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { webAppShell } from "@/lib/flex-layout";
 
@@ -29,6 +30,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    logStartupStep("login:render:end");
     hideFrennixBootShell();
   }, []);
 
