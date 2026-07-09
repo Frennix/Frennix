@@ -2,8 +2,8 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
-import { pushScreen } from "@/lib/press-utils";
 import { reportClientError } from "@/lib/report-client-error";
+import { StartupDiagnosticPanel } from "@/components/StartupDiagnosticPanel";
 
 const FRIENDLY_CRASH_MESSAGE =
   "Something went wrong while loading Frennix. Please try again.";
@@ -62,15 +62,12 @@ export class AppErrorBoundary extends Component<Props, State> {
             >
               <Text style={styles.buttonText}>Retry</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Open diagnostics"
-              onPress={() => pushScreen("/beta-diagnostics")}
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.secondaryButtonText}>Diagnostics</Text>
-            </Pressable>
           </View>
+          <StartupDiagnosticPanel
+            source={`error-boundary:${this.props.scope ?? "app"}`}
+            reason={error.message}
+            screen={this.props.screen ?? this.props.scope}
+          />
         </View>
       );
     }

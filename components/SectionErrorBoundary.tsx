@@ -1,9 +1,9 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, spacing, typography } from "@frennix/ui";
-import { pushScreen } from "@/lib/press-utils";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { reportClientError } from "@/lib/report-client-error";
+import { StartupDiagnosticPanel } from "@/components/StartupDiagnosticPanel";
 
 type Props = {
   children: ReactNode;
@@ -76,10 +76,12 @@ export class SectionErrorBoundary extends Component<Props, State> {
             <Pressable style={styles.primaryButton} onPress={this.handleRetry}>
               <Text style={styles.primaryButtonText}>Try again</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => pushScreen("/beta-diagnostics")}>
-              <Text style={styles.secondaryButtonText}>Diagnostics</Text>
-            </Pressable>
           </View>
+          <StartupDiagnosticPanel
+            source={`section:${this.props.label}`}
+            reason={error.message}
+            screen={this.props.screen ?? this.props.label}
+          />
         </View>
       );
     }

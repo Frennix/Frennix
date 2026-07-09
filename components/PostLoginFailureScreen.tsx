@@ -1,7 +1,7 @@
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, spacing } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
-import { pushScreen } from "@/lib/press-utils";
+import { StartupDiagnosticPanel } from "@/components/StartupDiagnosticPanel";
 
 type PostLoginFailureScreenProps = {
   title?: string;
@@ -11,6 +11,8 @@ type PostLoginFailureScreenProps = {
   onLogout?: () => void;
   /** Full-screen overlay above app chrome (post-login watchdog). */
   overlay?: boolean;
+  diagnosticSource?: string;
+  diagnosticReason?: string;
 };
 
 /** Visible fallback when post-login startup fails — never leave a black screen. */
@@ -21,10 +23,15 @@ export function PostLoginFailureScreen({
   onRetry,
   onLogout,
   overlay = false,
+  diagnosticSource = "post-login-failure",
+  diagnosticReason,
 }: PostLoginFailureScreenProps) {
+  const reason = diagnosticReason ?? message;
+
   return (
-    <View
-      style={[styles.container, overlay && styles.overlay]}
+    <ScrollView
+      style={overlay ? styles.overlayScroll : undefined}
+      contentContainerStyle={styles.container}
       nativeID="authenticated-startup-fallback"
     >
       <Text style={styles.title}>{title}</Text>
@@ -51,16 +58,9 @@ export function PostLoginFailureScreen({
             <Text style={styles.secondaryButtonText}>Log out</Text>
           </Pressable>
         ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open diagnostics"
-          onPress={() => pushScreen("/beta-diagnostics")}
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-        >
-          <Text style={styles.secondaryButtonText}>Diagnostics</Text>
-        </Pressable>
       </View>
-    </View>
+      <StartupDiagnosticPanel source={diagnosticSource} reason={reason} />
+    </ScrollView>
   );
 }
 
@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.lg,
     gap: spacing.sm,
+    flexGrow: 1,
   },
   overlay: Platform.select({
     web: {
@@ -82,10 +83,28 @@ const styles = StyleSheet.create({
       right: 0,
       bottom: 0,
       zIndex: 2147483645,
+      backgroundColor: colors.background,
     },
     default: {
       ...StyleSheet.absoluteFillObject,
       zIndex: 9999,
+      backgroundColor: colors.background,
+    },
+  }),
+  overlayScroll: Platform.select({
+    web: {
+      position: "fixed" as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 2147483645,
+      backgroundColor: colors.background,
+    },
+    default: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 9999,
+      backgroundColor: colors.background,
     },
   }),
   title: {

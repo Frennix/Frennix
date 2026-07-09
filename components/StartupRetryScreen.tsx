@@ -1,8 +1,8 @@
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, spacing } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
-import { pushScreen } from "@/lib/press-utils";
 import { formatStartupMountSummary, getStartupMountGap } from "@/lib/startup-mount-trace";
+import { StartupDiagnosticPanel } from "@/components/StartupDiagnosticPanel";
 
 type StartupRetryScreenProps = {
   title?: string;
@@ -12,6 +12,7 @@ type StartupRetryScreenProps = {
   onRetry?: () => void;
   onLogout?: () => void;
   showDiagnostics?: boolean;
+  diagnosticSource?: string;
   /** When false, hide mount trace (misleading during first render before effects flush). */
   showMountTrace?: boolean;
 };
@@ -25,13 +26,15 @@ export function StartupRetryScreen({
   onRetry,
   onLogout,
   showDiagnostics = true,
+  diagnosticSource = "startup-retry",
   showMountTrace = true,
 }: StartupRetryScreenProps) {
   const gap = showMountTrace ? getStartupMountGap() : null;
   const traceSummary = showMountTrace ? formatStartupMountSummary(6) : null;
+  const showDiagnosticPanel = showDiagnostics && !loading && Boolean(onRetry || onLogout);
 
   return (
-    <View style={styles.container} nativeID="startup-retry-screen">
+    <ScrollView contentContainerStyle={styles.container} nativeID="startup-retry-screen">
       {loading ? <ActivityIndicator color={colors.accent} size="large" /> : null}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
@@ -59,18 +62,11 @@ export function StartupRetryScreen({
             <Text style={styles.secondaryButtonText}>Log out</Text>
           </Pressable>
         ) : null}
-        {showDiagnostics ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open diagnostics"
-            onPress={() => pushScreen("/beta-diagnostics")}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          >
-            <Text style={styles.secondaryButtonText}>Diagnostics</Text>
-          </Pressable>
-        ) : null}
       </View>
-    </View>
+      {showDiagnosticPanel ? (
+        <StartupDiagnosticPanel source={diagnosticSource} reason={message} />
+      ) : null}
+    </ScrollView>
   );
 }
 
@@ -83,6 +79,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.lg,
     gap: spacing.sm,
+    flexGrow: 1,
   },
   title: {
     color: colors.text,

@@ -188,6 +188,10 @@ export function collectDomStartupState(route = ""): StartupDomState {
   const login = document.getElementById("auth-login-screen");
   const retry = document.getElementById("startup-retry-screen");
   const failure = document.getElementById("login-failure-screen");
+  const authFallback = document.getElementById("authenticated-startup-fallback");
+  const feedTab = document.getElementById("feed-tab-scene");
+  const feedRoot = document.getElementById("feed-root-container");
+  const onboarding = document.getElementById("onboarding-screen");
   const root = document.getElementById("root");
   const passwordInput = [...document.querySelectorAll("input")].find((el) => el.type === "password");
   const passwordRect = passwordInput?.getBoundingClientRect();
@@ -203,6 +207,10 @@ export function collectDomStartupState(route = ""): StartupDomState {
     !login &&
     !retry &&
     !failure &&
+    !authFallback &&
+    !feedTab &&
+    !feedRoot &&
+    !onboarding &&
     bodyText.length < 20 &&
     (root?.childElementCount ?? 0) <= 1;
 
@@ -356,6 +364,30 @@ export function recordStartupSnapshot(
 
   persistSnapshotsLocally();
   sendSnapshotToServer(snapshot);
+
+  if (
+    snapshot.phase === "snapshot:black-screen" ||
+    snapshot.phase === "login:failure" ||
+    (snapshot.dom.blackScreenSuspected && snapshot.auth?.hasSession)
+  ) {
+    void import("@/lib/auto-startup-diagnostic-report").then(({ sendStartupDiagnosticReport }) =>
+      sendStartupDiagnosticReport({
+        source: `startup-snapshot:${snapshot.phase}`,
+        reason:
+          snapshot.phase === "snapshot:black-screen"
+            ? "Black screen suspected after authentication"
+            : `Startup snapshot ${snapshot.phase}`,
+        userId: snapshot.auth?.userId,
+        screen: snapshot.dom.route,
+        extra: {
+          snapshot_id: snapshot.id,
+          black_screen_suspected: snapshot.dom.blackScreenSuspected,
+          mount_trace_tail: snapshot.mountTraceTail,
+          body_text_preview: snapshot.dom.bodyTextPreview,
+        },
+      })
+    );
+  }
 
   if (snapshot.dom.blackScreenSuspected && phase !== "snapshot:black-screen") {
     recordStartupSnapshot("snapshot:black-screen", {

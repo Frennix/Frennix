@@ -87,6 +87,8 @@ export function AuthenticatedStartupWatchdog() {
         });
       }}
       overlay
+      diagnosticSource="authenticated-startup-watchdog"
+      diagnosticReason="Authenticated startup stalled past 5s without feed or onboarding"
     />
   );
 }

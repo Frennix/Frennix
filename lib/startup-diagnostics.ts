@@ -5,7 +5,7 @@ import {
 } from "@/lib/startup-mount-trace";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackStartupStall } from "@/lib/beta-health-analytics";
-import { reportClientError } from "@/lib/report-client-error";
+import { sendStartupDiagnosticReport } from "@/lib/auto-startup-diagnostic-report";
 
 export type StartupStallContext = {
   loading?: boolean;
@@ -42,9 +42,9 @@ export function reportStartupStall(
 
   trackStartupStall(gap ?? reason);
 
-  void reportClientError({
+  void sendStartupDiagnosticReport({
     source: "startup.stall",
-    error: new Error(reason),
+    reason,
     userId: context.userId,
     email: context.email,
     screen: "startup",

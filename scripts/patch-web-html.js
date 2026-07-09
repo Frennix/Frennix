@@ -76,11 +76,118 @@ const bootShellHtml = `
 const bootShellScript = `
     <script id="frennix-boot-shell-script">
 (function () {
+  var STALL_MS = 5000;
+  var cfg = {
+    supabaseUrl: ${JSON.stringify(process.env.EXPO_PUBLIC_SUPABASE_URL || loadEnvVar("EXPO_PUBLIC_SUPABASE_URL"))},
+    anonKey: ${JSON.stringify(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || loadEnvVar("EXPO_PUBLIC_SUPABASE_ANON_KEY"))}
+  };
+
+  function readAuth() {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf("auth-token") !== -1) {
+          var data = JSON.parse(localStorage.getItem(key) || "{}");
+          return {
+            hasToken: !!data.access_token,
+            userId: data.user && data.user.id,
+            email: data.user && data.user.email,
+            accessToken: data.access_token
+          };
+        }
+      }
+    } catch (e) {}
+    return { hasToken: false };
+  }
+
+  function visibleDestination() {
+    var ids = [
+      "auth-login-screen",
+      "startup-retry-screen",
+      "login-failure-screen",
+      "authenticated-startup-fallback",
+      "startup-diagnostic-panel",
+      "feed-tab-scene",
+      "feed-root-container",
+      "onboarding-screen"
+    ];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el && String(el.textContent || "").replace(/\\s+/g, "").length > 0) return true;
+    }
+    return false;
+  }
+
+  function collectInlineDiag(reason) {
+    var auth = readAuth();
+    var trace = window.__FRENNIX_MOUNT_TRACE__ || [];
+    return {
+      at: new Date().toISOString(),
+      reason: reason,
+      route: location.pathname,
+      href: location.href,
+      auth: { hasToken: auth.hasToken, userId: auth.userId, email: auth.email },
+      mount_trace_tail: trace.slice(-12).map(function (e) { return e.id; }),
+      body_preview: String(document.body.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 240),
+      user_agent: navigator.userAgent
+    };
+  }
+
+  function sendInlineReport(diag) {
+    if (!cfg.supabaseUrl || !cfg.anonKey || !diag.auth.userId || !diag.auth.hasToken) return;
+    var token = readAuth().accessToken;
+    if (!token) return;
+    var payload = {
+      user_id: diag.auth.userId,
+      type: "crash",
+      status: "new",
+      priority: "critical",
+      message: "[inline-startup] " + diag.reason,
+      screen_path: diag.route,
+      metadata: diag
+    };
+    fetch(cfg.supabaseUrl + "/rest/v1/beta_feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: cfg.anonKey,
+        Authorization: "Bearer " + token,
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(payload)
+    }).catch(function () {});
+  }
+
+  function showInlineFailure(diag) {
+    var shell = document.getElementById("frennix-boot-shell");
+    if (!shell) return;
+    shell.style.display = "flex";
+    shell.setAttribute("aria-busy", "false");
+    shell.innerHTML =
+      '<div id="authenticated-startup-fallback" style="max-width:360px;text-align:center;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px">' +
+      '<div style="font-size:18px;font-weight:700">Account loading stalled</div>' +
+      '<div style="font-size:14px;opacity:0.85;line-height:20px">We\\'re having trouble loading your account. Please retry or log out.</div>' +
+      '<div id="startup-diagnostic-panel" style="font-size:12px;opacity:0.75">Diagnostic report sent automatically. Tap Copy report to share with support.</div>' +
+      '<button id="frennix-inline-copy" style="padding:10px 16px;border-radius:8px;border:none;background:#c8ff00;color:#0a0a0b;font-weight:700">Copy report</button>' +
+      '<button id="frennix-inline-retry" style="padding:10px 16px;border-radius:8px;border:1px solid #444;background:transparent;color:#f5f5f5">Retry</button>' +
+      "</div>";
+    var copyBtn = document.getElementById("frennix-inline-copy");
+    if (copyBtn) {
+      copyBtn.onclick = function () {
+        var text = JSON.stringify(diag, null, 2);
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+      };
+    }
+    var retryBtn = document.getElementById("frennix-inline-retry");
+    if (retryBtn) retryBtn.onclick = function () { location.reload(); };
+  }
+
   function hideBootShell() {
     var el = document.getElementById("frennix-boot-shell");
     if (el) el.style.display = "none";
   }
-  function startupReady() {
+
+  function signedOutReady() {
     if (document.getElementById("auth-login-screen")) return true;
     if (document.getElementById("startup-retry-screen")) return true;
     if (document.getElementById("login-failure-screen")) return true;
@@ -90,12 +197,31 @@ const bootShellScript = `
       return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "auth-login:mounted";
     });
   }
+
+  function startupReady() {
+    if (visibleDestination()) return true;
+    if (readAuth().hasToken) return false;
+    return signedOutReady();
+  }
+
+  var stallTimer = setTimeout(function () {
+    var auth = readAuth();
+    if (!auth.hasToken) return;
+    if (visibleDestination()) return;
+    var diag = collectInlineDiag("post-login black screen before React destination");
+    try { sessionStorage.setItem("frennix:inline-startup-diag", JSON.stringify(diag)); } catch (e) {}
+    sendInlineReport(diag);
+    showInlineFailure(diag);
+  }, STALL_MS);
+
   var iv = setInterval(function () {
     if (startupReady()) {
       hideBootShell();
       clearInterval(iv);
+      clearTimeout(stallTimer);
     }
   }, 150);
+
   window.addEventListener("load", function () {
     setTimeout(function () {
       if (!startupReady()) {
@@ -162,6 +288,11 @@ if (!html.includes('id="frennix-boot-shell"')) {
 
 if (!html.includes('id="frennix-boot-shell-script"')) {
   html = html.replace("</body>", `${bootShellScript}\n  </body>`);
+} else {
+  html = html.replace(
+    /<script id="frennix-boot-shell-script">[\s\S]*?<\/script>/,
+    bootShellScript.trim()
+  );
 }
 
 // Remove legacy pre-JS emergency banner if present from an older export.
