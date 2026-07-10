@@ -30,9 +30,7 @@ import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
 import { AuthenticatedStartupWatchdog } from "@/components/AuthenticatedStartupWatchdog";
-import { PostLoginDiagnosticOverlay } from "@/components/PostLoginDiagnosticOverlay";
 import { PostLoginBlackScreenMonitor } from "@/components/PostLoginBlackScreenMonitor";
-import { BuildVersionBanner } from "@/components/BuildVersionBanner";
 import { StartupSnapshotBootstrap } from "@/components/StartupSnapshotBootstrap";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
@@ -138,8 +136,6 @@ export default function RootLayout() {
                     <StartupSnapshotBootstrap />
                     <AuthenticatedStartupWatchdog />
                     <PostLoginBlackScreenMonitor />
-                    <BuildVersionBanner />
-                    <PostLoginDiagnosticOverlay />
                     <StartupMountProbe id="tab-badge-root">
                       <TabBadgeRoot>
                         <StartupMountProbe id="navigation-error-boundary">

@@ -29,7 +29,6 @@ const DESTINATION_MARKERS = [
   "startup-retry-screen",
   "post-login-failure-screen",
   "authenticated-startup-fallback",
-  "post-login-diagnostic-overlay",
 ] as const;
 
 /** True when the user can see feed, onboarding, or an explicit error/retry screen. */
@@ -46,7 +45,7 @@ export function isAuthenticatedDestinationReady(): boolean {
   }
 
   const bodyText = (document.body?.innerText ?? "").replace(/\s+/g, " ").trim();
-  if (/Set up profile|Share workout|STORIES|Could not load|Something went wrong|This section could not load|Post-login diagnostics/i.test(bodyText)) {
+  if (/Set up profile|Share workout|STORIES|Could not load|Something went wrong|This section could not load/i.test(bodyText)) {
     return true;
   }
 

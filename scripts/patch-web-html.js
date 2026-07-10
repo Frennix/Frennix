@@ -117,7 +117,7 @@ const bootShellScript = `
     var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
     if (feedRootH > 80) return true;
     var bodyText = String(document.body.innerText || "").replace(/\\s+/g, " ").trim();
-    if (/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load|Post-login diagnostics/i.test(bodyText)) {
+    if (/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText)) {
       return true;
     }
     return false;
@@ -131,8 +131,7 @@ const bootShellScript = `
       "login-failure-screen",
       "authenticated-startup-fallback",
       "startup-diagnostic-panel",
-      "onboarding-screen",
-      "post-login-diagnostic-overlay"
+      "onboarding-screen"
     ];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
