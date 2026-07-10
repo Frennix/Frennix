@@ -22,7 +22,7 @@ function loadEnvVar(name) {
 }
 
 const PWA_PATCH_ID = "frennix-pwa-shell";
-const SW_VERSION = "20260709-diag-v1";
+const SW_VERSION = "20260710-web-recovery-v1";
 
 function resolveBuildSha() {
   try {
@@ -114,12 +114,13 @@ const bootShellScript = `
 
   function feedDestinationReady() {
     var feedRoot = document.getElementById("feed-root-container");
+    var feedScene = document.getElementById("feed-tab-scene");
     var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    var feedSceneH = feedScene ? Math.round(feedScene.getBoundingClientRect().height) : -1;
     if (feedRootH > 80) return true;
     var bodyText = String(document.body.innerText || "").replace(/\\s+/g, " ").trim();
-    if (/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText)) {
-      return true;
-    }
+    var hasFeedText = /STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText);
+    if (feedSceneH > 120 && feedRootH > 40 && hasFeedText) return true;
     return false;
   }
 

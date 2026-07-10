@@ -2,8 +2,8 @@
  * Frennix PWA service worker — push + click + shell cache.
  * Bump FRENNIX_SW_VERSION on deploy to refresh installed PWAs.
  */
-const FRENNIX_SW_VERSION = "20260709-diag-v1";
-const SHELL_CACHE = "frennix-shell-v4";
+const FRENNIX_SW_VERSION = "20260710-web-recovery-v1";
+const SHELL_CACHE = "frennix-shell-v5";
 const SHELL_ASSETS = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("message", (event) => {
@@ -94,9 +94,9 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((response) => response)
-        .catch(() => caches.match("/") ?? caches.match("/index.html"))
+      fetch(request, { cache: "no-store" }).catch(() =>
+        fetch(new URL("/", self.location.origin).href, { cache: "no-store" })
+      )
     );
     return;
   }

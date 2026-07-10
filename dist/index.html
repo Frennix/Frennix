@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 372266b7</title>
+    <title>Frennix · 12d19a9d</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,10 +26,10 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="372266b76a9598b5ea323304c319937ec7cbbf61" />
-    <meta name="frennix-build-bundle" content="index-1ba532da4f7c132bc8e543001f0f018f.js" />
-    <meta name="frennix-build-at" content="2026-07-10T17:36:11.429Z" />
-    <meta name="frennix-sw-version" content="20260709-diag-v1" />
+    <meta name="frennix-build-sha" content="12d19a9da926cdf455688985b97e8a0c6aec65c1" />
+    <meta name="frennix-build-bundle" content="index-8ed821c2058f50180a17f2b3506ef236.js" />
+    <meta name="frennix-build-at" content="2026-07-10T19:11:21.357Z" />
+    <meta name="frennix-sw-version" content="20260710-web-recovery-v1" />
       <style id="frennix-web-scroll">
   :root {
     --frennix-tab-header-h: 52px;
@@ -83,7 +83,7 @@
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
-    min-height: 0 !important;
+    min-height: max(200px, calc(100dvh - var(--frennix-tab-chrome-h) - var(--frennix-tab-header-h))) !important;
     overflow: hidden !important;
     background-color: #0A0A0B !important;
   }
@@ -180,19 +180,19 @@
         Still loading — check your connection or reopen the app.
       </div>
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="372266b76a9598b5ea323304c319937ec7cbbf61" data-bundle="index-1ba532da4f7c132bc8e543001f0f018f.js" data-sw="20260709-diag-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="12d19a9da926cdf455688985b97e8a0c6aec65c1" data-bundle="index-8ed821c2058f50180a17f2b3506ef236.js" data-sw="20260710-web-recovery-v1"></div>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-1ba532da4f7c132bc8e543001f0f018f.js?v=372266b7" defer></script>
+  <script src="/_expo/static/js/web/index-8ed821c2058f50180a17f2b3506ef236.js?v=12d19a9d" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js?v=372266b7", { scope: "/", updateViaCache: "none" }).catch(function (err) {
+          navigator.serviceWorker.register("/sw.js?v=12d19a9d", { scope: "/", updateViaCache: "none" }).catch(function (err) {
             console.warn("[frennix-pwa] SW register failed", err);
           });
         });
@@ -227,12 +227,13 @@
 
   function feedDestinationReady() {
     var feedRoot = document.getElementById("feed-root-container");
+    var feedScene = document.getElementById("feed-tab-scene");
     var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    var feedSceneH = feedScene ? Math.round(feedScene.getBoundingClientRect().height) : -1;
     if (feedRootH > 80) return true;
     var bodyText = String(document.body.innerText || "").replace(/\s+/g, " ").trim();
-    if (/STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText)) {
-      return true;
-    }
+    var hasFeedText = /STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText);
+    if (feedSceneH > 120 && feedRootH > 40 && hasFeedText) return true;
     return false;
   }
 

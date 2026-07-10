@@ -18,9 +18,10 @@ function hasMeaningfulFeedText(): boolean {
 
 function feedDestinationReady(): boolean {
   const feedRootH = rectH("feed-root-container");
+  const feedTabSceneH = rectH("feed-tab-scene");
   if (feedRootH > 80) return true;
-  if (feedRootH > 0 && hasMeaningfulFeedText()) return true;
-  return hasMeaningfulFeedText();
+  if (feedTabSceneH > 120 && feedRootH > 40 && hasMeaningfulFeedText()) return true;
+  return false;
 }
 
 /** DOM markers that mean post-login startup reached a visible destination. */
@@ -45,7 +46,7 @@ export function isAuthenticatedDestinationReady(): boolean {
   }
 
   const bodyText = (document.body?.innerText ?? "").replace(/\s+/g, " ").trim();
-  if (/Set up profile|Share workout|STORIES|Could not load|Something went wrong|This section could not load/i.test(bodyText)) {
+  if (/Set up profile|Could not load|Something went wrong|This section could not load/i.test(bodyText)) {
     return true;
   }
 

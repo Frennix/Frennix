@@ -5,6 +5,7 @@ import { StartupRetryScreen } from "@/components/StartupRetryScreen";
 import { useAuth } from "@/providers/AuthProvider";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
+import { isAuthenticatedDestinationReady } from "@/lib/authenticated-startup-ready";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAppStartup } from "@/lib/beta-health-analytics";
@@ -82,9 +83,23 @@ function IndexGate({
   };
 
   useEffect(() => {
-    if (authReady) {
-      hideFrennixBootShell();
-    }
+    if (!authReady) return;
+
+    const tryHideBootShell = () => {
+      if (isAuthenticatedDestinationReady()) {
+        hideFrennixBootShell();
+        return true;
+      }
+      return false;
+    };
+
+    if (tryHideBootShell()) return;
+
+    const poll = setInterval(() => {
+      if (tryHideBootShell()) clearInterval(poll);
+    }, 200);
+
+    return () => clearInterval(poll);
   }, [authReady]);
 
   useEffect(() => {
