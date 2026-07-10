@@ -1,5 +1,6 @@
 import { Redirect } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { StartupRetryScreen } from "@/components/StartupRetryScreen";
 import { useAuth } from "@/providers/AuthProvider";
@@ -12,6 +13,7 @@ import { trackAppStartup } from "@/lib/beta-health-analytics";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { describeAuthBootstrapPhase } from "@/lib/startup-mount-trace";
 import { logStartupStep } from "@/lib/startup-step-log";
+import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 import { profileNeedsOnboardingRepair, describeProfileRepairReason } from "@frennix/api";
 
 const APP_BOOT_MARK =
@@ -226,7 +228,18 @@ function IndexGate({
     if (repairReason) {
       logStartupStep("auth:session:loaded", { hasProfile: true, route: "onboarding", repairReason });
     }
+    if (Platform.OS === "web") {
+      recordWebStartupCheckpoint("onboarding:resolved", {
+        complete: false,
+        repair: Boolean(repairReason),
+      });
+    }
     return <Redirect href="/onboarding" />;
+  }
+
+  if (Platform.OS === "web") {
+    recordWebStartupCheckpoint("onboarding:resolved", { complete: true, repair: false });
+    recordWebStartupCheckpoint("redirect:started", { target: "/(tabs)" });
   }
 
   return <Redirect href="/(tabs)" />;

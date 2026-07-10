@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import { pushLog } from "@/lib/web-push-diagnostics";
 
 /** Keep in sync with FRENNIX_SW_VERSION in public/sw.js */
-export const PWA_SW_VERSION = "20260710-web-recovery-v1";
+export const PWA_SW_VERSION = "20260710-startup-guard-v1";
 
 const SW_PATH = "/sw.js";
 const VERSION_PATTERN = /FRENNIX_SW_VERSION\s*=\s*["']([^"']+)["']/;

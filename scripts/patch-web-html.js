@@ -22,7 +22,7 @@ function loadEnvVar(name) {
 }
 
 const PWA_PATCH_ID = "frennix-pwa-shell";
-const SW_VERSION = "20260710-web-recovery-v1";
+const SW_VERSION = "20260710-startup-guard-v1";
 
 function resolveBuildSha() {
   try {
@@ -112,15 +112,24 @@ const bootShellScript = `
     return { hasToken: false };
   }
 
+  function elementVisible(id, minHeight) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    var rect = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (Number(style.opacity) < 0.05) return false;
+    return rect.height >= minHeight && rect.width >= 20;
+  }
+
   function feedDestinationReady() {
-    var feedRoot = document.getElementById("feed-root-container");
+    if (elementVisible("feed-scroll-list", 60)) return true;
+    if (elementVisible("feed-root-container", 100)) return true;
     var feedScene = document.getElementById("feed-tab-scene");
-    var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    var feedRoot = document.getElementById("feed-root-container");
     var feedSceneH = feedScene ? Math.round(feedScene.getBoundingClientRect().height) : -1;
-    if (feedRootH > 80) return true;
-    var bodyText = String(document.body.innerText || "").replace(/\\s+/g, " ").trim();
-    var hasFeedText = /STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText);
-    if (feedSceneH > 120 && feedRootH > 40 && hasFeedText) return true;
+    var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    if (feedSceneH > 200 && feedRootH >= 120) return true;
     return false;
   }
 
@@ -132,7 +141,8 @@ const bootShellScript = `
       "login-failure-screen",
       "authenticated-startup-fallback",
       "startup-diagnostic-panel",
-      "onboarding-screen"
+      "onboarding-screen",
+      "web-authenticated-startup-fallback"
     ];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);

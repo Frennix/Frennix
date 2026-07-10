@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 12d19a9d</title>
+    <title>Frennix · 8eacb846</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,10 +26,10 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="12d19a9da926cdf455688985b97e8a0c6aec65c1" />
-    <meta name="frennix-build-bundle" content="index-8ed821c2058f50180a17f2b3506ef236.js" />
-    <meta name="frennix-build-at" content="2026-07-10T19:11:21.357Z" />
-    <meta name="frennix-sw-version" content="20260710-web-recovery-v1" />
+    <meta name="frennix-build-sha" content="8eacb8463021416877e76f11d2e59dd176ad3170" />
+    <meta name="frennix-build-bundle" content="index-c8077ea5820765474066e28fe8906a16.js" />
+    <meta name="frennix-build-at" content="2026-07-10T19:51:34.999Z" />
+    <meta name="frennix-sw-version" content="20260710-startup-guard-v1" />
       <style id="frennix-web-scroll">
   :root {
     --frennix-tab-header-h: 52px;
@@ -180,19 +180,19 @@
         Still loading — check your connection or reopen the app.
       </div>
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="12d19a9da926cdf455688985b97e8a0c6aec65c1" data-bundle="index-8ed821c2058f50180a17f2b3506ef236.js" data-sw="20260710-web-recovery-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="8eacb8463021416877e76f11d2e59dd176ad3170" data-bundle="index-c8077ea5820765474066e28fe8906a16.js" data-sw="20260710-startup-guard-v1"></div>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-8ed821c2058f50180a17f2b3506ef236.js?v=12d19a9d" defer></script>
+  <script src="/_expo/static/js/web/index-c8077ea5820765474066e28fe8906a16.js?v=8eacb846" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js?v=12d19a9d", { scope: "/", updateViaCache: "none" }).catch(function (err) {
+          navigator.serviceWorker.register("/sw.js?v=8eacb846", { scope: "/", updateViaCache: "none" }).catch(function (err) {
             console.warn("[frennix-pwa] SW register failed", err);
           });
         });
@@ -225,15 +225,24 @@
     return { hasToken: false };
   }
 
+  function elementVisible(id, minHeight) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    var rect = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (Number(style.opacity) < 0.05) return false;
+    return rect.height >= minHeight && rect.width >= 20;
+  }
+
   function feedDestinationReady() {
-    var feedRoot = document.getElementById("feed-root-container");
+    if (elementVisible("feed-scroll-list", 60)) return true;
+    if (elementVisible("feed-root-container", 100)) return true;
     var feedScene = document.getElementById("feed-tab-scene");
-    var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    var feedRoot = document.getElementById("feed-root-container");
     var feedSceneH = feedScene ? Math.round(feedScene.getBoundingClientRect().height) : -1;
-    if (feedRootH > 80) return true;
-    var bodyText = String(document.body.innerText || "").replace(/\s+/g, " ").trim();
-    var hasFeedText = /STORIES|Share workout|Your feed is ready|Could not load feed|This section could not load/i.test(bodyText);
-    if (feedSceneH > 120 && feedRootH > 40 && hasFeedText) return true;
+    var feedRootH = feedRoot ? Math.round(feedRoot.getBoundingClientRect().height) : -1;
+    if (feedSceneH > 200 && feedRootH >= 120) return true;
     return false;
   }
 
@@ -245,7 +254,8 @@
       "login-failure-screen",
       "authenticated-startup-fallback",
       "startup-diagnostic-panel",
-      "onboarding-screen"
+      "onboarding-screen",
+      "web-authenticated-startup-fallback"
     ];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);

@@ -29,13 +29,15 @@ import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMount
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
-import { AuthenticatedStartupWatchdog } from "@/components/AuthenticatedStartupWatchdog";
+import { WebAuthenticatedStartupGuard } from "@/components/WebAuthenticatedStartupGuard";
+import { WebAuthenticatedErrorBoundary } from "@/components/WebAuthenticatedErrorBoundary";
 import { PostLoginBlackScreenMonitor } from "@/components/PostLoginBlackScreenMonitor";
 import { StartupSnapshotBootstrap } from "@/components/StartupSnapshotBootstrap";
 import { AuthNavigationGuard } from "@/lib/auth-navigation";
 import { backScreen, fadeScreen } from "@/lib/stack-navigation";
 import { animation, colors } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
+import { clearSafeTransientStartupState } from "@/lib/web-startup-checkpoints";
 import { frennixNavigationTheme } from "@/lib/navigation-theme";
 
 initSentry();
@@ -80,6 +82,36 @@ function TabBadgeRoot({ children }: { children: ReactNode }) {
     <SectionErrorBoundary label="tab-badges" userId={userId} email={session?.user.email ?? undefined}>
       <TabBadgeProvider userId={userId}>{children}</TabBadgeProvider>
     </SectionErrorBoundary>
+  );
+}
+
+function WebAuthenticatedShell({ children }: { children: ReactNode }) {
+  const { session, signOut, refreshProfile } = useAuth();
+
+  if (Platform.OS !== "web") return <>{children}</>;
+
+  return (
+    <WebAuthenticatedErrorBoundary
+      userId={session?.user.id}
+      email={session?.user.email ?? undefined}
+      onRetry={() => {
+        clearSafeTransientStartupState();
+        if (session?.user.id) {
+          void refreshProfile(session.user.id).finally(() => {
+            if (typeof window !== "undefined") window.location.reload();
+          });
+        } else if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }}
+      onSignOut={() => {
+        void signOut().finally(() => {
+          if (typeof window !== "undefined") window.location.replace("/(auth)/login");
+        });
+      }}
+    >
+      {children}
+    </WebAuthenticatedErrorBoundary>
   );
 }
 
@@ -134,10 +166,11 @@ export default function RootLayout() {
                   <AuthProvider>
                     <ClientDiagnosticsBootstrap />
                     <StartupSnapshotBootstrap />
-                    <AuthenticatedStartupWatchdog />
+                    <WebAuthenticatedStartupGuard />
                     <PostLoginBlackScreenMonitor />
                     <StartupMountProbe id="tab-badge-root">
                       <TabBadgeRoot>
+                        <WebAuthenticatedShell>
                         <StartupMountProbe id="navigation-error-boundary">
                           <AuthAwareErrorBoundary scope="navigation">
                             <StartupMountMarker id="notification-bootstrap" />
@@ -157,7 +190,13 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="reset-password" options={backScreen("New password")} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="(tabs)"
+              options={{
+                headerShown: false,
+                ...(Platform.OS === "web" ? { animation: "none" as const } : null),
+              }}
+            />
             <Stack.Screen name="onboarding" options={{ title: "Set up profile", headerBackVisible: false }} />
             <Stack.Screen
               name="create-post"
@@ -256,6 +295,7 @@ export default function RootLayout() {
                             </StartupMountProbe>
                           </AuthAwareErrorBoundary>
                         </StartupMountProbe>
+                        </WebAuthenticatedShell>
                       </TabBadgeRoot>
                     </StartupMountProbe>
                   </AuthProvider>

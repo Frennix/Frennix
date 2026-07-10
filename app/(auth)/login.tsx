@@ -18,6 +18,7 @@ import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic, markDiagnosticFailure, markDiagnosticSuccess } from "@/lib/client-diagnostics";
 import { logStartupStep } from "@/lib/startup-step-log";
+import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { webAppShell } from "@/lib/flex-layout";
 
@@ -37,6 +38,9 @@ export default function LoginScreen() {
   async function handleLogin() {
     setError("");
     setLoading(true);
+    if (Platform.OS === "web") {
+      recordWebStartupCheckpoint("login:submitted");
+    }
 
     let session = null;
     try {
@@ -61,6 +65,9 @@ export default function LoginScreen() {
     try {
       console.info("[sign-in] applying session", { userId: session.user.id });
       await applySession(session);
+      if (Platform.OS === "web") {
+        recordWebStartupCheckpoint("session:created", { userId: redactUserId(session.user.id) });
+      }
       markDiagnosticSuccess("auth.login", { userId: session.user.id.slice(0, 8) });
       logDiagnostic("auth", "login session applied", "info", { email: session.user.email });
       router.replace("/");

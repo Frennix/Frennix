@@ -92,11 +92,18 @@ import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
+import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
   const { session, profile: viewerProfile } = useAuth();
   const userId = session?.user.id ?? "";
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      recordWebStartupCheckpoint("feed-route:mounted");
+    }
+  }, []);
   const isolateStories = isFeedIsolateDisabled("stories");
   const isolateFeedList = isFeedIsolateDisabled("feed-list");
   const isolatePostCards = isFeedIsolateDisabled("post-cards");
@@ -425,6 +432,24 @@ export default function HomeScreen() {
   markFeedHook("suggestions-query");
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !userId) return;
+    if (isLoading || isFetching) {
+      recordWebStartupCheckpoint("feed-request:started");
+      return;
+    }
+    if (isError) {
+      recordWebStartupCheckpoint("feed-request:failed", {
+        message: getErrorMessage(error).slice(0, 120),
+      });
+      return;
+    }
+    if (isFeedReady) {
+      recordWebStartupCheckpoint("feed-request:succeeded", { postCount: posts.length });
+    }
+  }, [userId, isLoading, isFetching, isError, isFeedReady, error, posts.length]);
+
   const showFeedSkeleton = posts.length === 0 && (!isFeedReady || isLoading || isFetching);
   const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();

@@ -27,6 +27,7 @@ import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
 import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
+import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
 import { logStartupStep } from "@/lib/startup-step-log";
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
@@ -133,6 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!options?.background) {
         setProfileLoading(true);
+        if (Platform.OS === "web") {
+          recordWebStartupCheckpoint("profile:fetch-started", { userId: redactUserId(userId) });
+        }
       }
       setProfileFetchFailed(false);
 
@@ -147,6 +151,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           resolvedProfileUserIdRef.current = userId;
           writeCachedProfile(userId, nextProfile);
           setProfileFetchFailed(false);
+          if (Platform.OS === "web") {
+            recordWebStartupCheckpoint("profile:fetch-succeeded", {
+              userId: redactUserId(userId),
+              onboarding_complete: nextProfile.onboarding_complete,
+            });
+          }
         } catch (error) {
           if (epoch !== authEpochRef.current) return;
           console.error("[auth] getProfile failed", error);
@@ -166,6 +176,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           resolvedProfileUserIdRef.current = userId;
           writeCachedProfile(userId, cached);
           setProfileFetchFailed(!cached);
+          if (Platform.OS === "web") {
+            recordWebStartupCheckpoint("profile:fetch-failed", {
+              userId: redactUserId(userId),
+              hadCache: Boolean(cached),
+              status: status ?? null,
+            });
+          }
           void import("@/lib/client-diagnostics").then(({ markDiagnosticFailure, logDiagnostic }) => {
             markDiagnosticFailure("auth.getProfile", error, { userId: userId.slice(0, 8) });
             logDiagnostic("auth", "kept cached profile after getProfile failure", "warn", {
@@ -586,6 +603,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const authReady =
     authBootstrapTimedOut || (!loading && !(session?.user.id && profileLoading));
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !authReady) return;
+    recordWebStartupCheckpoint("auth:provider-ready", {
+      hasSession: Boolean(session),
+      hasProfile: Boolean(profile),
+      userId: redactUserId(session?.user.id),
+    });
+  }, [authReady, session?.user.id, profile?.id]);
 
   const value = useMemo(
     () => ({

@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
@@ -19,6 +19,7 @@ import { colors } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { useTabSceneLayoutGuard } from "@/lib/tab-scene-layout-guard";
+import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 
 const HeaderBell = memo(function HeaderBell() {
   const { session } = useAuth();
@@ -204,6 +205,12 @@ const TabsShell = memo(function TabsShell() {
 
 export default function TabsLayout() {
   const { session } = useAuth();
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      recordWebStartupCheckpoint("tabs-layout:mounted");
+    }
+  }, []);
 
   return (
     <StartupMountProbe id="tabs-layout">

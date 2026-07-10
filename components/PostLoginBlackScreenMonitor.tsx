@@ -7,7 +7,7 @@ import { reportClientError } from "@/lib/report-client-error";
 import { buildStartupAuthState, recordStartupSnapshot } from "@/lib/startup-snapshot-log";
 import { isIosSafariBrowser, isIosWebDevice, isWebStandalone } from "@/lib/pwa";
 import { getStartupMountEvents } from "@/lib/startup-mount-trace";
-import { describeFeedLayoutReadiness } from "@/lib/authenticated-startup-ready";
+import { measureAuthenticatedFeedVisibility } from "@/lib/authenticated-feed-visibility";
 
 const POLL_MS = 2_000;
 const REPORT_COOLDOWN_MS = 60_000;
@@ -38,7 +38,7 @@ export function PostLoginBlackScreenMonitor() {
         mountTraceTail: getStartupMountEvents().slice(-12).map((e) => e.id),
       });
 
-      const feedLayout = describeFeedLayoutReadiness();
+      const feedLayout = measureAuthenticatedFeedVisibility();
       const authState = buildStartupAuthState({
         authReady,
         loading,
@@ -48,7 +48,10 @@ export function PostLoginBlackScreenMonitor() {
         passwordRecovery: false,
       });
 
-      if (snap.blackScreenSuspected || (feedLayout.feedTabSceneH > 80 && feedLayout.feedRootH <= 1 && !feedLayout.feedMeaningfulText)) {
+      if (
+        snap.blackScreenSuspected ||
+        (feedLayout.feedTabSceneH > 80 && !feedLayout.feedRootVisible && !feedLayout.feedScrollVisible)
+      ) {
         recordStartupSnapshot("snapshot:black-screen", {
           auth: authState,
           route: snap.route,
