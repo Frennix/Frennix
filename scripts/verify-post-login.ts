@@ -85,7 +85,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Index gate waits for authReady before tabs redirect",
     run: () => {
       assertIncludes("app/index.tsx", "authReady", "index must wait for authReady");
-      assertIncludes("app/index.tsx", 'Redirect href="/(tabs)"', "completed users route to tabs");
+      assertIncludes("app/index.tsx", 'replaceWithAuthenticatedTabs', "completed users must imperatively hand off to tabs");
       assertExcludes(
         "app/index.tsx",
         "if (!session) return <Redirect href=\"/(tabs)\"",
@@ -97,6 +97,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "AuthNavigationGuard protects routes after bootstrap",
     run: () => {
       assertIncludes("lib/auth-navigation.ts", "authReady", "guard must wait for authReady");
+      assertIncludes("lib/auth-navigation.ts", "replaceWithAuthenticatedTabs", "guard must imperatively hand off authenticated index");
       assertIncludes("lib/auth-navigation.ts", "AuthNavigationGuard", "guard export required");
     },
   },

@@ -1,8 +1,12 @@
-import { router, useRouter, useSegments, type Href } from "expo-router";
+import { router, usePathname, useRouter, useSegments, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
 import { getSession, profileNeedsOnboardingRepair } from "@frennix/api";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { useAuth } from "@/providers/AuthProvider";
+import {
+  isBootstrapIndexRoute,
+  isTabsRouteActive,
+} from "@/lib/auth-route-handoff-metrics";
 
 const LOGIN_HREF = "/(auth)/login" as Href;
 const TABS_HREF = "/(tabs)" as Href;
@@ -18,6 +22,14 @@ export function redirectToLogin() {
   router.replace(LOGIN_HREF);
 }
 
+/** Imperative authenticated handoff — declarative Redirect leaves "/" with null output on web. */
+export function replaceWithAuthenticatedTabs(navigationRouter = router) {
+  if (navigationRouter.canDismiss()) {
+    navigationRouter.dismissAll();
+  }
+  navigationRouter.replace(TABS_HREF);
+}
+
 function isPublicRoute(root: string | undefined) {
   return root === "(auth)" || root === "join";
 }
@@ -26,12 +38,18 @@ function isPasswordRecoveryRoute(root: string | undefined) {
   return root === "reset-password";
 }
 
+function canEnterTabs(profile: ReturnType<typeof useAuth>["profile"]) {
+  return Boolean(profile?.onboarding_complete && !profileNeedsOnboardingRepair(profile));
+}
+
 /** Redirect signed-out users away from protected screens without a full page refresh. */
 export function AuthNavigationGuard() {
   const { session, authReady, profile, passwordRecovery } = useAuth();
   const segments = useSegments();
+  const pathname = usePathname();
   const navigationRouter = useRouter();
   const hadSessionRef = useRef(false);
+  const tabsHandoffRef = useRef(false);
 
   useEffect(() => {
     if (session) {
@@ -40,16 +58,24 @@ export function AuthNavigationGuard() {
   }, [session]);
 
   useEffect(() => {
+    if (!authReady || !session || passwordRecovery || !canEnterTabs(profile)) return;
+    if (!isBootstrapIndexRoute(pathname, segments)) return;
+    if (isTabsRouteActive(segments)) return;
+    if (tabsHandoffRef.current) return;
+
+    tabsHandoffRef.current = true;
+    replaceWithAuthenticatedTabs(navigationRouter);
+  }, [authReady, session, profile, passwordRecovery, segments, pathname, navigationRouter]);
+
+  useEffect(() => {
     if (!authReady) return;
 
     const root = segments[0];
     if (!root || root === "index") return;
 
-    if (root === "onboarding" && session && profile?.onboarding_complete && !profileNeedsOnboardingRepair(profile)) {
-      if (navigationRouter.canDismiss()) {
-        navigationRouter.dismissAll();
-      }
-      navigationRouter.replace(TABS_HREF);
+    if (root === "onboarding" && session && canEnterTabs(profile)) {
+      tabsHandoffRef.current = true;
+      replaceWithAuthenticatedTabs(navigationRouter);
       return;
     }
 
@@ -60,8 +86,6 @@ export function AuthNavigationGuard() {
     let cancelled = false;
 
     async function redirectIfStillSignedOut() {
-      // Session can briefly appear null while Supabase refreshes after tab resume.
-      // Skip grace when auth storage was cleared (logout / expired session).
       if (hadSessionRef.current && hasPersistedAuthToken()) {
         await new Promise((resolve) => setTimeout(resolve, SESSION_RECOVERY_MS));
         if (cancelled) return;

@@ -30,6 +30,7 @@ import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
 import { markStartupMount } from "@/lib/startup-mount-trace";
 import { WebAuthenticatedStartupGuard } from "@/components/WebAuthenticatedStartupGuard";
+import { WebAuthRouteHandoffGuard } from "@/components/WebAuthRouteHandoffGuard";
 import { WebAuthenticatedErrorBoundary } from "@/components/WebAuthenticatedErrorBoundary";
 import { PostLoginBlackScreenMonitor } from "@/components/PostLoginBlackScreenMonitor";
 import { StartupSnapshotBootstrap } from "@/components/StartupSnapshotBootstrap";
@@ -167,6 +168,7 @@ export default function RootLayout() {
                     <ClientDiagnosticsBootstrap />
                     <StartupSnapshotBootstrap />
                     <WebAuthenticatedStartupGuard />
+                    <WebAuthRouteHandoffGuard />
                     <PostLoginBlackScreenMonitor />
                     <StartupMountProbe id="tab-badge-root">
                       <TabBadgeRoot>

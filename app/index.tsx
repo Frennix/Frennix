@@ -1,4 +1,4 @@
-import { Redirect } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
@@ -7,6 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { isAuthenticatedDestinationReady } from "@/lib/authenticated-startup-ready";
+import { replaceWithAuthenticatedTabs } from "@/lib/auth-navigation";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAppStartup } from "@/lib/beta-health-analytics";
@@ -239,8 +240,27 @@ function IndexGate({
 
   if (Platform.OS === "web") {
     recordWebStartupCheckpoint("onboarding:resolved", { complete: true, repair: false });
-    recordWebStartupCheckpoint("redirect:started", { target: "/(tabs)" });
   }
 
-  return <Redirect href="/(tabs)" />;
+  return <AuthenticatedTabsHandoff />;
+}
+
+/** Imperative stack replace — declarative Redirect leaves "/" mounted with null output on Safari web. */
+function AuthenticatedTabsHandoff() {
+  const router = useRouter();
+  const handoffRef = useRef(false);
+
+  useEffect(() => {
+    if (handoffRef.current) return;
+    handoffRef.current = true;
+    if (Platform.OS === "web") {
+      recordWebStartupCheckpoint("redirect:started", {
+        target: "/(tabs)",
+        method: "index.router.replace",
+      });
+    }
+    replaceWithAuthenticatedTabs(router);
+  }, [router]);
+
+  return null;
 }
