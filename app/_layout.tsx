@@ -49,11 +49,11 @@ const stackDefaults = {
   contentStyle: {
     backgroundColor: colors.background,
     ...flexFill,
-    ...(Platform.OS === "web" ? webAppShell : null),
   },
   headerShadowVisible: false,
   animation: "fade" as const,
   animationDuration: animation.stackFadeMs,
+  ...(Platform.OS === "web" ? ({ detachInactiveScreens: true } as const) : null),
 } as const;
 
 function AuthAwareErrorBoundary({

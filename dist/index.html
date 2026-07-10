@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 01fbe587</title>
+    <title>Frennix · d98d8c3a</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="01fbe58779a6ff859a341b607823dc5feec06685" />
-    <meta name="frennix-build-bundle" content="index-f0184732804e71d59f00eeec1875238c.js" />
-    <meta name="frennix-build-at" content="2026-07-10T21:54:46.084Z" />
+    <meta name="frennix-build-sha" content="d98d8c3abe43e64702d5d45b938810ce1fc56bf8" />
+    <meta name="frennix-build-bundle" content="index-0ec243af91cdd79f63e670efc5963359.js" />
+    <meta name="frennix-build-at" content="2026-07-10T22:42:18.100Z" />
     <meta name="frennix-sw-version" content="20260710-startup-guard-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -65,8 +65,32 @@
     background-color: #0A0A0B;
     pointer-events: auto;
   }
+  #app-root-shell {
+    position: relative !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background-color: #0A0A0B !important;
+  }
+  /*
+   * RN stack scene flex column: contentStyle wrapper (empty, min-height:100%) must not
+   * sit above screen content and push #feed-tab-scene to top:~100vh (black screen).
+   */
+  #app-root-shell .r-ifefl9 > .r-13qz1uu:empty {
+    display: none !important;
+    flex: 0 0 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+  }
   /* Resilient authenticated tab shell — cannot collapse to 0px on WebKit/PWA. */
-  #app-root-shell,
   #feed-tab-scene {
     flex: 1 1 auto !important;
     display: flex !important;
@@ -129,6 +153,11 @@
     box-shadow: 0 0 0 1000px #141416 inset !important;
     transition: background-color 99999s ease-out 0s;
   }
+  #frennix-boot-shell[style*="display: none"],
+  #frennix-boot-shell[hidden] {
+    display: none !important;
+    pointer-events: none !important;
+  }
   #auth-login-screen,
   #startup-retry-screen,
   #login-failure-screen {
@@ -180,19 +209,19 @@
         Still loading — check your connection or reopen the app.
       </div>
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="01fbe58779a6ff859a341b607823dc5feec06685" data-bundle="index-f0184732804e71d59f00eeec1875238c.js" data-sw="20260710-startup-guard-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="d98d8c3abe43e64702d5d45b938810ce1fc56bf8" data-bundle="index-0ec243af91cdd79f63e670efc5963359.js" data-sw="20260710-startup-guard-v1"></div>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-f0184732804e71d59f00eeec1875238c.js?v=01fbe587" defer></script>
+  <script src="/_expo/static/js/web/index-0ec243af91cdd79f63e670efc5963359.js?v=d98d8c3a" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js?v=01fbe587", { scope: "/", updateViaCache: "none" }).catch(function (err) {
+          navigator.serviceWorker.register("/sw.js?v=d98d8c3a", { scope: "/", updateViaCache: "none" }).catch(function (err) {
             console.warn("[frennix-pwa] SW register failed", err);
           });
         });
