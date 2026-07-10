@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 8eacb846</title>
+    <title>Frennix · 747eefda</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="8eacb8463021416877e76f11d2e59dd176ad3170" />
-    <meta name="frennix-build-bundle" content="index-c8077ea5820765474066e28fe8906a16.js" />
-    <meta name="frennix-build-at" content="2026-07-10T19:51:34.999Z" />
+    <meta name="frennix-build-sha" content="747eefda7a71cfed72fde76840b3912d66f2fe71" />
+    <meta name="frennix-build-bundle" content="index-b7389be32cd8d5031b95badcb51650c9.js" />
+    <meta name="frennix-build-at" content="2026-07-10T21:03:24.211Z" />
     <meta name="frennix-sw-version" content="20260710-startup-guard-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -180,19 +180,19 @@
         Still loading — check your connection or reopen the app.
       </div>
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="8eacb8463021416877e76f11d2e59dd176ad3170" data-bundle="index-c8077ea5820765474066e28fe8906a16.js" data-sw="20260710-startup-guard-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="747eefda7a71cfed72fde76840b3912d66f2fe71" data-bundle="index-b7389be32cd8d5031b95badcb51650c9.js" data-sw="20260710-startup-guard-v1"></div>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-c8077ea5820765474066e28fe8906a16.js?v=8eacb846" defer></script>
+  <script src="/_expo/static/js/web/index-b7389be32cd8d5031b95badcb51650c9.js?v=747eefda" defer></script>
     
     <script id="frennix-pwa-shell">
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js?v=8eacb846", { scope: "/", updateViaCache: "none" }).catch(function (err) {
+          navigator.serviceWorker.register("/sw.js?v=747eefda", { scope: "/", updateViaCache: "none" }).catch(function (err) {
             console.warn("[frennix-pwa] SW register failed", err);
           });
         });
@@ -246,20 +246,22 @@
     return false;
   }
 
+  function markerVisible(id, minHeight) {
+    return elementVisible(id, minHeight || 40);
+  }
+
   function visibleDestination() {
     if (feedDestinationReady()) return true;
-    var ids = [
-      "auth-login-screen",
-      "startup-retry-screen",
-      "login-failure-screen",
-      "authenticated-startup-fallback",
-      "startup-diagnostic-panel",
-      "onboarding-screen",
-      "web-authenticated-startup-fallback"
+    var markers = [
+      ["auth-login-screen", 200],
+      ["startup-retry-screen", 200],
+      ["login-failure-screen", 120],
+      ["onboarding-screen", 120],
+      ["web-authenticated-startup-fallback", 120],
+      ["frennix-startup-failure-overlay", 120]
     ];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el && String(el.textContent || "").replace(/\s+/g, "").length > 0) return true;
+    for (var i = 0; i < markers.length; i++) {
+      if (markerVisible(markers[i][0], markers[i][1])) return true;
     }
     return false;
   }
@@ -305,18 +307,21 @@
   }
 
   function showInlineFailure(diag) {
-    var shell = document.getElementById("frennix-boot-shell");
-    if (!shell) return;
-    shell.style.display = "flex";
-    shell.setAttribute("aria-busy", "false");
-    shell.innerHTML =
-      '<div id="authenticated-startup-fallback" style="max-width:360px;text-align:center;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px">' +
+    if (document.getElementById("frennix-startup-failure-overlay")) return;
+    var overlay = document.createElement("div");
+    overlay.id = "frennix-startup-failure-overlay";
+    overlay.setAttribute("role", "alert");
+    overlay.style.cssText =
+      "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#0A0A0B;padding:20px;";
+    overlay.innerHTML =
+      '<div style="max-width:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">' +
       '<div style="font-size:18px;font-weight:700">Account loading stalled</div>' +
       '<div style="font-size:14px;opacity:0.85;line-height:20px">We\'re having trouble loading your account. Please retry or log out.</div>' +
-      '<div id="startup-diagnostic-panel" style="font-size:12px;opacity:0.75">Diagnostic report sent automatically. Tap Copy report to share with support.</div>' +
+      '<div style="font-size:12px;opacity:0.75">Diagnostic report sent automatically. Tap Copy report to share with support.</div>' +
       '<button id="frennix-inline-copy" style="padding:10px 16px;border-radius:8px;border:none;background:#c8ff00;color:#0a0a0b;font-weight:700">Copy report</button>' +
       '<button id="frennix-inline-retry" style="padding:10px 16px;border-radius:8px;border:1px solid #444;background:transparent;color:#f5f5f5">Retry</button>' +
       "</div>";
+    document.body.appendChild(overlay);
     var copyBtn = document.getElementById("frennix-inline-copy");
     if (copyBtn) {
       copyBtn.onclick = function () {
@@ -334,14 +339,10 @@
   }
 
   function signedOutReady() {
-    if (document.getElementById("auth-login-screen")) return true;
-    if (document.getElementById("startup-retry-screen")) return true;
-    if (document.getElementById("login-failure-screen")) return true;
-    var trace = window.__FRENNIX_MOUNT_TRACE__;
-    if (!trace || !trace.length) return false;
-    return trace.some(function (e) {
-      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "auth-login:mounted";
-    });
+    if (markerVisible("auth-login-screen", 200)) return true;
+    if (markerVisible("startup-retry-screen", 200)) return true;
+    if (markerVisible("login-failure-screen", 120)) return true;
+    return false;
   }
 
   function startupReady() {

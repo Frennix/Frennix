@@ -133,20 +133,22 @@ const bootShellScript = `
     return false;
   }
 
+  function markerVisible(id, minHeight) {
+    return elementVisible(id, minHeight || 40);
+  }
+
   function visibleDestination() {
     if (feedDestinationReady()) return true;
-    var ids = [
-      "auth-login-screen",
-      "startup-retry-screen",
-      "login-failure-screen",
-      "authenticated-startup-fallback",
-      "startup-diagnostic-panel",
-      "onboarding-screen",
-      "web-authenticated-startup-fallback"
+    var markers = [
+      ["auth-login-screen", 200],
+      ["startup-retry-screen", 200],
+      ["login-failure-screen", 120],
+      ["onboarding-screen", 120],
+      ["web-authenticated-startup-fallback", 120],
+      ["frennix-startup-failure-overlay", 120]
     ];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el && String(el.textContent || "").replace(/\\s+/g, "").length > 0) return true;
+    for (var i = 0; i < markers.length; i++) {
+      if (markerVisible(markers[i][0], markers[i][1])) return true;
     }
     return false;
   }
@@ -192,18 +194,21 @@ const bootShellScript = `
   }
 
   function showInlineFailure(diag) {
-    var shell = document.getElementById("frennix-boot-shell");
-    if (!shell) return;
-    shell.style.display = "flex";
-    shell.setAttribute("aria-busy", "false");
-    shell.innerHTML =
-      '<div id="authenticated-startup-fallback" style="max-width:360px;text-align:center;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px">' +
+    if (document.getElementById("frennix-startup-failure-overlay")) return;
+    var overlay = document.createElement("div");
+    overlay.id = "frennix-startup-failure-overlay";
+    overlay.setAttribute("role", "alert");
+    overlay.style.cssText =
+      "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#0A0A0B;padding:20px;";
+    overlay.innerHTML =
+      '<div style="max-width:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">' +
       '<div style="font-size:18px;font-weight:700">Account loading stalled</div>' +
       '<div style="font-size:14px;opacity:0.85;line-height:20px">We\\'re having trouble loading your account. Please retry or log out.</div>' +
-      '<div id="startup-diagnostic-panel" style="font-size:12px;opacity:0.75">Diagnostic report sent automatically. Tap Copy report to share with support.</div>' +
+      '<div style="font-size:12px;opacity:0.75">Diagnostic report sent automatically. Tap Copy report to share with support.</div>' +
       '<button id="frennix-inline-copy" style="padding:10px 16px;border-radius:8px;border:none;background:#c8ff00;color:#0a0a0b;font-weight:700">Copy report</button>' +
       '<button id="frennix-inline-retry" style="padding:10px 16px;border-radius:8px;border:1px solid #444;background:transparent;color:#f5f5f5">Retry</button>' +
       "</div>";
+    document.body.appendChild(overlay);
     var copyBtn = document.getElementById("frennix-inline-copy");
     if (copyBtn) {
       copyBtn.onclick = function () {
@@ -221,14 +226,10 @@ const bootShellScript = `
   }
 
   function signedOutReady() {
-    if (document.getElementById("auth-login-screen")) return true;
-    if (document.getElementById("startup-retry-screen")) return true;
-    if (document.getElementById("login-failure-screen")) return true;
-    var trace = window.__FRENNIX_MOUNT_TRACE__;
-    if (!trace || !trace.length) return false;
-    return trace.some(function (e) {
-      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "auth-login:mounted";
-    });
+    if (markerVisible("auth-login-screen", 200)) return true;
+    if (markerVisible("startup-retry-screen", 200)) return true;
+    if (markerVisible("login-failure-screen", 120)) return true;
+    return false;
   }
 
   function startupReady() {

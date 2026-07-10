@@ -29,19 +29,34 @@ const bootShellCss = `
 
 const bootShellScript = `
 (function () {
+  function elementVisible(id, minHeight) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    var rect = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (Number(style.opacity) < 0.05) return false;
+    return rect.height >= minHeight && rect.width >= 20;
+  }
   function hideBootShell() {
     var el = document.getElementById("frennix-boot-shell");
     if (el) el.style.display = "none";
   }
   function startupReady() {
-    if (document.getElementById("auth-login-screen")) return true;
-    if (document.getElementById("startup-retry-screen")) return true;
-    if (document.getElementById("login-failure-screen")) return true;
-    var trace = window.__FRENNIX_MOUNT_TRACE__;
-    if (!trace || !trace.length) return false;
-    return trace.some(function (e) {
-      return e.id === "stack:mounted" || e.id === "index-route:mounted" || e.id === "auth-login:mounted";
-    });
+    var markers = [
+      ["auth-login-screen", 200],
+      ["startup-retry-screen", 200],
+      ["login-failure-screen", 120],
+      ["onboarding-screen", 120],
+      ["web-authenticated-startup-fallback", 120],
+      ["frennix-startup-failure-overlay", 120]
+    ];
+    for (var i = 0; i < markers.length; i++) {
+      if (elementVisible(markers[i][0], markers[i][1])) return true;
+    }
+    if (elementVisible("feed-scroll-list", 60)) return true;
+    if (elementVisible("feed-root-container", 100)) return true;
+    return false;
   }
   var iv = setInterval(function () {
     if (startupReady()) {

@@ -19,7 +19,7 @@ function rectH(id: string): number {
   return Math.round(el.getBoundingClientRect().height);
 }
 
-function elementVisible(id: string, minHeight: number): boolean {
+export function isDomElementVisuallyReady(id: string, minHeight: number): boolean {
   if (typeof document === "undefined") return false;
   const el = document.getElementById(id);
   if (!el) return false;
@@ -28,6 +28,10 @@ function elementVisible(id: string, minHeight: number): boolean {
   if (style.display === "none" || style.visibility === "hidden") return false;
   if (Number(style.opacity) < 0.05) return false;
   return rect.height >= minHeight && rect.width >= 20;
+}
+
+function elementVisible(id: string, minHeight: number): boolean {
+  return isDomElementVisuallyReady(id, minHeight);
 }
 
 function tabBarHeight(): number {

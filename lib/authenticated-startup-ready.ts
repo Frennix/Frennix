@@ -1,17 +1,20 @@
 import { Platform } from "react-native";
 import {
   isAuthenticatedFeedVisuallyReady,
+  isDomElementVisuallyReady,
   measureAuthenticatedFeedVisibility,
 } from "@/lib/authenticated-feed-visibility";
 
 /** DOM markers that mean post-login startup reached a visible destination. */
-const DESTINATION_MARKERS = [
-  "onboarding-screen",
-  "startup-retry-screen",
-  "post-login-failure-screen",
-  "authenticated-startup-fallback",
-  "web-authenticated-startup-fallback",
-] as const;
+const DESTINATION_MARKERS: ReadonlyArray<{ id: string; minHeight: number }> = [
+  { id: "onboarding-screen", minHeight: 120 },
+  { id: "startup-retry-screen", minHeight: 200 },
+  { id: "post-login-failure-screen", minHeight: 120 },
+  { id: "web-authenticated-startup-fallback", minHeight: 120 },
+  { id: "frennix-startup-failure-overlay", minHeight: 120 },
+  { id: "auth-login-screen", minHeight: 200 },
+  { id: "login-failure-screen", minHeight: 120 },
+];
 
 /** True when the user can see feed, onboarding, or an explicit error/retry screen. */
 export function isAuthenticatedDestinationReady(): boolean {
@@ -19,16 +22,18 @@ export function isAuthenticatedDestinationReady(): boolean {
 
   if (isAuthenticatedFeedVisuallyReady()) return true;
 
-  for (const id of DESTINATION_MARKERS) {
-    const node = document.getElementById(id);
-    if (!node) continue;
-    const text = (node.textContent ?? "").replace(/\s+/g, " ").trim();
-    if (text.length > 0) return true;
+  for (const marker of DESTINATION_MARKERS) {
+    if (isDomElementVisuallyReady(marker.id, marker.minHeight)) return true;
   }
 
-  const bodyText = (document.body?.innerText ?? "").replace(/\s+/g, " ").trim();
-  if (/Set up profile|Could not load your profile|Could not load feed|Something went wrong|This section could not load|Frennix could not finish loading/i.test(bodyText)) {
-    return true;
+  if (Platform.OS === "web") {
+    const bodyText = (document.body?.innerText ?? "").replace(/\s+/g, " ").trim();
+    if (
+      /Frennix could not finish loading/i.test(bodyText) &&
+      isDomElementVisuallyReady("web-authenticated-startup-fallback", 80)
+    ) {
+      return true;
+    }
   }
 
   return false;
