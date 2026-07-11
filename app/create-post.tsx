@@ -497,7 +497,7 @@ export default function CreatePostScreen() {
     return (
       <>
         <Stack.Screen options={screenOptions} />
-        <View style={styles.loading}>
+        <View style={styles.loading} nativeID="create-post-screen">
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       </>
@@ -507,7 +507,11 @@ export default function CreatePostScreen() {
   return (
     <>
       <Stack.Screen options={screenOptions} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        nativeID="create-post-screen"
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
         <Text style={styles.sectionLabel}>Workout types</Text>
         <View style={styles.chips}>
           {ACTIVITIES.map((activity) => (

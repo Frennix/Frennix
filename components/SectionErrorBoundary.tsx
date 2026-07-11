@@ -86,12 +86,17 @@ export class SectionErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return <View key={resetKey} style={styles.flex}>{this.props.children}</View>;
+    return (
+      <View key={resetKey} style={this.props.compact ? styles.compactWrap : styles.flex}>
+        {this.props.children}
+      </View>
+    );
   }
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minHeight: 0 },
+  compactWrap: { flexGrow: 0, flexShrink: 0, alignSelf: "stretch" },
   container: {
     flex: 1,
     justifyContent: "center",

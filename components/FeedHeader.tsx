@@ -65,17 +65,19 @@ export const FeedHeader = memo(function FeedHeader({
 
       {showStories ? (
         <SectionErrorBoundary label="feed-stories-carousel" compact>
-          <FeedStoriesRow
-            stories={stories}
-            onStoryPress={onStoryPress}
-            onAddStoryPress={openCreateStory}
-          />
+          <View style={styles.storiesWrap}>
+            <FeedStoriesRow
+              stories={stories}
+              onStoryPress={onStoryPress}
+              onAddStoryPress={openCreateStory}
+            />
+          </View>
         </SectionErrorBoundary>
       ) : null}
 
       {showQuickActions ? (
         <SectionErrorBoundary label="feed-quick-actions" compact>
-        <View style={styles.quickActions}>
+        <View style={styles.quickActions} nativeID="feed-quick-actions-row">
           <Pressable style={styles.chip} onPress={openCreatePost}>
             <Text style={styles.chipText}>Share workout</Text>
           </Pressable>
@@ -131,6 +133,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
+    flexShrink: 0,
+    position: "relative",
+    zIndex: 1,
+  },
+  storiesWrap: {
+    flexShrink: 0,
+    marginBottom: spacing.sm,
   },
   chip: {
     paddingHorizontal: spacing.sm,

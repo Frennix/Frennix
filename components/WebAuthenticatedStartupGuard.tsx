@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
-import { usePathname } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
-import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
+import {
+  dismissInlineStartupFailureOverlay,
+  hideFrennixBootShell,
+} from "@/lib/hide-boot-shell";
 import { isAuthenticatedDestinationReady } from "@/lib/authenticated-startup-ready";
 import { measureAuthenticatedFeedVisibility } from "@/lib/authenticated-feed-visibility";
+import {
+  isAuthenticatedStartupComplete,
+  markAuthenticatedStartupComplete,
+} from "@/lib/authenticated-startup-complete";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { reportClientError } from "@/lib/report-client-error";
@@ -31,10 +37,10 @@ function resolveFailureCategory(input: {
 }
 
 /**
- * Web-only guard: structured checkpoints, strict visual readiness, visible fallback.
+ * Web-only guard: protects the initial login/startup flow only.
+ * Does not re-arm on later authenticated navigation (e.g. /create-post modals).
  */
 export function WebAuthenticatedStartupGuard() {
-  const pathname = usePathname();
   const { session, profile, authReady, profileFetchFailed, signOut, refreshProfile } = useAuth();
   const [showFallback, setShowFallback] = useState(false);
   const [failureCategory, setFailureCategory] = useState<WebStartupFailureCategory>("timeout");
@@ -48,11 +54,16 @@ export function WebAuthenticatedStartupGuard() {
       return;
     }
 
-    armedRef.current = true;
-    setShowFallback(false);
-    reportedRef.current = false;
+    if (isAuthenticatedStartupComplete()) {
+      armedRef.current = false;
+      setShowFallback(false);
+      return;
+    }
 
     const evaluate = () => {
+      if (!isAuthenticatedDestinationReady()) return false;
+
+      markAuthenticatedStartupComplete();
       const visibility = measureAuthenticatedFeedVisibility();
       if (visibility.ready) {
         recordWebStartupCheckpoint("feed-root:visible", {
@@ -60,19 +71,25 @@ export function WebAuthenticatedStartupGuard() {
           feedScrollH: visibility.feedScrollH,
           feedTabSceneH: visibility.feedTabSceneH,
         });
-        setShowFallback(false);
-        hideFrennixBootShell();
-        return true;
       }
-      return false;
+      setShowFallback(false);
+      hideFrennixBootShell();
+      return true;
     };
 
     if (evaluate()) return;
 
+    armedRef.current = true;
+    setShowFallback(false);
+    reportedRef.current = false;
+
     const poll = setInterval(evaluate, 250);
     const timer = setTimeout(() => {
       if (!armedRef.current) return;
-      if (isAuthenticatedDestinationReady()) return;
+      if (isAuthenticatedDestinationReady()) {
+        markAuthenticatedStartupComplete();
+        return;
+      }
 
       const visibility = measureAuthenticatedFeedVisibility();
       const category = resolveFailureCategory({
@@ -91,13 +108,16 @@ export function WebAuthenticatedStartupGuard() {
         feedRootOpacity: visibility.feedRootOpacity,
         userId: redactUserId(session.user.id),
       });
-      recordWebStartupCheckpoint("startup:fallback-shown", { category, route: pathname ?? "/" });
+      recordWebStartupCheckpoint("startup:fallback-shown", {
+        category,
+        route: typeof window !== "undefined" ? window.location.pathname : "/",
+      });
 
       if (!reportedRef.current) {
         reportedRef.current = true;
         logDiagnostic("auth", "web authenticated startup fallback shown", "error", {
           userId: redactUserId(session.user.id),
-          path: pathname,
+          path: typeof window !== "undefined" ? window.location.pathname : "/",
           category,
           visibility,
         });
@@ -112,7 +132,7 @@ export function WebAuthenticatedStartupGuard() {
           error: new Error(`Web startup fallback: ${category}`),
           userId: session.user.id,
           email: session.user.email ?? undefined,
-          screen: pathname ?? "/",
+          screen: typeof window !== "undefined" ? window.location.pathname : "/",
           extra: { category, visibility },
         });
       }
@@ -123,17 +143,11 @@ export function WebAuthenticatedStartupGuard() {
     }, AUTHENTICATED_STARTUP_TIMEOUT_MS);
 
     return () => {
+      armedRef.current = false;
       clearInterval(poll);
       clearTimeout(timer);
     };
-  }, [
-    authReady,
-    pathname,
-    profile,
-    profileFetchFailed,
-    session?.user.email,
-    session?.user.id,
-  ]);
+  }, [authReady, profile, profileFetchFailed, session?.user.email, session?.user.id]);
 
   if (!showFallback || !session) return null;
 
@@ -142,7 +156,20 @@ export function WebAuthenticatedStartupGuard() {
       category={failureCategory}
       onRetry={() => {
         clearSafeTransientStartupState();
+        dismissInlineStartupFailureOverlay();
         hideFrennixBootShell();
+        setShowFallback(false);
+
+        if (isAuthenticatedDestinationReady()) {
+          markAuthenticatedStartupComplete();
+          return;
+        }
+
+        if (profile && !profileFetchFailed) {
+          markAuthenticatedStartupComplete();
+          return;
+        }
+
         void refreshProfile(session.user.id).finally(() => {
           if (typeof window !== "undefined") window.location.reload();
         });

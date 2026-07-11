@@ -19,6 +19,7 @@ import {
   readCachedProfile,
   writeCachedProfile,
 } from "@/lib/auth-profile-cache";
+import { clearAuthenticatedStartupComplete } from "@/lib/authenticated-startup-complete";
 import { isSupabaseConfigured } from "@/lib/config";
 import { ensureSupabaseInitialized } from "@/lib/init-supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
@@ -244,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       resolvedProfileUserIdRef.current = null;
       clearCachedProfile();
+      clearAuthenticatedStartupComplete();
       setPasswordRecovery(false);
       setProfileLoading(false);
       setLoading(false);

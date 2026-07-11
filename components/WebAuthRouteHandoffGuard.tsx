@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSegments } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { isAuthenticatedDestinationReady } from "@/lib/authenticated-startup-ready";
+import { isAuthenticatedStartupComplete, markAuthenticatedStartupComplete } from "@/lib/authenticated-startup-complete";
 import {
   collectAuthRouteHandoffMetrics,
   isAuthenticatedHandoffStalled,
@@ -44,6 +45,11 @@ export function WebAuthRouteHandoffGuard() {
       return;
     }
 
+    if (isAuthenticatedStartupComplete()) {
+      setShowRecovery(false);
+      return;
+    }
+
     const metrics = collectAuthRouteHandoffMetrics({
       pathname,
       segments,
@@ -77,6 +83,7 @@ export function WebAuthRouteHandoffGuard() {
     }
 
     if (isAuthenticatedDestinationReady()) {
+      markAuthenticatedStartupComplete();
       setShowRecovery(false);
       hideFrennixBootShell();
       return;

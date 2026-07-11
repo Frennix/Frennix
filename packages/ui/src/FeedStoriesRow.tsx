@@ -1,4 +1,4 @@
-import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { FeedStory } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { formatRelativeTime, formatStreakBadgeLabel } from "./formatRelativeTime";
@@ -61,66 +61,109 @@ function StoryAvatar({
   );
 }
 
+function StoryItem({
+  item,
+  onStoryPress,
+  onAddStoryPress,
+}: {
+  item: FeedStory;
+  onStoryPress?: (story: FeedStory) => void;
+  onAddStoryPress?: () => void;
+}) {
+  const isSelf = item.is_self;
+  const label = storyLabel(item);
+  const streakLabel = formatStreakBadgeLabel(item.workout_streak);
+  const activeStories = item.active_stories ?? [];
+  const hasActiveStory = activeStories.length > 0;
+
+  return (
+    <Pressable
+      style={styles.item}
+      onPress={() => {
+        if (isSelf && !hasActiveStory) {
+          onAddStoryPress?.();
+          return;
+        }
+        if (hasActiveStory) onStoryPress?.(item);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={
+        isSelf
+          ? `Your story, ${streakLabel}, ${label}`
+          : `${item.profile.username} story, ${label}`
+      }
+    >
+      <StoryAvatar story={item} onAddStoryPress={onAddStoryPress} />
+      <Text style={styles.username} numberOfLines={1}>
+        {isSelf ? "Your Story" : item.profile.username}
+      </Text>
+      <Text style={[styles.meta, item.workout_streak > 0 && styles.metaActive]} numberOfLines={1}>
+        {streakLabel}
+      </Text>
+      <Text style={styles.lastWorkout} numberOfLines={2}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedStoriesRowProps) {
   if (!stories.length) return null;
 
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Stories</Text>
-      <FlatList
-        data={stories}
-        horizontal
-        nestedScrollEnabled
-        style={WEB_HORIZONTAL_SCROLL_STYLE}
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.user_id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => {
-          const isSelf = item.is_self;
-          const label = storyLabel(item);
-          const streakLabel = formatStreakBadgeLabel(item.workout_streak);
-          const activeStories = item.active_stories ?? [];
-          const hasActiveStory = activeStories.length > 0;
-
-          return (
-            <Pressable
-              style={styles.item}
-              onPress={() => {
-                if (isSelf && !hasActiveStory) {
-                  onAddStoryPress?.();
-                  return;
-                }
-                if (hasActiveStory) onStoryPress?.(item);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isSelf
-                  ? `Your story, ${streakLabel}, ${label}`
-                  : `${item.profile.username} story, ${label}`
-              }
-            >
-              <StoryAvatar story={item} onAddStoryPress={onAddStoryPress} />
-              <Text style={styles.username} numberOfLines={1}>
-                {isSelf ? "Your Story" : item.profile.username}
-              </Text>
-              <Text style={[styles.meta, item.workout_streak > 0 && styles.metaActive]} numberOfLines={1}>
-                {streakLabel}
-              </Text>
-              <Text style={styles.lastWorkout} numberOfLines={2}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        }}
-      />
+      {Platform.OS === "web" ? (
+        <View style={styles.webListShell}>
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            style={WEB_HORIZONTAL_SCROLL_STYLE}
+            contentContainerStyle={styles.listContent}
+            showsHorizontalScrollIndicator={false}
+          >
+            {stories.map((item) => (
+              <StoryItem
+                key={item.user_id}
+                item={item}
+                onStoryPress={onStoryPress}
+                onAddStoryPress={onAddStoryPress}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      ) : (
+        <FlatList
+          data={stories}
+          horizontal
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.user_id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <StoryItem
+              item={item}
+              onStoryPress={onStoryPress}
+              onAddStoryPress={onAddStoryPress}
+            />
+          )}
+        />
+      )}
     </View>
   );
 }
+
+const STORY_ROW_MIN_HEIGHT = 132;
+const STORY_SECTION_HEIGHT = STORY_ROW_MIN_HEIGHT + 28;
 
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
   Platform.OS === "web"
     ? ({
         touchAction: "pan-x pinch-zoom",
+        height: STORY_ROW_MIN_HEIGHT,
+        minHeight: STORY_ROW_MIN_HEIGHT,
+        flexGrow: 0,
+        flexShrink: 0,
       } as ViewStyle)
     : undefined;
 
@@ -130,6 +173,17 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     paddingBottom: feedLayout.feedChrome.storiesPaddingBottom,
     gap: spacing.xxs,
+    flexShrink: 0,
+    overflow: "visible",
+    ...(Platform.OS === "web"
+      ? ({ minHeight: STORY_SECTION_HEIGHT, flexBasis: "auto" } as ViewStyle)
+      : null),
+  },
+  webListShell: {
+    height: STORY_ROW_MIN_HEIGHT,
+    minHeight: STORY_ROW_MIN_HEIGHT,
+    flexShrink: 0,
+    overflow: "visible",
   },
   sectionTitle: {
     ...typography.bodySmall,
@@ -138,10 +192,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
     paddingHorizontal: spacing.md,
-    marginBottom: -2,
+    marginBottom: spacing.xxs,
   },
   listContent: {
     paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xxs,
     gap: spacing.sm,
   },
   item: {
