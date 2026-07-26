@@ -18,8 +18,8 @@ CREATE INDEX IF NOT EXISTS idx_challenges_public_active
   WHERE is_public = true;
 
 CREATE INDEX IF NOT EXISTS idx_challenges_featured
-  ON public.challenges (is_featured)
-  WHERE is_featured = true AND end_date > now();
+  ON public.challenges (is_featured, end_date DESC)
+  WHERE is_featured = true;
 
 CREATE TABLE IF NOT EXISTS public.challenge_check_ins (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
