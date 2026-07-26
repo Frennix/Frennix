@@ -14,7 +14,7 @@ This is the approved official Frennix logo. All branding — app UI, website, so
 
 | Asset | Path | Use |
 |-------|------|-----|
-| **Master logo** | `assets/brand/frennix-logo.png` | Official artwork — symbol, FRENNIX wordmark, tagline |
+| **Master logo** | `assets/frennix-logo.PNG` | Founder-provided official artwork (synced to `assets/brand/frennix-logo.png`) |
 | Wordmark export | `assets/brand/frennix-logo-full.png` | Cropped from master — headers, login, signup |
 | Symbol export | `assets/brand/frennix-logo-icon.png` | Cropped from master — compact UI, push notifications |
 | Website / general marketing | `assets/brand/marketing/frennix-logo-official.png` | Exact copy of master |

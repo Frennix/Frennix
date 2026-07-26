@@ -272,5 +272,8 @@ export async function removeTrainingMatch(matchId: string): Promise<Match> {
 }
 
 export async function setMatchingEnabled(userId: string, enabled: boolean): Promise<Profile> {
-  return updateProfile(userId, { matching_enabled: enabled });
+  return updateProfile(userId, {
+    matching_enabled: enabled,
+    discovery_explicitly_disabled_at: enabled ? null : new Date().toISOString(),
+  });
 }

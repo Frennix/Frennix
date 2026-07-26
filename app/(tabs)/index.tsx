@@ -76,6 +76,8 @@ import {
 } from "@/lib/feed-performance";
 import { useImageLightbox } from "@/lib/useImageLightbox";
 import { NewPostsBanner } from "@/components/NewPostsBanner";
+import { LocationFeedBanner } from "@/components/LocationFeedBanner";
+import { useLocationFeedBanner } from "@/lib/useLocationFeedBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
@@ -524,6 +526,9 @@ export default function HomeScreen() {
     },
   });
   markFeedHook("new-posts-banner");
+
+  const { showLocationBanner, dismissLocationBanner } = useLocationFeedBanner(viewerProfile);
+  markFeedHook("location-feed-banner");
 
   const scrollFeedToTop = useCallback(() => {
     if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
@@ -1055,6 +1060,13 @@ export default function HomeScreen() {
       </View>
       {showBanner && !storyVisible ? (
         <NewPostsBanner count={newPostCount} onPress={() => void handleNewPostsBannerPress()} />
+      ) : null}
+      {showLocationBanner && !storyVisible ? (
+        <LocationFeedBanner
+          visible
+          onEnable={() => pushScreen("/privacy-settings")}
+          onDismiss={() => void dismissLocationBanner()}
+        />
       ) : null}
       <FeedRenderTraceProbe id="feed:ui:post-action-sheets">{postActionSheets}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:post-interaction-sheet">{interactionSheet}</FeedRenderTraceProbe>

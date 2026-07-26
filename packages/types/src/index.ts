@@ -41,6 +41,9 @@ export interface MessageReaction {
 
 export type ProfileVisibility = "public" | "followers" | "private";
 
+/** How a user's location appears on their public profile. */
+export type LocationDisplayMode = "city_state" | "distance_only" | "hidden";
+
 export type PostType = "workout_update" | "text" | "photo" | "video";
 
 export type GroupMemberRole = "owner" | "admin" | "member";
@@ -258,6 +261,24 @@ export interface Profile {
   discovery_radius_miles?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** US state / region — shown with city when location display allows. */
+  state?: string | null;
+  /** Use approximate coordinates for nearby match ranking. Own profile only from API. */
+  use_location_for_matching?: boolean | null;
+  /** Show city and state on public profile when display mode allows. Own profile only. */
+  show_city_state?: boolean | null;
+  /** Show approximate distance bucket to viewers with location. Own profile only. */
+  show_approximate_distance?: boolean | null;
+  /** Public location display: city_state | distance_only | hidden. Own profile only. */
+  location_display_mode?: LocationDisplayMode | null;
+  /** Set when user explicitly disables Appear in Frennix Match. Own profile only. */
+  discovery_explicitly_disabled_at?: string | null;
+  /** One-time location onboarding completed. Own profile only. */
+  location_prompt_completed_at?: string | null;
+  /** Maybe Later on location prompt — shows banner. Own profile only. */
+  location_prompt_dismissed_at?: string | null;
+  /** Approximate distance label for other users — never raw coordinates. */
+  distance_bucket_label?: string | null;
   /** Lifestyle Matching — optional parent / schedule fields. */
   parent_status?: ParentStatus | null;
   parent_type?: ParentType | null;

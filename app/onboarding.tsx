@@ -33,6 +33,9 @@ import {
   EMPTY_LIFESTYLE_FIELDS,
 } from "@/lib/lifestyle-matching";
 import type { LifestyleProfileFields } from "@frennix/types";
+import { buildDefaultDiscoverySettings } from "@frennix/api";
+import { LocationOnboardingStep } from "@/components/LocationOnboardingStep";
+import type { GeocodedPlace } from "@/lib/location-geocode";
 import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui";
 
 const SUCCESS_NAV_DELAY_MS = 2000;
@@ -46,7 +49,7 @@ const onboardingSchema = z.object({
     .regex(/^[a-z0-9_]+$/, "Lowercase letters, numbers, underscores only"),
   displayName: z.string().min(1, "Display name is required"),
   bio: z.string().optional(),
-  city: z.string().min(1, "City helps nearby athletes find you"),
+  city: z.string().optional(),
   gender: z.enum(GENDERS, { required_error: "Select your gender" }),
   matchPreference: z.enum(["same", "opposite", "any"]),
   goals: z.array(z.string()).min(1, "Pick at least one goal"),
@@ -81,6 +84,7 @@ function OnboardingContent() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [lifestyle, setLifestyle] = useState<LifestyleProfileFields>(EMPTY_LIFESTYLE_FIELDS);
+  const [savedLocation, setSavedLocation] = useState<GeocodedPlace | null>(null);
   const submittingRef = useRef(false);
   const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -150,12 +154,19 @@ function OnboardingContent() {
     submittingRef.current = true;
     setSubmitError("");
     try {
+      const hasLocation =
+        savedLocation?.latitude != null && savedLocation?.longitude != null;
+      const discoveryDefaults = buildDefaultDiscoverySettings(hasLocation);
+
       const upsertPayload = {
         id: userId,
         username: data.username.toLowerCase(),
         display_name: data.displayName,
         bio: data.bio || null,
-        city: data.city || null,
+        city: savedLocation?.city ?? data.city?.trim() ?? null,
+        state: savedLocation?.state ?? null,
+        latitude: savedLocation?.latitude ?? null,
+        longitude: savedLocation?.longitude ?? null,
         fitness_goals: data.goals,
         activities: data.activities,
         gender: data.gender,
@@ -163,6 +174,7 @@ function OnboardingContent() {
         avatar_url: null as string | null,
         onboarding_complete: true,
         visibility: "public" as const,
+        ...discoveryDefaults,
         ...buildLifestyleProfilePatch(lifestyle),
       };
 
@@ -184,7 +196,7 @@ function OnboardingContent() {
       await refreshProfile(saved);
       setSubmitSuccess(true);
       navigateTimeoutRef.current = setTimeout(() => {
-        router.replace("/matching-settings?welcome=1");
+        router.replace("/(tabs)");
         submittingRef.current = false;
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
@@ -203,21 +215,24 @@ function OnboardingContent() {
 
   async function nextStep() {
     if (step === 0) {
-      const ok = await trigger(["username", "displayName", "city"]);
-      if (ok) setStep(1);
+      setStep(1);
     } else if (step === 1) {
-      const ok = await trigger(["gender", "matchPreference"]);
+      const ok = await trigger(["username", "displayName"]);
       if (ok) setStep(2);
     } else if (step === 2) {
-      const ok = await trigger(["goals"]);
+      const ok = await trigger(["gender", "matchPreference"]);
       if (ok) setStep(3);
     } else if (step === 3) {
-      const ok = await trigger(["activities"]);
+      const ok = await trigger(["goals"]);
       if (ok) setStep(4);
+    } else if (step === 4) {
+      const ok = await trigger(["activities"]);
+      if (ok) setStep(5);
     }
   }
 
   const stepTitles = [
+    "Location & discovery",
     "Your profile",
     "About you",
     "Your goals",
@@ -265,6 +280,17 @@ function OnboardingContent() {
       <Text style={styles.stepHeading}>{stepTitles[step]}</Text>
 
       <View style={step === 0 ? styles.stepPanel : styles.hiddenStep} pointerEvents={step === 0 ? "auto" : "none"}>
+        <LocationOnboardingStep
+          onLocationResolved={(place) => {
+            setSavedLocation(place);
+            if (place) {
+              setValue("city", place.city, { shouldValidate: true });
+            }
+          }}
+        />
+      </View>
+
+      <View style={step === 1 ? styles.stepPanel : styles.hiddenStep} pointerEvents={step === 1 ? "auto" : "none"}>
           <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
             <Avatar uri={avatarUri} name={watch("displayName")} size={96} />
             <Text style={styles.avatarHint}>Tap to add photo</Text>
@@ -278,7 +304,7 @@ function OnboardingContent() {
                 value={value}
                 onChangeText={(t) => onChange(t.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                 autoCapitalize="none"
-                error={step === 0 ? errors.username?.message : undefined}
+                error={step === 1 ? errors.username?.message : undefined}
               />
             )}
           />
@@ -290,7 +316,7 @@ function OnboardingContent() {
                 label="Display name"
                 value={value}
                 onChangeText={onChange}
-                error={step === 0 ? errors.displayName?.message : undefined}
+                error={step === 1 ? errors.displayName?.message : undefined}
               />
             )}
           />
@@ -301,21 +327,33 @@ function OnboardingContent() {
               <Input label="Bio" value={value} onChangeText={onChange} multiline />
             )}
           />
-          <Controller
-            control={control}
-            name="city"
-            render={({ field: { onChange, value } }) => (
-              <Input
-                label="City"
-                value={value}
-                onChangeText={onChange}
-                error={step === 0 ? errors.city?.message : undefined}
-              />
-            )}
-          />
+          {!savedLocation ? (
+            <Controller
+              control={control}
+              name="city"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="City (optional)"
+                  value={value}
+                  onChangeText={onChange}
+                  error={step === 1 ? errors.city?.message : undefined}
+                />
+              )}
+            />
+          ) : (
+            <Text style={styles.sectionHint}>
+              Location saved: {savedLocation.city}
+              {savedLocation.state ? `, ${savedLocation.state}` : ""}. You can change this later in
+              Privacy & Discovery settings.
+            </Text>
+          )}
+          <Text style={styles.sectionHint}>
+            You&apos;ll appear in Frennix Match by default. Approximate location helps nearby
+            recommendations — you can adjust privacy anytime in settings.
+          </Text>
       </View>
 
-      {step === 1 ? (
+      {step === 2 ? (
         <View style={styles.stepPanel}>
           <Text style={styles.sectionLabel}>Your gender</Text>
           <Text style={styles.sectionHint}>
@@ -355,7 +393,7 @@ function OnboardingContent() {
         </View>
       ) : null}
 
-      {step === 2 ? (
+      {step === 3 ? (
         <View style={styles.stepPanel}>
           <Text style={styles.sectionHint}>Pick at least one goal so training partners know what you are working toward.</Text>
           <View style={styles.chips}>
@@ -375,7 +413,7 @@ function OnboardingContent() {
         </View>
       ) : null}
 
-      {step === 3 ? (
+      {step === 4 ? (
         <View style={styles.stepPanel}>
           <Text style={styles.sectionHint}>Pick at least one workout style so partners know how you train.</Text>
           <View style={styles.chips}>
@@ -395,7 +433,7 @@ function OnboardingContent() {
         </View>
       ) : null}
 
-      {step === 4 ? (
+      {step === 5 ? (
         <View style={styles.stepPanel}>
           <LifestyleProfileSection value={lifestyle} onChange={setLifestyle} compact />
         </View>
@@ -407,14 +445,14 @@ function OnboardingContent() {
         isSubmitting={isSubmitting || uploadingAvatar}
         isSuccess={submitSuccess}
         submittingLabel={uploadingAvatar ? "Uploading photo…" : "Setting up your profile…"}
-        successLabel="Welcome to Frennix! Next, set up training partner discovery…"
+        successLabel="Welcome to Frennix! Your profile and discovery settings are ready."
       />
 
       <View style={styles.footer}>
         {step > 0 ? (
           <Button title="Back" variant="secondary" onPress={prevStep} disabled={isSubmitting || submitSuccess} />
         ) : null}
-        {step < 4 ? (
+        {step < 5 ? (
           <Button title="Continue" onPress={nextStep} />
         ) : (
           <>

@@ -108,3 +108,12 @@ export function withinDiscoveryRadius(
   if (radius == null || distanceMiles == null) return false;
   return distanceMiles <= radius;
 }
+
+/** Human-readable approximate distance bucket — never expose precise miles publicly. */
+export function formatDistanceBucketLabel(miles: number | null | undefined): string | null {
+  if (miles == null || Number.isNaN(miles) || miles < 0) return null;
+  if (miles < 5) return "Less than 5 miles away";
+  if (miles <= 10) return "5–10 miles away";
+  if (miles <= 25) return "10–25 miles away";
+  return "More than 25 miles away";
+}

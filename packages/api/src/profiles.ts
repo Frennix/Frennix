@@ -124,6 +124,7 @@ export async function discoverProfiles(
     .select("*")
     .eq("onboarding_complete", true)
     .eq("visibility", "public")
+    .eq("matching_enabled", true)
     .limit(60);
 
   const lifestyle = filters?.lifestyle;

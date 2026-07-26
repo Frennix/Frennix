@@ -98,6 +98,7 @@ export default function MatchingSettingsScreen() {
   const { welcome } = useLocalSearchParams<{ welcome?: string }>();
   const showWelcome = welcome === "1";
 
+  const [saving, setSaving] = useState(false);
   const [discoveryEnabled, setDiscoveryEnabled] = useState(false);
   const [gender, setGender] = useState<TrainingPartnerGender | null>(null);
   const [partnerPreference, setPartnerPreference] = useState<MatchPreference>("any");

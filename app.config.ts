@@ -24,6 +24,8 @@ const config: ExpoConfig = {
       NSPhotoLibraryUsageDescription:
         "Frennix needs photo library access to share workout content.",
       NSMicrophoneUsageDescription: "Frennix needs microphone access for workout videos.",
+      NSLocationWhenInUseUsageDescription:
+        "Frennix uses your approximate location to recommend nearby training partners, workouts, and events. Only your city-level location is saved — never your exact address.",
       UIBackgroundModes: ["remote-notification"],
     },
   },
@@ -33,10 +35,18 @@ const config: ExpoConfig = {
       backgroundColor: "#0A0A0B",
     },
     package: "com.frennix.app",
+    permissions: ["ACCESS_COARSE_LOCATION"],
   },
   plugins: [
     "expo-router",
     "expo-secure-store",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Frennix uses your approximate location to recommend nearby training partners, workouts, and events. Only your city-level location is saved — never your exact address.",
+      },
+    ],
     [
       "expo-notifications",
       {

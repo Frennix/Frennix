@@ -186,8 +186,8 @@ export default function SettingsScreen() {
 
       <Text style={styles.section}>Privacy</Text>
       <Pressable onPress={() => pushScreen("/privacy-settings")}>
-        <Text style={styles.link}>Privacy settings</Text>
-        <Text style={styles.linkHint}>Online status and visibility controls</Text>
+        <Text style={styles.link}>Privacy & Discovery</Text>
+        <Text style={styles.linkHint}>Match visibility, location, and online status</Text>
       </Pressable>
 
       <Text style={styles.section}>Notifications</Text>

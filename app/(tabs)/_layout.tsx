@@ -12,6 +12,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
 import { NotificationOnboardingPrompt } from "@/components/NotificationOnboardingPrompt";
+import { LocationDiscoveryPrompt } from "@/components/LocationDiscoveryPrompt";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
@@ -95,6 +96,7 @@ const TabsShell = memo(function TabsShell() {
       >
         <WhatsNewLaunchPrompt />
         <NotificationOnboardingPrompt />
+        <LocationDiscoveryPrompt />
       </PostLoginShellErrorBoundary>
       <TabPrefetchCoordinator />
       <View

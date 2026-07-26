@@ -11,25 +11,25 @@ import {
 import { CachedAssetImage } from "@frennix/ui";
 
 /**
- * Official Frennix logo — always loads from `assets/brand/frennix-logo.png` (master)
- * or layout exports cropped from that master. Do not substitute alternate artwork.
+ * Official Frennix logo — master at `assets/frennix-logo.PNG` (also synced to assets/brand/).
+ * Layout exports are proportional crops of the master — not separate designs.
  */
 export type FrennixLogoVariant = "full" | "icon" | "mark";
 
 const SOURCES: Record<FrennixLogoVariant, number> = {
   /** Cropped from master — symbol + FRENNIX wordmark (no tagline) */
   full: require("@/assets/brand/frennix-logo-full.png"),
-  /** Cropped from master — symbol only */
+  /** Cropped from master — shield symbol only */
   icon: require("@/assets/brand/frennix-logo-icon.png"),
   /** Official master — full artwork with CONNECT. TRAIN. GROW. tagline */
-  mark: require("@/assets/brand/frennix-logo.png"),
+  mark: require("@/assets/frennix-logo.PNG"),
 };
 
 /** Width / height for each variant (from official master exports). */
 const ASPECT_RATIO: Record<FrennixLogoVariant, number> = {
-  full: 688 / 597,
+  full: 1254 / 1020,
   icon: 1,
-  mark: 698 / 623,
+  mark: 1,
 };
 
 const DEFAULT_HEIGHT: Record<FrennixLogoVariant, number> = {

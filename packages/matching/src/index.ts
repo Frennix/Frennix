@@ -43,6 +43,7 @@ export {
   coerceStringArray,
   distanceMilesBetween,
   environmentsCompatible,
+  formatDistanceBucketLabel,
   getSharedValues,
   gymsMatch,
   isRecentlyActive,
