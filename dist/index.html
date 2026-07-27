@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 6f3a34a0</title>
+    <title>Frennix · 36a43ddc</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,10 +26,10 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="6f3a34a04fd4aa5ddba55dc54bdddf50661327d5" />
-    <meta name="frennix-build-bundle" content="index-87af7db85da5748fe8a48329d003e67a.js" />
-    <meta name="frennix-build-at" content="2026-07-11T00:38:36.938Z" />
-    <meta name="frennix-sw-version" content="20260710-startup-guard-v1" />
+    <meta name="frennix-build-sha" content="36a43ddc4416c3b01e396bf00e1ec7bf61c79827" />
+    <meta name="frennix-build-bundle" content="index-9a9f214d518bb82c4528fa079a1711d5.js" />
+    <meta name="frennix-build-at" content="2026-07-27T18:46:31.945Z" />
+    <meta name="frennix-sw-version" content="20260727-pwa-auto-update-v1" />
       <style id="frennix-web-scroll">
   :root {
     --frennix-tab-header-h: 52px;
@@ -209,25 +209,54 @@
         Still loading — check your connection or reopen the app.
       </div>
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="6f3a34a04fd4aa5ddba55dc54bdddf50661327d5" data-bundle="index-87af7db85da5748fe8a48329d003e67a.js" data-sw="20260710-startup-guard-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="36a43ddc4416c3b01e396bf00e1ec7bf61c79827" data-bundle="index-9a9f214d518bb82c4528fa079a1711d5.js" data-sw="20260727-pwa-auto-update-v1"></div>
+    <script id="frennix-pwa-early-update">
+(function () {
+  var RELOAD_KEY = "frennix:pwa-update-reload";
+  function isStandalone() {
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.navigator.standalone === true
+    );
+  }
+  function localSha() {
+    var stamp = document.getElementById("frennix-build-stamp");
+    if (stamp && stamp.getAttribute("data-sha")) return stamp.getAttribute("data-sha");
+    var meta = document.querySelector('meta[name="frennix-build-sha"]');
+    return meta ? meta.getAttribute("content") : null;
+  }
+  function remoteSha(html) {
+    var m =
+      html.match(/data-sha="([^"]+)"/) ||
+      html.match(/name="frennix-build-sha"\s+content="([^"]+)"/);
+    return m ? m[1] : null;
+  }
+  if (!isStandalone()) return;
+  var current = localSha();
+  if (!current) return;
+  var url = window.location.href.split("#")[0];
+  url += (url.indexOf("?") >= 0 ? "&" : "?") + "frennix_build_check=" + Date.now();
+  fetch(url, { cache: "no-store", credentials: "same-origin" })
+    .then(function (res) { return res.text(); })
+    .then(function (html) {
+      var latest = remoteSha(html);
+      if (!latest || latest === current) return;
+      if (sessionStorage.getItem(RELOAD_KEY) === latest) return;
+      sessionStorage.setItem(RELOAD_KEY, latest);
+      window.location.reload();
+    })
+    .catch(function () {});
+})();
+    </script>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-87af7db85da5748fe8a48329d003e67a.js?v=6f3a34a0" defer></script>
-    
-    <script id="frennix-pwa-shell">
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js?v=6f3a34a0", { scope: "/", updateViaCache: "none" }).catch(function (err) {
-            console.warn("[frennix-pwa] SW register failed", err);
-          });
-        });
-      }
-    </script>
-  
+  <script src="/_expo/static/js/web/index-9a9f214d518bb82c4528fa079a1711d5.js?v=36a43ddc" defer></script>
+
     <script id="frennix-boot-shell-script">
 (function () {
   var STALL_MS = 5000;

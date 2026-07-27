@@ -7,6 +7,10 @@ function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
+function assertExcludes(haystack: string, needle: string, label: string) {
+  if (haystack.includes(needle)) throw new Error(`${label}: expected source NOT to include "${needle}"`);
+}
+
 function assertIncludes(haystack: string, needle: string, label: string) {
   assert(haystack.includes(needle), `${label}: expected source to include "${needle}"`);
 }
@@ -26,7 +30,7 @@ function testPublicAssets() {
   const sw = read("public/sw.js");
   assertIncludes(sw, "skipWaiting", "sw install");
   assertIncludes(sw, "clients.claim", "sw activate");
-  assertIncludes(sw, "frennix-shell-v3", "sw cache version");
+  assertIncludes(sw, "frennix-shell-v8", "sw cache version");
   assertIncludes(sw, "FRENNIX_SW_VERSION", "sw version constant");
 }
 
@@ -37,7 +41,8 @@ function testBuildPipeline() {
   const patch = read("scripts/patch-web-html.js");
   assertIncludes(patch, "manifest.webmanifest", "patch manifest link");
   assertIncludes(patch, "apple-mobile-web-app-capable", "patch apple PWA meta");
-  assertIncludes(patch, 'register("/sw.js")', "patch sw registration");
+  assertIncludes(patch, "frennix-pwa-early-update", "patch early pwa update");
+  assertExcludes(patch, 'register("/sw.js")', "patch no duplicate sw register");
 
   const copyScript = read("scripts/copy-pwa-assets.mjs");
   assertIncludes(copyScript, "public", "copy script public dir");
@@ -64,7 +69,7 @@ function testComponents() {
   assertIncludes(webPush, "subscribeToWebPush", "web push subscribe");
 
   const bootstrap = read("components/PwaBootstrap.tsx");
-  assertIncludes(bootstrap, "ensurePwaServiceWorkerReady", "pwa bootstrap");
+  assertIncludes(bootstrap, "runPwaUpdateCheck", "pwa bootstrap update check");
 
   const layout = read("app/_layout.tsx");
   assertIncludes(layout, "PwaBootstrap", "layout pwa bootstrap");

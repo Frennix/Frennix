@@ -22,7 +22,7 @@ function loadEnvVar(name) {
 }
 
 const PWA_PATCH_ID = "frennix-pwa-shell";
-const SW_VERSION = "20260727-location-discovery-v1";
+const SW_VERSION = "20260727-pwa-auto-update-v1";
 
 function resolveBuildSha() {
   try {
@@ -40,15 +40,46 @@ const pwaHeadTags = `
     <meta name="apple-mobile-web-app-title" content="Frennix" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />`;
 
-const pwaBootScript = `
-    <script id="${PWA_PATCH_ID}">
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js?v=${buildSha.slice(0, 8)}", { scope: "/", updateViaCache: "none" }).catch(function (err) {
-            console.warn("[frennix-pwa] SW register failed", err);
-          });
-        });
-      }
+/** Early standalone PWA update — runs before the JS bundle so stale shells self-reload. */
+const earlyPwaUpdateScript = `
+    <script id="frennix-pwa-early-update">
+(function () {
+  var RELOAD_KEY = "frennix:pwa-update-reload";
+  function isStandalone() {
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.navigator.standalone === true
+    );
+  }
+  function localSha() {
+    var stamp = document.getElementById("frennix-build-stamp");
+    if (stamp && stamp.getAttribute("data-sha")) return stamp.getAttribute("data-sha");
+    var meta = document.querySelector('meta[name="frennix-build-sha"]');
+    return meta ? meta.getAttribute("content") : null;
+  }
+  function remoteSha(html) {
+    var m =
+      html.match(/data-sha="([^"]+)"/) ||
+      html.match(/name="frennix-build-sha"\\s+content="([^"]+)"/);
+    return m ? m[1] : null;
+  }
+  if (!isStandalone()) return;
+  var current = localSha();
+  if (!current) return;
+  var url = window.location.href.split("#")[0];
+  url += (url.indexOf("?") >= 0 ? "&" : "?") + "frennix_build_check=" + Date.now();
+  fetch(url, { cache: "no-store", credentials: "same-origin" })
+    .then(function (res) { return res.text(); })
+    .then(function (html) {
+      var latest = remoteSha(html);
+      if (!latest || latest === current) return;
+      if (sessionStorage.getItem(RELOAD_KEY) === latest) return;
+      sessionStorage.setItem(RELOAD_KEY, latest);
+      window.location.reload();
+    })
+    .catch(function () {});
+})();
     </script>`;
 
 const bootShellCss = `
@@ -347,14 +378,17 @@ if (!html.includes('rel="manifest"')) {
   html = html.replace("</head>", `    ${pwaHeadTags}\n  </head>`);
 }
 
-if (!html.includes(`id="${PWA_PATCH_ID}"`)) {
-  html = html.replace("</body>", `    ${pwaBootScript}\n  </body>`);
+if (!html.includes('id="frennix-pwa-early-update"')) {
+  html = html.replace(buildStampHtml, `${buildStampHtml}\n    ${earlyPwaUpdateScript.trim()}`);
 } else {
   html = html.replace(
-    new RegExp(`<script id="${PWA_PATCH_ID}">[\\s\\S]*?</script>`),
-    pwaBootScript.trim()
+    /<script id="frennix-pwa-early-update">[\s\S]*?<\/script>/,
+    earlyPwaUpdateScript.trim()
   );
 }
+
+// Legacy inline SW registration removed — PwaBootstrap registers /sw.js once.
+html = html.replace(new RegExp(`<script id="${PWA_PATCH_ID}">[\\s\\S]*?</script>\\s*`, "g"), "");
 
 const vapidPublicKey =
   process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY || loadEnvVar("EXPO_PUBLIC_VAPID_PUBLIC_KEY");

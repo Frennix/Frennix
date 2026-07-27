@@ -1,21 +1,57 @@
 import { Platform } from "react-native";
+import {
+  checkForDeployedBuildUpdate,
+  reloadForPwaUpdate,
+  type PwaBuildUpdateCheck,
+} from "@/lib/pwa-app-update";
+import { isWebStandalone } from "@/lib/pwa";
 import { pushLog } from "@/lib/web-push-diagnostics";
 
 /** Keep in sync with FRENNIX_SW_VERSION in public/sw.js */
-export const PWA_SW_VERSION = "20260727-location-discovery-v1";
+export const PWA_SW_VERSION = "20260727-pwa-auto-update-v1";
 
 const SW_PATH = "/sw.js";
 const VERSION_PATTERN = /FRENNIX_SW_VERSION\s*=\s*["']([^"']+)["']/;
 
 let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null;
+let controllerReloadHookInstalled = false;
+let controllerExistedOnBoot = false;
+let controllerReloadScheduled = false;
 
 export type ServiceWorkerEnsureResult =
   | { ok: true; registration: ServiceWorkerRegistration; latestVersion: string | null; updated: boolean }
   | { ok: false; reason: "unsupported" }
   | { ok: false; reason: "needs_reopen"; latestVersion: string | null };
 
+export type PwaUpdateRunResult = {
+  buildCheck: PwaBuildUpdateCheck;
+  sw: ServiceWorkerEnsureResult;
+  reloaded: boolean;
+  showUpdatePrompt: boolean;
+};
+
 function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function installControllerReloadListener(): void {
+  if (controllerReloadHookInstalled || typeof navigator === "undefined" || !navigator.serviceWorker) {
+    return;
+  }
+
+  controllerReloadHookInstalled = true;
+  controllerExistedOnBoot = Boolean(navigator.serviceWorker.controller);
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!controllerExistedOnBoot) {
+      controllerExistedOnBoot = true;
+      return;
+    }
+    if (controllerReloadScheduled) return;
+    controllerReloadScheduled = true;
+    pushLog("sw.controllerchange.reload");
+    reloadForPwaUpdate();
+  });
 }
 
 function waitForServiceWorkerController(timeoutMs: number): Promise<boolean> {
@@ -99,18 +135,23 @@ function attachUpdateListener(registration: ServiceWorkerRegistration): void {
     if (!installing) return;
     installing.addEventListener("statechange", () => {
       pushLog("sw.state", installing.state, { scriptURL: installing.scriptURL });
-      if (installing.state === "installed" && registration.waiting) {
+      if (installing.state === "installed" && navigator.serviceWorker.controller) {
         activateWaitingWorker(registration);
       }
     });
   });
+
+  if (registration.waiting && navigator.serviceWorker.controller) {
+    activateWaitingWorker(registration);
+  }
 }
 
-/** Register the PWA service worker on web (idempotent). */
+/** Register the PWA service worker on web (idempotent, single URL). */
 export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (Platform.OS !== "web" || typeof navigator === "undefined") return null;
   if (!("serviceWorker" in navigator)) return null;
 
+  installControllerReloadListener();
   pushLog("sw.register.start", SW_PATH, { origin: window.location.origin });
 
   if (!registrationPromise) {
@@ -128,6 +169,7 @@ export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistrat
       .catch((error) => {
         pushLog("sw.register.error", String(error));
         console.warn("[frennix-pwa] service worker registration failed", error);
+        registrationPromise = null;
         return null;
       });
   }
@@ -143,6 +185,8 @@ export async function ensurePwaServiceWorkerReady(): Promise<ServiceWorkerEnsure
   if (Platform.OS !== "web" || typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return { ok: false, reason: "unsupported" };
   }
+
+  installControllerReloadListener();
 
   const latestVersion = await fetchLatestServiceWorkerVersion();
   pushLog("sw.version.latest", latestVersion ?? PWA_SW_VERSION);
@@ -165,7 +209,7 @@ export async function ensurePwaServiceWorkerReady(): Promise<ServiceWorkerEnsure
     await waitForInstallingWorker(registration, 6000);
   }
 
-  if (registration.waiting) {
+  if (registration.waiting && navigator.serviceWorker.controller) {
     activateWaitingWorker(registration);
     await waitMs(400);
   }
@@ -203,6 +247,43 @@ export async function ensurePwaServiceWorkerReady(): Promise<ServiceWorkerEnsure
   });
 
   return { ok: true, registration: readyRegistration, latestVersion, updated };
+}
+
+/** Standalone PWA: check deployed build + service worker, reload when safe. */
+export async function runPwaUpdateCheck(): Promise<PwaUpdateRunResult> {
+  if (Platform.OS !== "web" || typeof window === "undefined" || !isWebStandalone()) {
+    return {
+      buildCheck: { status: "unknown" },
+      sw: { ok: false, reason: "unsupported" },
+      reloaded: false,
+      showUpdatePrompt: false,
+    };
+  }
+
+  const buildCheck = await checkForDeployedBuildUpdate();
+  if (buildCheck.status === "update_available") {
+    const reloaded = reloadForPwaUpdate(buildCheck.remoteSha);
+    return {
+      buildCheck,
+      sw: { ok: false, reason: "unsupported" },
+      reloaded,
+      showUpdatePrompt: !reloaded,
+    };
+  }
+
+  const sw = await ensurePwaServiceWorkerReady();
+
+  if (sw.ok && sw.updated && navigator.serviceWorker.controller) {
+    const reloaded = reloadForPwaUpdate(sw.latestVersion ?? PWA_SW_VERSION);
+    return { buildCheck, sw, reloaded, showUpdatePrompt: !reloaded };
+  }
+
+  const showUpdatePrompt =
+    buildCheck.status === "unknown" ||
+    (!sw.ok && sw.reason === "needs_reopen") ||
+    Boolean(sw.ok && sw.registration.waiting);
+
+  return { buildCheck, sw, reloaded: false, showUpdatePrompt };
 }
 
 /** Check for a waiting service worker update (call on app resume). */
