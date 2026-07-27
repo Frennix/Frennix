@@ -39,6 +39,7 @@ import {
 import { useFeatureFlag } from "@/lib/useFeatureFlag";
 import { hapticMatch } from "@/lib/haptics";
 import { isTrainingPartnerDiscoveryReady } from "@/lib/training-partner-readiness";
+import { isTrainingPartnerDiscoveryEnabled } from "@/lib/training-partner-discovery-toggle";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button, EmptyState, ScreenSpinner, prefetchCachedImage, colors, spacing, typography } from "@frennix/ui";
 
@@ -84,7 +85,7 @@ export default function TrainingPartnerDiscoveryScreen() {
   );
   const loadStartedAt = useRef(Date.now());
 
-  const discoveryEnabled = profile?.matching_enabled ?? false;
+  const discoveryEnabled = isTrainingPartnerDiscoveryEnabled(profile);
   const profileReady = profile ? isTrainingPartnerDiscoveryReady(profile) : false;
 
   const {

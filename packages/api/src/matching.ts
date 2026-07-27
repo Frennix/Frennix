@@ -14,6 +14,7 @@ import type {
 } from "@frennix/types";
 import { formatSupabaseError } from "./profile-utils";
 import { getProfile, getProfilesByIds, updateProfile } from "./profiles";
+import { setMatchingEnabledWithOptOut } from "./location-discovery";
 import { getWorkoutStreaksForUserIds } from "./matching-streaks";
 import { getSupabase } from "./supabase";
 import { publishPlatformActivity } from "./platform-activity-engine";
@@ -272,8 +273,5 @@ export async function removeTrainingMatch(matchId: string): Promise<Match> {
 }
 
 export async function setMatchingEnabled(userId: string, enabled: boolean): Promise<Profile> {
-  return updateProfile(userId, {
-    matching_enabled: enabled,
-    discovery_explicitly_disabled_at: enabled ? null : new Date().toISOString(),
-  });
+  return setMatchingEnabledWithOptOut(userId, enabled);
 }

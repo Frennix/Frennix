@@ -7,13 +7,16 @@ import {
   locationDisplayToToggles,
   removeUserLocation,
   saveUserLocation,
-  setMatchingEnabledWithOptOut,
   updateDiscoveryPrivacy,
   updateProfile,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { setPresenceSharingEnabled } from "@/lib/presence";
 import { showAlert } from "@/lib/alerts";
+import {
+  isTrainingPartnerDiscoveryEnabled,
+  setTrainingPartnerDiscoveryEnabled,
+} from "@/lib/training-partner-discovery-toggle";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { ManualLocationSheet } from "@/components/ManualLocationSheet";
 import { requestApproximateDeviceLocation } from "@/lib/device-location";
@@ -56,9 +59,10 @@ export default function PrivacySettingsScreen() {
   const userId = session?.user.id ?? "";
   const [manualVisible, setManualVisible] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [discoverySaving, setDiscoverySaving] = useState(false);
 
   const showOnlineStatus = profile?.show_online_status !== false;
-  const appearInMatch = profile?.matching_enabled ?? true;
+  const appearInMatch = isTrainingPartnerDiscoveryEnabled(profile);
   const useLocationMatching = profile?.use_location_for_matching ?? true;
   const toggles = locationDisplayToToggles(profile?.location_display_mode ?? "city_state");
   const showCityState = profile?.show_city_state ?? toggles.showCityState;
@@ -149,7 +153,23 @@ export default function PrivacySettingsScreen() {
     );
   }
 
-  const discoveryBusy = discoveryMutation.isPending || locationLoading;
+  const discoveryBusy = discoveryMutation.isPending || locationLoading || discoverySaving;
+
+  async function handleAppearInMatchChange(next: boolean) {
+    if (!userId) return;
+    setDiscoverySaving(true);
+    try {
+      const updated = await setTrainingPartnerDiscoveryEnabled(userId, next);
+      await refreshProfile(updated);
+    } catch (error) {
+      showAlert(
+        "Could not update discovery setting",
+        getUserFriendlyErrorMessage(error, "Something went wrong")
+      );
+    } finally {
+      setDiscoverySaving(false);
+    }
+  }
 
   return (
     <>
@@ -164,15 +184,9 @@ export default function PrivacySettingsScreen() {
         <Text style={styles.sectionTitle}>Frennix Match</Text>
         <SettingRow
           title="Appear in Frennix Match"
-          description="When off, you are removed from the training partner deck and nearby match recommendations. Existing matches and messages stay."
+          description="When off, you are removed from the training partner deck and nearby match recommendations. Synced with Training partner preferences. Existing matches and messages stay."
           value={appearInMatch}
-          onValueChange={(next) => {
-            if (!next) {
-              void setMatchingEnabledWithOptOut(userId, false).then(refreshProfile);
-              return;
-            }
-            void setMatchingEnabledWithOptOut(userId, true).then(refreshProfile);
-          }}
+          onValueChange={(next) => void handleAppearInMatchChange(next)}
           disabled={discoveryBusy}
         />
         <SettingRow

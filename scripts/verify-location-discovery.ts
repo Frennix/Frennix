@@ -115,9 +115,39 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "Discovery toggle uses shared matching_enabled setting",
+    run: () => {
+      assertIncludes(
+        "lib/training-partner-discovery-toggle.ts",
+        "setMatchingEnabledWithOptOut",
+        "shared discovery setter"
+      );
+      assertIncludes(
+        "app/matching-settings.tsx",
+        "setTrainingPartnerDiscoveryEnabled",
+        "matching settings shared setter"
+      );
+      assertIncludes(
+        "app/privacy-settings.tsx",
+        "setTrainingPartnerDiscoveryEnabled",
+        "privacy settings shared setter"
+      );
+      assertIncludes(
+        "app/matching-settings.tsx",
+        "isTrainingPartnerDiscoveryEnabled",
+        "matching settings shared reader"
+      );
+      assertIncludes(
+        "packages/api/src/matching.ts",
+        "setMatchingEnabledWithOptOut",
+        "setMatchingEnabled delegates to shared helper"
+      );
+    },
+  },
+  {
     name: "setMatchingEnabled records explicit opt-out",
     run: () => {
-      assertIncludes("packages/api/src/matching.ts", "discovery_explicitly_disabled_at", "opt-out timestamp");
+      assertIncludes("packages/api/src/location-discovery.ts", "discovery_explicitly_disabled_at", "opt-out timestamp");
     },
   },
 ];

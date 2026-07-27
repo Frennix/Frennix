@@ -36,6 +36,7 @@
     "verify:location-discovery": "npx tsx scripts/verify-location-discovery.ts",
     "verify:location-prompt-eligibility": "npx tsx scripts/verify-location-prompt-eligibility.ts",
     "verify:pwa-update": "npx tsx scripts/verify-pwa-update.ts",
+    "verify:training-partner-discovery-sync": "npx tsx scripts/verify-training-partner-discovery-sync.ts",
     "verify:post-workout-types": "npx tsx scripts/verify-post-workout-types.ts",
     "verify:notification-engine-phase0": "npx tsx scripts/verify-notification-engine-phase0.ts",
     "verify:notification-engine-phase1": "npx tsx scripts/verify-notification-engine-phase1.ts",

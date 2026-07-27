@@ -1,8 +1,6 @@
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -10,7 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { setMatchingEnabled, updateProfile } from "@frennix/api";
+import { updateProfile } from "@frennix/api";
 import type { MatchPreference, Profile, SkillLevel, TrainingEnvironment, TrainingScheduleSlot } from "@frennix/types";
 import {
   SKILL_LEVEL_OPTIONS,
@@ -33,25 +31,12 @@ import {
 } from "@/lib/training-partner-readiness";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
+import {
+  confirmDisableTrainingPartnerDiscovery,
+  isTrainingPartnerDiscoveryEnabled,
+  setTrainingPartnerDiscoveryEnabled,
+} from "@/lib/training-partner-discovery-toggle";
 import { Button, Chip, colors, spacing, typography } from "@frennix/ui";
-
-function confirmDisableDiscovery(onConfirm: () => void) {
-  const title = "Hide from training partner discovery?";
-  const message =
-    "You will not appear in the discovery deck and will not see new training partners. Existing training matches stay.";
-
-  if (Platform.OS === "web") {
-    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-
-  Alert.alert(title, message, [
-    { text: "Cancel", style: "cancel" },
-    { text: "Turn off", style: "destructive", onPress: onConfirm },
-  ]);
-}
 
 function TrainingProfilePreview({ profile }: { profile: Profile }) {
   const goals = (profile.fitness_goals ?? []).slice(0, 3).map(formatGoal);
@@ -99,7 +84,7 @@ export default function MatchingSettingsScreen() {
   const showWelcome = welcome === "1";
 
   const [saving, setSaving] = useState(false);
-  const [discoveryEnabled, setDiscoveryEnabled] = useState(false);
+  const [discoverySaving, setDiscoverySaving] = useState(false);
   const [gender, setGender] = useState<TrainingPartnerGender | null>(null);
   const [partnerPreference, setPartnerPreference] = useState<MatchPreference>("any");
   const [skillLevel, setSkillLevel] = useState<SkillLevel | null>(null);
@@ -109,17 +94,31 @@ export default function MatchingSettingsScreen() {
   const [error, setError] = useState("");
 
   const profileReady = profile ? isTrainingPartnerDiscoveryReady(profile) : false;
+  const discoveryEnabled = isTrainingPartnerDiscoveryEnabled(profile);
 
   useEffect(() => {
     if (!profile) return;
-    setDiscoveryEnabled(profile.matching_enabled ?? false);
     setGender((profile.gender as TrainingPartnerGender | null) ?? null);
     setPartnerPreference(profile.match_preference ?? "any");
     setSkillLevel(profile.skill_level ?? null);
     setTrainingSchedules(profile.training_schedules ?? []);
     setTrainingEnvironment(profile.training_environment ?? null);
     setHomeGym(profile.home_gym ?? "");
-  }, [profile?.id, profile?.updated_at, profile?.matching_enabled]);
+  }, [profile?.id, profile?.updated_at]);
+
+  async function persistDiscoveryEnabled(next: boolean) {
+    if (!userId) return;
+    setDiscoverySaving(true);
+    setError("");
+    try {
+      const updated = await setTrainingPartnerDiscoveryEnabled(userId, next);
+      await refreshProfile(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update discovery setting");
+    } finally {
+      setDiscoverySaving(false);
+    }
+  }
 
   function handleDiscoveryToggle(next: boolean) {
     if (next && profile && !isTrainingPartnerDiscoveryReady(profile)) {
@@ -128,12 +127,11 @@ export default function MatchingSettingsScreen() {
     }
 
     if (!next && discoveryEnabled) {
-      confirmDisableDiscovery(() => setDiscoveryEnabled(false));
+      confirmDisableTrainingPartnerDiscovery(() => void persistDiscoveryEnabled(false));
       return;
     }
 
-    setError("");
-    setDiscoveryEnabled(next);
+    void persistDiscoveryEnabled(next);
   }
 
   async function handleSave() {
@@ -161,14 +159,8 @@ export default function MatchingSettingsScreen() {
         training_environment: trainingEnvironment,
         home_gym: homeGym.trim() || null,
       });
-      await setMatchingEnabled(userId, discoveryEnabled);
       await refreshProfile();
-      showAlert(
-        "Preferences saved",
-        discoveryEnabled
-          ? "You can now find training partners who share your goals and workout style."
-          : "Training partner discovery is turned off."
-      );
+      showAlert("Preferences saved", "Your training partner filters have been updated.");
       router.back();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save preferences");
@@ -215,18 +207,20 @@ export default function MatchingSettingsScreen() {
           <Text style={styles.toggleTitle}>Show me in training partner discovery</Text>
           <Text style={styles.toggleDescription}>
             When on, you appear in other athletes&apos; decks and can browse new training partners.
-            Both athletes need discovery enabled to connect.
+            Synced with Privacy &amp; Discovery → Appear in Frennix Match.
           </Text>
         </View>
-        <Switch
-          value={discoveryEnabled}
-          onValueChange={handleDiscoveryToggle}
-          disabled={!profileReady && !discoveryEnabled}
-          trackColor={{ false: colors.border, true: colors.accentMuted }}
-          thumbColor={discoveryEnabled ? colors.accent : colors.textMuted}
-          ios_backgroundColor={colors.border}
-          accessibilityLabel="Show me in training partner discovery"
-        />
+        <View style={styles.toggleSwitchWrap}>
+          <Switch
+            value={discoveryEnabled}
+            onValueChange={handleDiscoveryToggle}
+            disabled={discoverySaving || (!profileReady && !discoveryEnabled)}
+            trackColor={{ false: colors.border, true: colors.accentMuted }}
+            thumbColor={discoveryEnabled ? colors.accent : colors.textMuted}
+            ios_backgroundColor={colors.border}
+            accessibilityLabel="Show me in training partner discovery"
+          />
+        </View>
       </View>
 
       {!profileReady && !discoveryEnabled ? (
@@ -366,16 +360,17 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderRadius: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  toggleText: { flex: 1, gap: 4 },
+  toggleText: { flex: 1, minWidth: 0, gap: 4 },
+  toggleSwitchWrap: { flexShrink: 0, paddingTop: 2 },
   toggleTitle: { ...typography.body, fontWeight: "600", color: colors.text },
   toggleDescription: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   toggleLockedHint: {
