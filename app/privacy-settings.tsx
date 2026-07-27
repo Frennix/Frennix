@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import {
@@ -23,18 +22,28 @@ import { requestApproximateDeviceLocation } from "@/lib/device-location";
 import { formatCityState } from "@/lib/location-geocode";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
+type PrivacyToggleKey =
+  | "appearInMatch"
+  | "useLocationMatching"
+  | "showCityState"
+  | "showApproxDistance"
+  | "hideLocation"
+  | "showOnlineStatus";
+
 function SettingRow({
   title,
   description,
   value,
   onValueChange,
   disabled,
+  saving,
 }: {
   title: string;
   description: string;
   value: boolean;
   onValueChange: (next: boolean) => void;
   disabled?: boolean;
+  saving?: boolean;
 }) {
   return (
     <View style={styles.row}>
@@ -42,24 +51,31 @@ function SettingRow({
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowDescription}>{description}</Text>
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-        trackColor={{ false: colors.border, true: colors.accentMuted }}
-        thumbColor={value ? colors.accent : colors.textMuted}
-        ios_backgroundColor={colors.border}
-      />
+      <View style={styles.rowSwitchWrap}>
+        {saving ? (
+          <ActivityIndicator color={colors.accent} size="small" style={styles.rowSavingSpinner} />
+        ) : null}
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          disabled={disabled || saving}
+          trackColor={{ false: colors.border, true: colors.accentMuted }}
+          thumbColor={value ? colors.accent : colors.textMuted}
+          ios_backgroundColor={colors.border}
+          accessibilityLabel={title}
+        />
+      </View>
     </View>
   );
 }
 
 export default function PrivacySettingsScreen() {
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile, profileFetchFailed, refreshProfile } = useAuth();
   const userId = session?.user.id ?? "";
   const [manualVisible, setManualVisible] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
-  const [discoverySaving, setDiscoverySaving] = useState(false);
+  const [savingKey, setSavingKey] = useState<PrivacyToggleKey | null>(null);
+  const [profileRetrying, setProfileRetrying] = useState(false);
 
   const showOnlineStatus = profile?.show_online_status !== false;
   const appearInMatch = isTrainingPartnerDiscoveryEnabled(profile);
@@ -70,49 +86,42 @@ export default function PrivacySettingsScreen() {
   const hideLocation = toggles.hideLocation;
   const savedLocationLabel = formatCityState(profile?.city, profile?.state);
 
-  const onlineMutation = useMutation({
-    mutationFn: async (next: boolean) => {
-      if (!userId) throw new Error("Not signed in");
-      const { setPresence } = await import("@frennix/api");
-      const updated = await updateProfile(userId, { show_online_status: next });
-      setPresenceSharingEnabled(next);
-      if (!next) {
-        await setPresence(false, "privacy-show-online-status-off");
-      }
-      await refreshProfile(updated);
-    },
-    onError: (error) => {
-      showAlert(
-        "Could not update privacy setting",
-        getUserFriendlyErrorMessage(error, "Something went wrong")
-      );
-    },
-  });
+  const isSaving = useCallback((key: PrivacyToggleKey) => savingKey === key, [savingKey]);
 
-  const discoveryMutation = useMutation({
-    mutationFn: async (patch: Parameters<typeof updateDiscoveryPrivacy>[1]) => {
-      if (!userId) throw new Error("Not signed in");
-      const updated = await updateDiscoveryPrivacy(userId, patch);
-      await refreshProfile(updated);
+  const runToggleSave = useCallback(
+    async (key: PrivacyToggleKey, task: () => Promise<void>) => {
+      if (!userId) {
+        showAlert("Not signed in", "Sign in again to update privacy settings.");
+        return;
+      }
+      setSavingKey(key);
+      try {
+        await task();
+      } catch (error) {
+        showAlert(
+          "Could not update privacy setting",
+          getUserFriendlyErrorMessage(error, "Something went wrong")
+        );
+      } finally {
+        setSavingKey(null);
+      }
     },
-    onError: (error) => {
-      showAlert(
-        "Could not update discovery settings",
-        getUserFriendlyErrorMessage(error, "Something went wrong")
-      );
-    },
-  });
+    [userId]
+  );
 
   const applyDisplayMode = useCallback(
-    (nextShowCity: boolean, nextShowDistance: boolean, nextHide: boolean) => {
+    (key: PrivacyToggleKey, nextShowCity: boolean, nextShowDistance: boolean, nextHide: boolean) => {
       const mode = deriveLocationDisplayMode(nextShowCity, nextShowDistance, nextHide);
-      discoveryMutation.mutate({
-        show_city_state: nextShowCity,
-        show_approximate_distance: nextShowDistance,
-        location_display_mode: mode,
+      void runToggleSave(key, async () => {
+        const updated = await updateDiscoveryPrivacy(userId, {
+          show_city_state: nextShowCity,
+          show_approximate_distance: nextShowDistance,
+          location_display_mode: mode,
+        });
+        await refreshProfile(updated);
       });
     },
-    [discoveryMutation]
+    [runToggleSave, userId, refreshProfile]
   );
 
   async function handleEnableDeviceLocation() {
@@ -145,30 +154,22 @@ export default function PrivacySettingsScreen() {
     await refreshProfile(updated);
   }
 
+  async function handleRetryProfile() {
+    if (!userId) return;
+    setProfileRetrying(true);
+    try {
+      await refreshProfile(userId);
+    } finally {
+      setProfileRetrying(false);
+    }
+  }
+
   if (!profile) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
-  }
-
-  const discoveryBusy = discoveryMutation.isPending || locationLoading || discoverySaving;
-
-  async function handleAppearInMatchChange(next: boolean) {
-    if (!userId) return;
-    setDiscoverySaving(true);
-    try {
-      const updated = await setTrainingPartnerDiscoveryEnabled(userId, next);
-      await refreshProfile(updated);
-    } catch (error) {
-      showAlert(
-        "Could not update discovery setting",
-        getUserFriendlyErrorMessage(error, "Something went wrong")
-      );
-    } finally {
-      setDiscoverySaving(false);
-    }
   }
 
   return (
@@ -181,20 +182,48 @@ export default function PrivacySettingsScreen() {
           online status. Disabling discovery or location may reduce nearby recommendations.
         </Text>
 
+        {profileFetchFailed ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorTitle}>Could not refresh your profile</Text>
+            <Text style={styles.errorBody}>
+              Settings may be out of date. Retry to load the latest privacy preferences.
+            </Text>
+            <Button
+              title="Retry"
+              variant="secondary"
+              onPress={() => void handleRetryProfile()}
+              loading={profileRetrying}
+            />
+          </View>
+        ) : null}
+
         <Text style={styles.sectionTitle}>Frennix Match</Text>
         <SettingRow
           title="Appear in Frennix Match"
           description="When off, you are removed from the training partner deck and nearby match recommendations. Synced with Training partner preferences. Existing matches and messages stay."
           value={appearInMatch}
-          onValueChange={(next) => void handleAppearInMatchChange(next)}
-          disabled={discoveryBusy}
+          saving={isSaving("appearInMatch")}
+          onValueChange={(next) =>
+            void runToggleSave("appearInMatch", async () => {
+              const updated = await setTrainingPartnerDiscoveryEnabled(userId, next);
+              await refreshProfile(updated);
+            })
+          }
         />
         <SettingRow
           title="Use Location for Nearby Matches"
           description="Uses your approximate city coordinates to rank nearby training partners. Does not share your exact location."
           value={useLocationMatching}
-          onValueChange={(next) => discoveryMutation.mutate({ use_location_for_matching: next })}
-          disabled={discoveryBusy || !savedLocationLabel}
+          saving={isSaving("useLocationMatching")}
+          disabled={!savedLocationLabel}
+          onValueChange={(next) =>
+            void runToggleSave("useLocationMatching", async () => {
+              const updated = await updateDiscoveryPrivacy(userId, {
+                use_location_for_matching: next,
+              });
+              await refreshProfile(updated);
+            })
+          }
         />
 
         <Text style={styles.sectionTitle}>Location visibility</Text>
@@ -202,26 +231,33 @@ export default function PrivacySettingsScreen() {
           title="Show My City and State"
           description="Display your city and state on your public profile when location is not hidden."
           value={showCityState && !hideLocation}
+          saving={isSaving("showCityState")}
+          disabled={hideLocation}
           onValueChange={(next) =>
-            applyDisplayMode(next, showApproxDistance && !next ? true : showApproxDistance, false)
+            applyDisplayMode(
+              "showCityState",
+              next,
+              showApproxDistance && !next ? true : showApproxDistance,
+              false
+            )
           }
-          disabled={discoveryBusy || hideLocation}
         />
         <SettingRow
           title="Show My Approximate Distance"
           description="Show distance ranges like “5–10 miles away” instead of or alongside your city."
           value={showApproxDistance && !hideLocation}
-          onValueChange={(next) => applyDisplayMode(showCityState, next, false)}
-          disabled={discoveryBusy || hideLocation}
+          saving={isSaving("showApproxDistance")}
+          disabled={hideLocation}
+          onValueChange={(next) => applyDisplayMode("showApproxDistance", showCityState, next, false)}
         />
         <SettingRow
           title="Hide My Location"
           description="Hides your city, state, and distance from your public profile. You can still use Frennix and stay discoverable in Match if enabled above."
           value={hideLocation}
+          saving={isSaving("hideLocation")}
           onValueChange={(next) =>
-            applyDisplayMode(showCityState, showApproxDistance, next)
+            applyDisplayMode("hideLocation", showCityState, showApproxDistance, next)
           }
-          disabled={discoveryBusy}
         />
 
         <Text style={styles.sectionTitle}>Saved location</Text>
@@ -261,8 +297,18 @@ export default function PrivacySettingsScreen() {
           title="Show Online Status"
           description="When on, other users can see when you are online or recently active. When off, you appear offline to everyone."
           value={showOnlineStatus}
-          onValueChange={(next) => onlineMutation.mutate(next)}
-          disabled={onlineMutation.isPending}
+          saving={isSaving("showOnlineStatus")}
+          onValueChange={(next) =>
+            void runToggleSave("showOnlineStatus", async () => {
+              const { setPresence } = await import("@frennix/api");
+              const updated = await updateProfile(userId, { show_online_status: next });
+              setPresenceSharingEnabled(next);
+              if (!next) {
+                await setPresence(false, "privacy-show-online-status-off");
+              }
+              await refreshProfile(updated);
+            })
+          }
         />
       </ScrollView>
 
@@ -298,6 +344,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.background,
   },
+  errorBanner: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  errorTitle: { ...typography.body, fontWeight: "700", color: colors.text },
+  errorBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -306,7 +362,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  rowText: { flex: 1, gap: spacing.xs },
+  rowText: { flex: 1, minWidth: 0, gap: spacing.xs },
+  rowSwitchWrap: {
+    flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingTop: 2,
+    minWidth: 52,
+    minHeight: 44,
+    justifyContent: "flex-end",
+  },
+  rowSavingSpinner: { width: 20, height: 20 },
   rowTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   rowDescription: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   locationCard: {
