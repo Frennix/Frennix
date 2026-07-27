@@ -184,7 +184,7 @@ export default function SettingsScreen() {
         <Text style={styles.linkHint}>Copy logs for crashes, API failures, and notification setup issues</Text>
       </Pressable>
 
-      <Text style={styles.section}>Privacy</Text>
+      <Text style={styles.section}>Privacy & Discovery</Text>
       <Pressable onPress={() => pushScreen("/privacy-settings")}>
         <Text style={styles.link}>Privacy & Discovery</Text>
         <Text style={styles.linkHint}>Match visibility, location, and online status</Text>

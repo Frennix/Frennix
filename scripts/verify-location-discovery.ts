@@ -60,12 +60,27 @@ const checks: Array<{ name: string; run: () => void }> = [
       assertIncludes("app/privacy-settings.tsx", "Appear in Frennix Match", "discovery toggle");
       assertIncludes("app/privacy-settings.tsx", "Remove Saved Location", "remove location");
       assertIncludes("app/settings.tsx", "Privacy & Discovery", "settings link");
+      assertIncludes("app/_layout.tsx", 'backScreen("Privacy & Discovery")', "stack title");
     },
   },
   {
     name: "One-time existing user prompt",
     run: () => {
-      assertIncludes("components/LocationDiscoveryPrompt.tsx", "Find more training partners", "prompt copy");
+      assertIncludes(
+        "components/LocationDiscoveryPrompt.tsx",
+        "Find Your Training Partner",
+        "prompt title"
+      );
+      assertIncludes(
+        "components/LocationDiscoveryPrompt.tsx",
+        "Use Existing City",
+        "legacy city action"
+      );
+      assertIncludes(
+        "packages/api/src/location-discovery.ts",
+        "legacy city alone does not suppress",
+        "prompt eligibility comment"
+      );
       assertIncludes("app/(tabs)/_layout.tsx", "LocationDiscoveryPrompt", "tabs mount");
     },
   },
@@ -88,7 +103,7 @@ const checks: Array<{ name: string; run: () => void }> = [
       assertIncludes("components/LocationOnboardingStep.tsx", "FrennixLogo", "onboarding logo");
       assertIncludes("components/LocationDiscoveryPrompt.tsx", "FrennixLogo", "prompt logo");
       assertIncludes("components/LocationFeedBanner.tsx", "FrennixLogo", "banner logo");
-      assertIncludes("components/FrennixLogo.tsx", "frennix-logo.PNG", "official master asset");
+      assertIncludes("components/FrennixLogo.tsx", "frennix-logo.png", "official master asset");
     },
   },
   {

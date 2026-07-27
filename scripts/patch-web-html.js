@@ -22,7 +22,7 @@ function loadEnvVar(name) {
 }
 
 const PWA_PATCH_ID = "frennix-pwa-shell";
-const SW_VERSION = "20260710-startup-guard-v1";
+const SW_VERSION = "20260727-location-discovery-v1";
 
 function resolveBuildSha() {
   try {

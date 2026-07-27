@@ -17,24 +17,36 @@ export type DiscoveryPrivacyPatch = {
   discovery_explicitly_disabled_at?: string | null;
 };
 
+export function profileHasDeviceCoordinates(profile: Profile | null | undefined): boolean {
+  if (!profile) return false;
+  return profile.latitude != null && profile.longitude != null;
+}
+
+/** City or coordinates — used for match ranking, not for one-time prompt eligibility. */
 export function profileHasSavedLocation(profile: Profile | null | undefined): boolean {
   if (!profile) return false;
-  const hasCoords = profile.latitude != null && profile.longitude != null;
+  const hasCoords = profileHasDeviceCoordinates(profile);
   const hasCity = !!profile.city?.trim();
   return hasCoords || hasCity;
+}
+
+export function profileHasLegacyCityOnly(profile: Profile | null | undefined): boolean {
+  if (!profile) return false;
+  return !!profile.city?.trim() && !profileHasDeviceCoordinates(profile);
 }
 
 export function shouldShowLocationFeedBanner(profile: Profile | null | undefined): boolean {
   if (!profile?.onboarding_complete) return false;
   if (!profile.matching_enabled) return false;
-  if (profileHasSavedLocation(profile)) return false;
+  if (!profile.location_prompt_completed_at) return false;
+  if (profileHasDeviceCoordinates(profile)) return false;
   return true;
 }
 
+/** One-time existing-user prompt — legacy city alone does not suppress. */
 export function shouldShowLocationOnboardingPrompt(profile: Profile | null | undefined): boolean {
   if (!profile?.onboarding_complete) return false;
   if (profile.location_prompt_completed_at) return false;
-  if (profileHasSavedLocation(profile)) return false;
   return true;
 }
 
@@ -99,6 +111,11 @@ export async function markLocationPromptCompleted(userId: string): Promise<Profi
   return updateProfile(userId, {
     location_prompt_completed_at: new Date().toISOString(),
   });
+}
+
+/** Keep legacy city/state/coords; only record that the one-time prompt was handled. */
+export async function confirmExistingSavedCity(userId: string): Promise<Profile> {
+  return markLocationPromptCompleted(userId);
 }
 
 export async function markLocationPromptDismissed(userId: string): Promise<Profile> {
