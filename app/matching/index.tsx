@@ -15,6 +15,7 @@ import {
   getErrorMessage,
   getMatchCandidates,
   getOrCreateConversation,
+  getTechnicalErrorMessage,
   recordMatchSwipe,
 } from "@frennix/api";
 import type { MatchCandidate } from "@frennix/types";
@@ -122,9 +123,12 @@ export default function TrainingPartnerDiscoveryScreen() {
 
   useEffect(() => {
     if (isError && error) {
-      logMatchmakingError("match_candidates", error);
+      logMatchmakingError("match_candidates", error, {
+        technical: getTechnicalErrorMessage(error),
+        userId: userId.slice(0, 8),
+      });
     }
-  }, [isError, error]);
+  }, [isError, error, userId]);
 
   useEffect(() => {
     if (deckInitialized && !isLoading && discoveryEnabled && deck.length === 0 && !isError) {
@@ -335,8 +339,8 @@ export default function TrainingPartnerDiscoveryScreen() {
         >
           <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
-            title="No training partners right now"
-            description="Check back later as more athletes enable discovery, or update your training partner filters."
+            title="No athletes match your filters yet"
+            description="Try updating your training partner preferences, or check back as more athletes enable discovery."
             actionLabel="Update preferences"
             onAction={() => pushScreen("/matching-settings")}
           />

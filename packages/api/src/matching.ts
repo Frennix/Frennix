@@ -12,7 +12,7 @@ import type {
   RecordMatchSwipeResult,
   SwipeDirection,
 } from "@frennix/types";
-import { formatSupabaseError } from "./profile-utils";
+import { formatSupabaseError, getSupabaseErrorDetails, logProfileError } from "./profile-utils";
 import { getProfile, getProfilesByIds, updateProfile } from "./profiles";
 import { setMatchingEnabledWithOptOut } from "./location-discovery";
 import { getWorkoutStreaksForUserIds } from "./matching-streaks";
@@ -181,6 +181,11 @@ export async function getMatchCandidates(
   });
 
   if (error) {
+    logProfileError("getMatchCandidates rpc failed", error, {
+      viewerId,
+      limit: clampCandidateLimit(limit),
+      ...getSupabaseErrorDetails(error),
+    });
     throw formatSupabaseError(error, "Failed to load match candidates");
   }
 
