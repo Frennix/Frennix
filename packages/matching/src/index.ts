@@ -29,6 +29,7 @@ export {
   scoreMatch,
   type MatchContext,
 } from "./engine";
+export { DEFAULT_MATCHING_WEIGHTS } from "@frennix/types";
 export {
   formatLifestyleTime,
   formatMatchActivity,

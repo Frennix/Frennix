@@ -1,4 +1,9 @@
-import type { MatchReason, MatchableProfile, MatchingWeights } from "@frennix/types";
+import {
+  DEFAULT_MATCHING_WEIGHTS,
+  type MatchReason,
+  type MatchableProfile,
+  type MatchingWeights,
+} from "@frennix/types";
 import {
   formatMatchActivity,
   formatMatchEnvironment,
@@ -20,12 +25,24 @@ export interface MatchContext {
   candidateStreak?: number;
 }
 
+function resolveMatchingWeights(weights: MatchingWeights | null | undefined): MatchingWeights {
+  if (
+    weights &&
+    typeof weights.sharedGoals === "number" &&
+    typeof weights.sharedActivities === "number"
+  ) {
+    return weights;
+  }
+  return DEFAULT_MATCHING_WEIGHTS;
+}
+
 export function buildMatchReasons(
   viewer: MatchableProfile,
   candidate: MatchableProfile,
   weights: MatchingWeights,
   context: MatchContext = {}
 ): MatchReason[] {
+  const resolvedWeights = resolveMatchingWeights(weights);
   const reasons: MatchReason[] = [];
 
   const sharedGoals = getSharedValues(viewer.fitness_goals, candidate.fitness_goals);
@@ -37,7 +54,7 @@ export function buildMatchReasons(
       label: wantsAccountability
         ? "Both want accountability partners"
         : "Similar fitness goals",
-      weight: weights.sharedGoals,
+      weight: resolvedWeights.sharedGoals,
       details: labels,
     });
   }
@@ -55,7 +72,7 @@ export function buildMatchReasons(
         : sharedActivities.length === 1
           ? `Both enjoy ${labels[0]}`
           : "Similar workout interests",
-      weight: weights.sharedActivities,
+      weight: resolvedWeights.sharedActivities,
       details: labels,
     });
   }
@@ -66,13 +83,13 @@ export function buildMatchReasons(
     reasons.push({
       code: "nearby_distance",
       label: `Live within ${miles} mile${miles === 1 ? "" : "s"}`,
-      weight: weights.nearbyDistance,
+      weight: resolvedWeights.nearbyDistance,
     });
   } else if (citiesMatch(viewer, candidate)) {
     reasons.push({
       code: "same_city",
       label: `You're both in ${candidate.city?.trim() ?? "the same city"}`,
-      weight: weights.sameCity,
+      weight: resolvedWeights.sameCity,
     });
   }
 
@@ -81,7 +98,7 @@ export function buildMatchReasons(
     reasons.push({
       code: "shared_schedule",
       label: "Similar workout schedule",
-      weight: weights.sharedSchedule,
+      weight: resolvedWeights.sharedSchedule,
       details: sharedSchedules,
     });
   }
@@ -90,7 +107,7 @@ export function buildMatchReasons(
     reasons.push({
       code: "skill_compatible",
       label: "Similar experience level",
-      weight: weights.skillCompatible,
+      weight: resolvedWeights.skillCompatible,
     });
   }
 
@@ -98,7 +115,7 @@ export function buildMatchReasons(
     reasons.push({
       code: "same_gym",
       label: `You both train at ${candidate.home_gym?.trim()}`,
-      weight: weights.sameGym,
+      weight: resolvedWeights.sameGym,
     });
   }
 
@@ -109,7 +126,7 @@ export function buildMatchReasons(
     reasons.push({
       code: "shared_environment",
       label: `You both prefer ${env}`,
-      weight: weights.sharedEnvironment,
+      weight: resolvedWeights.sharedEnvironment,
     });
   }
 
@@ -119,14 +136,14 @@ export function buildMatchReasons(
     reasons.push({
       code: "workout_streak",
       label: "Both have a 20+ day workout streak",
-      weight: weights.workoutStreak,
+      weight: resolvedWeights.workoutStreak,
       details: [`${viewerStreak}`, `${candidateStreak}`],
     });
   } else if (candidateStreak >= 7) {
     reasons.push({
       code: "workout_streak",
       label: `${candidateStreak}-day workout streak`,
-      weight: Math.round(weights.workoutStreak * 0.6),
+      weight: Math.round(resolvedWeights.workoutStreak * 0.6),
     });
   }
 
@@ -134,13 +151,13 @@ export function buildMatchReasons(
     reasons.push({
       code: "online_now",
       label: "Online now",
-      weight: weights.onlineNow,
+      weight: resolvedWeights.onlineNow,
     });
   } else if (isRecentlyActive(candidate.last_seen_at)) {
     reasons.push({
       code: "recently_active",
       label: "Recently active on Frennix",
-      weight: weights.recentlyActive,
+      weight: resolvedWeights.recentlyActive,
     });
   }
 
@@ -148,7 +165,7 @@ export function buildMatchReasons(
     reasons.push({
       code: "discovery_active",
       label: "Open to training partners",
-      weight: weights.discoveryActive,
+      weight: resolvedWeights.discoveryActive,
     });
   }
 

@@ -11,7 +11,7 @@ import {
   scoreMatch,
 } from "../packages/matching/src";
 import { DEFAULT_MATCHING_WEIGHTS } from "../packages/types/src/matching";
-import type { MatchableProfile } from "../packages/types/src";
+import type { MatchableProfile, MatchingWeights } from "../packages/types/src";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
@@ -86,7 +86,10 @@ const checks: Array<{ name: string; test: () => boolean }> = [
   },
   {
     name: "Shared schedule reason",
-    test: () => reasons.some((r) => r.code === "shared_schedule" && r.label.includes("morning")),
+    test: () =>
+      reasons.some(
+        (r) => r.code === "shared_schedule" && (r.details?.includes("morning") ?? false)
+      ),
   },
   {
     name: "Same gym reason",
@@ -132,6 +135,49 @@ const checks: Array<{ name: string; test: () => boolean }> = [
     test: () => {
       const api = readFileSync(join(ROOT, "packages/api/src/matching.ts"), "utf8");
       return api.includes("buildMatchReasons") && api.includes("match_reasons");
+    },
+  },
+  {
+    name: "API imports DEFAULT_MATCHING_WEIGHTS from @frennix/types",
+    test: () => {
+      const api = readFileSync(join(ROOT, "packages/api/src/matching.ts"), "utf8");
+      return api.includes('import { DEFAULT_MATCHING_WEIGHTS } from "@frennix/types"');
+    },
+  },
+  {
+    name: "buildMatchReasons tolerates sparse candidate metadata",
+    test: () => {
+      const sparse = profile({
+        id: "sparse",
+        fitness_goals: undefined as unknown as string[],
+        activities: null as unknown as string[],
+        city: null,
+        training_schedules: undefined,
+      });
+      const result = buildMatchReasons(viewer, sparse, DEFAULT_MATCHING_WEIGHTS);
+      return Array.isArray(result) && result.every((reason) => typeof reason.weight === "number");
+    },
+  },
+  {
+    name: "buildMatchReasons falls back when weights argument is undefined",
+    test: () => {
+      const result = buildMatchReasons(
+        viewer,
+        candidate,
+        undefined as unknown as MatchingWeights
+      );
+      return result.length > 0 && !result.some((reason) => Number.isNaN(reason.weight));
+    },
+  },
+  {
+    name: "parseMatchCandidates filters invalid rows without throwing",
+    test: () => {
+      const api = readFileSync(join(ROOT, "packages/api/src/matching.ts"), "utf8");
+      return (
+        api.includes("normalizeMatchableProfile(row: unknown): MatchableProfile | null") &&
+        api.includes("return normalized ? [normalized] : []") &&
+        !api.includes("Invalid match candidate profile")
+      );
     },
   },
   {

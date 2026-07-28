@@ -1,5 +1,4 @@
 import {
-  DEFAULT_MATCHING_WEIGHTS,
   buildMatchReasons,
   scoreFromReasons,
 } from "@frennix/matching";
@@ -12,6 +11,7 @@ import type {
   RecordMatchSwipeResult,
   SwipeDirection,
 } from "@frennix/types";
+import { DEFAULT_MATCHING_WEIGHTS } from "@frennix/types";
 import { createMatchCandidatesLoadError } from "./match-candidates-diagnostics";
 import { formatSupabaseError, getSupabaseErrorDetails, logProfileError } from "./profile-utils";
 import { getProfile, getProfilesByIds, updateProfile } from "./profiles";
@@ -37,12 +37,16 @@ function coerceStringArray(value: unknown): string[] {
   return [];
 }
 
-function normalizeMatchableProfile(row: unknown): MatchableProfile {
+function normalizeMatchableProfile(row: unknown): MatchableProfile | null {
   if (!row || typeof row !== "object" || Array.isArray(row)) {
-    throw new Error("Invalid match candidate profile");
+    return null;
   }
 
   const profile = row as MatchableProfile;
+  if (typeof profile.id !== "string" || !profile.id.trim()) {
+    return null;
+  }
+
   return {
     ...profile,
     fitness_goals: coerceStringArray(profile.fitness_goals),
@@ -59,11 +63,8 @@ function parseMatchCandidates(value: unknown): MatchableProfile[] {
   const rows = Array.isArray(value) ? value : [value];
 
   return rows.flatMap((row) => {
-    try {
-      return [normalizeMatchableProfile(row)];
-    } catch {
-      return [];
-    }
+    const normalized = normalizeMatchableProfile(row);
+    return normalized ? [normalized] : [];
   });
 }
 
@@ -72,9 +73,12 @@ function enrichCandidates(
   candidates: MatchableProfile[],
   streaks: Map<string, number>
 ): MatchCandidate[] {
+  if (!viewer?.id) return [];
+
   const viewerStreak = streaks.get(viewer.id) ?? 0;
 
   return candidates
+    .filter((candidate) => typeof candidate?.id === "string" && candidate.id.trim().length > 0)
     .map((candidate) => {
       const candidateStreak = streaks.get(candidate.id) ?? 0;
       const match_reasons = buildMatchReasons(viewer, candidate, DEFAULT_MATCHING_WEIGHTS, {
