@@ -1,6 +1,9 @@
 import { getSupabaseErrorDetails, getUserFriendlyErrorMessage } from "./profile-utils";
 
-export type MatchCandidatesLoadStep = "profiles_reader" | "get_match_candidates";
+export type MatchCandidatesLoadStep =
+  | "profiles_reader"
+  | "get_match_candidates"
+  | "unknown";
 
 export type MatchCandidatesLoadDiagnostic = {
   step: MatchCandidatesLoadStep;
@@ -91,6 +94,17 @@ export function getMatchCandidatesLoadDiagnostic(
 ): MatchCandidatesLoadDiagnostic | null {
   if (isMatchCandidatesLoadError(error)) return error.diagnostic;
   return null;
+}
+
+/** Structured diagnostic for wrapped or legacy/unclassified load errors. */
+export function resolveMatchCandidatesLoadDiagnostic(
+  error: unknown
+): MatchCandidatesLoadDiagnostic | null {
+  if (error == null) return null;
+  return (
+    getMatchCandidatesLoadDiagnostic(error) ??
+    buildMatchCandidatesLoadDiagnostic("unknown", error)
+  );
 }
 
 type CreateMatchCandidatesLoadErrorInput = {

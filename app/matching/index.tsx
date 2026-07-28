@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
   getMatchCandidates,
-  getMatchCandidatesLoadDiagnostic,
+  resolveMatchCandidatesLoadDiagnostic,
   getOrCreateConversation,
   getTechnicalErrorMessage,
   recordMatchSwipe,
@@ -311,9 +311,11 @@ export default function TrainingPartnerDiscoveryScreen() {
   }
 
   if (isError) {
-    const loadDiagnostic = getMatchCandidatesLoadDiagnostic(error);
-    const showLoadDiagnostic =
-      isTrainingPartnerLoadDiagnosticsVisible(profile) && loadDiagnostic != null;
+    const diagnosticsEnabled = isTrainingPartnerLoadDiagnosticsVisible(profile, !!userId);
+    const loadDiagnostic = diagnosticsEnabled
+      ? resolveMatchCandidatesLoadDiagnostic(error)
+      : null;
+    const showLoadDiagnostic = diagnosticsEnabled && loadDiagnostic != null;
 
     return (
       <>

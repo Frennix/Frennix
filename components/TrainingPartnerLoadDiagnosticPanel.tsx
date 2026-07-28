@@ -5,7 +5,6 @@ import {
   type MatchCandidatesLoadDiagnostic,
 } from "@frennix/api";
 import { showAlert, showSuccess } from "@/lib/alerts";
-import { TRAINING_PARTNER_LOAD_DEBUG_STORAGE_KEY } from "@/lib/training-partner-load-diagnostics";
 import { colors, spacing, typography } from "@frennix/ui";
 
 type TrainingPartnerLoadDiagnosticPanelProps = {
@@ -49,8 +48,8 @@ export function TrainingPartnerLoadDiagnosticPanel({
         <Text style={styles.buttonText}>Copy Error Details</Text>
       </Pressable>
       <Text style={styles.hint}>
-        Admin/founder only, or enable debug with{" "}
-        {TRAINING_PARTNER_LOAD_DEBUG_STORAGE_KEY}=1 in localStorage.
+        Temporary production debug — visible to signed-in users while load failures are
+        investigated. No tokens, IDs, or private profile data are included.
       </Text>
     </View>
   );
