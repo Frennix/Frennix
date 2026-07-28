@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
   getMatchCandidates,
+  getMatchCandidatesLoadDiagnostic,
   getOrCreateConversation,
   getTechnicalErrorMessage,
   recordMatchSwipe,
@@ -27,6 +28,7 @@ import {
 import { TrainingPartnerCard } from "@/components/TrainingPartnerCard";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
 import { TrainingPartnerDeckSafety } from "@/components/TrainingPartnerDeckSafety";
+import { TrainingPartnerLoadDiagnosticPanel } from "@/components/TrainingPartnerLoadDiagnosticPanel";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen } from "@/lib/press-utils";
 import { logMatchmakingError } from "@/lib/matchmaking-observability";
@@ -41,6 +43,7 @@ import { useFeatureFlag } from "@/lib/useFeatureFlag";
 import { hapticMatch } from "@/lib/haptics";
 import { isTrainingPartnerDiscoveryReady } from "@/lib/training-partner-readiness";
 import { isTrainingPartnerDiscoveryEnabled } from "@/lib/training-partner-discovery-toggle";
+import { isTrainingPartnerLoadDiagnosticsVisible } from "@/lib/training-partner-load-diagnostics";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button, EmptyState, ScreenSpinner, prefetchCachedImage, colors, spacing, typography } from "@frennix/ui";
 
@@ -308,10 +311,14 @@ export default function TrainingPartnerDiscoveryScreen() {
   }
 
   if (isError) {
+    const loadDiagnostic = getMatchCandidatesLoadDiagnostic(error);
+    const showLoadDiagnostic =
+      isTrainingPartnerLoadDiagnosticsVisible(profile) && loadDiagnostic != null;
+
     return (
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
-        <View style={styles.gated}>
+        <ScrollView contentContainerStyle={styles.gated}>
           <FrennixLogo variant="full" height={34} style={styles.logo} />
           <EmptyState
             title="Could not load partners"
@@ -319,7 +326,10 @@ export default function TrainingPartnerDiscoveryScreen() {
             actionLabel="Try again"
             onAction={() => void handleRefresh()}
           />
-        </View>
+          {showLoadDiagnostic ? (
+            <TrainingPartnerLoadDiagnosticPanel diagnostic={loadDiagnostic} />
+          ) : null}
+        </ScrollView>
       </>
     );
   }

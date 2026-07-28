@@ -35,6 +35,7 @@ export * from "./suggestions";
 export * from "./achievements";
 export * from "./presence";
 export * from "./matching";
+export * from "./match-candidates-diagnostics";
 export * from "./location-discovery";
 export * from "./trainer";
 export * from "./analytics";

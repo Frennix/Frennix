@@ -12,6 +12,7 @@ import type {
   RecordMatchSwipeResult,
   SwipeDirection,
 } from "@frennix/types";
+import { createMatchCandidatesLoadError } from "./match-candidates-diagnostics";
 import { formatSupabaseError, getSupabaseErrorDetails, logProfileError } from "./profile-utils";
 import { getProfile, getProfilesByIds, updateProfile } from "./profiles";
 import { setMatchingEnabledWithOptOut } from "./location-discovery";
@@ -171,9 +172,24 @@ export async function getMatchCandidates(
   viewerId: string,
   limit = DEFAULT_CANDIDATE_LIMIT
 ): Promise<MatchCandidate[]> {
-  const viewer = await getProfile(viewerId);
+  let viewer;
+  try {
+    viewer = await getProfile(viewerId);
+  } catch (error) {
+    logProfileError("getMatchCandidates profiles_reader failed", error, {
+      step: "profiles_reader",
+      ...getSupabaseErrorDetails(error),
+    });
+    throw createMatchCandidatesLoadError({ step: "profiles_reader", cause: error });
+  }
+
   if (!viewer) {
-    throw new Error("Profile not found");
+    const notFound = new Error("Profile not found");
+    throw createMatchCandidatesLoadError({
+      step: "profiles_reader",
+      cause: notFound,
+      userMessage: "Profile not found",
+    });
   }
 
   const { data, error } = await getSupabase().rpc("get_match_candidates", {
@@ -182,11 +198,11 @@ export async function getMatchCandidates(
 
   if (error) {
     logProfileError("getMatchCandidates rpc failed", error, {
-      viewerId,
+      step: "get_match_candidates",
       limit: clampCandidateLimit(limit),
       ...getSupabaseErrorDetails(error),
     });
-    throw formatSupabaseError(error, "Failed to load match candidates");
+    throw createMatchCandidatesLoadError({ step: "get_match_candidates", cause: error });
   }
 
   const candidates = parseMatchCandidates(data);
