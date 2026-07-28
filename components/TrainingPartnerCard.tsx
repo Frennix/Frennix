@@ -114,12 +114,23 @@ export function TrainingPartnerCard({
         />
       ) : null}
 
-      {sharedGoals.length || sharedActivities.length ? (
+      {sharedGoals.length ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mutual workout interests</Text>
+          <Text style={styles.sectionTitle}>Mutual fitness goals</Text>
           <View style={styles.chipRow}>
-            {[...sharedGoals, ...sharedActivities].map((label) => (
-              <Chip key={label} label={label} selected />
+            {sharedGoals.map((label) => (
+              <Chip key={`shared-goal-${label}`} label={label} selected />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {sharedActivities.length ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Mutual workout styles</Text>
+          <View style={styles.chipRow}>
+            {sharedActivities.map((label) => (
+              <Chip key={`shared-activity-${label}`} label={label} selected />
             ))}
           </View>
         </View>

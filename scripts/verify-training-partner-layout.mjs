@@ -62,6 +62,17 @@ function assertStaticLayoutPatterns() {
         footerSection.indexOf("TrainingPartnerDeckActions"),
       "Report or block appears above Skip/Connect actions",
     ],
+    [
+      !card.includes("Mutual workout interests"),
+      "Merged mutual workout interests section removed",
+    ],
+    [card.includes("Mutual fitness goals"), "Mutual fitness goals section present"],
+    [card.includes("Mutual workout styles"), "Mutual workout styles section present"],
+    [
+      card.indexOf("Mutual fitness goals") < card.indexOf("Mutual workout styles"),
+      "Mutual fitness goals appear before mutual workout styles",
+    ],
+    [!/\[\.\.\.sharedGoals,\s*\.\.\.sharedActivities\]/.test(card), "Shared goals and activities are not merged"],
   ];
 
   for (const [ok, label] of checks) {
@@ -304,7 +315,7 @@ async function verifyBrowserLayout(baseUrl) {
   await page.goto(`${baseUrl}/matching`, { waitUntil: "networkidle", timeout: 60_000 });
   await page
     .waitForFunction(
-      () => /Athlete 1|Mutual workout interests|No athletes match/i.test(document.body?.innerText ?? ""),
+      () => /Athlete 1|Mutual fitness goals|Mutual workout styles|No athletes match/i.test(document.body?.innerText ?? ""),
       { timeout: 15_000 }
     )
     .catch(() => null);
@@ -322,7 +333,8 @@ async function verifyBrowserLayout(baseUrl) {
     const skip = byText(/^Skip$/);
     const connect = byText(/^Connect$/);
     const report = byText(/Report or block/i);
-    const mutual = byText(/Mutual workout interests/i);
+    const mutualGoals = byText(/Mutual fitness goals/i);
+    const mutualStyles = byText(/Mutual workout styles/i);
 
     const rect = (el) => (el ? el.getBoundingClientRect() : null);
 
@@ -335,7 +347,8 @@ async function verifyBrowserLayout(baseUrl) {
       skipRect: rect(skip),
       connectRect: rect(connect),
       reportRect: rect(report),
-      mutualRect: rect(mutual),
+      mutualGoalsRect: rect(mutualGoals),
+      mutualStylesRect: rect(mutualStyles),
       scrollOverflow: scroll ? scroll.scrollHeight > scroll.clientHeight + 4 : false,
       viewportH: window.innerHeight,
     };
@@ -346,7 +359,7 @@ async function verifyBrowserLayout(baseUrl) {
   console.log(`[INFO] Screenshot: ${SCREENSHOT}`);
   console.log(`[INFO] Body preview: ${layout.bodyText}`);
 
-  const deckRendered = /Athlete 1|Mutual workout interests/i.test(layout.bodyText);
+  const deckRendered = /Athlete 1|Mutual fitness goals|Mutual workout styles/i.test(layout.bodyText);
   if (!deckRendered) {
     console.log(
       "[WARN] Browser fixture did not hydrate a candidate deck (static layout checks still passed). Verify on device."
@@ -367,8 +380,9 @@ async function verifyBrowserLayout(baseUrl) {
     throw new Error("Skip/Connect buttons render above the deck footer region");
   }
 
-  if (layout.mutualRect && layout.skipRect && rectsOverlap(layout.mutualRect, layout.skipRect)) {
-    throw new Error("Mutual workout interests overlap Skip button");
+  const mutualRect = layout.mutualGoalsRect ?? layout.mutualStylesRect;
+  if (mutualRect && layout.skipRect && rectsOverlap(mutualRect, layout.skipRect)) {
+    throw new Error("Mutual section overlaps Skip button");
   }
 
   if (layout.reportRect && layout.skipRect && rectsOverlap(layout.reportRect, layout.skipRect)) {
