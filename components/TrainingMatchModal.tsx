@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xl,
-    paddingTop: spacing.md,
+    paddingVertical: spacing.sm,
   },
   actionButton: {
     alignItems: "center",

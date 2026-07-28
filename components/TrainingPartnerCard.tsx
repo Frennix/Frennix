@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { MatchCandidate, MatchableProfile } from "@frennix/types";
 import { MatchReasonsList } from "@/components/MatchReasonsList";
 import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
@@ -70,6 +70,13 @@ export function TrainingPartnerCard({
       accessibilityLabel={accessibilityLabel}
       accessible={Boolean(accessibilityLabel)}
     >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        testID="training-partner-card-scroll"
+      >
       {matchScore != null && matchScore > 0 ? (
         <FrennixMatchDisplay score={matchScore} variant="compact" />
       ) : null}
@@ -159,6 +166,7 @@ export function TrainingPartnerCard({
           <Text style={styles.profileLink}>View full profile →</Text>
         </Pressable>
       ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -170,9 +178,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: "hidden",
+    position: "relative",
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: spacing.lg,
     gap: spacing.md,
-    position: "relative",
   },
   scoreBadge: {
     alignSelf: "flex-start",

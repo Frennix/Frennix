@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -88,6 +89,7 @@ export default function TrainingPartnerDiscoveryScreen() {
     true
   );
   const loadStartedAt = useRef(Date.now());
+  const insets = useSafeAreaInsets();
 
   const discoveryEnabled = isTrainingPartnerDiscoveryEnabled(profile);
   const profileReady = profile ? isTrainingPartnerDiscoveryReady(profile) : false;
@@ -402,29 +404,39 @@ export default function TrainingPartnerDiscoveryScreen() {
           </View>
         </View>
 
-        {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
+        <View
+          style={[
+            styles.deckFooter,
+            { paddingBottom: Math.max(insets.bottom, spacing.md) },
+          ]}
+          testID="training-partner-deck-footer"
+        >
+          {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
 
-        <TrainingPartnerDeckActions
-          onSkip={() => void handleDecision("left")}
-          onConnect={() => void handleDecision("right")}
-          disabled={acting}
-          loading={acting}
-        />
+          <TrainingPartnerDeckSafety
+            userId={userId}
+            partnerId={currentCandidate.id}
+            partnerName={currentCandidate.display_name}
+            onPartnerRemoved={() => void advanceDeck()}
+          />
 
-        {acting ? (
-          <Text style={styles.actingHint}>Saving your choice…</Text>
-        ) : (
-          <Text style={styles.actingHint}>Connect to train together · Skip to see the next athlete</Text>
-        )}
+          <TrainingPartnerDeckActions
+            onSkip={() => void handleDecision("left")}
+            onConnect={() => void handleDecision("right")}
+            disabled={acting}
+            loading={acting}
+          />
 
-        <TrainingPartnerDeckSafety
-          userId={userId}
-          partnerId={currentCandidate.id}
-          partnerName={currentCandidate.display_name}
-          onPartnerRemoved={() => void advanceDeck()}
-        />
+          {acting ? (
+            <Text style={styles.actingHint}>Saving your choice…</Text>
+          ) : (
+            <Text style={styles.actingHint}>
+              Connect to train together · Skip to see the next athlete
+            </Text>
+          )}
 
-        <ReportIssueLink area="training_partners" from="/matching" />
+          <ReportIssueLink area="training_partners" from="/matching" />
+        </View>
       </View>
 
       <TrainingMatchModal
@@ -443,7 +455,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
   },
   header: {
     paddingTop: spacing.sm,
@@ -475,8 +486,8 @@ const styles = StyleSheet.create({
   loadingText: { ...typography.bodySmall, color: colors.textMuted },
   deckArea: {
     flex: 1,
+    minHeight: 0,
     position: "relative",
-    marginBottom: spacing.sm,
   },
   backCard: {
     ...StyleSheet.absoluteFillObject,
@@ -495,6 +506,14 @@ const styles = StyleSheet.create({
   },
   frontCard: {
     flex: 1,
+    minHeight: 0,
+  },
+  deckFooter: {
+    backgroundColor: colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+    gap: spacing.xs,
   },
   error: {
     color: colors.danger,
@@ -506,7 +525,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     textAlign: "center",
-    marginTop: spacing.sm,
     lineHeight: 18,
   },
 });

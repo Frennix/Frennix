@@ -48,6 +48,11 @@ export function TrainingPartnerDeckSafety({
 }
 
 const styles = StyleSheet.create({
-  row: { alignItems: "center", paddingTop: spacing.xs },
+  row: {
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
   link: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
 });
