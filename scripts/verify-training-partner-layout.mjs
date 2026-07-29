@@ -72,6 +72,30 @@ function assertStaticLayoutPatterns() {
       card.indexOf("Mutual fitness goals") < card.indexOf("Mutual workout styles"),
       "Mutual fitness goals appear before mutual workout styles",
     ],
+    [
+      card.includes("formatAthleteFitnessGoalsTitle"),
+      "Athlete fitness goals use possessive section title",
+    ],
+    [
+      card.includes("getAdditionalPersonalLabels"),
+      "Duplicate personal goal/style sections are suppressed",
+    ],
+    [
+      !card.includes("Training goals") && !card.includes("Workout styles"),
+      "Legacy personal section titles removed",
+    ],
+    [
+      screen.includes("TRAINING_PARTNERS_HEADER_LOGO_HEIGHT"),
+      "Header logo uses enlarged training partners size",
+    ],
+    [
+      screen.includes('label="Report an app issue"'),
+      "Footer uses Report an app issue label",
+    ],
+    [
+      fs.readFileSync(path.join(ROOT, "components/TrainingMatchModal.tsx"), "utf8").includes("actionItem"),
+      "Skip and Connect use balanced icon-plus-label layout",
+    ],
     [!/\[\.\.\.sharedGoals,\s*\.\.\.sharedActivities\]/.test(card), "Shared goals and activities are not merged"],
   ];
 

@@ -46,6 +46,8 @@ import { isTrainingPartnerLoadDiagnosticsVisible } from "@/lib/training-partner-
 import { useAuth } from "@/providers/AuthProvider";
 import { Button, EmptyState, ScreenSpinner, prefetchCachedImage, colors, spacing, typography } from "@frennix/ui";
 
+const TRAINING_PARTNERS_HEADER_LOGO_HEIGHT = 41;
+
 function MatchingHeaderActions() {
   return (
     <View style={styles.headerActions}>
@@ -236,7 +238,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <View style={styles.gated}>
-          <FrennixLogo variant="full" height={34} style={styles.logo} />
+          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} style={styles.logo} />
           <EmptyState
             title="Training partners temporarily unavailable"
             description="We are making improvements to training partner discovery. Please check back soon."
@@ -251,7 +253,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <View style={styles.gated}>
-          <FrennixLogo variant="full" height={34} style={styles.logo} />
+          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} style={styles.logo} />
           <EmptyState
             title="Training partner discovery is off"
             description="Turn on discovery in your training partner preferences to browse athletes who share your goals and workout style."
@@ -268,7 +270,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <ScrollView contentContainerStyle={styles.gated}>
-          <FrennixLogo variant="full" height={34} style={styles.logo} />
+          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} style={styles.logo} />
           <EmptyState
             title="Complete your training profile"
             description="Add your goals, workout styles, city, and gender before browsing training partners."
@@ -304,7 +306,7 @@ export default function TrainingPartnerDiscoveryScreen() {
       <>
         <Stack.Screen options={{ headerRight: () => <MatchingHeaderActions /> }} />
         <ScrollView contentContainerStyle={styles.gated}>
-          <FrennixLogo variant="full" height={34} style={styles.logo} />
+          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} style={styles.logo} />
           <EmptyState
             title="Could not load partners"
             description={getErrorMessage(error)}
@@ -332,7 +334,7 @@ export default function TrainingPartnerDiscoveryScreen() {
             />
           }
         >
-          <FrennixLogo variant="full" height={34} style={styles.logo} />
+          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} style={styles.logo} />
           <EmptyState
             title="No athletes match your filters yet"
             description="Try updating your training partner preferences, or check back as more athletes enable discovery."
@@ -361,7 +363,7 @@ export default function TrainingPartnerDiscoveryScreen() {
 
       <View style={styles.screen}>
         <View style={styles.header}>
-          <FrennixLogo variant="full" height={34} />
+          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} />
           <Text style={styles.headerHint}>
             {remainingCount > 0
               ? `${remainingCount + 1} athletes in your deck`
@@ -417,7 +419,7 @@ export default function TrainingPartnerDiscoveryScreen() {
             </Text>
           )}
 
-          <ReportIssueLink area="training_partners" from="/matching" />
+          <ReportIssueLink area="training_partners" from="/matching" label="Report an app issue" />
         </View>
       </View>
 

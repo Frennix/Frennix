@@ -7,8 +7,11 @@ import { getFrennixMatchWhyTitle } from "@frennix/matching";
 import {
   formatCandidateActivities,
   formatCandidateGoals,
+  formatAthleteFitnessGoalsTitle,
+  formatAthleteWorkoutStylesTitle,
   formatSharedActivityLabels,
   formatSharedGoalLabels,
+  getAdditionalPersonalLabels,
   sharesCity,
 } from "@/lib/training-partner-utils";
 import {
@@ -48,6 +51,10 @@ export function TrainingPartnerCard({
   const sharedActivities = formatSharedActivityLabels(viewer, candidate);
   const goals = formatCandidateGoals(candidate);
   const activities = formatCandidateActivities(candidate);
+  const personalGoals = getAdditionalPersonalLabels(goals, sharedGoals);
+  const personalActivities = getAdditionalPersonalLabels(activities, sharedActivities);
+  const fitnessGoalsTitle = formatAthleteFitnessGoalsTitle(candidate.display_name);
+  const workoutStylesTitle = formatAthleteWorkoutStylesTitle(candidate.display_name);
   const sameCity = sharesCity(viewer, candidate);
   const reasons = isScoredCandidate(candidate) ? candidate.match_reasons : [];
   const streak = isScoredCandidate(candidate) ? candidate.workout_streak : 0;
@@ -142,23 +149,23 @@ export function TrainingPartnerCard({
         </View>
       ) : null}
 
-      {goals.length ? (
+      {personalGoals.length ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Training goals</Text>
+          <Text style={styles.sectionTitle}>{fitnessGoalsTitle}</Text>
           <View style={styles.chipRow}>
-            {goals.map((label) => (
-              <Chip key={label} label={label} selected={sharedGoals.includes(label)} />
+            {personalGoals.map((label) => (
+              <Chip key={label} label={label} />
             ))}
           </View>
         </View>
       ) : null}
 
-      {activities.length ? (
+      {personalActivities.length ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Workout styles</Text>
+          <Text style={styles.sectionTitle}>{workoutStylesTitle}</Text>
           <View style={styles.chipRow}>
-            {activities.map((label) => (
-              <Chip key={label} label={label} selected={sharedActivities.includes(label)} />
+            {personalActivities.map((label) => (
+              <Chip key={label} label={label} />
             ))}
           </View>
         </View>

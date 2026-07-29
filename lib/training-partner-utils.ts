@@ -42,3 +42,26 @@ export function formatCandidateGoals(candidate: Profile, limit = 4): string[] {
 export function formatCandidateActivities(candidate: Profile, limit = 5): string[] {
   return coerceStringArray(candidate.activities).slice(0, limit).map(formatActivity);
 }
+
+export function getAthleteFirstName(displayName: string | null | undefined): string | null {
+  const trimmed = displayName?.trim();
+  if (!trimmed) return null;
+  const [first] = trimmed.split(/\s+/);
+  return first || null;
+}
+
+export function formatAthleteFitnessGoalsTitle(displayName: string | null | undefined): string {
+  const firstName = getAthleteFirstName(displayName);
+  return firstName ? `${firstName}'s Fitness Goals` : "Athlete's Fitness Goals";
+}
+
+export function formatAthleteWorkoutStylesTitle(displayName: string | null | undefined): string {
+  const firstName = getAthleteFirstName(displayName);
+  return firstName ? `${firstName}'s Workout Styles` : "Athlete's Workout Styles";
+}
+
+/** Personal labels not already covered by a mutual section. */
+export function getAdditionalPersonalLabels(personal: string[], mutual: string[]): string[] {
+  const mutualSet = new Set(mutual);
+  return personal.filter((label) => !mutualSet.has(label));
+}

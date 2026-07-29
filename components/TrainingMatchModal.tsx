@@ -81,25 +81,29 @@ export function TrainingPartnerDeckActions({
 }: TrainingPartnerDeckActionsProps) {
   return (
     <View style={styles.actionsRow}>
-      <Pressable
-        style={[styles.actionButton, styles.skipButton, disabled && styles.actionDisabled]}
-        onPress={onSkip}
-        disabled={disabled || loading}
-        accessibilityLabel="Skip training partner"
-      >
-        <AppIcon name="close" color={colors.textSecondary} size={28} />
+      <View style={styles.actionItem}>
+        <Pressable
+          style={[styles.circleButton, styles.skipButton, disabled && styles.actionDisabled]}
+          onPress={onSkip}
+          disabled={disabled || loading}
+          accessibilityLabel="Skip training partner"
+        >
+          <AppIcon name="close" color={colors.textSecondary} size={28} />
+        </Pressable>
         <Text style={styles.skipLabel}>Skip</Text>
-      </Pressable>
+      </View>
 
-      <Pressable
-        style={[styles.actionButton, styles.connectButton, disabled && styles.actionDisabled]}
-        onPress={onConnect}
-        disabled={disabled || loading}
-        accessibilityLabel="Connect with training partner"
-      >
-        <AppIcon name="users" color={colors.background} size={28} />
+      <View style={styles.actionItem}>
+        <Pressable
+          style={[styles.circleButton, styles.connectButton, disabled && styles.actionDisabled]}
+          onPress={onConnect}
+          disabled={disabled || loading}
+          accessibilityLabel="Connect with training partner"
+        >
+          <AppIcon name="users" color={colors.background} size={28} />
+        </Pressable>
         <Text style={styles.connectLabel}>Connect</Text>
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -137,16 +141,19 @@ const styles = StyleSheet.create({
   secondaryLabel: { ...typography.bodySmall, color: colors.accent, fontWeight: "600" },
   actionsRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
-    gap: spacing.xl,
+    gap: spacing.xxl,
     paddingVertical: spacing.sm,
   },
-  actionButton: {
+  actionItem: {
+    alignItems: "center",
+    gap: spacing.xs,
+    minWidth: 88,
+  },
+  circleButton: {
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    minWidth: 96,
   },
   skipButton: {
     width: 72,
@@ -163,6 +170,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   skipLabel: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
-  connectLabel: { ...typography.caption, color: colors.accent, fontWeight: "700" },
+  connectLabel: { ...typography.caption, color: colors.text, fontWeight: "700" },
   actionDisabled: { opacity: 0.45 },
 });
