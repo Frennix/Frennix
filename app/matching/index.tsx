@@ -24,6 +24,7 @@ import type { MatchCandidate } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { TrainingPartnerDeckActions } from "@/components/TrainingMatchModal";
 import { TrainingPartnerCard } from "@/components/TrainingPartnerCard";
+import { FrennixMatchExplainerModal } from "@/components/FrennixMatchExplainerModal";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
 import { TrainingPartnerDeckSafety } from "@/components/TrainingPartnerDeckSafety";
 import { TrainingPartnerLoadDiagnosticPanel } from "@/components/TrainingPartnerLoadDiagnosticPanel";
@@ -77,6 +78,7 @@ export default function TrainingPartnerDiscoveryScreen() {
   const [deckInitialized, setDeckInitialized] = useState(false);
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [matchExplainerVisible, setMatchExplainerVisible] = useState(false);
 
   const { enabled: matchmakingEnabled, isLoading: flagLoading } = useFeatureFlag(
     "training_matchmaking",
@@ -378,6 +380,7 @@ export default function TrainingPartnerDiscoveryScreen() {
             <TrainingPartnerCard
               candidate={currentCandidate}
               viewer={profile}
+              onLearnMoreMatch={() => setMatchExplainerVisible(true)}
               accessibilityLabel={`Training partner ${currentCandidate.display_name}`}
             />
           </View>
@@ -417,6 +420,11 @@ export default function TrainingPartnerDiscoveryScreen() {
           <ReportIssueLink area="training_partners" from="/matching" />
         </View>
       </View>
+
+      <FrennixMatchExplainerModal
+        visible={matchExplainerVisible}
+        onClose={() => setMatchExplainerVisible(false)}
+      />
     </>
   );
 }

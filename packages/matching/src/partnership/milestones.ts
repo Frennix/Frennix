@@ -6,6 +6,14 @@ import type {
   PartnershipTimelineEntry,
 } from "@frennix/types";
 
+/** Milestones that may optionally include an approximate shared region when consented. */
+const LOCATION_ELIGIBLE_MILESTONE_CODES = new Set<PartnershipMilestoneCode>([
+  "partnership_started",
+  "first_workout_together",
+  "first_event_together",
+  "workouts_together_10",
+]);
+
 export function formatPartnershipTimelineTimestamp(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
@@ -26,6 +34,42 @@ export function formatPartnershipTimelineTimestamp(iso: string): string {
 function readMilestoneMetadata(value: unknown): PartnershipMilestoneMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as PartnershipMilestoneMetadata;
+}
+
+function looksLikePreciseCoordinates(value: string): boolean {
+  return (
+    /^-?\d{1,3}\.\d{3,}/.test(value) ||
+    /\b\d{1,3}\.\d{3,},\s*-?\d{1,3}\.\d{3,}\b/.test(value) ||
+    /\b(street|st\.|ave|avenue|road|rd\.|blvd|boulevard|suite|apt|#)\b/i.test(value)
+  );
+}
+
+/** Approximate city/region only — never street-level or coordinate strings. */
+export function sanitizePartnershipTimelineLocation(label: string): string | null {
+  const trimmed = label.trim();
+  if (!trimmed || looksLikePreciseCoordinates(trimmed)) return null;
+  return trimmed;
+}
+
+/**
+ * Show location only when the server attached it at milestone award time with consent metadata.
+ * Never infer location from profile fields on the client.
+ */
+export function getPartnershipTimelineLocationLabel(
+  entry: PartnershipTimelineEntry
+): string | null {
+  if (entry.status !== "achieved") return null;
+  if (!LOCATION_ELIGIBLE_MILESTONE_CODES.has(entry.code)) return null;
+
+  const metadata = entry.metadata ?? {};
+  const triggerSource = metadata.trigger_source;
+  if (typeof triggerSource !== "string" || !triggerSource.length) return null;
+
+  const metadataLocation =
+    typeof metadata.location_label === "string" ? metadata.location_label : entry.locationLabel;
+  if (!metadataLocation) return null;
+
+  return sanitizePartnershipTimelineLocation(metadataLocation);
 }
 
 export const PARTNERSHIP_MILESTONE_DEFINITIONS: readonly PartnershipMilestoneDefinition[] = [
@@ -152,12 +196,10 @@ export function buildPartnershipTimeline(
     const occurredAt = record?.occurred_at ?? null;
     const isAchieved = occurredAt != null;
     const metadata = metadataByCode.get(definition.code);
-    const locationLabel =
-      typeof metadata?.location_label === "string" ? metadata.location_label : null;
     const triggerSource =
       typeof metadata?.trigger_source === "string" ? metadata.trigger_source : null;
 
-    return {
+    const timelineEntry: PartnershipTimelineEntry = {
       code: definition.code,
       emoji: definition.emoji,
       label: definition.label,
@@ -166,9 +208,15 @@ export function buildPartnershipTimeline(
       status: isAchieved ? "achieved" : "upcoming",
       occurred_at: occurredAt,
       occurredAtLabel: occurredAt ? formatPartnershipTimelineTimestamp(occurredAt) : null,
-      locationLabel,
+      locationLabel:
+        typeof metadata?.location_label === "string" ? metadata.location_label : null,
       triggerSource,
       metadata,
+    };
+
+    return {
+      ...timelineEntry,
+      locationLabel: getPartnershipTimelineLocationLabel(timelineEntry),
     };
   }).sort((a, b) => a.sortOrder - b.sortOrder);
 }

@@ -154,6 +154,8 @@ for (const token of [
   "FRENIX_MATCH_FUTURE_FACTORS",
   "formatFrennixMatchDisplay",
   "Elite Frennix Match",
+  "Exceptional Frennix Match",
+  "Strong Frennix Match",
   "What is Frennix Match?",
   "proprietary compatibility system",
 ]) {
@@ -228,7 +230,8 @@ if (badge?.percentLabel.includes("Frennix Match")) {
   fail("engine:badge", "Frennix Match badge format unexpected");
 }
 
-if (level.id === "elite" && score >= 95) pass("engine:level", level.label);
+if (level.id === "exceptional" && score >= 90) pass("engine:level", level.label);
+else if (level.id === "strong" && score >= 75 && score < 90) pass("engine:level", level.label);
 else if (level.label.includes("Frennix Match")) pass("engine:level", level.label);
 else fail("engine:level", "match level unexpected");
 

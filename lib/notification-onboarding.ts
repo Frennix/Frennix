@@ -44,12 +44,20 @@ export const NOTIFICATION_ONBOARDING_BENEFITS = [
 
 let showHandler: (() => void) | null = null;
 let pendingShow = false;
+let onboardingBlocked = false;
 
 export function registerNotificationOnboardingHandler(handler: (() => void) | null) {
   showHandler = handler;
-  if (handler && pendingShow) {
-    handler();
-    pendingShow = false;
+  if (handler && pendingShow && !onboardingBlocked) {
+    void flushPendingNotificationOnboarding();
+  }
+}
+
+/** Block prompts during flows such as Training Partner Journey intro/timeline. */
+export function setNotificationOnboardingBlocked(blocked: boolean): void {
+  onboardingBlocked = blocked;
+  if (!blocked && pendingShow) {
+    void flushPendingNotificationOnboarding();
   }
 }
 
@@ -84,10 +92,41 @@ async function markPromptShown(): Promise<void> {
 }
 
 async function canPromptAfterActivity(): Promise<boolean> {
-  if (await wasNotificationOnboardingSnoozed()) return true;
+  if (await wasNotificationOnboardingSnoozed()) return false;
 
   const lastPromptAt = await getLastPromptAt();
   return Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS;
+}
+
+async function flushPendingNotificationOnboarding(): Promise<void> {
+  if (onboardingBlocked || !pendingShow) return;
+  if (!(await isEligibleForOnboarding())) {
+    pendingShow = false;
+    return;
+  }
+
+  const permission = await getWebPushPermissionStatus();
+  if (permission !== "default") {
+    pendingShow = false;
+    return;
+  }
+
+  if (await wasNotificationOnboardingSnoozed()) {
+    pendingShow = false;
+    return;
+  }
+
+  if (!(await canPromptAfterActivity())) return;
+
+  pendingShow = false;
+  await markPromptShown();
+
+  if (showHandler) {
+    showHandler();
+    return;
+  }
+
+  pendingShow = true;
 }
 
 async function isEligibleForOnboarding(): Promise<boolean> {
@@ -108,16 +147,20 @@ export async function requestNotificationOnboarding(): Promise<void> {
   const permission = await getWebPushPermissionStatus();
   if (permission !== "default") return;
 
+  if (await wasNotificationOnboardingSnoozed()) return;
+
   if (!(await canPromptAfterActivity())) return;
 
-  if (await wasNotificationOnboardingSnoozed()) {
-    await clearNotificationOnboardingSnooze();
+  if (onboardingBlocked) {
+    pendingShow = true;
+    return;
   }
 
   await markPromptShown();
 
   if (showHandler) {
     showHandler();
+    pendingShow = false;
     return;
   }
 

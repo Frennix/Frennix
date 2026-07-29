@@ -11,5 +11,7 @@ export {
   formatMatchScoreImprovementStory,
   formatPartnershipTimelineTimestamp,
   getPartnershipMilestoneDefinition,
+  getPartnershipTimelineLocationLabel,
+  sanitizePartnershipTimelineLocation,
   sumMilestoneEngagementPoints,
 } from "./milestones";

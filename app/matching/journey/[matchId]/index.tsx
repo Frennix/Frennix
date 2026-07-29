@@ -1,14 +1,18 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { frennixRefreshControlProps } from "@/lib/screen-shell";
 import {
   getOrCreateConversation,
   getTrainingPartnershipJourney,
 } from "@frennix/api";
+import { FrennixMatchExplainerModal } from "@/components/FrennixMatchExplainerModal";
 import { PartnershipLevelBadge } from "@/components/PartnershipLevelBadge";
 import { PartnershipTimeline } from "@/components/PartnershipTimeline";
 import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
+import { useDeferNotificationOnboarding } from "@/lib/useDeferNotificationOnboarding";
 import { pushScreen } from "@/lib/press-utils";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -20,13 +24,20 @@ import {
   spacing,
   typography,
 } from "@frennix/ui";
-import { useState } from "react";
 
 export default function TrainingPartnerJourneyScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
+  const insets = useSafeAreaInsets();
   const [openingChat, setOpeningChat] = useState(false);
+  const [explainerVisible, setExplainerVisible] = useState(false);
+
+  useDeferNotificationOnboarding();
+
+  const openFrennixMatchExplainer = useCallback(() => {
+    setExplainerVisible(true);
+  }, []);
 
   const journeyQuery = useQuery({
     queryKey: ["training-partnership-journey", matchId, userId],
@@ -99,11 +110,16 @@ export default function TrainingPartnerJourneyScreen() {
     journey.partnership.match_score_at_start ??
     null;
 
+  const bottomInset = Math.max(insets.bottom, spacing.md);
+
   return (
     <>
       <Stack.Screen options={{ title: "Training Partner Journey" }} />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomInset + spacing.xxl + spacing.lg },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={journeyQuery.isRefetching}
@@ -118,7 +134,13 @@ export default function TrainingPartnerJourneyScreen() {
           {journey.partner.username ? (
             <Text style={styles.username}>@{journey.partner.username}</Text>
           ) : null}
-          {score != null && score > 0 ? <FrennixMatchDisplay score={score} variant="compact" /> : null}
+          {score != null && score > 0 ? (
+            <FrennixMatchDisplay
+              score={score}
+              variant="compact"
+              onLearnMore={openFrennixMatchExplainer}
+            />
+          ) : null}
         </View>
 
         <PartnershipLevelBadge level={journey.level} />
@@ -143,6 +165,11 @@ export default function TrainingPartnerJourneyScreen() {
           onPress={() => pushScreen("/matching/matches")}
         />
       </ScrollView>
+
+      <FrennixMatchExplainerModal
+        visible={explainerVisible}
+        onClose={() => setExplainerVisible(false)}
+      />
     </>
   );
 }
@@ -160,7 +187,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.xl,
     gap: spacing.lg,
-    paddingBottom: spacing.xxl,
   },
   hero: { alignItems: "center", gap: spacing.sm },
   partnerName: { ...typography.heading, color: colors.text, textAlign: "center" },

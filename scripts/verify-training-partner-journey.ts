@@ -11,6 +11,7 @@ import {
   formatPartnershipTimelineTimestamp,
   getPartnershipLevel,
 } from "../packages/matching/src/partnership";
+import { getFrennixMatchLevel } from "../packages/matching/src/frennix-match";
 
 const ROOT = join(__dirname, "..");
 
@@ -42,6 +43,11 @@ requireFile("app/matching/journey/[matchId]/intro.tsx");
 requireFile("app/matching/journey/[matchId]/index.tsx");
 requireFile("components/PartnershipTimeline.tsx");
 requireFile("features/training-partnership/README.md");
+requireFile("lib/useDeferNotificationOnboarding.ts");
+
+const onboardingTs = readFileSync(join(ROOT, "lib/notification-onboarding.ts"), "utf8");
+const matchDisplayTs = readFileSync(join(ROOT, "components/FrennixMatchDisplay.tsx"), "utf8");
+const frenixMatchTs = readFileSync(join(ROOT, "packages/matching/src/frennix-match.ts"), "utf8");
 
 const indexTsx = readFileSync(join(ROOT, "app/matching/index.tsx"), "utf8");
 if (indexTsx.includes("bootstrapTrainingPartnership") && indexTsx.includes("/matching/journey/")) {
@@ -193,6 +199,34 @@ if (codes.size === PARTNERSHIP_MILESTONE_DEFINITIONS.length) {
   ok("Milestone codes are unique");
 } else {
   fail("Duplicate milestone codes detected");
+}
+
+if (
+  onboardingTs.includes("setNotificationOnboardingBlocked") &&
+  onboardingTs.includes("onboardingBlocked") &&
+  readFileSync(join(ROOT, "app/matching/journey/[matchId]/intro.tsx"), "utf8").includes(
+    "useDeferNotificationOnboarding"
+  )
+) {
+  ok("Notification onboarding deferred during journey flow");
+} else {
+  fail("Journey notification defer missing");
+}
+
+if (matchDisplayTs.includes("scoreRow") && !matchDisplayTs.includes("styles.root")) {
+  ok("Frennix Match info icon attached inside badge");
+} else {
+  fail("Frennix Match info icon layout regression");
+}
+
+if (
+  frenixMatchTs.includes("Exceptional Frennix Match") &&
+  frenixMatchTs.includes("Strong Frennix Match") &&
+  getFrennixMatchLevel(85).label === "Strong Frennix Match"
+) {
+  ok("Shared Frennix Match score labels use centralized thresholds");
+} else {
+  fail("Frennix Match label mapping incorrect");
 }
 
 if (!process.exitCode) {

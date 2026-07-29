@@ -8,6 +8,7 @@ import {
 } from "@frennix/api";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { PartnershipLevelBadge } from "@/components/PartnershipLevelBadge";
+import { useDeferNotificationOnboarding } from "@/lib/useDeferNotificationOnboarding";
 import { pushScreen } from "@/lib/press-utils";
 import { useAuth } from "@/providers/AuthProvider";
 import { Avatar, Button, EmptyState, ScreenSpinner, colors, spacing, typography } from "@frennix/ui";
@@ -18,6 +19,8 @@ export default function TrainingPartnerJourneyIntroScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const matchScore = score ? Number(score) : null;
+
+  useDeferNotificationOnboarding();
 
   const journeyQuery = useQuery({
     queryKey: ["training-partnership-journey", matchId, userId],
@@ -92,9 +95,9 @@ export default function TrainingPartnerJourneyIntroScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Your Training Partner Journey" }} />
+      <Stack.Screen options={{ title: "Your Training Partner Journey Begins" }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <FrennixLogo variant="icon" height={36} style={styles.logo} />
+        <FrennixLogo variant="icon" height={44} style={styles.logo} />
 
         <View style={styles.hero}>
           <Avatar uri={journey.partner.avatar_url} name={journey.partner.display_name} size={96} />

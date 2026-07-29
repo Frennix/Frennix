@@ -39,43 +39,30 @@ export function FrennixMatchDisplay({
   }
 
   return (
-    <View style={[styles.root, isInline && styles.rootInline]}>
-      <Pressable
-        onPress={handleLearnMore}
-        style={[styles.badge, isInline && styles.badgeInline]}
-        accessibilityRole="button"
-        accessibilityLabel={`${display.percentLabel}. ${display.levelLabel}. Tap for details.`}
-      >
-        <Text style={[styles.percent, isCompact && styles.percentCompact]}>{display.percentLabel}</Text>
-        {!isInline ? (
-          <Text style={[styles.level, isCompact && styles.levelCompact]}>{display.levelLabel}</Text>
+    <Pressable
+      onPress={handleLearnMore}
+      style={[styles.badge, isInline && styles.badgeInline]}
+      accessibilityRole="button"
+      accessibilityLabel={`${display.percentLabel}. ${display.levelLabel}. Tap for details.`}
+    >
+      <View style={styles.scoreRow}>
+        <Text style={[styles.percent, isCompact && styles.percentCompact]} numberOfLines={1}>
+          {display.percentLabel}
+        </Text>
+        {showInfo ? (
+          <View style={styles.infoInline} accessibilityElementsHidden importantForAccessibility="no">
+            <Text style={styles.infoIcon}>ⓘ</Text>
+          </View>
         ) : null}
-      </Pressable>
-      {showInfo ? (
-        <Pressable
-          onPress={handleLearnMore}
-          hitSlop={8}
-          style={styles.infoButton}
-          accessibilityRole="button"
-          accessibilityLabel="About Frennix Match"
-        >
-          <Text style={styles.infoIcon}>ⓘ</Text>
-        </Pressable>
+      </View>
+      {!isInline ? (
+        <Text style={[styles.level, isCompact && styles.levelCompact]}>{display.levelLabel}</Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    gap: spacing.xs,
-    alignSelf: "flex-start",
-  },
-  rootInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
   badge: {
     gap: 2,
     paddingHorizontal: spacing.sm,
@@ -84,15 +71,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.accent,
+    alignSelf: "flex-start",
   },
   badgeInline: {
     paddingVertical: 4,
+  },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
   percent: {
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: "800",
     fontSize: 13,
+    flexShrink: 1,
   },
   percentCompact: {
     fontSize: 12,
@@ -106,10 +100,10 @@ const styles = StyleSheet.create({
   levelCompact: {
     fontSize: 10,
   },
-  infoButton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  infoInline: {
+    minWidth: 28,
+    minHeight: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.accentMuted,
@@ -120,7 +114,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.accent,
     fontWeight: "800",
-    fontSize: 12,
-    lineHeight: 14,
+    fontSize: 13,
+    lineHeight: 16,
   },
 });

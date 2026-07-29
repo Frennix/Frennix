@@ -27,6 +27,7 @@ type TrainingPartnerCardProps = {
   candidate: MatchCandidate | MatchableProfile;
   viewer: MatchableProfile;
   onPressProfile?: () => void;
+  onLearnMoreMatch?: () => void;
   accessibilityLabel?: string;
 };
 
@@ -40,6 +41,7 @@ export function TrainingPartnerCard({
   candidate,
   viewer,
   onPressProfile,
+  onLearnMoreMatch,
   accessibilityLabel,
 }: TrainingPartnerCardProps) {
   const sharedGoals = formatSharedGoalLabels(viewer, candidate);
@@ -78,7 +80,11 @@ export function TrainingPartnerCard({
         testID="training-partner-card-scroll"
       >
       {matchScore != null && matchScore > 0 ? (
-        <FrennixMatchDisplay score={matchScore} variant="compact" />
+        <FrennixMatchDisplay
+          score={matchScore}
+          variant="compact"
+          onLearnMore={onLearnMoreMatch}
+        />
       ) : null}
       <View style={styles.hero}>
         <View style={styles.avatarWrap}>

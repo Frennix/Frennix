@@ -54,7 +54,7 @@ export const FRENIX_MATCH_FUTURE_FACTORS = [
 
 export type FrennixMatchFutureFactor = (typeof FRENIX_MATCH_FUTURE_FACTORS)[number];
 
-export type FrennixMatchLevelId = "elite" | "excellent" | "strong" | "potential";
+export type FrennixMatchLevelId = "exceptional" | "strong" | "good" | "potential";
 
 export interface FrennixMatchLevel {
   id: FrennixMatchLevelId;
@@ -65,10 +65,10 @@ export interface FrennixMatchLevel {
 }
 
 export const FRENIX_MATCH_LEVELS: readonly FrennixMatchLevel[] = [
-  { id: "elite", min: 95, max: 100, emoji: "🟢", label: "Elite Frennix Match" },
-  { id: "excellent", min: 85, max: 94, emoji: "🔵", label: "Excellent Frennix Match" },
-  { id: "strong", min: 70, max: 84, emoji: "🟠", label: "Strong Frennix Match" },
-  { id: "potential", min: 0, max: 69, emoji: "⚪", label: "Potential Frennix Match" },
+  { id: "exceptional", min: 90, max: 100, emoji: "🟢", label: "Exceptional Frennix Match" },
+  { id: "strong", min: 75, max: 89, emoji: "🔵", label: "Strong Frennix Match" },
+  { id: "good", min: 60, max: 74, emoji: "🟠", label: "Good Frennix Match" },
+  { id: "potential", min: 0, max: 59, emoji: "⚪", label: "Potential Frennix Match" },
 ] as const;
 
 export function roundFrennixMatchScore(score: number): number {
@@ -77,9 +77,9 @@ export function roundFrennixMatchScore(score: number): number {
 
 export function getFrennixMatchLevel(score: number): FrennixMatchLevel {
   const rounded = roundFrennixMatchScore(score);
-  if (rounded >= 95) return FRENIX_MATCH_LEVELS[0]!;
-  if (rounded >= 85) return FRENIX_MATCH_LEVELS[1]!;
-  if (rounded >= 70) return FRENIX_MATCH_LEVELS[2]!;
+  if (rounded >= 90) return FRENIX_MATCH_LEVELS[0]!;
+  if (rounded >= 75) return FRENIX_MATCH_LEVELS[1]!;
+  if (rounded >= 60) return FRENIX_MATCH_LEVELS[2]!;
   return FRENIX_MATCH_LEVELS[3]!;
 }
 
@@ -103,15 +103,15 @@ export function formatFrennixMatchDisplay(score: number): FrennixMatchDisplay | 
 }
 
 export function getFrennixMatchWhyTitle(score: number): string {
-  return score >= 70
+  return score >= 60
     ? FRENIX_MATCH_BRAND.sections.whyGreat
     : FRENIX_MATCH_BRAND.sections.why;
 }
 
 export const FRENIX_MATCH_FILTER_THRESHOLDS = [
-  { value: 95, label: "Elite (95%+)" },
-  { value: 85, label: "Excellent (85%+)" },
-  { value: 70, label: "Strong (70%+)" },
+  { value: 90, label: "Exceptional (90%+)" },
+  { value: 75, label: "Strong (75%+)" },
+  { value: 60, label: "Good (60%+)" },
 ] as const;
 
 /** @deprecated Use formatFrennixMatchDisplay — kept for gradual migration. */
