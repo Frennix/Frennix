@@ -18,6 +18,7 @@ import {
   getMatches,
   getOrCreateConversation,
   removeTrainingMatch,
+  resolveTrainingPartnerJourneyRoute,
 } from "@frennix/api";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { TrainingMatchRow } from "@/components/TrainingMatchRow";
@@ -42,6 +43,7 @@ export default function TrainingMatchesScreen() {
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const [openingPartnerId, setOpeningPartnerId] = useState<string | null>(null);
+  const [openingJourneyMatchId, setOpeningJourneyMatchId] = useState<string | null>(null);
   const [removingMatchId, setRemovingMatchId] = useState<string | null>(null);
   const [chatError, setChatError] = useState("");
 
@@ -134,6 +136,24 @@ export default function TrainingMatchesScreen() {
     [openingPartnerId, queryClient, userId]
   );
 
+  const handleOpenJourney = useCallback(async (matchId: string) => {
+    if (openingJourneyMatchId) return;
+    setOpeningJourneyMatchId(matchId);
+    try {
+      const route = await resolveTrainingPartnerJourneyRoute(matchId);
+      if (route.accessible) {
+        router.push(route.href);
+      } else {
+        showAlert("Journey unavailable", route.message);
+        router.push(route.fallbackHref);
+      }
+    } catch (e) {
+      showAlert("Journey unavailable", e instanceof Error ? e.message : "Try again in a moment.");
+    } finally {
+      setOpeningJourneyMatchId(null);
+    }
+  }, [openingJourneyMatchId]);
+
   const handleRemove = useCallback(
     (matchId: string, partnerName: string) => {
       if (removingMatchId || removeMutation.isPending) return;
@@ -151,12 +171,21 @@ export default function TrainingMatchesScreen() {
       <TrainingMatchRow
         item={item}
         onOpenChat={handleOpenChat}
+        onOpenJourney={handleOpenJourney}
         onRemove={handleRemove}
         openingChat={openingPartnerId === item.other_user?.id}
+        openingJourney={openingJourneyMatchId === item.id}
         removing={removingMatchId === item.id}
       />
     ),
-    [handleOpenChat, handleRemove, openingPartnerId, removingMatchId]
+    [
+      handleOpenChat,
+      handleOpenJourney,
+      handleRemove,
+      openingPartnerId,
+      openingJourneyMatchId,
+      removingMatchId,
+    ]
   );
 
   if (isLoading) {

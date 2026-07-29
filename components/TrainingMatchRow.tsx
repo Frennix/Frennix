@@ -15,8 +15,10 @@ import {
 type TrainingMatchRowProps = {
   item: TrainingMatchListItem;
   onOpenChat: (partnerId: string) => void;
+  onOpenJourney: (matchId: string) => void;
   onRemove: (matchId: string, partnerName: string) => void;
   openingChat?: boolean;
+  openingJourney?: boolean;
   removing?: boolean;
 };
 
@@ -29,8 +31,10 @@ function messagePreview(item: TrainingMatchListItem) {
 export const TrainingMatchRow = memo(function TrainingMatchRow({
   item,
   onOpenChat,
+  onOpenJourney,
   onRemove,
   openingChat,
+  openingJourney,
   removing,
 }: TrainingMatchRowProps) {
   const partner = item.other_user;
@@ -92,6 +96,13 @@ export const TrainingMatchRow = memo(function TrainingMatchRow({
 
       <View style={styles.actions}>
         <Button
+          title="View journey"
+          variant="secondary"
+          onPress={() => onOpenJourney(item.id)}
+          loading={openingJourney}
+          style={styles.journeyButton}
+        />
+        <Button
           title="Open chat"
           onPress={() => onOpenChat(partner.id)}
           loading={openingChat}
@@ -99,12 +110,12 @@ export const TrainingMatchRow = memo(function TrainingMatchRow({
         />
         <Pressable
           onPress={() => onRemove(item.id, partner.display_name)}
-          disabled={openingChat || removing}
+          disabled={openingChat || openingJourney || removing}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={`Remove training match with ${partner.display_name}`}
         >
-          <Text style={[styles.removeText, (openingChat || removing) && styles.removeTextDisabled]}>
+          <Text style={[styles.removeText, (openingChat || openingJourney || removing) && styles.removeTextDisabled]}>
             {removing ? "Removing…" : "Remove"}
           </Text>
         </Pressable>
@@ -154,6 +165,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: colors.black, fontSize: 11, fontWeight: "700" },
   actions: { alignItems: "center", gap: spacing.sm, alignSelf: "center" },
+  journeyButton: { minWidth: 110, minHeight: 40 },
   chatButton: { minWidth: 96, minHeight: 40 },
   removeText: { ...typography.caption, color: colors.danger, fontWeight: "600" },
   removeTextDisabled: { opacity: 0.5 },

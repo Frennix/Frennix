@@ -8,6 +8,14 @@ export default function MatchingLayout() {
     <Stack screenOptions={nestedStackScreenOptions()}>
       <Stack.Screen name="index" options={nestedBackScreen("Training partners")} />
       <Stack.Screen name="matches" options={nestedBackScreen("Training matches")} />
+      <Stack.Screen
+        name="journey/[matchId]/intro"
+        options={nestedBackScreen("Your Training Partner Journey Begins")}
+      />
+      <Stack.Screen
+        name="journey/[matchId]/index"
+        options={nestedBackScreen("Training Partner Journey")}
+      />
     </Stack>
     </MatchingRouteErrorBoundary>
   );

@@ -4,6 +4,7 @@ import {
   getOrCreateConversation,
   markNotificationRead,
   recordNotificationEngagement,
+  resolveTrainingPartnerJourneyRoute,
   safeNotificationPayload,
 } from "@frennix/api";
 import { pushScreen } from "@/lib/press-utils";
@@ -48,6 +49,18 @@ async function openTrainingMatchDestination(
   userId: string
 ): Promise<NotificationNavResult> {
   const payload = safeNotificationPayload(notification.payload);
+  const matchId = asString(payload.match_id);
+
+  if (matchId) {
+    const route = await resolveTrainingPartnerJourneyRoute(matchId);
+    if (route.accessible) {
+      return pushHref(route.href);
+    }
+    const fallback = pushHref(route.fallbackHref);
+    if (!fallback.ok) return fallback;
+    return { ok: false, message: route.message };
+  }
+
   const partnerId =
     asString(payload.matched_user_id) ?? notification.actor?.id ?? undefined;
 
@@ -204,6 +217,17 @@ export async function openNotificationFromPushDataAsync(
   const payload = safeNotificationPayload(data);
 
   if (type === "match") {
+    const matchId = asString(data.match_id) ?? asString(payload.match_id);
+    if (matchId) {
+      const route = await resolveTrainingPartnerJourneyRoute(matchId);
+      if (route.accessible) {
+        return pushHref(route.href);
+      }
+      const fallback = pushHref(route.fallbackHref);
+      if (!fallback.ok) return fallback;
+      return { ok: false, message: route.message };
+    }
+
     const partnerId = asString(data.matched_user_id) ?? asString(payload.matched_user_id);
     if (partnerId) {
       try {

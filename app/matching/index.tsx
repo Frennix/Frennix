@@ -13,19 +13,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  bootstrapTrainingPartnership,
   getErrorMessage,
   getMatchCandidates,
   resolveMatchCandidatesLoadDiagnostic,
-  getOrCreateConversation,
   getTechnicalErrorMessage,
   recordMatchSwipe,
 } from "@frennix/api";
 import type { MatchCandidate } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
-import {
-  TrainingMatchModal,
-  TrainingPartnerDeckActions,
-} from "@/components/TrainingMatchModal";
+import { TrainingPartnerDeckActions } from "@/components/TrainingMatchModal";
 import { TrainingPartnerCard } from "@/components/TrainingPartnerCard";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
 import { TrainingPartnerDeckSafety } from "@/components/TrainingPartnerDeckSafety";
@@ -80,9 +77,6 @@ export default function TrainingPartnerDiscoveryScreen() {
   const [deckInitialized, setDeckInitialized] = useState(false);
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState("");
-  const [matchPartner, setMatchPartner] = useState<MatchCandidate | null>(null);
-  const [matchModalVisible, setMatchModalVisible] = useState(false);
-  const [openingMessage, setOpeningMessage] = useState(false);
 
   const { enabled: matchmakingEnabled, isLoading: flagLoading } = useFeatureFlag(
     "training_matchmaking",
@@ -186,13 +180,24 @@ export default function TrainingPartnerDiscoveryScreen() {
 
       if (direction === "right" && result.is_mutual && result.match) {
         hapticMatch();
-        setMatchPartner(currentCandidate);
-        setMatchModalVisible(true);
+        await bootstrapTrainingPartnership(
+          result.match.id,
+          currentCandidate.match_score ?? null
+        ).catch(() => undefined);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["training-matches", userId] }),
           queryClient.invalidateQueries({ queryKey: ["notifications", userId] }),
           queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] }),
+          queryClient.invalidateQueries({
+            queryKey: ["training-partnership-journey", result.match.id, userId],
+          }),
         ]);
+        const score =
+          currentCandidate.match_score != null ? String(currentCandidate.match_score) : undefined;
+        router.push({
+          pathname: "/matching/journey/[matchId]/intro",
+          params: { matchId: result.match.id, ...(score ? { score } : {}) },
+        });
       }
 
       await advanceDeck();
@@ -202,32 +207,6 @@ export default function TrainingPartnerDiscoveryScreen() {
     } finally {
       setActing(false);
     }
-  }
-
-  async function handleSendMessage() {
-    if (!matchPartner || !userId) return;
-
-    setOpeningMessage(true);
-    try {
-      const conversationId = await getOrCreateConversation(userId, matchPartner.id);
-      setMatchModalVisible(false);
-      setMatchPartner(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["training-matches", userId] }),
-        queryClient.invalidateQueries({ queryKey: ["conversations", userId] }),
-        queryClient.invalidateQueries({ queryKey: ["unread-messages", userId] }),
-      ]);
-      router.push(`/chat/${conversationId}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Could not open chat");
-    } finally {
-      setOpeningMessage(false);
-    }
-  }
-
-  function handleKeepBrowsing() {
-    setMatchModalVisible(false);
-    setMatchPartner(null);
   }
 
   if (!authReady || !profile || flagLoading) {
@@ -438,14 +417,6 @@ export default function TrainingPartnerDiscoveryScreen() {
           <ReportIssueLink area="training_partners" from="/matching" />
         </View>
       </View>
-
-      <TrainingMatchModal
-        visible={matchModalVisible}
-        partner={matchPartner}
-        messaging={openingMessage}
-        onSendMessage={() => void handleSendMessage()}
-        onKeepBrowsing={handleKeepBrowsing}
-      />
     </>
   );
 }

@@ -679,3 +679,4 @@ export * from "./story-engagement";
 export * from "./workout-story";
 export * from "./matching";
 export * from "./lifestyle";
+export * from "./training-partnership";
