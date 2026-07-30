@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   FlatList,
@@ -52,6 +52,7 @@ import {
   useTabScreenWebHeightStyle,
 } from "@/lib/screen-shell";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
+import { scheduleDocumentHorizontalScrollReset } from "@/lib/document-horizontal-scroll";
 import {
   DiscoverProfileCard,
   EmptyState,
@@ -317,6 +318,12 @@ export default function DiscoverScreen() {
   useEffect(() => {
     resetAtTop();
   }, [resetAtTop, tab]);
+
+  useFocusEffect(
+    useCallback(() => {
+      scheduleDocumentHorizontalScrollReset();
+    }, [])
+  );
 
   useTabScrollRegistration(
     "discover",
@@ -656,8 +663,16 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { ...tabScreenContainer, padding: spacing.md },
-  header: { ...typography.heading, marginBottom: spacing.sm },
+  container: {
+    ...tabScreenContainer,
+    padding: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    alignSelf: "stretch",
+    overflow: "hidden",
+  },
+  header: { ...typography.heading, marginBottom: spacing.sm, width: "100%", maxWidth: "100%" },
   matchingSectionTitle: {
     ...typography.bodySmall,
     fontWeight: "700",
@@ -666,7 +681,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: spacing.sm,
   },
-  matchingCards: { gap: spacing.sm, marginBottom: spacing.md },
+  matchingCards: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
   matchingCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -676,6 +697,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   matchingCardIcon: {
     width: 44,
@@ -685,14 +710,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  matchingCardCopy: { flex: 1, gap: 4 },
+  matchingCardCopy: { flex: 1, minWidth: 0, gap: 4 },
   matchingCardTitle: { ...typography.body, fontWeight: "700" },
   matchingCardBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
-  searchBlock: { gap: spacing.xs, marginBottom: spacing.xs },
+  searchBlock: {
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  },
   searchHint: { ...typography.caption, color: colors.textMuted },
-  tabRow: { flexDirection: "row", gap: spacing.sm, marginVertical: spacing.md },
+  tabRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginVertical: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
   tab: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: spacing.sm,
     alignItems: "center",
     borderRadius: 8,
@@ -705,7 +745,7 @@ const styles = StyleSheet.create({
   sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   sectionTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   sectionBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
-  list: { paddingBottom: spacing.xxl },
+  list: { paddingBottom: spacing.xxl, width: "100%", maxWidth: "100%", minWidth: 0 },
   createLink: { color: colors.accent, fontWeight: "600", marginBottom: spacing.md },
   loader: { marginVertical: spacing.md },
 });

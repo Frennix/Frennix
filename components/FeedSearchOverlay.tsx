@@ -31,6 +31,7 @@ import {
   registerFeedSearchController,
   resetFeedHorizontalScroll,
 } from "@/lib/feed-search-controller";
+import { scheduleDocumentHorizontalScrollReset } from "@/lib/document-horizontal-scroll";
 import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
 import { useAuth } from "@/providers/AuthProvider";
@@ -78,6 +79,7 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
     Keyboard.dismiss();
     inputRef.current?.blur();
     resetFeedHorizontalScroll();
+    scheduleDocumentHorizontalScrollReset();
     onClose?.();
   }, [onClose]);
 

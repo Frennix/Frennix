@@ -4,6 +4,10 @@ import { Platform, type ViewStyle } from "react-native";
 export const flexFill: ViewStyle = {
   flex: 1,
   minHeight: 0,
+  minWidth: 0,
+  width: "100%",
+  maxWidth: "100%",
+  alignSelf: "stretch",
   ...(Platform.OS === "web" ? ({ flexBasis: 0 } as ViewStyle) : null),
 };
 
@@ -13,8 +17,12 @@ export const webAppShell: ViewStyle | undefined =
     ? ({
         flex: 1,
         width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
         height: "100%",
         minHeight: "100%",
+        alignSelf: "stretch",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         backgroundColor: "#0A0A0B",
@@ -27,8 +35,11 @@ export const webTabSceneShell: ViewStyle | undefined =
     ? ({
         flex: 1,
         width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
         minHeight: 0,
         flexBasis: 0,
+        alignSelf: "stretch",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",

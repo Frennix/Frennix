@@ -1,4 +1,8 @@
-import { Keyboard, Platform } from "react-native";
+import { Keyboard } from "react-native";
+import {
+  resetDocumentHorizontalScroll,
+  scheduleDocumentHorizontalScrollReset,
+} from "@/lib/document-horizontal-scroll";
 
 type FeedSearchController = {
   open: () => void;
@@ -47,32 +51,11 @@ export function consumeFeedScrollY() {
 
 /** Clears accidental horizontal drift without dismissing the keyboard. */
 export function resetFeedHorizontalScroll() {
-  if (Platform.OS !== "web" || typeof document === "undefined") return;
-
-  document.documentElement.scrollLeft = 0;
-  document.body.scrollLeft = 0;
-
-  for (const id of [
-    "feed-tab-scene",
-    "feed-root-container",
-    "feed-scroll-shell",
-    "feed-scroll-list",
-    "feed-search-section",
-    "feed-search-overlay",
-  ]) {
-    const element = document.getElementById(id);
-    if (element && "scrollLeft" in element) {
-      (element as HTMLElement).scrollLeft = 0;
-    }
-  }
-
-  if (typeof window !== "undefined") {
-    window.scrollTo({ left: 0, top: window.scrollY, behavior: "auto" });
-  }
+  resetDocumentHorizontalScroll();
 }
 
 /** Full layout reset when leaving search or the feed screen. */
 export function resetFeedScrollLayout() {
   Keyboard.dismiss();
-  resetFeedHorizontalScroll();
+  scheduleDocumentHorizontalScrollReset();
 }

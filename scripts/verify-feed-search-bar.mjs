@@ -66,7 +66,7 @@ function main() {
   record(results, "Navigation reuses Discover tab for filters", nav.includes('/(tabs)/discover') && nav.includes("openFilters"));
   record(results, "Feed search reset controller exists", controller.includes("resetFeedSearch"));
   record(results, "Feed search resets on blur/focus", overlay.includes("useFocusEffect") && overlay.includes("resetSearch"));
-  record(results, "Feed search resets horizontal scroll", controller.includes("resetFeedHorizontalScroll"));
+  record(results, "Feed search resets horizontal scroll", controller.includes("resetDocumentHorizontalScroll"));
   record(results, "Feed search overlay mounted on feed screen", index.includes("<FeedSearchOverlay"));
   record(results, "Feed search restores scroll on close", index.includes("restoreFeedScrollPosition") && controller.includes("consumeFeedScrollY"));
   record(results, "Feed search overlay uses fixed web positioning", overlay.includes('position: "fixed"') && webStyles.includes("#feed-search-overlay"));

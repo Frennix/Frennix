@@ -26,6 +26,7 @@ function runStaticChecks() {
   const results = [];
   const tokens = read("packages/ui/src/feed-layout/tokens.ts");
   const stories = read("packages/ui/src/FeedStoriesRow.tsx");
+  const filters = read("components/DiscoverLifestyleFilters.tsx");
   const shortcuts = read("packages/ui/src/FeedQuickActionCards.tsx");
   const actions = read("packages/ui/src/feed-layout/FeedPostActionBar.tsx");
   const postCard = read("packages/ui/src/FeedPostCard.tsx");
@@ -39,6 +40,23 @@ function runStaticChecks() {
       !/root:[\s\S]*width:\s*"100%"[\s\S]*marginHorizontal/.test(tokens)
   );
   record(results, "Stories header uses safe row layout", stories.includes("viewAllButton") && stories.includes("flex: 1"));
+  record(
+    results,
+    "Discover filter rows are width-clamped",
+    filters.includes("chipRowShell") &&
+      filters.includes("chipRowScroll") &&
+      filters.includes('overflow: "hidden"')
+  );
+  record(
+    results,
+    "Document horizontal scroll reset exists",
+    read("lib/document-horizontal-scroll.ts").includes("resetDocumentHorizontalScroll")
+  );
+  record(
+    results,
+    "Tabs reset horizontal scroll on route change",
+    read("components/DocumentHorizontalScrollCoordinator.tsx").includes("usePathname")
+  );
   record(results, "Stories horizontal list is width-clamped", stories.includes("nativeList") && stories.includes('maxWidth: "100%"'));
   record(results, "Shortcuts use four flex columns", shortcuts.includes("flex: 1") && shortcuts.includes("paddingHorizontal: spacing.md"));
   record(results, "Post actions are four equal items", actions.includes("flex: 1") && !actions.includes("onMore"));

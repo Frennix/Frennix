@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 5e61bdf9</title>
+    <title>Frennix · a402d7be</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="5e61bdf9a8f8160d4633c5a3a96615565e58a4bf" />
-    <meta name="frennix-build-bundle" content="index-079c1527a5da8bcd23c811932bad8cdd.js" />
-    <meta name="frennix-build-at" content="2026-07-30T22:28:26.707Z" />
+    <meta name="frennix-build-sha" content="a402d7befbaaf888f155087ad88c13b4398aa2c4" />
+    <meta name="frennix-build-bundle" content="index-daaea8c843f53f50562e00eb7ed435f5.js" />
+    <meta name="frennix-build-at" content="2026-07-30T22:45:44.425Z" />
     <meta name="frennix-sw-version" content="20260727-pwa-auto-update-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -44,7 +44,11 @@
     min-height: 100%;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
     overflow-x: hidden;
+    overscroll-behavior-x: none;
     box-sizing: border-box;
     background-color: #0A0A0B;
   }
@@ -60,9 +64,12 @@
     min-height: 100dvh;
     min-height: -webkit-fill-available;
     margin: 0;
+    padding: 0;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     overflow-x: hidden;
+    overscroll-behavior-x: none;
     background-color: #0A0A0B;
     overflow: hidden;
   }
@@ -72,10 +79,14 @@
     flex-direction: column;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
     height: 100%;
     min-height: 100%;
     min-height: 0;
     overflow-x: hidden;
+    overscroll-behavior-x: none;
     box-sizing: border-box;
     background-color: #0A0A0B;
     pointer-events: auto;
@@ -151,6 +162,12 @@
     max-width: 100% !important;
     min-width: 0 !important;
     overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+  #discover-scroll [data-focusable="true"],
+  #discover-scroll input,
+  #discover-scroll textarea {
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
   #feed-search-overlay {
@@ -269,7 +286,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="5e61bdf9a8f8160d4633c5a3a96615565e58a4bf" data-bundle="index-079c1527a5da8bcd23c811932bad8cdd.js" data-sw="20260727-pwa-auto-update-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="a402d7befbaaf888f155087ad88c13b4398aa2c4" data-bundle="index-daaea8c843f53f50562e00eb7ed435f5.js" data-sw="20260727-pwa-auto-update-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -315,7 +332,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-079c1527a5da8bcd23c811932bad8cdd.js?v=5e61bdf9" defer></script>
+  <script src="/_expo/static/js/web/index-daaea8c843f53f50562e00eb7ed435f5.js?v=a402d7be" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

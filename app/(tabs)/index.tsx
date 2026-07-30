@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
@@ -107,6 +108,7 @@ import {
   resetFeedHorizontalScroll,
   resetFeedSearch,
 } from "@/lib/feed-search-controller";
+import { scheduleDocumentHorizontalScrollReset } from "@/lib/document-horizontal-scroll";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -118,6 +120,12 @@ export default function HomeScreen() {
       recordWebStartupCheckpoint("feed-route:mounted");
     }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      scheduleDocumentHorizontalScrollReset();
+    }, [])
+  );
   const isolateStories = isFeedIsolateDisabled("stories");
   const isolateFeedList = isFeedIsolateDisabled("feed-list");
   const isolatePostCards = isFeedIsolateDisabled("post-cards");

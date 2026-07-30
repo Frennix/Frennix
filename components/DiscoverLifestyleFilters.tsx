@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import type { ReactNode } from "react";
 import type { DiscoverCompatibilityFilters } from "@frennix/types";
 import { FRENIX_MATCH_BRAND } from "@frennix/matching";
 import {
@@ -14,6 +15,7 @@ import {
   hasActiveDiscoverFilters,
 } from "@/lib/lifestyle-matching";
 import { formatActivity, formatGoal } from "@/lib/labels";
+import { webHorizontalScrollStyle } from "@/lib/flex-layout";
 import { Chip, colors, spacing, typography } from "@frennix/ui";
 
 interface DiscoverCompatibilityFiltersProps {
@@ -39,6 +41,22 @@ function toggle<T extends DiscoverCompatibilityFilters, K extends keyof T>(
   return next;
 }
 
+function FilterChipRow({ children }: { children: ReactNode }) {
+  return (
+    <View style={styles.chipRowShell}>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        style={[styles.chipRowScroll, webHorizontalScrollStyle]}
+        contentContainerStyle={styles.chipRowContent}
+      >
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function DiscoverCompatibilityFilters({
   filters,
   onChange,
@@ -58,7 +76,7 @@ export function DiscoverCompatibilityFilters({
       <Text style={styles.hint}>{LIFESTYLE_BRAND.filtersHint}</Text>
 
       <Text style={styles.groupLabel}>Lifestyle</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         <Chip
           label="Parents"
           selected={filters.parentsOnly === true}
@@ -102,10 +120,10 @@ export function DiscoverCompatibilityFilters({
           selected={filters.lookingForParentPartner === true}
           onPress={() => onChange(toggle(filters, "lookingForParentPartner", true))}
         />
-      </ScrollView>
+      </FilterChipRow>
 
       <Text style={styles.groupLabel}>Workout time</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         {PREFERRED_WORKOUT_TIMES.map((slot) => (
           <Chip
             key={slot}
@@ -114,10 +132,10 @@ export function DiscoverCompatibilityFilters({
             onPress={() => onChange(toggle(filters, "preferredWorkoutTime", slot))}
           />
         ))}
-      </ScrollView>
+      </FilterChipRow>
 
       <Text style={styles.groupLabel}>Children age</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         {CHILDREN_AGE_GROUPS.map((group) => (
           <Chip
             key={group}
@@ -126,10 +144,10 @@ export function DiscoverCompatibilityFilters({
             onPress={() => onChange(toggle(filters, "childrenAgeGroup", group))}
           />
         ))}
-      </ScrollView>
+      </FilterChipRow>
 
       <Text style={styles.groupLabel}>Goals</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         {DISCOVER_GOAL_FILTERS.slice(0, 6).map((goal) => (
           <Chip
             key={goal}
@@ -138,10 +156,10 @@ export function DiscoverCompatibilityFilters({
             onPress={() => onChange(toggle(filters, "goal", goal))}
           />
         ))}
-      </ScrollView>
+      </FilterChipRow>
 
       <Text style={styles.groupLabel}>Interests</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         {DISCOVER_ACTIVITY_FILTERS.slice(0, 8).map((activity) => (
           <Chip
             key={activity}
@@ -150,10 +168,10 @@ export function DiscoverCompatibilityFilters({
             onPress={() => onChange(toggle(filters, "activity", activity))}
           />
         ))}
-      </ScrollView>
+      </FilterChipRow>
 
       <Text style={styles.groupLabel}>Distance</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         {DISTANCE_FILTER_OPTIONS.map((opt) => (
           <Chip
             key={opt.value}
@@ -162,10 +180,10 @@ export function DiscoverCompatibilityFilters({
             onPress={() => onChange(toggle(filters, "maxDistanceMiles", opt.value))}
           />
         ))}
-      </ScrollView>
+      </FilterChipRow>
 
       <Text style={styles.groupLabel}>{FRENIX_MATCH_BRAND.sections.filterMinLabel}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <FilterChipRow>
         {COMPATIBILITY_FILTER_THRESHOLDS.map((opt) => (
           <Chip
             key={opt.value}
@@ -174,7 +192,7 @@ export function DiscoverCompatibilityFilters({
             onPress={() => onChange(toggle(filters, "minCompatibility", opt.value))}
           />
         ))}
-      </ScrollView>
+      </FilterChipRow>
     </View>
   );
 }
@@ -183,10 +201,24 @@ export function DiscoverCompatibilityFilters({
 export const DiscoverLifestyleFilters = DiscoverCompatibilityFilters;
 
 const styles = StyleSheet.create({
-  root: { gap: spacing.sm, marginBottom: spacing.sm },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { ...typography.bodySmall, fontWeight: "700", color: colors.textSecondary },
-  clear: { ...typography.caption, color: colors.accent, fontWeight: "600" },
+  root: {
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  title: { ...typography.bodySmall, fontWeight: "700", color: colors.textSecondary, flex: 1, minWidth: 0 },
+  clear: { ...typography.caption, color: colors.accent, fontWeight: "600", flexShrink: 0 },
   hint: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   groupLabel: {
     ...typography.caption,
@@ -194,5 +226,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: spacing.xs,
   },
-  chipRow: { gap: spacing.sm, paddingRight: spacing.md },
+  chipRowShell: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  chipRowScroll: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    flexGrow: 0,
+    ...(Platform.OS === "web" ? ({ boxSizing: "border-box" } as ViewStyle) : null),
+  },
+  chipRowContent: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingRight: spacing.md,
+    alignItems: "center",
+  },
 });
