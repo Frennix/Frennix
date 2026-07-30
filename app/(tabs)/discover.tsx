@@ -1,7 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View, ActivityIndicator } from "react-native";
+import {
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  ActivityIndicator,
+} from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
 import { DiscoverLifestyleFilters } from "@/components/DiscoverLifestyleFilters";
@@ -74,9 +84,14 @@ const DISCOVER_LIST_PERF = {
 
 export default function DiscoverScreen() {
   const { session, profile: viewerProfile } = useAuth();
+  const { focusSearch, openFilters } = useLocalSearchParams<{
+    focusSearch?: string;
+    openFilters?: string;
+  }>();
   const userId = session?.user.id ?? "";
   const webContainerStyle = useTabScreenWebContainerStyle();
   const webHeightStyle = useTabScreenWebHeightStyle();
+  const peopleSearchRef = useRef<TextInput>(null);
   const [tab, setTab] = useState<Tab>("people");
   const [peopleSearch, setPeopleSearch] = useState("");
   const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
@@ -93,6 +108,16 @@ export default function DiscoverScreen() {
     const timer = setTimeout(() => setDebouncedPeopleSearch(peopleSearch.trim()), 300);
     return () => clearTimeout(timer);
   }, [peopleSearch]);
+
+  useEffect(() => {
+    if (focusSearch !== "1" && openFilters !== "1") return;
+    setTab("people");
+    const focusTimer = setTimeout(() => {
+      peopleSearchRef.current?.focus();
+    }, 120);
+    router.setParams({ focusSearch: undefined, openFilters: undefined });
+    return () => clearTimeout(focusTimer);
+  }, [focusSearch, openFilters]);
 
   const isSearchingPeople = debouncedPeopleSearch.length > 0;
   const lifestyleFiltersActive = hasActiveDiscoverFilters(discoverFilters);
@@ -342,11 +367,14 @@ export default function DiscoverScreen() {
         {tab === "people" ? (
           <View style={styles.searchBlock}>
             <Input
+              ref={peopleSearchRef}
               placeholder="Search by name, interests, workout type, or bio..."
               value={peopleSearch}
               onChangeText={setPeopleSearch}
               autoCapitalize="none"
               autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
             />
             <Text style={styles.searchHint}>
               Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio

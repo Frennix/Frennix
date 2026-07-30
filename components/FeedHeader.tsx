@@ -5,12 +5,14 @@ import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import {
   FeedHeroBanner,
   FeedQuickActionCards,
+  FeedSearchBar,
   FeedStoriesRow,
   PeopleYouMayKnowCarousel,
   colors,
   feedLayout,
   spacing,
 } from "@frennix/ui";
+import { openDiscoverSearch } from "@/lib/discover-navigation";
 import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
 interface FeedHeaderProps {
@@ -54,6 +56,13 @@ export const FeedHeader = memo(function FeedHeader({
 
   return (
     <View style={styles.container}>
+      <SectionErrorBoundary label="feed-search-bar" compact>
+        <FeedSearchBar
+          onPress={() => openDiscoverSearch({ focusSearch: true })}
+          onFilterPress={() => openDiscoverSearch({ focusSearch: true, openFilters: true })}
+        />
+      </SectionErrorBoundary>
+
       {showHero ? (
         <SectionErrorBoundary label="feed-hero-banner" compact>
           <FeedHeroBanner
