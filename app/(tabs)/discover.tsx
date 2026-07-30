@@ -52,7 +52,7 @@ import {
   useTabScreenWebHeightStyle,
 } from "@/lib/screen-shell";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
-import { scheduleDocumentHorizontalScrollReset } from "@/lib/document-horizontal-scroll";
+import { scheduleWebViewportNormalize } from "@/lib/web-viewport-normalize";
 import {
   DiscoverProfileCard,
   EmptyState,
@@ -321,7 +321,7 @@ export default function DiscoverScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      scheduleDocumentHorizontalScrollReset();
+      scheduleWebViewportNormalize();
     }, [])
   );
 

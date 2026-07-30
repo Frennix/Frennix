@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { AppState, Platform } from "react-native";
+import { scheduleWebViewportNormalize } from "@/lib/web-viewport-normalize";
 
 /** Queries that are safe to refresh on tab resume (lightweight; skip heavy feed/notifications). */
 const RESUME_REFETCH_QUERY_ROOTS = new Set([
@@ -47,6 +48,8 @@ function onAppVisible(queryClient: QueryClient) {
   const wasHiddenLongEnough =
     hiddenAt !== null && Date.now() - hiddenAt >= RESUME_HIDDEN_MS;
   hiddenAt = null;
+
+  scheduleWebViewportNormalize();
 
   if (wasHiddenLongEnough) {
     scheduleResumeRefetch(queryClient);

@@ -20,6 +20,7 @@ import type { Profile, WorkoutEvent } from "@frennix/types";
 import { searchFeedContent, type FeedSearchWorkoutResult } from "@frennix/api";
 import { Avatar, colors, spacing, typography } from "@frennix/ui";
 import { DiscoverRecentSearches } from "@/components/DiscoverRecentSearches";
+import { WebOverlayPortal } from "@/components/WebPortal";
 import {
   addDiscoverSearchHistory,
   clearDiscoverSearchHistory,
@@ -31,7 +32,10 @@ import {
   registerFeedSearchController,
   resetFeedHorizontalScroll,
 } from "@/lib/feed-search-controller";
-import { scheduleDocumentHorizontalScrollReset } from "@/lib/document-horizontal-scroll";
+import {
+  clearWebBodyScrollLock,
+  scheduleWebViewportNormalize,
+} from "@/lib/web-viewport-normalize";
 import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
 import { useAuth } from "@/providers/AuthProvider";
@@ -78,12 +82,14 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
     setDebouncedQuery("");
     Keyboard.dismiss();
     inputRef.current?.blur();
+    clearWebBodyScrollLock();
     resetFeedHorizontalScroll();
-    scheduleDocumentHorizontalScrollReset();
+    scheduleWebViewportNormalize();
     onClose?.();
   }, [onClose]);
 
   const openSearch = useCallback(() => {
+    scheduleWebViewportNormalize();
     onOpen?.();
     setOpen(true);
     requestAnimationFrame(() => {
@@ -201,7 +207,7 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
 
   if (!open) return null;
 
-  return (
+  const overlay = (
     <View
       style={[styles.overlay, webOverlayStyle]}
       nativeID="feed-search-overlay"
@@ -373,6 +379,12 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
       </ScrollView>
     </View>
   );
+
+  if (Platform.OS === "web") {
+    return <WebOverlayPortal>{overlay}</WebOverlayPortal>;
+  }
+
+  return overlay;
 });
 
 const webOverlayStyle: ViewStyle =

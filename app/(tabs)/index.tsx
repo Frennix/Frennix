@@ -108,7 +108,7 @@ import {
   resetFeedHorizontalScroll,
   resetFeedSearch,
 } from "@/lib/feed-search-controller";
-import { scheduleDocumentHorizontalScrollReset } from "@/lib/document-horizontal-scroll";
+import { scheduleWebViewportNormalize } from "@/lib/web-viewport-normalize";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -123,7 +123,7 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      scheduleDocumentHorizontalScrollReset();
+      scheduleWebViewportNormalize();
     }, [])
   );
   const isolateStories = isFeedIsolateDisabled("stories");

@@ -3,7 +3,6 @@ import { memo, useCallback, useEffect } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
-import { DocumentHorizontalScrollCoordinator } from "@/components/DocumentHorizontalScrollCoordinator";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { TabPrefetchCoordinator } from "@/components/TabPrefetchCoordinator";
@@ -104,7 +103,6 @@ const TabsShell = memo(function TabsShell() {
         <LocationDiscoveryPrompt />
       </PostLoginShellErrorBoundary>
       <TabPrefetchCoordinator />
-      <DocumentHorizontalScrollCoordinator />
       <View
         style={[flexFill, webTabSceneShell]}
         collapsable={false}

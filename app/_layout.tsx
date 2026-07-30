@@ -25,6 +25,7 @@ import { ProductAnalyticsBootstrap } from "@/components/ProductAnalyticsBootstra
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ClientDiagnosticsBootstrap } from "@/components/ClientDiagnosticsBootstrap";
 import { AppResumeCoordinator } from "@/components/AppResumeCoordinator";
+import { DocumentHorizontalScrollCoordinator } from "@/components/DocumentHorizontalScrollCoordinator";
 import { StartupMountMarker, StartupMountProbe } from "@/components/StartupMountProbe";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupWatchdog } from "@/components/StartupWatchdog";
@@ -164,6 +165,7 @@ export default function RootLayout() {
             <StartupMountProbe id="query-provider">
               <QueryProvider>
                 <AppResumeCoordinator />
+                <DocumentHorizontalScrollCoordinator />
                 <StartupWatchdog />
                 <StartupMountProbe id="auth-provider">
                   <AuthProvider>

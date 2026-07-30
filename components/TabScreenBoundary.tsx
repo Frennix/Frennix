@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useAuth } from "@/providers/AuthProvider";
+import { AppScreen } from "@/components/AppScreen";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 
 type Props = {
@@ -12,14 +13,16 @@ type Props = {
 export function TabScreenBoundary({ label, children, compact }: Props) {
   const { session } = useAuth();
   return (
-    <SectionErrorBoundary
-      label={label}
-      screen={`/(tabs)/${label}`}
-      userId={session?.user.id}
-      email={session?.user.email ?? undefined}
-      compact={compact}
-    >
-      {children}
-    </SectionErrorBoundary>
+    <AppScreen nativeID={`screen-${label}`}>
+      <SectionErrorBoundary
+        label={label}
+        screen={`/(tabs)/${label}`}
+        userId={session?.user.id}
+        email={session?.user.email ?? undefined}
+        compact={compact}
+      >
+        {children}
+      </SectionErrorBoundary>
+    </AppScreen>
   );
 }

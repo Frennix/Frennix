@@ -1,8 +1,8 @@
 import { Keyboard } from "react-native";
 import {
   resetDocumentHorizontalScroll,
-  scheduleDocumentHorizontalScrollReset,
-} from "@/lib/document-horizontal-scroll";
+  scheduleWebViewportNormalize,
+} from "@/lib/web-viewport-normalize";
 
 type FeedSearchController = {
   open: () => void;
@@ -57,5 +57,5 @@ export function resetFeedHorizontalScroll() {
 /** Full layout reset when leaving search or the feed screen. */
 export function resetFeedScrollLayout() {
   Keyboard.dismiss();
-  scheduleDocumentHorizontalScrollReset();
+  scheduleWebViewportNormalize();
 }

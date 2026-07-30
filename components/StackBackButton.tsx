@@ -3,6 +3,7 @@ import { router, type Href } from "expo-router";
 import { Pressable, StyleSheet } from "react-native";
 import { colors, spacing } from "@frennix/ui";
 import { guardDoublePress } from "@/lib/press-utils";
+import { scheduleWebViewportNormalize } from "@/lib/web-viewport-normalize";
 
 type StackBackButtonProps = {
   /** Used when there is no history entry (common on mobile web). */
@@ -19,9 +20,11 @@ export function StackBackButton({ fallbackHref = "/(tabs)", onBack }: StackBackB
     }
     if (router.canGoBack()) {
       router.back();
+      scheduleWebViewportNormalize();
       return;
     }
     router.replace(fallbackHref);
+    scheduleWebViewportNormalize();
   });
 
   return (

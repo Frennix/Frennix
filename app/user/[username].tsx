@@ -13,6 +13,7 @@ import {
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { ProfileScreenContent } from "@/components/ProfileScreenContent";
+import { AppScreen } from "@/components/AppScreen";
 import { usePostActions } from "@/lib/usePostActions";
 import { useProfileActions } from "@/lib/useProfileActions";
 import { useFollowUser } from "@/lib/useFollowUser";
@@ -84,20 +85,23 @@ export default function UserProfileScreen() {
   if (profileLoading) return <DetailLoading />;
   if (!profile) {
     return (
-      <View style={styles.notFound}>
-        <EmptyState
-          title="Profile not found"
-          description="This user may not exist, has been blocked, or their profile is unavailable."
-          actionLabel="Go back"
-          onAction={() => router.back()}
-        />
-      </View>
+      <AppScreen nativeID="screen-profile-detail">
+        <View style={styles.notFound}>
+          <EmptyState
+            title="Profile not found"
+            description="This user may not exist, has been blocked, or their profile is unavailable."
+            actionLabel="Go back"
+            onAction={() => router.back()}
+          />
+        </View>
+      </AppScreen>
     );
   }
 
   const isOwn = profile.id === userId;
 
   return (
+    <AppScreen nativeID="screen-profile-detail">
     <ProfileScreenContent
       profile={profile}
       stats={stats ?? { posts: 0, followers: 0, following: 0, eventsJoined: 0, workoutStreak: 0 }}
@@ -122,6 +126,7 @@ export default function UserProfileScreen() {
       postActionSheet={isOwn ? postActionSheets : undefined}
       profileActionSheet={profileActionSheets}
     />
+    </AppScreen>
   );
 }
 
