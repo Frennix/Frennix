@@ -21,7 +21,7 @@ This is the approved official Frennix logo. All branding — app UI, website, so
 | Social media | `assets/brand/marketing/social/frennix-logo-official.png` | Exact copy of master |
 | Merchandise mockups | `assets/brand/marketing/merchandise/frennix-logo-official.png` | Exact copy of master |
 | App icon | `assets/icon.png` | iOS/Android home screen (from master symbol) |
-| Splash screen | `assets/splash-icon.png` | Launch screen on `#0A0A0B` (from master) |
+| Splash screen | `assets/splash-icon.png` | Launch screen on `#000000` (from master) |
 | Adaptive icon | `assets/adaptive-icon.png` | Android adaptive foreground (from master symbol) |
 
 Layout exports (`frennix-logo-full.png`, `frennix-logo-icon.png`) are crops/scales of the master — not separate logo designs.

@@ -11,12 +11,23 @@ const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const PUBLIC_DIR = join(ROOT, "public");
 const DIST_DIR = join(ROOT, "dist");
 const ICON_SRC = join(ROOT, "assets", "icon.png");
+const SPLASH_LOGO_SRC = join(ROOT, "assets", "splash-icon.png");
+const BRAND_DIR = join(PUBLIC_DIR, "brand");
+const SPLASH_LOGO_DEST = join(BRAND_DIR, "frennix-splash-logo.png");
 const ICONS_OUT = join(PUBLIC_DIR, "icons");
 
 function assertDistExists() {
   if (!existsSync(DIST_DIR)) {
     throw new Error("Missing dist/ — run expo export -p web first");
   }
+}
+
+function ensureSplashLogo() {
+  if (!existsSync(SPLASH_LOGO_SRC)) {
+    throw new Error(`Missing splash logo source: ${SPLASH_LOGO_SRC}`);
+  }
+  mkdirSync(BRAND_DIR, { recursive: true });
+  copyFileSync(SPLASH_LOGO_SRC, SPLASH_LOGO_DEST);
 }
 
 function ensureIcons() {
@@ -56,6 +67,7 @@ function copyRecursive(srcDir, destDir) {
 
 function main() {
   assertDistExists();
+  ensureSplashLogo();
   ensureIcons();
 
   if (!existsSync(PUBLIC_DIR)) {
@@ -69,6 +81,7 @@ function main() {
     .map((entry) => relative(PUBLIC_DIR, String(entry)));
 
   console.log("[copy-pwa-assets] copied public/ → dist/");
+  console.log(`[copy-pwa-assets] splash logo: ${SPLASH_LOGO_DEST}`);
   console.log(`[copy-pwa-assets] icons: ${join(ICONS_OUT, "icon-192.png")}, icon-512.png`);
   if (copied.length) {
     console.log(`[copy-pwa-assets] files: ${copied.join(", ")}`);

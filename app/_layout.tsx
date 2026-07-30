@@ -40,8 +40,10 @@ import { animation, colors } from "@frennix/ui";
 import { flexFill, webAppShell } from "@/lib/flex-layout";
 import { clearSafeTransientStartupState } from "@/lib/web-startup-checkpoints";
 import { frennixNavigationTheme } from "@/lib/navigation-theme";
+import { configureNativeSplashScreen } from "@/lib/native-splash-screen";
 
 initSentry();
+configureNativeSplashScreen();
 
 const stackDefaults = {
   headerStyle: { backgroundColor: colors.background },

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 551fbb82</title>
+    <title>Frennix · e7a75f8b</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="551fbb828b5eace14ae9cd098b31238ff5981e01" />
-    <meta name="frennix-build-bundle" content="index-9a9f214d518bb82c4528fa079a1711d5.js" />
-    <meta name="frennix-build-at" content="2026-07-27T18:49:00.365Z" />
+    <meta name="frennix-build-sha" content="e7a75f8b59b49196ba326d1f7d1297cd9c89d7bb" />
+    <meta name="frennix-build-bundle" content="index-8774fae6a103aca7e829ed23016061eb.js" />
+    <meta name="frennix-build-at" content="2026-07-30T03:21:07.696Z" />
     <meta name="frennix-sw-version" content="20260727-pwa-auto-update-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -129,13 +129,17 @@
     background-color: #141416 !important;
   }
   /* Auth inputs — Safari dark mode + autofill must stay readable. */
-  input,
+  input:not([role="switch"]),
   textarea,
   [contenteditable="true"] {
     color: #fafafa !important;
     background-color: #141416 !important;
     -webkit-text-fill-color: #fafafa !important;
     caret-color: #fafafa;
+  }
+  input[role="switch"] {
+    cursor: pointer;
+    touch-action: manipulation;
   }
   input::placeholder,
   textarea::placeholder {
@@ -169,47 +173,59 @@
       
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Frennix" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       <meta name="frennix-vapid-public-key" content="BIveW-l6AKdTigzSsBZEnykS_noURsQIKEBxaEvaeBiuQcYNVEuxCjgBoyUkrp7sE3KRd8K3v7ZY3jNwcEF4zi4" />
+      
+    <link rel="preload" href="/brand/frennix-splash-logo.png" as="image" type="image/png" />
+    <link rel="apple-touch-startup-image" href="/brand/frennix-splash-logo.png" />
       <style id="frennix-boot-shell-css">
   #frennix-boot-shell {
     position: fixed;
     inset: 0;
     z-index: 2147483646;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    background: #0A0A0B;
-    color: #f5f5f5;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #000000;
+    opacity: 1;
+    transition: opacity 320ms ease-out;
+    pointer-events: auto;
   }
-  #frennix-boot-shell .spinner {
-    width: 28px;
-    height: 28px;
-    border: 3px solid rgba(255,255,255,0.15);
-    border-top-color: #c8ff00;
-    border-radius: 50%;
-    animation: frennix-spin 0.9s linear infinite;
+  #frennix-boot-shell.frennix-boot-shell--hiding {
+    opacity: 0;
+    pointer-events: none;
   }
-  @keyframes frennix-spin { to { transform: rotate(360deg); } }
-
+  #frennix-boot-shell .frennix-boot-shell-logo {
+    display: block;
+    width: min(44vw, 200px);
+    height: auto;
+    max-height: 28vh;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  #frennix-boot-shell[style*="display: none"],
+  #frennix-boot-shell[hidden] {
+    display: none !important;
+    pointer-events: none !important;
+  }
     </style>
   </head>
 
   <body>
 
-    <div id="frennix-boot-shell" aria-live="polite" aria-busy="true">
-      <div class="spinner"></div>
-      <div>Loading Frennix…</div>
-      <div id="frennix-boot-shell-stalled" style="display:none;font-size:13px;opacity:0.75">
-        Still loading — check your connection or reopen the app.
-      </div>
+    <div id="frennix-boot-shell" aria-live="polite" aria-busy="true" aria-label="Frennix">
+      <img
+        class="frennix-boot-shell-logo"
+        src="/brand/frennix-splash-logo.png"
+        alt=""
+        decoding="async"
+        fetchpriority="high"
+      />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="551fbb828b5eace14ae9cd098b31238ff5981e01" data-bundle="index-9a9f214d518bb82c4528fa079a1711d5.js" data-sw="20260727-pwa-auto-update-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="e7a75f8b59b49196ba326d1f7d1297cd9c89d7bb" data-bundle="index-8774fae6a103aca7e829ed23016061eb.js" data-sw="20260727-pwa-auto-update-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -255,7 +271,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-9a9f214d518bb82c4528fa079a1711d5.js?v=551fbb82" defer></script>
+  <script src="/_expo/static/js/web/index-8774fae6a103aca7e829ed23016061eb.js?v=e7a75f8b" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
@@ -391,9 +407,19 @@
     if (retryBtn) retryBtn.onclick = function () { location.reload(); };
   }
 
+  
   function hideBootShell() {
     var el = document.getElementById("frennix-boot-shell");
-    if (el) el.style.display = "none";
+    if (!el || el.getAttribute("data-hiding") === "true") return;
+    el.setAttribute("data-hiding", "true");
+    el.classList.add("frennix-boot-shell--hiding");
+    el.setAttribute("aria-busy", "false");
+    var done = function () {
+      el.style.display = "none";
+      el.setAttribute("aria-hidden", "true");
+    };
+    el.addEventListener("transitionend", done, { once: true });
+    setTimeout(done, 450);
   }
 
   function signedOutReady() {
@@ -426,15 +452,6 @@
       clearTimeout(stallTimer);
     }
   }, 150);
-
-  window.addEventListener("load", function () {
-    setTimeout(function () {
-      if (!startupReady()) {
-        var stalled = document.getElementById("frennix-boot-shell-stalled");
-        if (stalled) stalled.style.display = "block";
-      }
-    }, 15000);
-  });
 })();</script>
   </body>
 </html>
