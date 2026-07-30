@@ -259,7 +259,7 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
 const styles = StyleSheet.create({
   container: {
     paddingBottom: feedLayout.feedChrome.storiesPaddingBottom,
-    gap: spacing.sm,
+    gap: spacing.xs,
     flexShrink: 0,
     overflow: "visible",
     ...(Platform.OS === "web"
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xs,
+    paddingBottom: 0,
     gap: spacing.md,
   },
   item: {

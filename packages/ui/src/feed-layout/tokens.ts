@@ -81,9 +81,9 @@ export const feedLayout = {
   /** Feed list chrome above first post (stories row, suggestions). */
   feedChrome: {
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    sectionGap: spacing.lg,
-    storiesPaddingBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    sectionGap: spacing.md,
+    storiesPaddingBottom: spacing.xxs,
   },
 
   /** Extension slots — spacing for future monetization / content overlays. */

@@ -222,6 +222,8 @@ async function runStaticChecks() {
   const hero = fs.readFileSync(path.join(ROOT, "packages/ui/src/FeedHeroBanner.tsx"), "utf8");
   const header = fs.readFileSync(path.join(ROOT, "components/FeedHeader.tsx"), "utf8");
   const stories = fs.readFileSync(path.join(ROOT, "packages/ui/src/FeedStoriesRow.tsx"), "utf8");
+  const quickActions = fs.readFileSync(path.join(ROOT, "packages/ui/src/FeedQuickActionCards.tsx"), "utf8");
+  const tokens = fs.readFileSync(path.join(ROOT, "packages/ui/src/feed-layout/tokens.ts"), "utf8");
   const index = fs.readFileSync(path.join(ROOT, "app/(tabs)/index.tsx"), "utf8");
 
   record(
@@ -241,6 +243,24 @@ async function runStaticChecks() {
   record("Quick action Explore Stories route", header.includes('pushScreen("/stories/explore")'));
   record("Quick action Events route", header.includes('switchTab("/(tabs)/events")'));
   record("Stories View All route", header.includes("onViewAllPress={() => pushScreen(\"/stories/explore\")}"));
+  record(
+    "Quick actions use 2-column grid on web",
+    /gridTemplateColumns:\s*"repeat\(2, minmax\(0, 1fr\)\)"/.test(quickActions)
+  );
+  record(
+    "Quick action cards use horizontal compact layout",
+    /flexDirection:\s*"row"/.test(quickActions) && /minHeight:\s*CARD_MIN_HEIGHT/.test(quickActions)
+  );
+  record(
+    "Quick action titles avoid truncation styles",
+    !/numberOfLines/.test(quickActions) &&
+      !/textOverflow:\s*"ellipsis"/.test(quickActions) &&
+      !/wordBreak:\s*"break-all"/.test(quickActions)
+  );
+  record(
+    "Feed chrome section gap tightened",
+    /sectionGap:\s*spacing\.md/.test(tokens) && /storiesPaddingBottom:\s*spacing\.xxs/.test(tokens)
+  );
 
   return results;
 }
@@ -429,6 +449,111 @@ async function main() {
     layout.tabClearanceOk,
     `clearance=${layout.tabClearance}px`
   );
+
+  const MOBILE_WIDTHS = [320, 375, 390, 430];
+  for (const width of MOBILE_WIDTHS) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.waitForTimeout(400);
+
+    const quickActionLayout = await page.evaluate(() => {
+      const grid = document.getElementById("feed-quick-actions-grid");
+      if (!grid) {
+        return { ok: false, detail: "grid not found" };
+      }
+
+      const cards = Array.from(grid.querySelectorAll('[role="button"]'));
+      if (cards.length < 4) {
+        return { ok: false, detail: `expected 4 cards, found ${cards.length}` };
+      }
+
+      const cardRects = cards.map((card) => card.getBoundingClientRect());
+      const rowPairs = [
+        [cardRects[0], cardRects[1]],
+        [cardRects[2], cardRects[3]],
+      ];
+
+      for (const [left, right] of rowPairs) {
+        const leftWidth = Math.round(left.width);
+        const rightWidth = Math.round(right.width);
+        if (leftWidth < 120 || rightWidth < 120) {
+          return { ok: false, detail: `card too narrow (${leftWidth}px, ${rightWidth}px)` };
+        }
+        const widthDelta = Math.abs(leftWidth - rightWidth);
+        if (widthDelta > 24) {
+          return { ok: false, detail: `uneven columns (${leftWidth}px vs ${rightWidth}px)` };
+        }
+      }
+
+      const titles = cards.map((card) => {
+        const titleEl = card.querySelector("span, div");
+        const textNodes = Array.from(card.querySelectorAll("*")).filter(
+          (el) => el.childElementCount === 0 && (el.textContent ?? "").trim().length > 2
+        );
+        const titleNode =
+          textNodes.find((el) => /Share Workout|Explore Stories|Find Athletes|Events/.test(el.textContent ?? "")) ??
+          titleEl;
+        const style = titleNode ? getComputedStyle(titleNode) : null;
+        const text = titleNode?.textContent?.trim() ?? "";
+        const rect = titleNode?.getBoundingClientRect();
+        const singleCharLines =
+          titleNode && rect
+            ? Math.max(1, Math.round(rect.height / (parseFloat(style?.lineHeight ?? "19") || 19)))
+            : 0;
+        const looksLetterWrapped =
+          text.length > 4 && singleCharLines > 2 && rect && rect.height > 48;
+        const truncated =
+          style?.textOverflow === "ellipsis" ||
+          (style?.overflow === "hidden" && text.endsWith("…"));
+        return { text, looksLetterWrapped, truncated };
+      });
+
+      const badTitle = titles.find((t) => t.looksLetterWrapped || t.truncated);
+      if (badTitle) {
+        return {
+          ok: false,
+          detail: `title issue: "${badTitle.text}"`,
+        };
+      }
+
+      const pageOverflow = document.documentElement.scrollWidth > window.innerWidth + 1;
+      if (pageOverflow) {
+        return { ok: false, detail: "horizontal page overflow" };
+      }
+
+      const storiesEl = Array.from(document.querySelectorAll("*")).find((el) =>
+        /^Stories$/.test(el.textContent?.trim() ?? "")
+      );
+      const pymkEl = Array.from(document.querySelectorAll("*")).find((el) =>
+        /People You May Know/i.test(el.textContent ?? "")
+      );
+      let sectionGapOk = true;
+      if (storiesEl && pymkEl) {
+        let storiesBlock = storiesEl.parentElement;
+        for (let i = 0; i < 4 && storiesBlock; i += 1) {
+          const rect = storiesBlock.getBoundingClientRect();
+          if (rect.height > 80) break;
+          storiesBlock = storiesBlock.parentElement;
+        }
+        const storiesBottom = storiesBlock?.getBoundingClientRect().bottom ?? 0;
+        const pymkTop = pymkEl.getBoundingClientRect().top;
+        const gap = Math.round(pymkTop - storiesBottom);
+        if (gap > 320) {
+          sectionGapOk = false;
+        }
+      }
+
+      return {
+        ok: !pageOverflow && sectionGapOk,
+        detail: sectionGapOk ? "columns balanced" : "excessive vertical gap before suggestions",
+      };
+    });
+
+    record(
+      `Quick actions layout at ${width}px`,
+      quickActionLayout.ok,
+      quickActionLayout.detail
+    );
+  }
 
   const navChecks = [
     { label: "Find Athletes hero", text: "Find Athletes", expectPath: /discover|matching/i },

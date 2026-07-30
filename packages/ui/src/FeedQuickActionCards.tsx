@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Platform, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { ScalePressable } from "./ScalePressable";
-import { applyShadow, colors, overlays, radius, spacing, typography } from "./theme";
+import { applyShadow, colors, overlays, spacing } from "./theme";
 
 export type FeedQuickAction = {
   key: string;
@@ -15,52 +15,99 @@ interface FeedQuickActionCardsProps {
   style?: ViewStyle;
 }
 
+const CARD_GAP = 12;
+const CARD_RADIUS = 17;
+const CARD_MIN_HEIGHT = 92;
+const CARD_PADDING = 16;
+
+function pairActions(actions: FeedQuickAction[]): FeedQuickAction[][] {
+  const rows: FeedQuickAction[][] = [];
+  for (let i = 0; i < actions.length; i += 2) {
+    rows.push(actions.slice(i, i + 2));
+  }
+  return rows;
+}
+
 export const FeedQuickActionCards = memo(function FeedQuickActionCards({
   actions,
   style,
 }: FeedQuickActionCardsProps) {
+  const rows = pairActions(actions);
+
   return (
-    <View style={[styles.grid, style]}>
-      {actions.map((action) => (
-        <ScalePressable
-          key={action.key}
-          onPress={action.onPress}
-          pressedScale={0.96}
-          containerStyle={styles.cardWrap}
-          accessibilityRole="button"
-          accessibilityLabel={action.title}
-        >
-          <View style={styles.card}>
-            <View style={styles.iconBubble}>
-              <Text style={styles.emoji}>{action.emoji}</Text>
+    <View style={[styles.grid, style]} nativeID="feed-quick-actions-grid">
+      {rows.map((row, rowIndex) => (
+        <View key={`row-${rowIndex}`} style={styles.row}>
+          {row.map((action) => (
+            <View key={action.key} style={styles.cardWrap}>
+              <ScalePressable
+                onPress={action.onPress}
+                pressedScale={0.97}
+                containerStyle={styles.cardPressable}
+                accessibilityRole="button"
+                accessibilityLabel={action.title}
+              >
+                <View style={styles.card}>
+                  <View style={styles.iconBubble}>
+                    <Text style={styles.emoji}>{action.emoji}</Text>
+                  </View>
+                  <Text style={styles.title}>{action.title}</Text>
+                </View>
+              </ScalePressable>
             </View>
-            <Text style={styles.title} numberOfLines={2}>
-              {action.title}
-            </Text>
-          </View>
-        </ScalePressable>
+          ))}
+        </View>
       ))}
     </View>
   );
 });
 
+const webTitleStyle: ViewStyle =
+  Platform.OS === "web"
+    ? ({
+        whiteSpace: "normal",
+        wordBreak: "normal",
+        overflowWrap: "normal",
+      } as ViewStyle)
+    : {};
+
+const webGridStyle: ViewStyle =
+  Platform.OS === "web"
+    ? ({
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gap: CARD_GAP,
+        width: "100%",
+      } as ViewStyle)
+    : {};
+
 const styles = StyleSheet.create({
   grid: {
+    width: "100%",
+    gap: CARD_GAP,
+    ...webGridStyle,
+  },
+  row: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
+    gap: CARD_GAP,
+    width: "100%",
+    ...(Platform.OS === "web" ? ({ display: "contents" } as ViewStyle) : null),
   },
   cardWrap: {
-    width: "48%",
-    flexGrow: 1,
-    flexBasis: "46%",
-    maxWidth: "48%",
+    flex: 1,
+    minWidth: 0,
+    ...(Platform.OS === "web" ? ({ minWidth: 0 } as ViewStyle) : null),
+  },
+  cardPressable: {
+    width: "100%",
   },
   card: {
-    minHeight: 88,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    gap: spacing.sm,
+    minHeight: CARD_MIN_HEIGHT,
+    borderRadius: CARD_RADIUS,
+    padding: CARD_PADDING,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: CARD_GAP,
     backgroundColor: colors.surfaceCard,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
@@ -73,23 +120,27 @@ const styles = StyleSheet.create({
       : null),
   },
   iconBubble: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: overlays.accentTint,
+    flexShrink: 0,
+    backgroundColor: overlays.accentTintStrong,
     borderWidth: 1,
     borderColor: overlays.accentBorder,
   },
   emoji: {
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 20,
+    lineHeight: 24,
   },
   title: {
-    ...typography.bodySmall,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 15,
+    fontWeight: "600",
+    lineHeight: 19,
     color: colors.text,
-    fontWeight: "700",
-    lineHeight: 18,
+    ...webTitleStyle,
   },
 });
