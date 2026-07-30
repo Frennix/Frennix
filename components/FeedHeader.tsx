@@ -63,23 +63,27 @@ export const FeedHeader = memo(function FeedHeader({
         </SectionErrorBoundary>
       ) : null}
 
-      {showStories ? (
-        <SectionErrorBoundary label="feed-stories-carousel" compact>
-          <FeedStoriesRow
-            stories={stories}
-            onStoryPress={onStoryPress}
-            onAddStoryPress={openCreateStory}
-            onViewAllPress={() => pushScreen("/stories/explore")}
-          />
-        </SectionErrorBoundary>
-      ) : null}
+      {showStories || showQuickActions ? (
+        <View style={styles.storiesShortcutsGroup}>
+          {showStories ? (
+            <SectionErrorBoundary label="feed-stories-carousel" compact>
+              <FeedStoriesRow
+                stories={stories}
+                onStoryPress={onStoryPress}
+                onAddStoryPress={openCreateStory}
+                onViewAllPress={() => pushScreen("/stories/explore")}
+              />
+            </SectionErrorBoundary>
+          ) : null}
 
-      {showQuickActions ? (
-        <SectionErrorBoundary label="feed-quick-actions" compact>
-          <View nativeID="feed-shortcut-row">
-            <FeedQuickActionCards actions={quickActions} />
-          </View>
-        </SectionErrorBoundary>
+          {showQuickActions ? (
+            <SectionErrorBoundary label="feed-quick-actions" compact>
+              <View nativeID="feed-shortcut-row">
+                <FeedQuickActionCards actions={quickActions} />
+              </View>
+            </SectionErrorBoundary>
+          ) : null}
+        </View>
       ) : null}
 
       {showSuggestions && suggestions.length > 0 ? (
@@ -106,5 +110,8 @@ const styles = StyleSheet.create({
     paddingTop: feedLayout.feedChrome.paddingTop,
     paddingBottom: feedLayout.feedChrome.paddingBottom,
     gap: feedLayout.feedChrome.sectionGap,
+  },
+  storiesShortcutsGroup: {
+    gap: spacing.xxs,
   },
 });

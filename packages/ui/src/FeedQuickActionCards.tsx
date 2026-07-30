@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Platform, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { ScalePressable } from "./ScalePressable";
-import { colors, overlays, spacing, typography } from "./theme";
+import { colors, overlays, spacing } from "./theme";
 
 export type FeedQuickAction = {
   key: string;
@@ -17,6 +17,16 @@ interface FeedQuickActionCardsProps {
 
 const ICON_SIZE = 60;
 
+const webLabelStyle: ViewStyle =
+  Platform.OS === "web"
+    ? ({
+        whiteSpace: "nowrap",
+        overflow: "visible",
+        textOverflow: "clip",
+        wordBreak: "normal",
+      } as ViewStyle)
+    : {};
+
 export const FeedQuickActionCards = memo(function FeedQuickActionCards({
   actions,
   style,
@@ -24,23 +34,22 @@ export const FeedQuickActionCards = memo(function FeedQuickActionCards({
   return (
     <View style={[styles.row, style]} nativeID="feed-shortcut-row">
       {actions.map((action) => (
-        <ScalePressable
-          key={action.key}
-          onPress={action.onPress}
-          pressedScale={0.96}
-          containerStyle={styles.itemWrap}
-          accessibilityRole="button"
-          accessibilityLabel={action.title}
-        >
-          <View style={styles.item}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.emoji}>{action.emoji}</Text>
+        <View key={action.key} style={styles.itemWrap}>
+          <ScalePressable
+            onPress={action.onPress}
+            pressedScale={0.96}
+            containerStyle={styles.itemPressable}
+            accessibilityRole="button"
+            accessibilityLabel={action.title}
+          >
+            <View style={styles.item}>
+              <View style={styles.iconCircle}>
+                <Text style={styles.emoji}>{action.emoji}</Text>
+              </View>
+              <Text style={styles.label}>{action.title}</Text>
             </View>
-            <Text style={styles.label} numberOfLines={1}>
-              {action.title}
-            </Text>
-          </View>
-        </ScalePressable>
+          </ScalePressable>
+        </View>
       ))}
     </View>
   );
@@ -56,11 +65,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxs,
   },
   itemWrap: {
-    flex: 1,
+    width: "25%",
     minWidth: 0,
-    maxWidth: "25%",
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  itemPressable: {
+    width: "100%",
   },
   item: {
+    width: "100%",
+    minWidth: 0,
     alignItems: "center",
     gap: spacing.xxs,
   },
@@ -85,12 +100,14 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   label: {
-    ...typography.caption,
+    width: "100%",
+    minWidth: 0,
     color: colors.textMuted,
     fontWeight: "600",
     fontSize: 12,
-    lineHeight: 14,
+    lineHeight: 15,
     textAlign: "center",
-    width: "100%",
+    flexShrink: 0,
+    ...webLabelStyle,
   },
 });

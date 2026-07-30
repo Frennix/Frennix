@@ -248,8 +248,10 @@ async function runStaticChecks() {
     /feed-shortcut-row/.test(quickActions) && /flexDirection:\s*"row"/.test(quickActions)
   );
   record(
-    "Feed shortcuts avoid large card grid",
-    !/gridTemplateColumns/.test(quickActions) && !/minHeight:\s*92/.test(quickActions)
+    "Feed shortcut labels avoid truncation",
+    !/numberOfLines/.test(quickActions) &&
+      /whiteSpace:\s*"nowrap"/.test(quickActions) &&
+      /width:\s*"25%"/.test(quickActions)
   );
   record(
     "Feed chrome section gap tightened",
@@ -464,6 +466,30 @@ async function main() {
       for (const rect of shortcutRects) {
         if (Math.round(rect.width) > 120) {
           return { ok: false, detail: `shortcut too wide (${Math.round(rect.width)}px)` };
+        }
+      }
+
+      const expectedLabels = ["Share", "Explore", "Athletes", "Events"];
+      const labelTexts = shortcuts.map((button) => {
+        const nodes = Array.from(button.querySelectorAll("*")).filter(
+          (el) => el.childElementCount === 0 && (el.textContent ?? "").trim().length > 0
+        );
+        const labelNode = nodes.find((el) =>
+          expectedLabels.some((label) => (el.textContent ?? "").trim() === label)
+        );
+        return {
+          text: labelNode?.textContent?.trim() ?? "",
+          style: labelNode ? getComputedStyle(labelNode) : null,
+        };
+      });
+
+      for (let i = 0; i < expectedLabels.length; i += 1) {
+        const { text, style } = labelTexts[i] ?? { text: "", style: null };
+        if (text !== expectedLabels[i]) {
+          return { ok: false, detail: `label mismatch: "${text}" expected "${expectedLabels[i]}"` };
+        }
+        if (style?.textOverflow === "ellipsis" || /\.\./.test(text)) {
+          return { ok: false, detail: `label truncated: "${text}"` };
         }
       }
 
