@@ -6,6 +6,7 @@ expo-env.d.ts
 # @end expo-cli
 
 # Environment & secrets
+.playwright-browsers/
 .env
 .env.local
 *.env

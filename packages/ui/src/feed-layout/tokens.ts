@@ -1,5 +1,5 @@
 import { Platform, StyleSheet } from "react-native";
-import { colors, spacing, touchTarget, typography } from "../theme";
+import { applyShadow, colors, overlays, radius, spacing, touchTarget, typography } from "../theme";
 
 /** Matches ACTION_SHEET_FONT_SCALE_MAX — caps Dynamic Type growth to preserve layout. */
 export const FEED_FONT_SCALE_MAX = 1.35;
@@ -31,37 +31,40 @@ export const feedLayout = {
   mediaMarginTop: 0,
 
   /** Vertical rhythm between major sections inside a post. */
-  sectionGap: spacing.xxs,
+  sectionGap: spacing.sm,
 
-  postPaddingBottom: spacing.sm,
+  postPaddingBottom: spacing.md,
+  postMarginX: spacing.md,
+  postMarginBottom: spacing.md,
+  postRadius: radius.xl,
 
   header: {
-    avatarSize: 32,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xxs,
-    gap: spacing.xs,
-    nameGap: 0,
+    avatarSize: 44,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+    nameGap: 2,
     usernameMarginTop: 0,
     metaMarginTop: 0,
-    workoutTagGap: spacing.xxs,
+    workoutTagGap: spacing.xs,
   },
 
   media: {
-    marginTop: 0,
-    marginBottom: 0,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
 
   actions: {
-    rowHeight: 44,
-    iconSize: 22,
+    rowHeight: 48,
+    iconSize: 24,
     gap: spacing.lg,
-    paddingTop: spacing.xxs,
-    paddingBottom: spacing.xxs,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
   },
 
   caption: {
-    paddingTop: spacing.xs,
-    lineHeight: 22,
+    paddingTop: spacing.sm,
+    lineHeight: 24,
   },
 
   engagement: {
@@ -77,10 +80,10 @@ export const feedLayout = {
 
   /** Feed list chrome above first post (stories row, suggestions). */
   feedChrome: {
-    paddingTop: spacing.xxs,
-    paddingBottom: spacing.xs,
-    sectionGap: spacing.xs,
-    storiesPaddingBottom: spacing.xxs,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    sectionGap: spacing.lg,
+    storiesPaddingBottom: spacing.sm,
   },
 
   /** Extension slots — spacing for future monetization / content overlays. */
@@ -96,20 +99,32 @@ export const feedLayout = {
 
 export const feedLayoutTypography = {
   displayName: {
-    ...typography.bodySmall,
-    fontWeight: "700" as const,
+    fontSize: 16,
+    fontWeight: "800" as const,
     color: colors.text,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   username: {
-    ...typography.caption,
+    ...typography.bodySmall,
     color: colors.accent,
-    lineHeight: 16,
+    fontWeight: "600" as const,
+    lineHeight: 18,
   },
   meta: {
     ...typography.caption,
     color: colors.textMuted,
     lineHeight: 16,
+  },
+  workoutTitle: {
+    fontSize: 18,
+    fontWeight: "800" as const,
+    color: colors.text,
+    lineHeight: 24,
+  },
+  workoutDescription: {
+    ...typography.body,
+    color: colors.textSecondary,
+    lineHeight: 22,
   },
   caption: {
     ...typography.body,
@@ -149,15 +164,21 @@ export const feedLayoutStyles = StyleSheet.create({
     width: "100%",
     maxWidth: Platform.OS === "web" ? feedLayout.maxContentWidth : undefined,
     alignSelf: Platform.OS === "web" ? "center" : undefined,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: feedLayout.postRadius,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    marginHorizontal: feedLayout.postMarginX,
+    marginBottom: feedLayout.postMarginBottom,
     paddingBottom: feedLayout.postPaddingBottom,
-    paddingHorizontal: feedLayout.contentPaddingX,
+    paddingHorizontal: spacing.md,
+    overflow: "hidden",
+    ...applyShadow("md"),
   },
   rootActive: {
     backgroundColor: colors.surfaceElevated,
-    borderBottomColor: colors.accent,
+    borderColor: overlays.accentBorder,
+    ...applyShadow("accent"),
   },
   /** Shared content column — every section is full width of the padded post root. */
   contentColumn: {
@@ -185,12 +206,15 @@ export const feedLayoutStyles = StyleSheet.create({
     width: "100%",
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
+    marginBottom: feedLayout.media.marginBottom,
+    borderRadius: radius.lg,
+    overflow: "hidden",
   },
   embeddedMedia: {
     width: "100%",
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     overflow: "hidden",
   },
   actions: {

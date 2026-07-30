@@ -1,15 +1,22 @@
-import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View, Animated, Easing, type ViewStyle } from "react-native";
+import { useEffect, useRef } from "react";
 import type { FeedStory } from "@frennix/types";
 import { Avatar } from "./Avatar";
+import { ScalePressable } from "./ScalePressable";
 import { formatRelativeTime, formatStreakBadgeLabel } from "./formatRelativeTime";
-import { colors, spacing, typography } from "./theme";
+import { applyShadow, colors, overlays, radius, spacing, typography } from "./theme";
 import { feedLayout } from "./feed-layout";
 
 interface FeedStoriesRowProps {
   stories: FeedStory[];
   onStoryPress?: (story: FeedStory) => void;
   onAddStoryPress?: () => void;
+  onViewAllPress?: () => void;
 }
+
+const RING_SIZE = 76;
+const AVATAR_SIZE = 64;
+const ITEM_WIDTH = 96;
 
 function storyLabel(item: FeedStory): string {
   const stories = item.active_stories ?? [];
@@ -22,6 +29,60 @@ function storyLabel(item: FeedStory): string {
   return `Story · ${time}`;
 }
 
+function storyProgress(item: FeedStory): number {
+  const slides = item.active_stories.at(-1)?.slides.length ?? 0;
+  if (slides <= 1) return item.viewed ? 1 : 0.35;
+  return Math.min(1, 0.25 + slides * 0.12);
+}
+
+function StoryGlow({ active }: { active: boolean }) {
+  const pulse = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    if (!active) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.4,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, pulse]);
+
+  if (!active) return null;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.glowRing,
+        {
+          opacity: pulse,
+          transform: [
+            {
+              scale: pulse.interpolate({
+                inputRange: [0.4, 1],
+                outputRange: [1, 1.08],
+              }),
+            },
+          ],
+        },
+      ]}
+    />
+  );
+}
+
 function StoryAvatar({
   story,
   onAddStoryPress,
@@ -31,6 +92,9 @@ function StoryAvatar({
 }) {
   const activeStories = story.active_stories ?? [];
   const hasStoryContent = activeStories.length > 0 || story.is_self;
+  const isUnviewed = hasStoryContent && !story.viewed && !story.is_self;
+  const progress = storyProgress(story);
+
   const ringStyle = !hasStoryContent
     ? styles.avatarRingMuted
     : story.viewed
@@ -38,9 +102,19 @@ function StoryAvatar({
       : styles.avatarRingUnviewed;
 
   return (
-    <View style={[styles.avatarRing, ringStyle]}>
-      <View style={styles.avatarInner}>
-        <Avatar uri={story.profile.avatar_url} name={story.profile.display_name} size={58} />
+    <View style={styles.avatarShell}>
+      <StoryGlow active={isUnviewed} />
+      <View style={[styles.avatarRing, ringStyle]}>
+        <View
+          style={[
+            styles.progressTrack,
+            isUnviewed && { borderColor: colors.accent, opacity: 0.25 + progress * 0.75 },
+          ]}
+        />
+        <View style={styles.avatarInner}>
+          <Avatar uri={story.profile.avatar_url} name={story.profile.display_name} size={AVATAR_SIZE} />
+        </View>
+        {story.has_recent_workout && !story.is_self ? <View style={styles.onlineDot} /> : null}
       </View>
       {story.is_self ? (
         <Pressable
@@ -54,7 +128,7 @@ function StoryAvatar({
         </Pressable>
       ) : story.workout_streak > 0 ? (
         <View style={styles.streakBadge}>
-          <Text style={styles.streakBadgeText}>🔥{story.workout_streak}</Text>
+          <Text style={styles.streakBadgeText}>🔥 {story.workout_streak}</Text>
         </View>
       ) : null}
     </View>
@@ -77,8 +151,9 @@ function StoryItem({
   const hasActiveStory = activeStories.length > 0;
 
   return (
-    <Pressable
-      style={styles.item}
+    <ScalePressable
+      containerStyle={styles.item}
+      pressedScale={0.94}
       onPress={() => {
         if (isSelf && !hasActiveStory) {
           onAddStoryPress?.();
@@ -100,19 +175,33 @@ function StoryItem({
       <Text style={[styles.meta, item.workout_streak > 0 && styles.metaActive]} numberOfLines={1}>
         {streakLabel}
       </Text>
-      <Text style={styles.lastWorkout} numberOfLines={2}>
-        {label}
-      </Text>
-    </Pressable>
+    </ScalePressable>
   );
 }
 
-export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedStoriesRowProps) {
+export function FeedStoriesRow({
+  stories,
+  onStoryPress,
+  onAddStoryPress,
+  onViewAllPress,
+}: FeedStoriesRowProps) {
   if (!stories.length) return null;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Stories</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.sectionTitle}>Stories</Text>
+        {onViewAllPress ? (
+          <Pressable
+            onPress={onViewAllPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="View all stories"
+          >
+            <Text style={styles.viewAll}>View All</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {Platform.OS === "web" ? (
         <View style={styles.webListShell}>
           <ScrollView
@@ -153,8 +242,8 @@ export function FeedStoriesRow({ stories, onStoryPress, onAddStoryPress }: FeedS
   );
 }
 
-const STORY_ROW_MIN_HEIGHT = 132;
-const STORY_SECTION_HEIGHT = STORY_ROW_MIN_HEIGHT + 28;
+const STORY_ROW_MIN_HEIGHT = RING_SIZE + 36;
+const STORY_SECTION_HEIGHT = STORY_ROW_MIN_HEIGHT + 36;
 
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
   Platform.OS === "web"
@@ -169,15 +258,30 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
 
 const styles = StyleSheet.create({
   container: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     paddingBottom: feedLayout.feedChrome.storiesPaddingBottom,
-    gap: spacing.xxs,
+    gap: spacing.sm,
     flexShrink: 0,
     overflow: "visible",
     ...(Platform.OS === "web"
       ? ({ minHeight: STORY_SECTION_HEIGHT, flexBasis: "auto" } as ViewStyle)
       : null),
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+  },
+  sectionTitle: {
+    ...typography.section,
+    fontSize: 17,
+    color: colors.text,
+    fontWeight: "800",
+  },
+  viewAll: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "700",
   },
   webListShell: {
     height: STORY_ROW_MIN_HEIGHT,
@@ -185,31 +289,44 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     overflow: "visible",
   },
-  sectionTitle: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.xxs,
-  },
   listContent: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xxs,
-    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+    gap: spacing.md,
   },
   item: {
-    width: 88,
+    width: ITEM_WIDTH,
     alignItems: "center",
-    gap: 4,
+    gap: 6,
+  },
+  avatarShell: {
+    width: RING_SIZE + 8,
+    height: RING_SIZE + 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glowRing: {
+    position: "absolute",
+    width: RING_SIZE + 10,
+    height: RING_SIZE + 10,
+    borderRadius: (RING_SIZE + 10) / 2,
+    backgroundColor: overlays.accentTintStrong,
+    ...applyShadow("accent"),
   },
   avatarRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: RING_SIZE,
+    height: RING_SIZE,
+    borderRadius: RING_SIZE / 2,
     padding: 3,
     position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressTrack: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: RING_SIZE / 2,
+    borderWidth: 3,
+    borderColor: "transparent",
   },
   avatarRingUnviewed: {
     backgroundColor: colors.accent,
@@ -218,27 +335,42 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   avatarRingMuted: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.borderSubtle,
   },
   avatarInner: {
-    flex: 1,
-    borderRadius: 999,
+    width: AVATAR_SIZE + 4,
+    height: AVATAR_SIZE + 4,
+    borderRadius: (AVATAR_SIZE + 4) / 2,
     overflow: "hidden",
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundFeed,
     padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  onlineDot: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.accent,
+    borderWidth: 2,
+    borderColor: colors.backgroundFeed,
   },
   addBadge: {
     position: "absolute",
-    bottom: -2,
-    right: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: colors.accent,
     borderWidth: 2,
-    borderColor: colors.background,
+    borderColor: colors.backgroundFeed,
     alignItems: "center",
     justifyContent: "center",
+    ...applyShadow("accent"),
   },
   addBadgeText: {
     color: colors.black,
@@ -248,17 +380,17 @@ const styles = StyleSheet.create({
   },
   streakBadge: {
     position: "absolute",
-    bottom: -2,
+    bottom: 0,
     right: -2,
-    minWidth: 28,
+    minWidth: 34,
     height: 22,
-    borderRadius: 11,
+    borderRadius: radius.full,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   streakBadgeText: {
     ...typography.caption,
@@ -268,7 +400,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   username: {
-    ...typography.caption,
+    ...typography.bodySmall,
     color: colors.text,
     fontWeight: "700",
     textAlign: "center",
@@ -276,8 +408,8 @@ const styles = StyleSheet.create({
   },
   meta: {
     ...typography.caption,
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 13,
     color: colors.textMuted,
     textAlign: "center",
     width: "100%",
@@ -285,14 +417,5 @@ const styles = StyleSheet.create({
   metaActive: {
     color: colors.accent,
     fontWeight: "700",
-  },
-  lastWorkout: {
-    ...typography.caption,
-    fontSize: 10,
-    lineHeight: 12,
-    color: colors.textSecondary,
-    textAlign: "center",
-    width: "100%",
-    minHeight: 24,
   },
 });

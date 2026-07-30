@@ -1,9 +1,16 @@
-import { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { memo, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
-import { FrennixLogo } from "@/components/FrennixLogo";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
-import { FeedStoriesRow, PeopleYouMayKnowCarousel, colors, feedLayout, spacing, typography } from "@frennix/ui";
+import {
+  FeedHeroBanner,
+  FeedQuickActionCards,
+  FeedStoriesRow,
+  PeopleYouMayKnowCarousel,
+  colors,
+  feedLayout,
+  spacing,
+} from "@frennix/ui";
 import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
 interface FeedHeaderProps {
@@ -13,8 +20,7 @@ interface FeedHeaderProps {
   followLoadingId?: string | null;
   onStoryPress?: (story: FeedStory) => void;
   onFollowPress?: (profileId: string, isFollowing: boolean) => void;
-  /** Bisection: top logo row only */
-  showTopRow?: boolean;
+  showHero?: boolean;
   showSuggestions?: boolean;
   showStories?: boolean;
   showQuickActions?: boolean;
@@ -27,31 +33,52 @@ export const FeedHeader = memo(function FeedHeader({
   followLoadingId = null,
   onStoryPress,
   onFollowPress,
-  showTopRow = true,
+  showHero = true,
   showSuggestions = true,
   showStories = true,
   showQuickActions = true,
 }: FeedHeaderProps) {
+  const quickActions = useMemo(
+    () => [
+      { key: "share", emoji: "🏋️", title: "Share Workout", onPress: openCreatePost },
+      { key: "stories", emoji: "📖", title: "Explore Stories", onPress: () => pushScreen("/stories/explore") },
+      { key: "athletes", emoji: "🎯", title: "Find Athletes", onPress: () => switchTab("/(tabs)/discover") },
+      { key: "events", emoji: "📅", title: "Events", onPress: () => switchTab("/(tabs)/events") },
+    ],
+    []
+  );
+
   return (
     <View style={styles.container}>
-      {showTopRow ? (
-        <View style={styles.topRow}>
-          <View style={styles.titleBlock}>
-            <FrennixLogo variant="full" height={34} />
-            <Text style={styles.subtitle}>Workouts, progress, and wins from your network</Text>
-          </View>
-          <Pressable
-            style={styles.createButton}
-            onPress={openCreatePost}
-            accessibilityRole="button"
-            accessibilityLabel="Create post"
-          >
-            <Text style={styles.createIcon}>＋</Text>
-          </Pressable>
-        </View>
+      {showHero ? (
+        <SectionErrorBoundary label="feed-hero-banner" compact>
+          <FeedHeroBanner
+            onFindAthletes={() => switchTab("/(tabs)/discover")}
+            onShareWorkout={openCreatePost}
+          />
+        </SectionErrorBoundary>
       ) : null}
 
-      {showSuggestions ? (
+      {showStories ? (
+        <SectionErrorBoundary label="feed-stories-carousel" compact>
+          <FeedStoriesRow
+            stories={stories}
+            onStoryPress={onStoryPress}
+            onAddStoryPress={openCreateStory}
+            onViewAllPress={() => pushScreen("/stories/explore")}
+          />
+        </SectionErrorBoundary>
+      ) : null}
+
+      {showQuickActions ? (
+        <SectionErrorBoundary label="feed-quick-actions" compact>
+          <View nativeID="feed-quick-actions-row">
+            <FeedQuickActionCards actions={quickActions} />
+          </View>
+        </SectionErrorBoundary>
+      ) : null}
+
+      {showSuggestions && suggestions.length > 0 ? (
         <SectionErrorBoundary label="feed-suggestions-carousel" compact>
           <PeopleYouMayKnowCarousel
             suggestions={suggestions}
@@ -62,92 +89,16 @@ export const FeedHeader = memo(function FeedHeader({
           />
         </SectionErrorBoundary>
       ) : null}
-
-      {showStories ? (
-        <SectionErrorBoundary label="feed-stories-carousel" compact>
-          <View style={styles.storiesWrap}>
-            <FeedStoriesRow
-              stories={stories}
-              onStoryPress={onStoryPress}
-              onAddStoryPress={openCreateStory}
-            />
-          </View>
-        </SectionErrorBoundary>
-      ) : null}
-
-      {showQuickActions ? (
-        <SectionErrorBoundary label="feed-quick-actions" compact>
-        <View style={styles.quickActions} nativeID="feed-quick-actions-row">
-          <Pressable style={styles.chip} onPress={openCreatePost}>
-            <Text style={styles.chipText}>Share workout</Text>
-          </Pressable>
-          <Pressable style={styles.chip} onPress={() => pushScreen("/stories/explore")}>
-            <Text style={styles.chipText}>Explore Stories</Text>
-          </Pressable>
-          <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/discover")}>
-            <Text style={styles.chipText}>Find athletes</Text>
-          </Pressable>
-          <Pressable style={styles.chip} onPress={() => switchTab("/(tabs)/events")}>
-            <Text style={styles.chipText}>Events</Text>
-          </Pressable>
-        </View>
-        </SectionErrorBoundary>
-      ) : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: "transparent",
     paddingHorizontal: spacing.md,
     paddingTop: feedLayout.feedChrome.paddingTop,
     paddingBottom: feedLayout.feedChrome.paddingBottom,
     gap: feedLayout.feedChrome.sectionGap,
   },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  titleBlock: { flex: 1, gap: 2 },
-  subtitle: { ...typography.caption, color: colors.textMuted },
-  createButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  createIcon: {
-    color: colors.black,
-    fontSize: 24,
-    lineHeight: 26,
-    fontWeight: "700",
-  },
-  quickActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    flexShrink: 0,
-    position: "relative",
-    zIndex: 1,
-  },
-  storiesWrap: {
-    flexShrink: 0,
-    marginBottom: spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipText: { ...typography.bodySmall, color: colors.text, fontWeight: "600" },
 });

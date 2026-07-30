@@ -43,6 +43,8 @@ import {
 } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
+import { FeedBackground } from "@/components/FeedBackground";
+import { FeedEmptyMotivation } from "@/components/FeedEmptyMotivation";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
@@ -81,7 +83,7 @@ import { useLocationFeedBanner } from "@/lib/useLocationFeedBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
-import { EmptyState, FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
@@ -944,9 +946,8 @@ export default function HomeScreen() {
     <StartupMountProbe id="feed-route">
     <TabScreenBoundary label="feed">
     <FeedRenderTraceProbe id="feed:ui:container">
-      <View
+      <FeedBackground
         style={[styles.container, webContainerStyle]}
-        pointerEvents="box-none"
         nativeID="feed-root-container"
       >
         <View
@@ -983,15 +984,7 @@ export default function HomeScreen() {
                   <FeedPostCardSkeleton />
                 </View>
               ) : (
-                <View style={styles.emptyWrap}>
-                  <EmptyState
-                    icon="🏋️"
-                    title="Your feed is ready"
-                    description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
-                    actionLabel="Share a workout"
-                    onAction={() => openCreatePost()}
-                  />
-                </View>
+                <FeedEmptyMotivation suggestions={suggestions} />
               )
             }
             refreshControl={refreshControl}
@@ -1041,15 +1034,7 @@ export default function HomeScreen() {
                   <FeedPostCardSkeleton />
                 </View>
               ) : (
-                <View style={styles.emptyWrap}>
-                  <EmptyState
-                    icon="🏋️"
-                    title="Your feed is ready"
-                    description="Follow athletes, join groups, or share your first workout photo, video, or progress update."
-                    actionLabel="Share a workout"
-                    onAction={() => openCreatePost()}
-                  />
-                </View>
+                <FeedEmptyMotivation suggestions={suggestions} />
               )
             }
             renderItem={renderItem}
@@ -1179,7 +1164,7 @@ export default function HomeScreen() {
           onToggleCollapsed={() => setFeedDebugCollapsed((value) => !value)}
         />
       ) : null}
-      </View>
+      </FeedBackground>
     </FeedRenderTraceProbe>
     </TabScreenBoundary>
     </StartupMountProbe>
@@ -1187,15 +1172,15 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.background },
-  feedScrollShell: { ...flexFill, backgroundColor: colors.background },
+  container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.backgroundFeed },
+  feedScrollShell: { ...flexFill, backgroundColor: "transparent" },
   feedList: { ...flexFill, ...webScrollSurface },
   list: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxl + spacing.lg + spacing.sm,
+    paddingTop: spacing.xs,
   },
-  emptyWrap: { padding: spacing.lg },
-  initialSkeletons: { gap: 0 },
+  initialSkeletons: { gap: spacing.md, paddingHorizontal: spacing.md },
   isolatePlaceholder: {
     flex: 1,
     alignItems: "center",

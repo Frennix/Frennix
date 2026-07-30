@@ -2,14 +2,19 @@ import { Platform, type ViewStyle } from "react-native";
 
 export const colors = {
   background: "#0A0A0B",
+  /** Premium feed canvas — charcoal with layered gradients. */
+  backgroundFeed: "#0B0B0D",
   surface: "#141416",
   surfaceElevated: "#1C1C1F",
+  surfaceCard: "#161618",
   border: "#2A2A2E",
+  borderSubtle: "#1F1F23",
   text: "#FAFAFA",
   textSecondary: "#A1A1AA",
   textMuted: "#71717A",
   accent: "#22C55E",
   accentMuted: "#166534",
+  accentGlow: "rgba(34, 197, 94, 0.35)",
   danger: "#EF4444",
   warning: "#F59E0B",
   white: "#FFFFFF",
@@ -56,6 +61,7 @@ export const radius = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 24,
   full: 9999,
 };
 
@@ -88,9 +94,10 @@ export const touchTarget = 44;
 
 export const animation = {
   stackFadeMs: 200,
-  feedEnter: { duration: 260, damping: 22 },
+  feedEnter: { duration: 240, damping: 22 },
   pressScale: 0.97,
   skeletonPulseMs: 700,
+  quick: 180,
 };
 
 type ShadowStyle = Pick<
@@ -123,7 +130,21 @@ export const shadows: Record<"sm" | "md" | "lg", ShadowStyle> = {
 };
 
 /** Cross-platform shadow helper — web ignores elevation. */
-export function applyShadow(level: keyof typeof shadows): ViewStyle {
+export function applyShadow(level: keyof typeof shadows | "accent"): ViewStyle {
+  if (level === "accent") {
+    return Platform.select({
+      web: {
+        boxShadow: "0 4px 24px rgba(34, 197, 94, 0.18), 0 2px 8px rgba(0,0,0,0.24)",
+      },
+      default: {
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.28,
+        shadowRadius: 10,
+        elevation: 6,
+      },
+    }) as ViewStyle;
+  }
   return Platform.select({
     web: {
       boxShadow: level === "sm" ? "0 1px 3px rgba(0,0,0,0.18)" : level === "md" ? "0 2px 8px rgba(0,0,0,0.22)" : "0 4px 16px rgba(0,0,0,0.28)",

@@ -7,6 +7,7 @@ import { CreateTabBarButton } from "@/components/CreateTabBarButton";
 import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { TabPrefetchCoordinator } from "@/components/TabPrefetchCoordinator";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
+import { FeedHeaderTitle } from "@/components/FeedHeaderTitle";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
@@ -50,7 +51,7 @@ const ProfileHeaderActions = memo(function ProfileHeaderActions() {
 });
 
 const TabsShell = memo(function TabsShell() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { unreadMessages } = useTabBadges();
   const isolateFab = isFeedIsolateDisabled("fab");
   const isolateBottomTabs = isFeedIsolateDisabled("bottom-tabs");
@@ -65,7 +66,10 @@ const TabsShell = memo(function TabsShell() {
     ...(isolateBottomTabs ? { display: "none" as const } : null),
   };
 
-  const renderFeedHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
+  const renderFeedHeaderTitle = useCallback(
+    () => <FeedHeaderTitle displayName={profile?.display_name} />,
+    [profile?.display_name]
+  );
   const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
   const renderProfileHeaderTitle = useCallback(() => <FrennixLogo variant="icon" height={24} />, []);
   const renderHeaderBell = useCallback(
@@ -107,7 +111,7 @@ const TabsShell = memo(function TabsShell() {
       >
       <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.background },
+        headerStyle: { backgroundColor: colors.backgroundFeed },
         headerTintColor: colors.text,
         headerShadowVisible: false,
         tabBarStyle,
@@ -117,7 +121,7 @@ const TabsShell = memo(function TabsShell() {
         sceneContainerStyle: {
           ...flexFill,
           ...webTabSceneShell,
-          backgroundColor: colors.background,
+          backgroundColor: colors.backgroundFeed,
         },
         lazy: false,
         freezeOnBlur: true,

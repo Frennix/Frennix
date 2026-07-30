@@ -175,29 +175,29 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "FeedLayout uses one shared content column width",
+    name: "FeedLayout uses premium card shell with shared content column",
     run: () => {
       const tokens = read("packages/ui/src/feed-layout/tokens.ts");
       if (!tokens.includes("contentColumn")) {
         throw new Error("feedLayout must define contentColumn for unified post width");
       }
-      if (!tokens.includes("paddingHorizontal: feedLayout.contentPaddingX")) {
-        throw new Error("FeedLayout root must apply contentPaddingX once for all sections");
+      if (!tokens.includes("paddingHorizontal: spacing.md")) {
+        throw new Error("FeedLayout root must apply horizontal inset for card content");
       }
-      if (/paddingHorizontal: feedLayout\.contentPaddingX,\n    paddingTop: feedLayout\.header/.test(tokens)) {
-        throw new Error("Header must not use separate horizontal padding from media");
+      if (!tokens.includes("postRadius")) {
+        throw new Error("feedLayout must define postRadius for premium cards");
       }
     },
   },
   {
-    name: "FeedPostCard uses compact workout meta instead of chip row",
+    name: "FeedPostCard renders workout type chips and stats pills",
     run: () => {
       const src = read("packages/ui/src/FeedPostCard.tsx");
-      if (src.includes("WorkoutTypeChips")) {
-        throw new Error("FeedPostCard must use inline workout meta via FeedLayout header");
+      if (!src.includes("WorkoutTypeChips")) {
+        throw new Error("FeedPostCard must render WorkoutTypeChips for workout tags");
       }
-      if (!src.includes("formatFeedCompactHeaderMeta")) {
-        throw new Error("FeedPostCard must use formatFeedCompactHeaderMeta");
+      if (!src.includes("WorkoutStatsPills")) {
+        throw new Error("FeedPostCard must render WorkoutStatsPills when metrics exist");
       }
     },
   },

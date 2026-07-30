@@ -13,6 +13,9 @@ import {
 import { normalizeWorkoutTypes } from "@frennix/types";
 import { ReactionBar } from "./ReactionBar";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
+import { WorkoutStatsPills } from "./WorkoutStatsPills";
+import { WorkoutTypeChips } from "./WorkoutTypeChips";
+import { formatWorkoutTypeLabel } from "./formatRelativeTime";
 import {
   FeedLayout,
   FeedMedia,
@@ -50,6 +53,17 @@ interface FeedPostCardProps {
 }
 
 const STRONG_WORK_EMOJI = "💪";
+
+function splitWorkoutCopy(content: string | null | undefined): {
+  title: string | null;
+  description: string | null;
+} {
+  if (!content?.trim()) return { title: null, description: null };
+  const lines = content.trim().split(/\n+/);
+  const title = lines[0]?.trim() ?? null;
+  const description = lines.slice(1).join("\n").trim() || null;
+  return { title, description };
+}
 
 export const FeedPostCard = memo(function FeedPostCard({
   post,
@@ -91,6 +105,17 @@ export const FeedPostCard = memo(function FeedPostCard({
   const reactionSummary = useMemo(() => formatReactionSummary(post.reactions), [post.reactions]);
   const hasMedia = Boolean(displayPost.media_urls?.length);
   const showCaption = Boolean(post.content);
+  const { title: contentTitle, description: contentDescription } = useMemo(
+    () => splitWorkoutCopy(isShared ? post.content : displayPost.content),
+    [displayPost.content, isShared, post.content]
+  );
+  const workoutTitle = useMemo(() => {
+    if (contentTitle) return contentTitle;
+    const primary = workoutTypes[0];
+    if (primary) return `${formatWorkoutTypeLabel(primary)} Workout`;
+    return null;
+  }, [contentTitle, workoutTypes]);
+  const workoutDescription = contentDescription ?? (contentTitle ? null : displayPost.content);
 
   const handleMorePress = useMemo(() => {
     if (onInteractPress) return () => onInteractPress();
@@ -166,12 +191,19 @@ export const FeedPostCard = memo(function FeedPostCard({
               {author?.display_name ?? "Unknown"}
             </Text>
             <Text
+              style={feedLayoutTypography.username}
+              allowFontScaling
+              maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+              numberOfLines={1}
+            >
+              {author?.username ? `@${author.username}` : ""}
+            </Text>
+            <Text
               style={feedLayoutTypography.meta}
               allowFontScaling
               maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-              numberOfLines={2}
+              numberOfLines={1}
             >
-              {author?.username ? `@${author.username} · ` : ""}
               {headerMeta}
             </Text>
           </FeedLayout.HeaderText>
@@ -221,6 +253,52 @@ export const FeedPostCard = memo(function FeedPostCard({
         </View>
       ) : null}
 
+      {workoutTitle ? (
+        <FeedLayout.Caption>
+          <Text
+            style={feedLayoutTypography.workoutTitle}
+            allowFontScaling
+            maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+          >
+            {workoutTitle}
+          </Text>
+        </FeedLayout.Caption>
+      ) : null}
+
+      {workoutDescription ? (
+        <FeedLayout.Caption>
+          <Pressable
+            onPress={openPostDetail}
+            disabled={!openPostDetail}
+            accessibilityRole="button"
+            accessibilityLabel="View full post"
+          >
+            <Text
+              style={feedLayoutTypography.workoutDescription}
+              allowFontScaling
+              maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            >
+              {workoutDescription}
+            </Text>
+          </Pressable>
+        </FeedLayout.Caption>
+      ) : null}
+
+      {!isShared && workoutTypes.length > 0 ? (
+        <FeedLayout.BelowMedia>
+          <WorkoutTypeChips types={workoutTypes} size="default" />
+        </FeedLayout.BelowMedia>
+      ) : null}
+
+      {!isShared ? (
+        <FeedLayout.BelowMedia>
+          <WorkoutStatsPills
+            metrics={displayPost.workout_metrics}
+            milestones={displayPost.story_milestones}
+          />
+        </FeedLayout.BelowMedia>
+      ) : null}
+
       <FeedLayout.BelowMedia>{slots?.belowMedia}</FeedLayout.BelowMedia>
 
       <FeedPostActionBar
@@ -233,7 +311,7 @@ export const FeedPostCard = memo(function FeedPostCard({
         onMore={handleMorePress}
       />
 
-      {showCaption ? (
+      {showCaption && isShared ? (
         <FeedLayout.Caption>
           <Pressable
             onPress={openPostDetail}

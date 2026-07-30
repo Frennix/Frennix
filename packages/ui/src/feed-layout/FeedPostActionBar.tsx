@@ -1,6 +1,7 @@
 import { memo, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, touchTarget } from "../theme";
+import { StyleSheet, Text, View } from "react-native";
+import { ScalePressable } from "../ScalePressable";
+import { colors, spacing, touchTarget } from "../theme";
 import { feedAccessibility, feedLayout, feedLayoutStyles } from "./tokens";
 
 const STRONG_WORK_EMOJI = "💪";
@@ -41,34 +42,32 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
           onPress={onLike}
         >
           <Text
-            style={[styles.icon, liked && styles.iconActive]}
+            style={[styles.label, liked && styles.labelActive]}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            importantForAccessibility="no"
           >
-            {liked ? "♥" : "♡"}
+            {liked ? "❤️" : "🤍"} Like
           </Text>
         </ActionButton>
       ) : null}
 
       {onStrongWork ? (
         <ActionButton
-          label={strongWorkActive ? "Strong Work, selected" : "Strong Work"}
+          label={strongWorkActive ? "Respect, selected" : "Respect"}
           hint={
             strongWorkActive
-              ? "Removes your Strong Work reaction"
-              : "Reacts with Strong Work"
+              ? "Removes your Respect reaction"
+              : "Reacts with Respect"
           }
           selected={strongWorkActive}
           onPress={onStrongWork}
         >
           <Text
-            style={[styles.emoji, strongWorkActive && styles.emojiActive]}
+            style={[styles.label, strongWorkActive && styles.labelActive]}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            importantForAccessibility="no"
           >
-            {STRONG_WORK_EMOJI}
+            {STRONG_WORK_EMOJI} Respect
           </Text>
         </ActionButton>
       ) : null}
@@ -76,12 +75,11 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
       {onComment ? (
         <ActionButton label="Comment on post" hint="Opens comments" onPress={onComment}>
           <Text
-            style={styles.icon}
+            style={styles.label}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            importantForAccessibility="no"
           >
-            💬
+            💬 Comment
           </Text>
         </ActionButton>
       ) : null}
@@ -89,12 +87,11 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
       {onShare ? (
         <ActionButton label="Share post" hint="Opens share options" onPress={onShare}>
           <Text
-            style={styles.icon}
+            style={styles.label}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            importantForAccessibility="no"
           >
-            ↗
+            📤 Share
           </Text>
         </ActionButton>
       ) : null}
@@ -106,12 +103,11 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
           onPress={onMore}
         >
           <Text
-            style={styles.moreIcon}
+            style={styles.moreLabel}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            importantForAccessibility="no"
           >
-            ⋯
+            ⋯ More
           </Text>
         </ActionButton>
       ) : null}
@@ -133,17 +129,17 @@ function ActionButton({
   children: ReactNode;
 }) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+    <ScalePressable
+      pressedScale={0.96}
       onPress={onPress}
+      containerStyle={styles.button}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
       accessibilityState={{ selected }}
-      hitSlop={8}
     >
       {children}
-    </Pressable>
+    </ScalePressable>
   );
 }
 
@@ -151,38 +147,34 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: feedLayout.actions.gap,
     minHeight: feedLayout.actions.rowHeight,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle,
+    marginTop: spacing.sm,
+    paddingTop: feedLayout.actions.paddingTop,
   },
   button: {
     minWidth: touchTarget,
     minHeight: touchTarget,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 4,
   },
-  buttonPressed: {
-    opacity: 0.7,
+  label: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    fontWeight: "700",
   },
-  icon: {
-    fontSize: feedLayout.actions.iconSize,
-    lineHeight: feedLayout.actions.iconSize + 4,
-    color: colors.text,
-    fontWeight: "400",
-  },
-  iconActive: {
+  labelActive: {
     color: colors.accent,
   },
-  emoji: {
-    fontSize: feedLayout.actions.iconSize,
-    lineHeight: feedLayout.actions.iconSize + 4,
-  },
-  emojiActive: {
-    opacity: 1,
-  },
-  moreIcon: {
-    fontSize: feedLayout.actions.iconSize + 2,
-    lineHeight: feedLayout.actions.iconSize + 6,
-    color: colors.textSecondary,
+  moreLabel: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: colors.textMuted,
     fontWeight: "700",
   },
 });

@@ -1,5 +1,4 @@
 import { memo } from "react";
-import { Platform } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { animation } from "@frennix/ui";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
@@ -19,7 +18,7 @@ type AnimatedFeedListItemProps = {
 };
 
 export const AnimatedFeedListItem = memo(function AnimatedFeedListItem(props: AnimatedFeedListItemProps) {
-  const shouldAnimate = Platform.OS !== "web" && !animatedPostIds.has(props.post.id);
+  const shouldAnimate = !animatedPostIds.has(props.post.id);
   if (shouldAnimate) {
     animatedPostIds.add(props.post.id);
     return (
