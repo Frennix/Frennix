@@ -15,6 +15,7 @@ import {
   getFeed,
   getFeedStories,
   getSuggestedAthletes,
+  getDismissedSuggestionIds,
   peekFeedFollowingIds,
   getErrorMessage,
   getDedicatedStoryInsights,
@@ -44,6 +45,7 @@ import {
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedBackground } from "@/components/FeedBackground";
+import { UndoSnackbar } from "@/components/UndoSnackbar";
 import { FeedEmptyMotivation } from "@/components/FeedEmptyMotivation";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
@@ -54,6 +56,7 @@ import { StoryViewersModal, type StoryViewerAction } from "@/components/story/St
 import { StoryReactionsModal } from "@/components/story/StoryReactionsModal";
 import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
+import { useSuggestionDismissUndo } from "@/lib/useSuggestionDismissUndo";
 import { usePostActions } from "@/lib/usePostActions";
 import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
@@ -208,6 +211,20 @@ export default function HomeScreen() {
     enabled: deferFeedSecondary,
   });
   markFeedHook("suggested-follow");
+
+  useQuery({
+    queryKey: ["dismissed-suggestion-ids", userId],
+    queryFn: () => getDismissedSuggestionIds(userId),
+    enabled: !!userId && deferFeedSecondary,
+    staleTime: 120_000,
+  });
+  markFeedHook("dismissed-suggestions-query");
+
+  const { pendingDismiss, dismissSuggestionRequest, undoDismiss } = useSuggestionDismissUndo(
+    userId,
+    viewerProfile
+  );
+  markFeedHook("suggestion-dismiss-undo");
 
   const handleStoryReact = useCallback(
     async (
@@ -424,9 +441,11 @@ export default function HomeScreen() {
     queryKey: ["discover-suggestions", userId],
     queryFn: () => {
       const cachedFollowing = queryClient.getQueryData<string[]>(["following-ids", userId]);
+      const cachedDismissed = queryClient.getQueryData<string[]>(["dismissed-suggestion-ids", userId]);
       return getSuggestedAthletes(userId, 20, {
         viewer: viewerProfile,
         followingIds: cachedFollowing,
+        dismissedIds: cachedDismissed,
       });
     },
     select: (athletes) => athletes.slice(0, 10),
@@ -765,6 +784,7 @@ export default function HomeScreen() {
             setActiveStoryIndex(index >= 0 ? index : null);
           }}
           onFollowPress={(profileId) => toggleFollow(profileId)}
+          onDismissPress={dismissSuggestionRequest}
         />
         </SectionErrorBoundary>
       </FeedRenderTraceProbe>
@@ -778,6 +798,7 @@ export default function HomeScreen() {
       followMutation.isPending,
       followMutation.variables?.targetUserId,
       toggleFollow,
+      dismissSuggestionRequest,
     ]
   );
 
@@ -1164,6 +1185,11 @@ export default function HomeScreen() {
           onToggleCollapsed={() => setFeedDebugCollapsed((value) => !value)}
         />
       ) : null}
+      <UndoSnackbar
+        visible={!!pendingDismiss}
+        message="Suggestion removed"
+        onUndo={undoDismiss}
+      />
       </FeedBackground>
     </FeedRenderTraceProbe>
     </TabScreenBoundary>

@@ -7,8 +7,9 @@ import {
   coerceStringArray,
 } from "@frennix/matching";
 import { getFollowingIds } from "./follows";
-import { getBlockedIds } from "./moderation";
+import { getBlockedByIds, getBlockedIds } from "./moderation";
 import { getProfile } from "./profiles";
+import { getDismissedSuggestionIds } from "./suggestion-dismissals";
 import { getSupabase } from "./supabase";
 
 const WORKOUT_POST_TYPES = ["workout_update", "photo", "video"] as const;
@@ -59,6 +60,10 @@ export type SuggestedAthletesOptions = {
   viewer?: Profile | null;
   /** Skip getFollowingIds when React Query already warmed the cache. */
   followingIds?: string[];
+  /** Skip DB reads when React Query already warmed dismissed IDs. */
+  dismissedIds?: string[];
+  /** Extra profile IDs to exclude (e.g. pending undo dismissals). */
+  extraExcludedIds?: string[];
 };
 
 export async function getSuggestedAthletes(
@@ -66,16 +71,25 @@ export async function getSuggestedAthletes(
   limit = 12,
   options?: SuggestedAthletesOptions
 ): Promise<SuggestedAthlete[]> {
-  const [viewerRow, followingIds, blockedIds] = await Promise.all([
+  const [viewerRow, followingIds, blockedIds, blockedByIds, dismissedIds] = await Promise.all([
     options?.viewer ? Promise.resolve(options.viewer) : getProfile(viewerId),
     options?.followingIds ? Promise.resolve(options.followingIds) : getFollowingIds(viewerId),
     getBlockedIds(viewerId),
+    getBlockedByIds(viewerId),
+    options?.dismissedIds ? Promise.resolve(options.dismissedIds) : getDismissedSuggestionIds(viewerId),
   ]);
 
   if (!viewerRow) return [];
   const viewer = normalizeProfile(viewerRow);
 
-  const excludeIds = new Set([viewerId, ...followingIds, ...blockedIds]);
+  const excludeIds = new Set([
+    viewerId,
+    ...followingIds,
+    ...blockedIds,
+    ...blockedByIds,
+    ...dismissedIds,
+    ...(options?.extraExcludedIds ?? []),
+  ]);
 
   const { data: candidates, error } = await getSupabase()
     .from("profiles_reader")
@@ -135,14 +149,22 @@ export async function getSuggestedAthletes(
       )
     )
     .filter((item) => item.compatibility_score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 
-  if (ranked.length >= Math.min(limit, 6)) return ranked;
+  const dedupedRanked: SuggestedAthlete[] = [];
+  const seenRanked = new Set<string>();
+  for (const item of ranked) {
+    if (seenRanked.has(item.profile.id)) continue;
+    seenRanked.add(item.profile.id);
+    dedupedRanked.push(item);
+    if (dedupedRanked.length >= limit) break;
+  }
+
+  if (dedupedRanked.length >= Math.min(limit, 6)) return dedupedRanked;
 
   const fallback = profiles
-    .filter((profile) => !ranked.some((item) => item.profile.id === profile.id))
-    .slice(0, limit - ranked.length)
+    .filter((profile) => !seenRanked.has(profile.id))
+    .slice(0, limit - dedupedRanked.length)
     .map((profile) => {
       const item = rankCandidate(viewer, profile, mutualCounts.get(profile.id) ?? 0, 0);
       return {
@@ -153,7 +175,7 @@ export async function getSuggestedAthletes(
       };
     });
 
-  return [...ranked, ...fallback].slice(0, limit);
+  return [...dedupedRanked, ...fallback].slice(0, limit);
 }
 
 /** Score a single profile pair client-side (profiles, Discover detail). */

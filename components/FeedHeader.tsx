@@ -20,6 +20,8 @@ interface FeedHeaderProps {
   followLoadingId?: string | null;
   onStoryPress?: (story: FeedStory) => void;
   onFollowPress?: (profileId: string, isFollowing: boolean) => void;
+  onDismissPress?: (athlete: SuggestedAthlete) => void;
+  dismissLoadingId?: string | null;
   showHero?: boolean;
   showSuggestions?: boolean;
   showStories?: boolean;
@@ -33,6 +35,8 @@ export const FeedHeader = memo(function FeedHeader({
   followLoadingId = null,
   onStoryPress,
   onFollowPress,
+  onDismissPress,
+  dismissLoadingId = null,
   showHero = true,
   showSuggestions = true,
   showStories = true,
@@ -85,7 +89,9 @@ export const FeedHeader = memo(function FeedHeader({
             followingIds={followingIds}
             onProfilePress={(username) => pushScreen(`/user/${username}`)}
             onFollowPress={onFollowPress}
+            onDismissPress={onDismissPress}
             followLoadingId={followLoadingId}
+            dismissLoadingId={dismissLoadingId}
           />
         </SectionErrorBoundary>
       ) : null}

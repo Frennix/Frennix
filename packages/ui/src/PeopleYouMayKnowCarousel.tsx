@@ -10,7 +10,9 @@ interface PeopleYouMayKnowCarouselProps {
   followingIds?: string[];
   onProfilePress?: (username: string) => void;
   onFollowPress?: (profileId: string, isFollowing: boolean) => void;
+  onDismissPress?: (athlete: SuggestedAthlete) => void;
   followLoadingId?: string | null;
+  dismissLoadingId?: string | null;
 }
 
 export function PeopleYouMayKnowCarousel({
@@ -18,7 +20,9 @@ export function PeopleYouMayKnowCarousel({
   followingIds = [],
   onProfilePress,
   onFollowPress,
+  onDismissPress,
   followLoadingId = null,
+  dismissLoadingId = null,
 }: PeopleYouMayKnowCarouselProps) {
   if (!suggestions.length) return null;
 
@@ -36,7 +40,8 @@ export function PeopleYouMayKnowCarousel({
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const isFollowing = followingSet.has(item.profile.id);
-          const isLoading = followLoadingId === item.profile.id;
+          const isFollowLoading = followLoadingId === item.profile.id;
+          const isDismissLoading = dismissLoadingId === item.profile.id;
           const online = isProfileOnline(item.profile);
           const presenceLabel = formatPresenceStatus(item.profile);
 
@@ -71,13 +76,23 @@ export function PeopleYouMayKnowCarousel({
                   {item.reason}
                 </Text>
               </Pressable>
-              <Button
-                title={isFollowing ? "Following" : "Follow"}
-                variant={isFollowing ? "secondary" : "primary"}
-                onPress={() => onFollowPress?.(item.profile.id, isFollowing)}
-                loading={isLoading}
-                style={styles.followButton}
-              />
+              <View style={styles.actions}>
+                <Button
+                  title={isFollowing ? "Following" : "Follow"}
+                  variant={isFollowing ? "secondary" : "primary"}
+                  onPress={() => onFollowPress?.(item.profile.id, isFollowing)}
+                  loading={isFollowLoading}
+                  style={styles.actionButton}
+                />
+                <Button
+                  title="Not Interested"
+                  variant="secondary"
+                  onPress={() => onDismissPress?.(item)}
+                  loading={isDismissLoading}
+                  style={styles.actionButton}
+                  accessibilityLabel="Remove suggestion"
+                />
+              </View>
             </View>
           );
         }}
@@ -110,7 +125,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   card: {
-    width: 168,
+    width: 176,
     padding: spacing.md,
     borderRadius: 16,
     borderWidth: 1,
@@ -149,7 +164,12 @@ const styles = StyleSheet.create({
     minHeight: 28,
     lineHeight: 14,
   },
-  followButton: {
+  actions: {
+    width: "100%",
+    gap: spacing.xs,
+  },
+  actionButton: {
+    width: "100%",
     minHeight: 36,
     paddingVertical: spacing.sm,
   },

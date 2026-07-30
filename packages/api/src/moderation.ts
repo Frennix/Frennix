@@ -39,6 +39,15 @@ export async function getBlockedIds(userId: string): Promise<string[]> {
   return (data ?? []).map((b) => b.blocked_id);
 }
 
+export async function getBlockedByIds(userId: string): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from("blocks")
+    .select("blocker_id")
+    .eq("blocked_id", userId);
+  if (error) throw error;
+  return (data ?? []).map((b) => b.blocker_id as string);
+}
+
 export async function getBlockedUsers(userId: string): Promise<(Block & { profile?: Profile })[]> {
   const { data, error } = await getSupabase()
     .from("blocks")
