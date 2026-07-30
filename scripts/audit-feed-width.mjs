@@ -50,6 +50,8 @@ function runStaticChecks() {
       !/container:\s*\{[^}]*paddingHorizontal:\s*spacing\.md/s.test(header)
   );
   record(results, "Web document uses border-box", webStyles.includes("box-sizing: border-box"));
+  record(results, "Web overlay uses fixed viewport positioning", webStyles.includes("#feed-search-overlay") && webStyles.includes("position: fixed"));
+  record(results, "Feed screen mounts search overlay", read("app/(tabs)/index.tsx").includes("FeedSearchOverlay"));
 
   return results;
 }
@@ -107,6 +109,7 @@ async function runBrowserChecks(viewportWidth) {
         "feed-scroll-shell",
         "feed-scroll-list",
         "feed-search-section",
+        "feed-search-overlay",
         "feed-shortcut-row",
       ];
       const viewport = window.innerWidth;

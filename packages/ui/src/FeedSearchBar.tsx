@@ -12,32 +12,61 @@ import { Search, SlidersHorizontal, X } from "lucide-react-native";
 import { colors, spacing, touchTarget, typography } from "./theme";
 
 interface FeedSearchBarProps {
-  value: string;
-  onChangeText: (text: string) => void;
+  value?: string;
+  onChangeText?: (text: string) => void;
   inputRef?: TextInputProps["ref"];
   onFocus?: () => void;
   onBlur?: () => void;
+  onBarPress?: () => void;
   onFilterPress?: () => void;
   onClear?: () => void;
   placeholder?: string;
   editable?: boolean;
+  autoFocus?: boolean;
 }
 
 const BAR_HEIGHT = 48;
 const BAR_RADIUS = 17;
 
 export const FeedSearchBar = memo(function FeedSearchBar({
-  value,
+  value = "",
   onChangeText,
   inputRef,
   onFocus,
   onBlur,
+  onBarPress,
   onFilterPress,
   onClear,
   placeholder = "Search athletes, workouts, events",
   editable = true,
+  autoFocus = false,
 }: FeedSearchBarProps) {
-  const showClear = value.length > 0 && editable;
+  const isTrigger = Boolean(onBarPress);
+  const inputEditable = editable && !isTrigger;
+  const showClear = value.length > 0 && inputEditable && onClear;
+
+  const input = (
+    <TextInput
+      ref={inputRef}
+      style={styles.input}
+      value={value}
+      onChangeText={onChangeText}
+      onFocus={isTrigger ? onBarPress : onFocus}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textMuted}
+      editable={inputEditable}
+      autoFocus={autoFocus}
+      autoCorrect={false}
+      autoCapitalize="none"
+      returnKeyType="search"
+      clearButtonMode="never"
+      showSoftInputOnFocus={!isTrigger}
+      accessibilityRole="search"
+      accessibilityLabel={placeholder}
+      {...(isTrigger ? { pointerEvents: "none" as const } : null)}
+    />
+  );
 
   return (
     <View style={styles.wrap} nativeID="feed-search-bar">
@@ -45,23 +74,19 @@ export const FeedSearchBar = memo(function FeedSearchBar({
         <View pointerEvents="none" style={styles.leadingIcon}>
           <Search size={18} color={colors.textMuted} strokeWidth={2.25} />
         </View>
-        <TextInput
-          ref={inputRef}
-          style={styles.input}
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          editable={editable}
-          autoCorrect={false}
-          autoCapitalize="none"
-          returnKeyType="search"
-          clearButtonMode="never"
-          accessibilityRole="search"
-          accessibilityLabel={placeholder}
-        />
+        {isTrigger ? (
+          <Pressable
+            style={styles.inputPressable}
+            onPress={onBarPress}
+            accessibilityRole="search"
+            accessibilityLabel={placeholder}
+            accessibilityHint="Opens search"
+          >
+            {input}
+          </Pressable>
+        ) : (
+          input
+        )}
         {showClear ? (
           <Pressable
             style={styles.iconButton}
@@ -123,6 +148,10 @@ const styles = StyleSheet.create({
   },
   leadingIcon: {
     flexShrink: 0,
+  },
+  inputPressable: {
+    flex: 1,
+    minWidth: 0,
   },
   input: {
     ...typography.bodySmall,

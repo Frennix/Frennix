@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
@@ -26,7 +26,6 @@ interface FeedHeaderProps {
   showSuggestions?: boolean;
   showStories?: boolean;
   showQuickActions?: boolean;
-  onSearchFocusScroll?: () => void;
 }
 
 export const FeedHeader = memo(function FeedHeader({
@@ -42,10 +41,7 @@ export const FeedHeader = memo(function FeedHeader({
   showSuggestions = true,
   showStories = true,
   showQuickActions = true,
-  onSearchFocusScroll,
 }: FeedHeaderProps) {
-  const [searchActive, setSearchActive] = useState(false);
-
   const quickActions = useMemo(
     () => [
       { key: "share", emoji: "🏋️", title: "Share", onPress: openCreatePost },
@@ -56,20 +52,15 @@ export const FeedHeader = memo(function FeedHeader({
     []
   );
 
-  const chromeVisible = !searchActive;
-
   return (
     <View style={styles.container}>
       <View style={styles.paddedSection}>
         <SectionErrorBoundary label="feed-search-bar" compact>
-          <FeedSearchSection
-            onActiveChange={setSearchActive}
-            onFocusScroll={onSearchFocusScroll}
-          />
+          <FeedSearchSection />
         </SectionErrorBoundary>
       </View>
 
-      {chromeVisible && showHero ? (
+      {showHero ? (
         <View style={styles.paddedSection}>
           <SectionErrorBoundary label="feed-hero-banner" compact>
             <FeedHeroBanner
@@ -80,7 +71,7 @@ export const FeedHeader = memo(function FeedHeader({
         </View>
       ) : null}
 
-      {chromeVisible && (showStories || showQuickActions) ? (
+      {showStories || showQuickActions ? (
         <View style={styles.storiesShortcutsGroup}>
           {showStories ? (
             <SectionErrorBoundary label="feed-stories-carousel" compact>
@@ -101,7 +92,7 @@ export const FeedHeader = memo(function FeedHeader({
         </View>
       ) : null}
 
-      {chromeVisible && showSuggestions && suggestions.length > 0 ? (
+      {showSuggestions && suggestions.length > 0 ? (
         <View style={styles.paddedSection}>
           <SectionErrorBoundary label="feed-suggestions-carousel" compact>
             <PeopleYouMayKnowCarousel

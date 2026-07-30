@@ -48,6 +48,7 @@ import { FeedBackground } from "@/components/FeedBackground";
 import { UndoSnackbar } from "@/components/UndoSnackbar";
 import { FeedEmptyMotivation } from "@/components/FeedEmptyMotivation";
 import { FeedHeader } from "@/components/FeedHeader";
+import { FeedSearchOverlay } from "@/components/FeedSearchOverlay";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
@@ -100,7 +101,12 @@ import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
-import { resetFeedHorizontalScroll, resetFeedSearch } from "@/lib/feed-search-controller";
+import {
+  consumeFeedScrollY,
+  rememberFeedScrollY,
+  resetFeedHorizontalScroll,
+  resetFeedSearch,
+} from "@/lib/feed-search-controller";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -398,6 +404,7 @@ export default function HomeScreen() {
 
   const listRef = useRef<FlatList<FeedListRow>>(null);
   const webScrollRef = useRef<ScrollView>(null);
+  const feedScrollYRef = useRef(0);
   const useWebScroll = Platform.OS === "web";
   const webContainerStyle = webTabSceneContainerStyle();
   const listLayoutHeightRef = useRef(0);
@@ -519,6 +526,7 @@ export default function HomeScreen() {
     (event: Parameters<typeof handleFeedScroll>[0]) => {
       handleFeedScroll(event);
       const { contentOffset } = event.nativeEvent;
+      feedScrollYRef.current = contentOffset.y;
       if (contentOffset.y > 120) {
         setDeferFeedSecondary(true);
       }
@@ -556,6 +564,22 @@ export default function HomeScreen() {
     resetFeedHorizontalScroll();
     if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
     else scrollFlatListToTop(listRef.current);
+  }, [useWebScroll]);
+
+  const saveFeedScrollPosition = useCallback(() => {
+    rememberFeedScrollY(feedScrollYRef.current);
+  }, []);
+
+  const restoreFeedScrollPosition = useCallback(() => {
+    const y = consumeFeedScrollY();
+    if (y <= 0) return;
+    requestAnimationFrame(() => {
+      if (useWebScroll) {
+        webScrollRef.current?.scrollTo({ y, animated: false });
+      } else {
+        listRef.current?.scrollToOffset?.({ offset: y, animated: false });
+      }
+    });
   }, [useWebScroll]);
 
   const scrollFeedToTop = useCallback(() => {
@@ -777,7 +801,6 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <SectionErrorBoundary label="feed-stories-header" compact>
         <FeedHeader
-          onSearchFocusScroll={scrollFeedListToTop}
           showStories={storiesDeferred && !isolateStories}
           stories={stories}
           suggestions={suggestions}
@@ -806,7 +829,6 @@ export default function HomeScreen() {
       followMutation.variables?.targetUserId,
       toggleFollow,
       dismissSuggestionRequest,
-      scrollFeedListToTop,
     ]
   );
 
@@ -1199,6 +1221,10 @@ export default function HomeScreen() {
         message="Suggestion removed"
         onUndo={undoDismiss}
       />
+      <FeedSearchOverlay
+        onOpen={saveFeedScrollPosition}
+        onClose={restoreFeedScrollPosition}
+      />
       </FeedBackground>
     </FeedRenderTraceProbe>
     </TabScreenBoundary>
@@ -1207,7 +1233,15 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.backgroundFeed },
+  container: {
+    ...flexFill,
+    ...webTabSceneShell,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    alignSelf: "stretch",
+    backgroundColor: colors.backgroundFeed,
+  },
   feedScrollShell: {
     ...flexFill,
     width: "100%",

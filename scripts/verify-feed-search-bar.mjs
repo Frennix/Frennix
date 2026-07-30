@@ -18,6 +18,7 @@ function main() {
   const results = [];
   const bar = read("packages/ui/src/FeedSearchBar.tsx");
   const section = read("components/FeedSearchSection.tsx");
+  const overlay = read("components/FeedSearchOverlay.tsx");
   const header = read("components/FeedHeader.tsx");
   const nav = read("lib/discover-navigation.ts");
   const api = read("packages/api/src/feed-search.ts");
@@ -29,8 +30,8 @@ function main() {
   record(results, "FeedSearchBar exported", barrel.includes('export * from "./FeedSearchBar"'));
   record(
     results,
-    "Feed search uses TextInput",
-    bar.includes("TextInput") && !bar.includes("onPress={() =>")
+    "Feed search bar supports trigger mode",
+    bar.includes("onBarPress") && bar.includes("showSoftInputOnFocus={!isTrigger}")
   );
   record(
     results,
@@ -39,23 +40,23 @@ function main() {
   );
   record(results, "Feed search compact height", /BAR_HEIGHT = 48/.test(bar));
   record(results, "Feed search has filter icon", bar.includes("SlidersHorizontal"));
-  record(results, "Feed search has clear button", bar.includes('accessibilityLabel="Clear search"'));
-  record(results, "Feed search section exists", section.includes("FeedSearchSection"));
+  record(results, "Feed search section is trigger-only", section.includes("onBarPress={openFeedSearch}") && !section.includes("DiscoverRecentSearches"));
+  record(results, "Feed search overlay exists", overlay.includes("FeedSearchOverlay"));
   record(results, "Feed search reuses searchProfiles", api.includes("searchProfiles("));
   record(
     results,
     "Feed search groups athletes/workouts/events",
-    section.includes(">Athletes<") && section.includes(">Workouts<") && section.includes(">Events<")
+    overlay.includes(">Athletes<") && overlay.includes(">Workouts<") && overlay.includes(">Events<")
   );
-  record(results, "Feed search has cancel", section.includes("Cancel search"));
-  record(results, "Feed search shows recent searches", section.includes("DiscoverRecentSearches"));
-  record(results, "Feed search shows empty state", section.includes("No results found"));
+  record(results, "Feed search has cancel", overlay.includes("Cancel search"));
+  record(results, "Feed search shows recent searches", overlay.includes("DiscoverRecentSearches"));
+  record(results, "Feed search shows empty state", overlay.includes("No results found"));
   record(
     results,
     "FeedHeader places search before hero",
     header.indexOf("<FeedSearchSection") < header.indexOf("<FeedHeroBanner")
   );
-  record(results, "FeedHeader hides chrome while searching", header.includes("searchActive"));
+  record(results, "FeedHeader always shows chrome", !header.includes("searchActive"));
   record(
     results,
     "Filter icon opens Discover filters only",
@@ -64,10 +65,12 @@ function main() {
   );
   record(results, "Navigation reuses Discover tab for filters", nav.includes('/(tabs)/discover') && nav.includes("openFilters"));
   record(results, "Feed search reset controller exists", controller.includes("resetFeedSearch"));
-  record(results, "Feed search resets on blur/focus", section.includes("useFocusEffect") && section.includes("resetSearch"));
+  record(results, "Feed search resets on blur/focus", overlay.includes("useFocusEffect") && overlay.includes("resetSearch"));
   record(results, "Feed search resets horizontal scroll", controller.includes("resetFeedHorizontalScroll"));
-  record(results, "Feed screen scroll-to-top skips search reset", index.includes("scrollFeedListToTop") && index.includes("onSearchFocusScroll={scrollFeedListToTop}"));
-  record(results, "Search focus only sets active state", section.includes("handleSearchFocus") && section.includes("setActive(true)"));
+  record(results, "Feed search overlay mounted on feed screen", index.includes("<FeedSearchOverlay"));
+  record(results, "Feed search restores scroll on close", index.includes("restoreFeedScrollPosition") && controller.includes("consumeFeedScrollY"));
+  record(results, "Feed search overlay uses fixed web positioning", overlay.includes('position: "fixed"') && webStyles.includes("#feed-search-overlay"));
+  record(results, "Feed search overlay header fits one row", overlay.includes("searchHeader") && overlay.includes("flexShrink: 0"));
   record(results, "Feed shortcuts use equal flex columns", read("packages/ui/src/FeedQuickActionCards.tsx").includes("flex: 1"));
   record(results, "Post actions use flexible equal items", read("packages/ui/src/feed-layout/FeedPostActionBar.tsx").includes("flex: 1") && !read("packages/ui/src/feed-layout/FeedPostActionBar.tsx").includes("onMore"));
   record(results, "Post cards avoid width 100% margin overflow", !/root:[\s\S]*width:\s*"100%"[\s\S]*marginHorizontal/.test(read("packages/ui/src/feed-layout/tokens.ts")));
