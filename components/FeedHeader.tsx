@@ -91,9 +91,7 @@ export const FeedHeader = memo(function FeedHeader({
 
           {showQuickActions ? (
             <SectionErrorBoundary label="feed-quick-actions" compact>
-              <View nativeID="feed-shortcut-row">
-                <FeedQuickActionCards actions={quickActions} />
-              </View>
+              <FeedQuickActionCards actions={quickActions} />
             </SectionErrorBoundary>
           ) : null}
         </View>

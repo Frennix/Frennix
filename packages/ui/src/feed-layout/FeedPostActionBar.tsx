@@ -45,6 +45,7 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={[styles.label, liked && styles.labelActive]}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            numberOfLines={1}
           >
             {liked ? "❤️" : "🤍"} Like
           </Text>
@@ -66,6 +67,7 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={[styles.label, strongWorkActive && styles.labelActive]}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            numberOfLines={1}
           >
             {STRONG_WORK_EMOJI} Respect
           </Text>
@@ -78,6 +80,7 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={styles.label}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            numberOfLines={1}
           >
             💬 Comment
           </Text>
@@ -90,6 +93,7 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={styles.label}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            numberOfLines={1}
           >
             📤 Share
           </Text>
@@ -106,6 +110,7 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={styles.moreLabel}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+            numberOfLines={1}
           >
             ⋯ More
           </Text>
@@ -147,8 +152,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: feedLayout.actions.gap,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    flexWrap: "nowrap",
+    gap: spacing.xxs,
     minHeight: feedLayout.actions.rowHeight,
     borderTopWidth: 1,
     borderTopColor: colors.borderSubtle,
@@ -156,25 +164,29 @@ const styles = StyleSheet.create({
     paddingTop: feedLayout.actions.paddingTop,
   },
   button: {
-    minWidth: touchTarget,
+    flex: 1,
+    minWidth: 0,
     minHeight: touchTarget,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   label: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     color: colors.textSecondary,
     fontWeight: "700",
+    textAlign: "center",
   },
   labelActive: {
     color: colors.accent,
   },
   moreLabel: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     color: colors.textMuted,
     fontWeight: "700",
+    textAlign: "center",
   },
 });

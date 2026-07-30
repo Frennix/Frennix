@@ -65,8 +65,11 @@ function main() {
   record(results, "Navigation reuses Discover tab for filters", nav.includes('/(tabs)/discover') && nav.includes("openFilters"));
   record(results, "Feed search reset controller exists", controller.includes("resetFeedSearch"));
   record(results, "Feed search resets on blur/focus", section.includes("useFocusEffect") && section.includes("resetSearch"));
-  record(results, "Feed search resets horizontal scroll", controller.includes("resetFeedScrollLayout"));
-  record(results, "Feed screen resets search on scroll-to-top", index.includes("resetFeedSearch") && index.includes("scrollFeedToTop"));
+  record(results, "Feed search resets horizontal scroll", controller.includes("resetFeedHorizontalScroll"));
+  record(results, "Feed screen scroll-to-top skips search reset", index.includes("scrollFeedListToTop") && index.includes("onSearchFocusScroll={scrollFeedListToTop}"));
+  record(results, "Search focus only sets active state", section.includes("handleSearchFocus") && section.includes("setActive(true)"));
+  record(results, "Feed shortcuts use equal flex columns", read("packages/ui/src/FeedQuickActionCards.tsx").includes("flex: 1"));
+  record(results, "Post actions use flexible equal items", read("packages/ui/src/feed-layout/FeedPostActionBar.tsx").includes("flex: 1"));
   record(results, "Feed avoids keyboard inset drift", !index.includes("automaticallyAdjustKeyboardInsets"));
   record(results, "Web CSS clamps feed/search width", webStyles.includes("#feed-search-section") && webStyles.includes("overflow-x: hidden"));
   record(results, "Feed header uses overflow hidden", header.includes('overflow: "hidden"'));

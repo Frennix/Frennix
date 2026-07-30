@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Search, SlidersHorizontal, X } from "lucide-react-native";
-import { colors, overlays, spacing, touchTarget, typography } from "./theme";
+import { colors, spacing, touchTarget, typography } from "./theme";
 
 interface FeedSearchBarProps {
   value: string;
@@ -42,7 +42,9 @@ export const FeedSearchBar = memo(function FeedSearchBar({
   return (
     <View style={styles.wrap} nativeID="feed-search-bar">
       <View style={styles.bar}>
-        <Search size={18} color={colors.textMuted} strokeWidth={2.25} />
+        <View pointerEvents="none" style={styles.leadingIcon}>
+          <Search size={18} color={colors.textMuted} strokeWidth={2.25} />
+        </View>
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -87,14 +89,6 @@ export const FeedSearchBar = memo(function FeedSearchBar({
   );
 });
 
-const webBarStyle: ViewStyle =
-  Platform.OS === "web"
-    ? ({
-        width: "100%",
-        maxWidth: "100%",
-      } as ViewStyle)
-    : {};
-
 const webInputStyle: ViewStyle =
   Platform.OS === "web"
     ? ({
@@ -113,7 +107,8 @@ const styles = StyleSheet.create({
   bar: {
     minHeight: BAR_HEIGHT,
     borderRadius: BAR_RADIUS,
-    paddingHorizontal: spacing.md,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
@@ -125,7 +120,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCard,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    ...webBarStyle,
+  },
+  leadingIcon: {
+    flexShrink: 0,
   },
   input: {
     ...typography.bodySmall,
@@ -140,7 +137,7 @@ const styles = StyleSheet.create({
   iconButton: {
     width: touchTarget,
     height: touchTarget,
-    marginRight: -spacing.sm,
+    flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
   },

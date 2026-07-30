@@ -249,9 +249,9 @@ async function runStaticChecks() {
   );
   record(
     "Feed shortcut labels avoid truncation",
-    !/numberOfLines/.test(quickActions) &&
-      /whiteSpace:\s*"nowrap"/.test(quickActions) &&
-      /width:\s*"25%"/.test(quickActions)
+    /flex:\s*1/.test(quickActions) &&
+      /minWidth:\s*0/.test(quickActions) &&
+      !/width:\s*"25%"/.test(quickActions)
   );
   record(
     "Feed chrome section gap tightened",

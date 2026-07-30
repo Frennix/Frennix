@@ -19,10 +19,8 @@ export function isFeedSearchStale() {
   return controller?.isStale() ?? false;
 }
 
-/** Clears accidental horizontal drift from iOS Safari keyboard / search overlays. */
-export function resetFeedScrollLayout() {
-  Keyboard.dismiss();
-
+/** Clears accidental horizontal drift without dismissing the keyboard. */
+export function resetFeedHorizontalScroll() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
 
   document.documentElement.scrollLeft = 0;
@@ -44,4 +42,10 @@ export function resetFeedScrollLayout() {
   if (typeof window !== "undefined") {
     window.scrollTo({ left: 0, top: window.scrollY, behavior: "auto" });
   }
+}
+
+/** Full layout reset when leaving search or the feed screen. */
+export function resetFeedScrollLayout() {
+  Keyboard.dismiss();
+  resetFeedHorizontalScroll();
 }

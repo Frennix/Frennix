@@ -27,7 +27,7 @@ import {
 } from "@/lib/discover-search-history";
 import {
   registerFeedSearchController,
-  resetFeedScrollLayout,
+  resetFeedHorizontalScroll,
 } from "@/lib/feed-search-controller";
 import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
@@ -81,7 +81,7 @@ export const FeedSearchSection = memo(function FeedSearchSection({
     setRecentSearches([]);
     Keyboard.dismiss();
     inputRef.current?.blur();
-    resetFeedScrollLayout();
+    resetFeedHorizontalScroll();
   }, []);
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export const FeedSearchSection = memo(function FeedSearchSection({
       if (activeRef.current || queryRef.current.length > 0) {
         resetSearch();
       } else {
-        resetFeedScrollLayout();
+        resetFeedHorizontalScroll();
       }
       return () => {
         resetSearch();
@@ -112,7 +112,7 @@ export const FeedSearchSection = memo(function FeedSearchSection({
 
     const handleViewportChange = () => {
       if (!activeRef.current) {
-        resetFeedScrollLayout();
+        resetFeedHorizontalScroll();
       }
     };
 
@@ -165,12 +165,9 @@ export const FeedSearchSection = memo(function FeedSearchSection({
     resetSearch();
   }, [resetSearch]);
 
-  const openSearch = useCallback(() => {
+  const handleSearchFocus = useCallback(() => {
     setActive(true);
     onFocusScroll?.();
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
   }, [onFocusScroll]);
 
   const handleSelectQuery = useCallback((next: string) => {
@@ -236,7 +233,7 @@ export const FeedSearchSection = memo(function FeedSearchSection({
             value={query}
             onChangeText={setQuery}
             inputRef={inputRef}
-            onFocus={openSearch}
+            onFocus={handleSearchFocus}
             onFilterPress={handleFilterPress}
             onClear={handleClearQuery}
           />

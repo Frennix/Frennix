@@ -258,10 +258,13 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
 
 const styles = StyleSheet.create({
   container: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
     paddingBottom: feedLayout.feedChrome.storiesPaddingBottom,
     gap: spacing.xs,
     flexShrink: 0,
-    overflow: "visible",
     ...(Platform.OS === "web"
       ? ({ minHeight: STORY_SECTION_HEIGHT, flexBasis: "auto" } as ViewStyle)
       : null),
@@ -270,7 +273,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    gap: spacing.sm,
   },
   sectionTitle: {
     ...typography.section,
@@ -284,13 +290,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   webListShell: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     height: STORY_ROW_MIN_HEIGHT,
     minHeight: STORY_ROW_MIN_HEIGHT,
     flexShrink: 0,
-    overflow: "visible",
+    overflow: "hidden",
   },
   listContent: {
-    paddingHorizontal: spacing.md,
     paddingBottom: 0,
     gap: spacing.md,
   },
@@ -381,7 +389,7 @@ const styles = StyleSheet.create({
   streakBadge: {
     position: "absolute",
     bottom: 0,
-    right: -2,
+    right: 0,
     minWidth: 34,
     height: 22,
     borderRadius: radius.full,

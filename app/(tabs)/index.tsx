@@ -100,7 +100,7 @@ import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
-import { resetFeedScrollLayout, resetFeedSearch } from "@/lib/feed-search-controller";
+import { resetFeedHorizontalScroll, resetFeedSearch } from "@/lib/feed-search-controller";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -552,12 +552,16 @@ export default function HomeScreen() {
   const { showLocationBanner, dismissLocationBanner } = useLocationFeedBanner(viewerProfile);
   markFeedHook("location-feed-banner");
 
-  const scrollFeedToTop = useCallback(() => {
-    resetFeedSearch();
-    resetFeedScrollLayout();
+  const scrollFeedListToTop = useCallback(() => {
+    resetFeedHorizontalScroll();
     if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
     else scrollFlatListToTop(listRef.current);
   }, [useWebScroll]);
+
+  const scrollFeedToTop = useCallback(() => {
+    resetFeedSearch();
+    scrollFeedListToTop();
+  }, [scrollFeedListToTop]);
 
   const handleNewPostsBannerPress = useCallback(async () => {
     clearBanner();
@@ -773,7 +777,7 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <SectionErrorBoundary label="feed-stories-header" compact>
         <FeedHeader
-          onSearchFocusScroll={scrollFeedToTop}
+          onSearchFocusScroll={scrollFeedListToTop}
           showStories={storiesDeferred && !isolateStories}
           stories={stories}
           suggestions={suggestions}
@@ -802,7 +806,7 @@ export default function HomeScreen() {
       followMutation.variables?.targetUserId,
       toggleFollow,
       dismissSuggestionRequest,
-      scrollFeedToTop,
+      scrollFeedListToTop,
     ]
   );
 
