@@ -31,6 +31,7 @@ export * from "./workout-story-utils";
 export * from "./push-tokens";
 export * from "./web-push-subscriptions";
 export * from "./feature-flags";
+export * from "./feed-search";
 export * from "./suggestions";
 export * from "./suggestion-dismissals";
 export * from "./achievements";

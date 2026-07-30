@@ -1,53 +1,80 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
+  TextInput,
   View,
+  type TextInputProps,
   type ViewStyle,
 } from "react-native";
-import { Search, SlidersHorizontal } from "lucide-react-native";
+import { Search, SlidersHorizontal, X } from "lucide-react-native";
 import { colors, overlays, spacing, touchTarget, typography } from "./theme";
 
 interface FeedSearchBarProps {
-  onPress: () => void;
+  value: string;
+  onChangeText: (text: string) => void;
+  inputRef?: TextInputProps["ref"];
+  onFocus?: () => void;
+  onBlur?: () => void;
   onFilterPress?: () => void;
+  onClear?: () => void;
   placeholder?: string;
+  editable?: boolean;
 }
 
 const BAR_HEIGHT = 48;
 const BAR_RADIUS = 17;
 
 export const FeedSearchBar = memo(function FeedSearchBar({
-  onPress,
+  value,
+  onChangeText,
+  inputRef,
+  onFocus,
+  onBlur,
   onFilterPress,
+  onClear,
   placeholder = "Search athletes, workouts, events",
+  editable = true,
 }: FeedSearchBarProps) {
-  const [pressed, setPressed] = useState(false);
+  const showClear = value.length > 0 && editable;
 
   return (
     <View style={styles.wrap} nativeID="feed-search-bar">
-      <Pressable
-        style={[styles.bar, pressed && styles.barPressed]}
-        onPress={onPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-        accessibilityRole="search"
-        accessibilityLabel={placeholder}
-        accessibilityHint="Opens Discover search"
-      >
+      <View style={styles.bar}>
         <Search size={18} color={colors.textMuted} strokeWidth={2.25} />
-        <Text style={styles.placeholder} numberOfLines={1}>
-          {placeholder}
-        </Text>
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          editable={editable}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          clearButtonMode="never"
+          accessibilityRole="search"
+          accessibilityLabel={placeholder}
+        />
+        {showClear ? (
+          <Pressable
+            style={styles.iconButton}
+            onPress={onClear}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
+            <X size={16} color={colors.textMuted} strokeWidth={2.25} />
+          </Pressable>
+        ) : null}
         {onFilterPress ? (
           <Pressable
-            style={styles.filterButton}
-            onPress={(event) => {
-              event.stopPropagation?.();
-              onFilterPress();
-            }}
+            style={styles.iconButton}
+            onPress={onFilterPress}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Open Discover filters"
@@ -55,7 +82,7 @@ export const FeedSearchBar = memo(function FeedSearchBar({
             <SlidersHorizontal size={18} color={colors.textMuted} strokeWidth={2.25} />
           </Pressable>
         ) : null}
-      </Pressable>
+      </View>
     </View>
   );
 });
@@ -63,9 +90,15 @@ export const FeedSearchBar = memo(function FeedSearchBar({
 const webBarStyle: ViewStyle =
   Platform.OS === "web"
     ? ({
-        cursor: "pointer",
         width: "100%",
         maxWidth: "100%",
+      } as ViewStyle)
+    : {};
+
+const webInputStyle: ViewStyle =
+  Platform.OS === "web"
+    ? ({
+        outlineStyle: "none",
       } as ViewStyle)
     : {};
 
@@ -85,22 +118,17 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     ...webBarStyle,
   },
-  barPressed: {
-    borderColor: overlays.accentBorder,
-    backgroundColor: colors.surfaceElevated,
-    ...(Platform.OS === "web"
-      ? ({ boxShadow: `0 0 0 1px ${overlays.accentTintStrong}` } as ViewStyle)
-      : null),
-  },
-  placeholder: {
+  input: {
     ...typography.bodySmall,
     flex: 1,
     minWidth: 0,
-    color: colors.textMuted,
+    color: colors.text,
     fontSize: 14,
     lineHeight: 18,
+    paddingVertical: Platform.OS === "web" ? spacing.xs : spacing.sm,
+    ...webInputStyle,
   },
-  filterButton: {
+  iconButton: {
     width: touchTarget,
     height: touchTarget,
     marginRight: -spacing.sm,

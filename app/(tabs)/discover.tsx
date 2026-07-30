@@ -112,11 +112,16 @@ export default function DiscoverScreen() {
   useEffect(() => {
     if (focusSearch !== "1" && openFilters !== "1") return;
     setTab("people");
-    const focusTimer = setTimeout(() => {
-      peopleSearchRef.current?.focus();
-    }, 120);
+    let focusTimer: ReturnType<typeof setTimeout> | undefined;
+    if (focusSearch === "1") {
+      focusTimer = setTimeout(() => {
+        peopleSearchRef.current?.focus();
+      }, 120);
+    }
     router.setParams({ focusSearch: undefined, openFilters: undefined });
-    return () => clearTimeout(focusTimer);
+    return () => {
+      if (focusTimer) clearTimeout(focusTimer);
+    };
   }, [focusSearch, openFilters]);
 
   const isSearchingPeople = debouncedPeopleSearch.length > 0;

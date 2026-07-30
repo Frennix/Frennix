@@ -1,18 +1,16 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
+import { FeedSearchSection } from "@/components/FeedSearchSection";
 import {
   FeedHeroBanner,
   FeedQuickActionCards,
-  FeedSearchBar,
   FeedStoriesRow,
   PeopleYouMayKnowCarousel,
-  colors,
   feedLayout,
   spacing,
 } from "@frennix/ui";
-import { openDiscoverSearch } from "@/lib/discover-navigation";
 import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
 interface FeedHeaderProps {
@@ -28,6 +26,7 @@ interface FeedHeaderProps {
   showSuggestions?: boolean;
   showStories?: boolean;
   showQuickActions?: boolean;
+  onSearchFocusScroll?: () => void;
 }
 
 export const FeedHeader = memo(function FeedHeader({
@@ -43,7 +42,10 @@ export const FeedHeader = memo(function FeedHeader({
   showSuggestions = true,
   showStories = true,
   showQuickActions = true,
+  onSearchFocusScroll,
 }: FeedHeaderProps) {
+  const [searchActive, setSearchActive] = useState(false);
+
   const quickActions = useMemo(
     () => [
       { key: "share", emoji: "🏋️", title: "Share", onPress: openCreatePost },
@@ -54,16 +56,18 @@ export const FeedHeader = memo(function FeedHeader({
     []
   );
 
+  const chromeVisible = !searchActive;
+
   return (
     <View style={styles.container}>
       <SectionErrorBoundary label="feed-search-bar" compact>
-        <FeedSearchBar
-          onPress={() => openDiscoverSearch({ focusSearch: true })}
-          onFilterPress={() => openDiscoverSearch({ focusSearch: true, openFilters: true })}
+        <FeedSearchSection
+          onActiveChange={setSearchActive}
+          onFocusScroll={onSearchFocusScroll}
         />
       </SectionErrorBoundary>
 
-      {showHero ? (
+      {chromeVisible && showHero ? (
         <SectionErrorBoundary label="feed-hero-banner" compact>
           <FeedHeroBanner
             onFindAthletes={() => switchTab("/(tabs)/discover")}
@@ -72,7 +76,7 @@ export const FeedHeader = memo(function FeedHeader({
         </SectionErrorBoundary>
       ) : null}
 
-      {showStories || showQuickActions ? (
+      {chromeVisible && (showStories || showQuickActions) ? (
         <View style={styles.storiesShortcutsGroup}>
           {showStories ? (
             <SectionErrorBoundary label="feed-stories-carousel" compact>
@@ -95,7 +99,7 @@ export const FeedHeader = memo(function FeedHeader({
         </View>
       ) : null}
 
-      {showSuggestions && suggestions.length > 0 ? (
+      {chromeVisible && showSuggestions && suggestions.length > 0 ? (
         <SectionErrorBoundary label="feed-suggestions-carousel" compact>
           <PeopleYouMayKnowCarousel
             suggestions={suggestions}

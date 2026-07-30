@@ -770,7 +770,7 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <SectionErrorBoundary label="feed-stories-header" compact>
         <FeedHeader
-          showTopRow={false}
+          onSearchFocusScroll={scrollFeedToTop}
           showStories={storiesDeferred && !isolateStories}
           stories={stories}
           suggestions={suggestions}
@@ -799,6 +799,7 @@ export default function HomeScreen() {
       followMutation.variables?.targetUserId,
       toggleFollow,
       dismissSuggestionRequest,
+      scrollFeedToTop,
     ]
   );
 
@@ -1026,6 +1027,8 @@ export default function HomeScreen() {
             contentContainerStyle={styles.list}
             scrollEnabled={feedScrollEnabled}
             nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
             initialNumToRender={8}
             maxToRenderPerBatch={8}
             windowSize={21}

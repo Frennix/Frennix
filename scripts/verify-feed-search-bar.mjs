@@ -17,12 +17,18 @@ function record(results, name, ok, detail = "") {
 function main() {
   const results = [];
   const bar = read("packages/ui/src/FeedSearchBar.tsx");
+  const section = read("components/FeedSearchSection.tsx");
   const header = read("components/FeedHeader.tsx");
   const nav = read("lib/discover-navigation.ts");
-  const discover = read("app/(tabs)/discover.tsx");
+  const api = read("packages/api/src/feed-search.ts");
   const barrel = read("packages/ui/src/index.ts");
 
   record(results, "FeedSearchBar exported", barrel.includes('export * from "./FeedSearchBar"'));
+  record(
+    results,
+    "Feed search uses TextInput",
+    bar.includes("TextInput") && !bar.includes("onPress={() =>")
+  );
   record(
     results,
     "Feed search placeholder",
@@ -30,13 +36,30 @@ function main() {
   );
   record(results, "Feed search compact height", /BAR_HEIGHT = 48/.test(bar));
   record(results, "Feed search has filter icon", bar.includes("SlidersHorizontal"));
+  record(results, "Feed search has clear button", bar.includes('accessibilityLabel="Clear search"'));
+  record(results, "Feed search section exists", section.includes("FeedSearchSection"));
+  record(results, "Feed search reuses searchProfiles", api.includes("searchProfiles("));
+  record(
+    results,
+    "Feed search groups athletes/workouts/events",
+    section.includes(">Athletes<") && section.includes(">Workouts<") && section.includes(">Events<")
+  );
+  record(results, "Feed search has cancel", section.includes("Cancel search"));
+  record(results, "Feed search shows recent searches", section.includes("DiscoverRecentSearches"));
+  record(results, "Feed search shows empty state", section.includes("No results found"));
   record(
     results,
     "FeedHeader places search before hero",
-    header.indexOf("<FeedSearchBar") < header.indexOf("<FeedHeroBanner")
+    header.indexOf("<FeedSearchSection") < header.indexOf("<FeedHeroBanner")
   );
-  record(results, "Navigation reuses Discover tab", nav.includes('/(tabs)/discover') && nav.includes("focusSearch"));
-  record(results, "Discover focuses search from feed", discover.includes("peopleSearchRef") && discover.includes("focusSearch"));
+  record(results, "FeedHeader hides chrome while searching", header.includes("searchActive"));
+  record(
+    results,
+    "Filter icon opens Discover filters only",
+    section.includes("openDiscoverSearch({ openFilters: true })") &&
+      !section.includes("openDiscoverSearch({ focusSearch: true })")
+  );
+  record(results, "Navigation reuses Discover tab for filters", nav.includes('/(tabs)/discover') && nav.includes("openFilters"));
 
   const failed = results.filter((r) => !r.ok);
   if (failed.length) process.exit(1);
