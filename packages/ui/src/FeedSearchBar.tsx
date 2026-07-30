@@ -105,6 +105,10 @@ const webInputStyle: ViewStyle =
 const styles = StyleSheet.create({
   wrap: {
     width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    flexShrink: 1,
+    overflow: "hidden",
   },
   bar: {
     minHeight: BAR_HEIGHT,
@@ -113,6 +117,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    flexShrink: 1,
+    overflow: "hidden",
     backgroundColor: colors.surfaceCard,
     borderWidth: 1,
     borderColor: colors.borderSubtle,

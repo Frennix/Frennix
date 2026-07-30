@@ -21,6 +21,9 @@ function main() {
   const header = read("components/FeedHeader.tsx");
   const nav = read("lib/discover-navigation.ts");
   const api = read("packages/api/src/feed-search.ts");
+  const controller = read("lib/feed-search-controller.ts");
+  const webStyles = read("lib/web-document-styles.js");
+  const index = read("app/(tabs)/index.tsx");
   const barrel = read("packages/ui/src/index.ts");
 
   record(results, "FeedSearchBar exported", barrel.includes('export * from "./FeedSearchBar"'));
@@ -60,6 +63,13 @@ function main() {
       !section.includes("openDiscoverSearch({ focusSearch: true })")
   );
   record(results, "Navigation reuses Discover tab for filters", nav.includes('/(tabs)/discover') && nav.includes("openFilters"));
+  record(results, "Feed search reset controller exists", controller.includes("resetFeedSearch"));
+  record(results, "Feed search resets on blur/focus", section.includes("useFocusEffect") && section.includes("resetSearch"));
+  record(results, "Feed search resets horizontal scroll", controller.includes("resetFeedScrollLayout"));
+  record(results, "Feed screen resets search on scroll-to-top", index.includes("resetFeedSearch") && index.includes("scrollFeedToTop"));
+  record(results, "Feed avoids keyboard inset drift", !index.includes("automaticallyAdjustKeyboardInsets"));
+  record(results, "Web CSS clamps feed/search width", webStyles.includes("#feed-search-section") && webStyles.includes("overflow-x: hidden"));
+  record(results, "Feed header uses overflow hidden", header.includes('overflow: "hidden"'));
 
   const failed = results.filter((r) => !r.ok);
   if (failed.length) process.exit(1);

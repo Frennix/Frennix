@@ -100,6 +100,7 @@ import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
+import { resetFeedScrollLayout, resetFeedSearch } from "@/lib/feed-search-controller";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -552,6 +553,8 @@ export default function HomeScreen() {
   markFeedHook("location-feed-banner");
 
   const scrollFeedToTop = useCallback(() => {
+    resetFeedSearch();
+    resetFeedScrollLayout();
     if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
     else scrollFlatListToTop(listRef.current);
   }, [useWebScroll]);
@@ -1028,7 +1031,6 @@ export default function HomeScreen() {
             scrollEnabled={feedScrollEnabled}
             nestedScrollEnabled
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
             initialNumToRender={8}
             maxToRenderPerBatch={8}
             windowSize={21}
@@ -1202,10 +1204,20 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { ...flexFill, ...webTabSceneShell, backgroundColor: colors.backgroundFeed },
-  feedScrollShell: { ...flexFill, backgroundColor: "transparent" },
+  feedScrollShell: {
+    ...flexFill,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+    backgroundColor: "transparent",
+  },
   feedList: { ...flexFill, ...webScrollSurface },
   list: {
     flexGrow: 1,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     paddingBottom: spacing.xxl + spacing.lg + spacing.sm,
     paddingTop: spacing.xs,
   },

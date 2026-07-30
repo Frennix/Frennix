@@ -34,8 +34,10 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: "flex-start",
     gap: 2,
+    width: "100%",
     maxWidth: "100%",
-    overflow: "visible",
+    minWidth: 0,
+    overflow: "hidden",
     paddingBottom: 2,
   },
   greeting: {

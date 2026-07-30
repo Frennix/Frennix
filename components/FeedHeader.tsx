@@ -119,6 +119,11 @@ export const FeedHeader = memo(function FeedHeader({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "transparent",
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    flexShrink: 1,
+    overflow: "hidden",
     paddingHorizontal: spacing.md,
     paddingTop: feedLayout.feedChrome.paddingTop,
     paddingBottom: feedLayout.feedChrome.paddingBottom,
@@ -126,5 +131,9 @@ const styles = StyleSheet.create({
   },
   storiesShortcutsGroup: {
     gap: spacing.xxs,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
 });

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +25,10 @@ import {
   removeDiscoverSearchHistoryItem,
   type DiscoverRecentSearch,
 } from "@/lib/discover-search-history";
+import {
+  registerFeedSearchController,
+  resetFeedScrollLayout,
+} from "@/lib/feed-search-controller";
 import { formatActivity } from "@/lib/labels";
 import { pushScreen } from "@/lib/press-utils";
 import { useAuth } from "@/providers/AuthProvider";
@@ -53,16 +58,71 @@ export const FeedSearchSection = memo(function FeedSearchSection({
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
   const inputRef = useRef<TextInput>(null);
+  const activeRef = useRef(false);
+  const queryRef = useRef("");
   const { height: windowHeight } = useWindowDimensions();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [active, setActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<DiscoverRecentSearch[]>([]);
 
+  activeRef.current = active;
+  queryRef.current = query;
+
   const panelMaxHeight = useMemo(
     () => Math.min(360, Math.max(220, windowHeight * 0.42)),
     [windowHeight]
   );
+
+  const resetSearch = useCallback(() => {
+    setActive(false);
+    setQuery("");
+    setDebouncedQuery("");
+    setRecentSearches([]);
+    Keyboard.dismiss();
+    inputRef.current?.blur();
+    resetFeedScrollLayout();
+  }, []);
+
+  useEffect(() => {
+    registerFeedSearchController({
+      reset: resetSearch,
+      isStale: () => activeRef.current || queryRef.current.length > 0,
+    });
+    return () => registerFeedSearchController(null);
+  }, [resetSearch]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (activeRef.current || queryRef.current.length > 0) {
+        resetSearch();
+      } else {
+        resetFeedScrollLayout();
+      }
+      return () => {
+        resetSearch();
+      };
+    }, [resetSearch])
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const handleViewportChange = () => {
+      if (!activeRef.current) {
+        resetFeedScrollLayout();
+      }
+    };
+
+    viewport.addEventListener("resize", handleViewportChange);
+    viewport.addEventListener("scroll", handleViewportChange);
+    return () => {
+      viewport.removeEventListener("resize", handleViewportChange);
+      viewport.removeEventListener("scroll", handleViewportChange);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250);
@@ -102,12 +162,8 @@ export const FeedSearchSection = memo(function FeedSearchSection({
   const showResults = showPanel && hasQuery && (isFetching || hasResults || isError);
 
   const closeSearch = useCallback(() => {
-    setActive(false);
-    setQuery("");
-    setDebouncedQuery("");
-    Keyboard.dismiss();
-    inputRef.current?.blur();
-  }, []);
+    resetSearch();
+  }, [resetSearch]);
 
   const openSearch = useCallback(() => {
     setActive(true);
@@ -135,47 +191,59 @@ export const FeedSearchSection = memo(function FeedSearchSection({
   const handleAthletePress = useCallback(
     (profile: Profile) => {
       void persistSearch(query);
-      closeSearch();
+      resetSearch();
       if (profile.username) {
         pushScreen(`/user/${profile.username}`);
       }
     },
-    [closeSearch, persistSearch, query]
+    [persistSearch, query, resetSearch]
   );
 
   const handleWorkoutPress = useCallback(
     (workout: FeedSearchWorkoutResult) => {
       void persistSearch(query);
-      closeSearch();
+      resetSearch();
       pushScreen({ pathname: "/stories/discover", params: { tag: workout.slug } });
     },
-    [closeSearch, persistSearch, query]
+    [persistSearch, query, resetSearch]
   );
 
   const handleEventPress = useCallback(
     (event: WorkoutEvent) => {
       void persistSearch(query);
-      closeSearch();
+      resetSearch();
       pushScreen(`/event/${event.id}`);
     },
-    [closeSearch, persistSearch, query]
+    [persistSearch, query, resetSearch]
   );
+
+  const handleFilterPress = useCallback(() => {
+    resetSearch();
+    openDiscoverSearch({ openFilters: true });
+  }, [resetSearch]);
+
+  const handleClearQuery = useCallback(() => {
+    setQuery("");
+    setDebouncedQuery("");
+    inputRef.current?.focus();
+  }, []);
 
   return (
     <View style={styles.root} nativeID="feed-search-section">
       <View style={styles.barRow}>
-        <View style={styles.barFlex}>
+        <View style={[styles.barFlex, active && styles.barFlexActive]}>
           <FeedSearchBar
             value={query}
             onChangeText={setQuery}
             inputRef={inputRef}
             onFocus={openSearch}
-            onFilterPress={() => openDiscoverSearch({ openFilters: true })}
-            onClear={() => setQuery("")}
+            onFilterPress={handleFilterPress}
+            onClear={handleClearQuery}
           />
         </View>
         {active ? (
           <Pressable
+            style={styles.cancelButton}
             onPress={closeSearch}
             hitSlop={8}
             accessibilityRole="button"
@@ -187,11 +255,15 @@ export const FeedSearchSection = memo(function FeedSearchSection({
       </View>
 
       {showPanel ? (
-        <View style={[styles.panel, { maxHeight: panelMaxHeight }]}>
+        <View
+          style={[styles.panel, { maxHeight: panelMaxHeight }]}
+          nativeID="feed-search-results-panel"
+        >
           {showRecent ? (
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
               contentContainerStyle={styles.panelContent}
             >
               <DiscoverRecentSearches
@@ -238,11 +310,7 @@ export const FeedSearchSection = memo(function FeedSearchSection({
                       style={styles.resultRow}
                       onPress={() => handleAthletePress(profile)}
                     >
-                      <Avatar
-                        uri={profile.avatar_url}
-                        name={profile.display_name}
-                        size={40}
-                      />
+                      <Avatar uri={profile.avatar_url} name={profile.display_name} size={40} />
                       <View style={styles.resultText}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
                           {profile.display_name}
@@ -327,16 +395,29 @@ const styles = StyleSheet.create({
   root: {
     width: "100%",
     maxWidth: "100%",
+    minWidth: 0,
+    flexShrink: 1,
+    overflow: "hidden",
   },
   barRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
     width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   barFlex: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
+  },
+  barFlexActive: {
+    flexShrink: 1,
+  },
+  cancelButton: {
+    flexShrink: 0,
+    marginLeft: spacing.sm,
   },
   cancel: {
     ...typography.bodySmall,
@@ -353,8 +434,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: "100%",
     maxWidth: "100%",
+    minWidth: 0,
+    flexShrink: 1,
     ...(Platform.OS === "web"
-      ? ({ boxShadow: "0 8px 24px rgba(0,0,0,0.18)" } as object)
+      ? ({ boxShadow: "0 8px 24px rgba(0,0,0,0.18)", boxSizing: "border-box" } as object)
       : null),
   },
   panelContent: {
@@ -364,6 +447,7 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.xxs,
+    minWidth: 0,
   },
   sectionTitle: {
     ...typography.caption,
@@ -381,11 +465,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: 12,
     backgroundColor: colors.surface,
+    width: "100%",
     maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   resultText: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
     gap: 2,
   },
   resultTitle: {
@@ -404,6 +492,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceElevated,
+    flexShrink: 0,
   },
   workoutBadgeText: {
     fontSize: 18,
