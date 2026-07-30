@@ -72,6 +72,12 @@ function main() {
     read("lib/web-viewport-normalize.ts").includes("normalizeWebViewport") &&
       read("components/FeedSearchOverlay.tsx").includes("clearWebBodyScrollLock")
   );
+  record(
+    results,
+    "Feed search dismisses keyboard before unmount",
+    overlay.includes("waitForSafariKeyboardDismiss") &&
+      /Keyboard\.dismiss\(\)[\s\S]*waitForSafariKeyboardDismiss[\s\S]*setOpen\(false\)/.test(overlay)
+  );
   record(results, "Navigation normalizes viewport on push", read("lib/press-utils.ts").includes("scheduleWebViewportNormalize"));
   record(results, "Feed search overlay mounted on feed screen", index.includes("<FeedSearchOverlay"));
   record(results, "Feed search restores scroll on close", index.includes("restoreFeedScrollPosition") && controller.includes("consumeFeedScrollY"));

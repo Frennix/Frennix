@@ -32,6 +32,7 @@ import {
   registerFeedSearchController,
   resetFeedHorizontalScroll,
 } from "@/lib/feed-search-controller";
+import { waitForSafariKeyboardDismiss } from "@/lib/safari-visual-viewport";
 import {
   clearWebBodyScrollLock,
   scheduleWebViewportNormalize,
@@ -76,16 +77,21 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
   openRef.current = open;
   queryRef.current = query;
 
-  const closeSearch = useCallback(() => {
-    setOpen(false);
-    setQuery("");
-    setDebouncedQuery("");
+  const closeSearch = useCallback((afterClose?: () => void) => {
     Keyboard.dismiss();
     inputRef.current?.blur();
     clearWebBodyScrollLock();
-    resetFeedHorizontalScroll();
-    scheduleWebViewportNormalize();
-    onClose?.();
+
+    void waitForSafariKeyboardDismiss().then(() => {
+      clearWebBodyScrollLock();
+      setOpen(false);
+      setQuery("");
+      setDebouncedQuery("");
+      resetFeedHorizontalScroll();
+      scheduleWebViewportNormalize();
+      onClose?.();
+      afterClose?.();
+    });
   }, [onClose]);
 
   const openSearch = useCallback(() => {
@@ -179,10 +185,11 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
   const handleAthletePress = useCallback(
     (profile: Profile) => {
       void persistSearch(query);
-      closeSearch();
-      if (profile.username) {
-        pushScreen(`/user/${profile.username}`);
-      }
+      closeSearch(() => {
+        if (profile.username) {
+          pushScreen(`/user/${profile.username}`);
+        }
+      });
     },
     [closeSearch, persistSearch, query]
   );
@@ -190,8 +197,9 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
   const handleWorkoutPress = useCallback(
     (workout: FeedSearchWorkoutResult) => {
       void persistSearch(query);
-      closeSearch();
-      pushScreen({ pathname: "/stories/discover", params: { tag: workout.slug } });
+      closeSearch(() => {
+        pushScreen({ pathname: "/stories/discover", params: { tag: workout.slug } });
+      });
     },
     [closeSearch, persistSearch, query]
   );
@@ -199,8 +207,9 @@ export const FeedSearchOverlay = memo(function FeedSearchOverlay({
   const handleEventPress = useCallback(
     (event: WorkoutEvent) => {
       void persistSearch(query);
-      closeSearch();
-      pushScreen(`/event/${event.id}`);
+      closeSearch(() => {
+        pushScreen(`/event/${event.id}`);
+      });
     },
     [closeSearch, persistSearch, query]
   );

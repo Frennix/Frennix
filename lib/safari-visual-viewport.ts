@@ -117,3 +117,42 @@ export function subscribeSafariVisualViewport(listener: ViewportListener): () =>
 export function requestSafariVisualViewportRemeasure(): void {
   notifyViewportListeners();
 }
+
+const KEYBOARD_DISMISS_TIMEOUT_MS = 180;
+
+/**
+ * Wait until Safari releases keyboard / visual-viewport shrink after input blur.
+ * Must run before unmounting a focused search input — otherwise body scroll-lock persists.
+ */
+export function waitForSafariKeyboardDismiss(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+
+  const vv = window.visualViewport;
+  if (!vv) {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  }
+
+  const baselineHeight = vv.height;
+  const baselineOffsetTop = vv.offsetTop;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      vv.removeEventListener("resize", onViewportChange);
+      resolve();
+    };
+
+    const onViewportChange = () => {
+      const keyboardLikelyClosed =
+        vv.height >= baselineHeight - 4 && Math.abs(vv.offsetTop - baselineOffsetTop) < 2;
+      if (keyboardLikelyClosed) finish();
+    };
+
+    vv.addEventListener("resize", onViewportChange);
+    setTimeout(finish, KEYBOARD_DISMISS_TIMEOUT_MS);
+  });
+}
