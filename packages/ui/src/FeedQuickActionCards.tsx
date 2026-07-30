@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Platform, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { ScalePressable } from "./ScalePressable";
-import { applyShadow, colors, overlays, spacing } from "./theme";
+import { colors, overlays, spacing, typography } from "./theme";
 
 export type FeedQuickAction = {
   key: string;
@@ -15,132 +15,82 @@ interface FeedQuickActionCardsProps {
   style?: ViewStyle;
 }
 
-const CARD_GAP = 12;
-const CARD_RADIUS = 17;
-const CARD_MIN_HEIGHT = 92;
-const CARD_PADDING = 16;
-
-function pairActions(actions: FeedQuickAction[]): FeedQuickAction[][] {
-  const rows: FeedQuickAction[][] = [];
-  for (let i = 0; i < actions.length; i += 2) {
-    rows.push(actions.slice(i, i + 2));
-  }
-  return rows;
-}
+const ICON_SIZE = 60;
 
 export const FeedQuickActionCards = memo(function FeedQuickActionCards({
   actions,
   style,
 }: FeedQuickActionCardsProps) {
-  const rows = pairActions(actions);
-
   return (
-    <View style={[styles.grid, style]} nativeID="feed-quick-actions-grid">
-      {rows.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={styles.row}>
-          {row.map((action) => (
-            <View key={action.key} style={styles.cardWrap}>
-              <ScalePressable
-                onPress={action.onPress}
-                pressedScale={0.97}
-                containerStyle={styles.cardPressable}
-                accessibilityRole="button"
-                accessibilityLabel={action.title}
-              >
-                <View style={styles.card}>
-                  <View style={styles.iconBubble}>
-                    <Text style={styles.emoji}>{action.emoji}</Text>
-                  </View>
-                  <Text style={styles.title}>{action.title}</Text>
-                </View>
-              </ScalePressable>
+    <View style={[styles.row, style]} nativeID="feed-shortcut-row">
+      {actions.map((action) => (
+        <ScalePressable
+          key={action.key}
+          onPress={action.onPress}
+          pressedScale={0.96}
+          containerStyle={styles.itemWrap}
+          accessibilityRole="button"
+          accessibilityLabel={action.title}
+        >
+          <View style={styles.item}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.emoji}>{action.emoji}</Text>
             </View>
-          ))}
-        </View>
+            <Text style={styles.label} numberOfLines={1}>
+              {action.title}
+            </Text>
+          </View>
+        </ScalePressable>
       ))}
     </View>
   );
 });
 
-const webTitleStyle: ViewStyle =
-  Platform.OS === "web"
-    ? ({
-        whiteSpace: "normal",
-        wordBreak: "normal",
-        overflowWrap: "normal",
-      } as ViewStyle)
-    : {};
-
-const webGridStyle: ViewStyle =
-  Platform.OS === "web"
-    ? ({
-        display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-        gap: CARD_GAP,
-        width: "100%",
-      } as ViewStyle)
-    : {};
-
 const styles = StyleSheet.create({
-  grid: {
-    width: "100%",
-    gap: CARD_GAP,
-    ...webGridStyle,
-  },
   row: {
     flexDirection: "row",
-    gap: CARD_GAP,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     width: "100%",
-    ...(Platform.OS === "web" ? ({ display: "contents" } as ViewStyle) : null),
+    gap: spacing.xs,
+    paddingVertical: spacing.xxs,
   },
-  cardWrap: {
+  itemWrap: {
     flex: 1,
     minWidth: 0,
-    ...(Platform.OS === "web" ? ({ minWidth: 0 } as ViewStyle) : null),
+    maxWidth: "25%",
   },
-  cardPressable: {
-    width: "100%",
-  },
-  card: {
-    minHeight: CARD_MIN_HEIGHT,
-    borderRadius: CARD_RADIUS,
-    padding: CARD_PADDING,
-    flexDirection: "row",
+  item: {
     alignItems: "center",
-    gap: CARD_GAP,
-    backgroundColor: colors.surfaceCard,
+    gap: spacing.xxs,
+  },
+  iconCircle: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: ICON_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: overlays.glassMedium,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    ...applyShadow("md"),
+    borderColor: overlays.glassBorder,
     ...(Platform.OS === "web"
       ? ({
-          backgroundImage:
-            "linear-gradient(145deg, rgba(34,197,94,0.08) 0%, rgba(22,22,24,0.95) 42%, rgba(11,11,13,1) 100%)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
         } as ViewStyle)
       : null),
   },
-  iconBubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    backgroundColor: overlays.accentTintStrong,
-    borderWidth: 1,
-    borderColor: overlays.accentBorder,
-  },
   emoji: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 24,
+    lineHeight: 28,
   },
-  title: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 15,
+  label: {
+    ...typography.caption,
+    color: colors.textMuted,
     fontWeight: "600",
-    lineHeight: 19,
-    color: colors.text,
-    ...webTitleStyle,
+    fontSize: 12,
+    lineHeight: 14,
+    textAlign: "center",
+    width: "100%",
   },
 });

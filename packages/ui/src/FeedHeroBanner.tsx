@@ -20,7 +20,6 @@ export const FeedHeroBanner = memo(function FeedHeroBanner({
         <View style={styles.glowTopRight} />
         <View style={styles.glowCenter} />
         <View style={styles.vignette} />
-        {Platform.OS === "web" ? <View style={styles.texture} /> : null}
       </View>
 
       <View style={styles.content}>
@@ -62,16 +61,16 @@ export const FeedHeroBanner = memo(function FeedHeroBanner({
 
 const styles = StyleSheet.create({
   shell: {
-    minHeight: 168,
-    maxHeight: 188,
-    borderRadius: radius.xl,
+    minHeight: 134,
+    maxHeight: 150,
+    borderRadius: radius.lg,
     overflow: "hidden",
-    marginBottom: spacing.sm,
-    ...applyShadow("lg"),
+    marginBottom: spacing.xxs,
+    ...applyShadow("md"),
     ...(Platform.OS === "web"
       ? ({
           backgroundImage:
-            "linear-gradient(135deg, #0f1a12 0%, #0b0b0d 38%, #12110f 72%, #0b0b0d 100%)",
+            "linear-gradient(135deg, #101510 0%, #0b0b0d 52%, #0f0f11 100%)",
         } as ViewStyle)
       : { backgroundColor: colors.backgroundFeed }),
   },
@@ -80,65 +79,60 @@ const styles = StyleSheet.create({
   },
   glowTopRight: {
     position: "absolute",
-    top: -40,
-    right: -20,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    top: -48,
+    right: -24,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: overlays.accentTintStrong,
-    opacity: 0.85,
+    opacity: 0.45,
   },
   glowCenter: {
     position: "absolute",
-    bottom: -60,
-    left: "20%",
-    width: 220,
-    height: 120,
-    borderRadius: 110,
-    backgroundColor: "rgba(34, 197, 94, 0.06)",
+    bottom: -48,
+    left: "18%",
+    width: 180,
+    height: 96,
+    borderRadius: 90,
+    backgroundColor: "rgba(34, 197, 94, 0.04)",
   },
   vignette: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: "rgba(0,0,0,0.28)",
   },
-  texture: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.04,
-    backgroundImage:
-      "repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 1px, transparent 6px)",
-  } as ViewStyle,
   content: {
     flex: 1,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     justifyContent: "flex-end",
-    gap: 2,
+    gap: 1,
   },
   kicker: {
     ...typography.caption,
     color: colors.accent,
     fontWeight: "800",
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
+    fontSize: 11,
   },
   headline: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 19,
+    lineHeight: 24,
     fontWeight: "800",
     color: colors.text,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   subtitle: {
     ...typography.bodySmall,
     color: overlays.whiteSoft,
-    lineHeight: 18,
-    fontSize: 13,
-    marginBottom: spacing.xs,
+    lineHeight: 17,
+    fontSize: 12,
+    marginBottom: spacing.xxs,
   },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    gap: spacing.xs,
+    marginTop: 2,
   },
   primaryWrap: {
     flexGrow: 1,
@@ -149,11 +143,11 @@ const styles = StyleSheet.create({
     flexBasis: "48%",
   },
   primaryButton: {
-    minHeight: 44,
-    borderRadius: radius.xl,
+    minHeight: 40,
+    borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.accent,
     ...applyShadow("accent"),
   },
@@ -161,13 +155,14 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.black,
     fontWeight: "800",
+    fontSize: 14,
   },
   secondaryButton: {
-    minHeight: 44,
-    borderRadius: radius.xl,
+    minHeight: 40,
+    borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     backgroundColor: overlays.glassMedium,
     borderWidth: 1,
     borderColor: overlays.glassBorder,
@@ -176,5 +171,6 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.text,
     fontWeight: "700",
+    fontSize: 14,
   },
 });

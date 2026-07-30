@@ -38,6 +38,14 @@ async function runStaticChecks() {
     path.join(ROOT, "supabase/migrations/20260730000001_suggestion_dismissals.sql"),
     "utf8"
   );
+  const rlsFix = fs.readFileSync(
+    path.join(ROOT, "supabase/migrations/20260730000002_fix_suggestion_dismissals_rls.sql"),
+    "utf8"
+  );
+  const shortcuts = fs.readFileSync(
+    path.join(ROOT, "packages/ui/src/FeedQuickActionCards.tsx"),
+    "utf8"
+  );
   const carousel = fs.readFileSync(
     path.join(ROOT, "packages/ui/src/PeopleYouMayKnowCarousel.tsx"),
     "utf8"
@@ -49,6 +57,11 @@ async function runStaticChecks() {
 
   record(results, "Migration creates suggestion_dismissals table", /CREATE TABLE IF NOT EXISTS public\.suggestion_dismissals/.test(migration));
   record(results, "Migration excludes dismissed users in RPC", /suggestion_dismissals WHERE viewer_id = p_viewer_id/.test(migration));
+  record(results, "RLS fix grants authenticated access", /GRANT SELECT, INSERT, UPDATE, DELETE ON public\.suggestion_dismissals TO authenticated/.test(rlsFix));
+  record(results, "RLS fix uses manage-own policy", /Manage own suggestion dismissals/.test(rlsFix));
+  record(results, "API inserts dismissals (not upsert)", api.includes('.insert(payload)') && !api.includes(".upsert("));
+  record(results, "Dismiss persists immediately", hook.includes("void persistDismiss(athlete, pending)"));
+  record(results, "Compact shortcut row replaces cards", shortcuts.includes('nativeID="feed-shortcut-row"') && shortcuts.includes("ICON_SIZE = 60"));
   record(results, "Carousel shows Not Interested button", carousel.includes('title="Not Interested"'));
   record(results, "Carousel keeps Follow button", carousel.includes('title={isFollowing ? "Following" : "Follow"}'));
   record(results, "API persists dismissals", api.includes("dismissSuggestion") && api.includes("undoDismissSuggestion"));

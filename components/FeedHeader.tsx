@@ -44,9 +44,9 @@ export const FeedHeader = memo(function FeedHeader({
 }: FeedHeaderProps) {
   const quickActions = useMemo(
     () => [
-      { key: "share", emoji: "🏋️", title: "Share Workout", onPress: openCreatePost },
-      { key: "stories", emoji: "📖", title: "Explore Stories", onPress: () => pushScreen("/stories/explore") },
-      { key: "athletes", emoji: "🎯", title: "Find Athletes", onPress: () => switchTab("/(tabs)/discover") },
+      { key: "share", emoji: "🏋️", title: "Share", onPress: openCreatePost },
+      { key: "stories", emoji: "🔍", title: "Explore", onPress: () => pushScreen("/stories/explore") },
+      { key: "athletes", emoji: "🎯", title: "Athletes", onPress: () => switchTab("/(tabs)/discover") },
       { key: "events", emoji: "📅", title: "Events", onPress: () => switchTab("/(tabs)/events") },
     ],
     []
@@ -76,7 +76,7 @@ export const FeedHeader = memo(function FeedHeader({
 
       {showQuickActions ? (
         <SectionErrorBoundary label="feed-quick-actions" compact>
-          <View nativeID="feed-quick-actions-row">
+          <View nativeID="feed-shortcut-row">
             <FeedQuickActionCards actions={quickActions} />
           </View>
         </SectionErrorBoundary>

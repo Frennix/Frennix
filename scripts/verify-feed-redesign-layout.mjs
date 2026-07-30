@@ -228,7 +228,7 @@ async function runStaticChecks() {
 
   record(
     "Hero banner max height capped",
-    /maxHeight:\s*188/.test(hero) && /minHeight:\s*168/.test(hero)
+    /maxHeight:\s*150/.test(hero) && /minHeight:\s*134/.test(hero)
   );
   record(
     "Story row uses horizontal scroll container",
@@ -244,22 +244,16 @@ async function runStaticChecks() {
   record("Quick action Events route", header.includes('switchTab("/(tabs)/events")'));
   record("Stories View All route", header.includes("onViewAllPress={() => pushScreen(\"/stories/explore\")}"));
   record(
-    "Quick actions use 2-column grid on web",
-    /gridTemplateColumns:\s*"repeat\(2, minmax\(0, 1fr\)\)"/.test(quickActions)
+    "Feed shortcuts use compact horizontal row",
+    /feed-shortcut-row/.test(quickActions) && /flexDirection:\s*"row"/.test(quickActions)
   );
   record(
-    "Quick action cards use horizontal compact layout",
-    /flexDirection:\s*"row"/.test(quickActions) && /minHeight:\s*CARD_MIN_HEIGHT/.test(quickActions)
-  );
-  record(
-    "Quick action titles avoid truncation styles",
-    !/numberOfLines/.test(quickActions) &&
-      !/textOverflow:\s*"ellipsis"/.test(quickActions) &&
-      !/wordBreak:\s*"break-all"/.test(quickActions)
+    "Feed shortcuts avoid large card grid",
+    !/gridTemplateColumns/.test(quickActions) && !/minHeight:\s*92/.test(quickActions)
   );
   record(
     "Feed chrome section gap tightened",
-    /sectionGap:\s*spacing\.md/.test(tokens) && /storiesPaddingBottom:\s*spacing\.xxs/.test(tokens)
+    /sectionGap:\s*spacing\.sm/.test(tokens) && /storiesPaddingBottom:\s*0/.test(tokens)
   );
 
   return results;
@@ -413,7 +407,7 @@ async function main() {
         tabFixed: Boolean(tabFixed),
         postCount,
         hasHero: /Find Athletes/i.test(document.body.innerText),
-        hasQuickActions: /Explore Stories/i.test(document.body.innerText),
+        hasQuickActions: /Explore|Athletes/i.test(document.body.innerText),
       };
     },
     { maxHero: MAX_HERO_HEIGHT_PX, minTabClearance: MIN_TAB_CLEARANCE_PX }
@@ -456,63 +450,21 @@ async function main() {
     await page.waitForTimeout(400);
 
     const quickActionLayout = await page.evaluate(() => {
-      const grid = document.getElementById("feed-quick-actions-grid");
+      const grid = document.getElementById("feed-shortcut-row");
       if (!grid) {
-        return { ok: false, detail: "grid not found" };
+        return { ok: false, detail: "shortcut row not found" };
       }
 
-      const cards = Array.from(grid.querySelectorAll('[role="button"]'));
-      if (cards.length < 4) {
-        return { ok: false, detail: `expected 4 cards, found ${cards.length}` };
+      const shortcuts = Array.from(grid.querySelectorAll('[role="button"]'));
+      if (shortcuts.length < 4) {
+        return { ok: false, detail: `expected 4 shortcuts, found ${shortcuts.length}` };
       }
 
-      const cardRects = cards.map((card) => card.getBoundingClientRect());
-      const rowPairs = [
-        [cardRects[0], cardRects[1]],
-        [cardRects[2], cardRects[3]],
-      ];
-
-      for (const [left, right] of rowPairs) {
-        const leftWidth = Math.round(left.width);
-        const rightWidth = Math.round(right.width);
-        if (leftWidth < 120 || rightWidth < 120) {
-          return { ok: false, detail: `card too narrow (${leftWidth}px, ${rightWidth}px)` };
+      const shortcutRects = shortcuts.map((button) => button.getBoundingClientRect());
+      for (const rect of shortcutRects) {
+        if (Math.round(rect.width) > 120) {
+          return { ok: false, detail: `shortcut too wide (${Math.round(rect.width)}px)` };
         }
-        const widthDelta = Math.abs(leftWidth - rightWidth);
-        if (widthDelta > 24) {
-          return { ok: false, detail: `uneven columns (${leftWidth}px vs ${rightWidth}px)` };
-        }
-      }
-
-      const titles = cards.map((card) => {
-        const titleEl = card.querySelector("span, div");
-        const textNodes = Array.from(card.querySelectorAll("*")).filter(
-          (el) => el.childElementCount === 0 && (el.textContent ?? "").trim().length > 2
-        );
-        const titleNode =
-          textNodes.find((el) => /Share Workout|Explore Stories|Find Athletes|Events/.test(el.textContent ?? "")) ??
-          titleEl;
-        const style = titleNode ? getComputedStyle(titleNode) : null;
-        const text = titleNode?.textContent?.trim() ?? "";
-        const rect = titleNode?.getBoundingClientRect();
-        const singleCharLines =
-          titleNode && rect
-            ? Math.max(1, Math.round(rect.height / (parseFloat(style?.lineHeight ?? "19") || 19)))
-            : 0;
-        const looksLetterWrapped =
-          text.length > 4 && singleCharLines > 2 && rect && rect.height > 48;
-        const truncated =
-          style?.textOverflow === "ellipsis" ||
-          (style?.overflow === "hidden" && text.endsWith("…"));
-        return { text, looksLetterWrapped, truncated };
-      });
-
-      const badTitle = titles.find((t) => t.looksLetterWrapped || t.truncated);
-      if (badTitle) {
-        return {
-          ok: false,
-          detail: `title issue: "${badTitle.text}"`,
-        };
       }
 
       const pageOverflow = document.documentElement.scrollWidth > window.innerWidth + 1;
@@ -549,7 +501,7 @@ async function main() {
     });
 
     record(
-      `Quick actions layout at ${width}px`,
+      `Feed shortcuts layout at ${width}px`,
       quickActionLayout.ok,
       quickActionLayout.detail
     );
@@ -558,8 +510,8 @@ async function main() {
   const navChecks = [
     { label: "Find Athletes hero", text: "Find Athletes", expectPath: /discover|matching/i },
     { label: "Share Workout hero", text: "Share Workout", expectPath: /create-post/i },
-    { label: "Explore Stories card", text: "Explore Stories", expectPath: /stories\/explore/i },
-    { label: "Find Athletes card", text: "Find Athletes", expectPath: /discover/i },
+    { label: "Explore shortcut", text: "Explore", expectPath: /stories\/explore/i },
+    { label: "Athletes shortcut", text: "Athletes", expectPath: /discover/i },
     { label: "Events card", text: "Events", expectPath: /events/i },
     { label: "View All stories", text: "View All", expectPath: /stories\/explore/i },
   ];

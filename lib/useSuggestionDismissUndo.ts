@@ -1,7 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Profile, SuggestedAthlete } from "@frennix/types";
-import { dismissSuggestion, getErrorMessage, getSuggestedAthletes } from "@frennix/api";
+import {
+  dismissSuggestion,
+  getSuggestedAthletes,
+  getSuggestionDismissErrorMessage,
+  undoDismissSuggestion,
+} from "@frennix/api";
 import { showAlert } from "@/lib/alerts";
 
 export const SUGGESTION_DISMISS_UNDO_MS = 7000;
@@ -27,6 +32,16 @@ export function useSuggestionDismissUndo(userId: string, viewerProfile: Profile 
       undoTimerRef.current = null;
     }
   }, []);
+
+  const patchDismissedIds = useCallback(
+    (updater: (current: string[]) => string[]) => {
+      queryClient.setQueryData<string[]>(["dismissed-suggestion-ids", userId], (current) => {
+        const next = updater(current ?? []);
+        return [...new Set(next)];
+      });
+    },
+    [queryClient, userId]
+  );
 
   const patchSuggestions = useCallback(
     (updater: (current: SuggestedAthlete[]) => SuggestedAthlete[]) => {
@@ -64,30 +79,35 @@ export function useSuggestionDismissUndo(userId: string, viewerProfile: Profile 
       const replacement = fresh.find((item) => !existing.has(item.profile.id));
       if (!replacement) return;
       patchSuggestions((list) => [...list, replacement]);
-    } catch {
-      // Backfill is best-effort; dismissal UX should still succeed.
+    } catch (error) {
+      console.warn("[suggestion-dismiss] backfill failed", error);
     }
   }, [patchSuggestions, queryClient, userId, viewerProfile]);
 
-  const commitDismiss = useCallback(
-    async (dismissedId: string, restore?: PendingDismiss) => {
+  const persistDismiss = useCallback(
+    async (athlete: SuggestedAthlete, restore?: PendingDismiss) => {
+      const dismissedId = athlete.profile.id;
       try {
         await dismissSuggestion(userId, dismissedId);
+        patchDismissedIds((ids) => [...ids, dismissedId]);
         void queryClient.invalidateQueries({ queryKey: ["dismissed-suggestion-ids", userId] });
         void queryClient.invalidateQueries({ queryKey: ["discover-suggestions", userId] });
       } catch (error) {
+        pendingIdsRef.current.delete(dismissedId);
         if (restore) {
           patchSuggestions((current) => {
-            if (current.some((item) => item.profile.id === restore.athlete.profile.id)) return current;
+            if (current.some((item) => item.profile.id === dismissedId)) return current;
             const next = [...current];
-            next.splice(Math.min(restore.index, next.length), 0, restore.athlete);
+            next.splice(Math.min(restore.index, next.length), 0, athlete);
             return next;
           });
+          patchDismissedIds((ids) => ids.filter((id) => id !== dismissedId));
         }
-        showAlert("Could not remove suggestion", getErrorMessage(error));
+        showAlert("Could not remove suggestion", getSuggestionDismissErrorMessage(error));
+        setPendingDismiss(null);
       }
     },
-    [patchSuggestions, queryClient, userId]
+    [patchDismissedIds, patchSuggestions, queryClient, userId]
   );
 
   const dismissSuggestionRequest = useCallback(
@@ -96,8 +116,6 @@ export function useSuggestionDismissUndo(userId: string, viewerProfile: Profile 
       if (existing) {
         clearTimer();
         setPendingDismiss(null);
-        pendingIdsRef.current.delete(existing.athlete.profile.id);
-        void commitDismiss(existing.athlete.profile.id);
       }
 
       const current = queryClient.getQueryData<SuggestedAthlete[]>(["discover-suggestions", userId]) ?? [];
@@ -109,31 +127,43 @@ export function useSuggestionDismissUndo(userId: string, viewerProfile: Profile 
 
       pendingIdsRef.current.add(athlete.profile.id);
       patchSuggestions((list) => list.filter((item) => item.profile.id !== athlete.profile.id));
+      patchDismissedIds((ids) => [...ids, athlete.profile.id]);
       void backfillSuggestion();
+      void persistDismiss(athlete, pending);
 
       setPendingDismiss(pending);
       undoTimerRef.current = setTimeout(() => {
-        pendingIdsRef.current.delete(athlete.profile.id);
         setPendingDismiss(null);
-        void commitDismiss(athlete.profile.id);
       }, SUGGESTION_DISMISS_UNDO_MS);
     },
-    [backfillSuggestion, clearTimer, commitDismiss, patchSuggestions, queryClient, userId]
+    [backfillSuggestion, clearTimer, patchDismissedIds, patchSuggestions, persistDismiss, queryClient, userId]
   );
 
   const undoDismiss = useCallback(() => {
     const pending = pendingRef.current;
     if (!pending) return;
     clearTimer();
-    pendingIdsRef.current.delete(pending.athlete.profile.id);
+
+    const dismissedId = pending.athlete.profile.id;
+    pendingIdsRef.current.delete(dismissedId);
     patchSuggestions((current) => {
-      if (current.some((item) => item.profile.id === pending.athlete.profile.id)) return current;
+      if (current.some((item) => item.profile.id === dismissedId)) return current;
       const next = [...current];
       next.splice(Math.min(pending.index, next.length), 0, pending.athlete);
       return next.slice(0, MAX_VISIBLE_SUGGESTIONS);
     });
+    patchDismissedIds((ids) => ids.filter((id) => id !== dismissedId));
     setPendingDismiss(null);
-  }, [clearTimer, patchSuggestions]);
+
+    void undoDismissSuggestion(userId, dismissedId)
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["dismissed-suggestion-ids", userId] });
+        void queryClient.invalidateQueries({ queryKey: ["discover-suggestions", userId] });
+      })
+      .catch((error) => {
+        showAlert("Could not undo", getSuggestionDismissErrorMessage(error));
+      });
+  }, [clearTimer, patchDismissedIds, patchSuggestions, queryClient, userId]);
 
   useEffect(() => clearTimer, [clearTimer]);
 
