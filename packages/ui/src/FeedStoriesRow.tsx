@@ -190,11 +190,14 @@ export function FeedStoriesRow({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Stories</Text>
+        <Text style={styles.sectionTitle} numberOfLines={1}>
+          Stories
+        </Text>
         {onViewAllPress ? (
           <Pressable
             onPress={onViewAllPress}
             hitSlop={8}
+            style={styles.viewAllButton}
             accessibilityRole="button"
             accessibilityLabel="View all stories"
           >
@@ -226,6 +229,7 @@ export function FeedStoriesRow({
           data={stories}
           horizontal
           nestedScrollEnabled
+          style={styles.nativeList}
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.user_id}
           contentContainerStyle={styles.listContent}
@@ -249,6 +253,9 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
   Platform.OS === "web"
     ? ({
         touchAction: "pan-x pinch-zoom",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
         height: STORY_ROW_MIN_HEIGHT,
         minHeight: STORY_ROW_MIN_HEIGHT,
         flexGrow: 0,
@@ -276,13 +283,20 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    ...(Platform.OS === "web" ? ({ boxSizing: "border-box" } as ViewStyle) : null),
   },
   sectionTitle: {
     ...typography.section,
+    flex: 1,
+    minWidth: 0,
     fontSize: 17,
     color: colors.text,
     fontWeight: "800",
+  },
+  viewAllButton: {
+    flexShrink: 0,
+    marginLeft: spacing.sm + spacing.xxs,
   },
   viewAll: {
     ...typography.bodySmall,
@@ -298,7 +312,13 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     overflow: "hidden",
   },
+  nativeList: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
   listContent: {
+    paddingHorizontal: spacing.md,
     paddingBottom: 0,
     gap: spacing.md,
   },

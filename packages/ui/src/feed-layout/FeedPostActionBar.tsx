@@ -13,7 +13,6 @@ export interface FeedPostActionBarProps {
   onStrongWork?: () => void;
   onComment?: () => void;
   onShare?: () => void;
-  onMore?: () => void;
 }
 
 export const FeedPostActionBar = memo(function FeedPostActionBar({
@@ -23,9 +22,8 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
   onStrongWork,
   onComment,
   onShare,
-  onMore,
 }: FeedPostActionBarProps) {
-  const hasActions = onLike || onStrongWork || onComment || onShare || onMore;
+  const hasActions = onLike || onStrongWork || onComment || onShare;
   if (!hasActions) return null;
 
   return (
@@ -99,23 +97,6 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
           </Text>
         </ActionButton>
       ) : null}
-
-      {onMore ? (
-        <ActionButton
-          label="More post actions"
-          hint="Opens menu with save, reply, and more"
-          onPress={onMore}
-        >
-          <Text
-            style={styles.moreLabel}
-            allowFontScaling
-            maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            numberOfLines={1}
-          >
-            ⋯ More
-          </Text>
-        </ActionButton>
-      ) : null}
     </View>
   );
 });
@@ -155,7 +136,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
-    flexWrap: "nowrap",
     gap: spacing.xxs,
     minHeight: feedLayout.actions.rowHeight,
     borderTopWidth: 1,
@@ -167,26 +147,18 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: touchTarget,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 2,
+    paddingHorizontal: 1,
   },
   label: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
     color: colors.textSecondary,
     fontWeight: "700",
     textAlign: "center",
   },
   labelActive: {
     color: colors.accent,
-  },
-  moreLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: colors.textMuted,
-    fontWeight: "700",
-    textAlign: "center",
   },
 });

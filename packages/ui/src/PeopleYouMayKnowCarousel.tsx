@@ -34,7 +34,8 @@ export function PeopleYouMayKnowCarousel({
       <FlatList
         data={suggestions}
         horizontal
-        style={WEB_HORIZONTAL_SCROLL_STYLE}
+        nestedScrollEnabled
+        style={[styles.list, WEB_HORIZONTAL_SCROLL_STYLE]}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.profile.id}
         contentContainerStyle={styles.listContent}
@@ -105,11 +106,18 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
   Platform.OS === "web"
     ? ({
         touchAction: "pan-x pinch-zoom",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
       } as ViewStyle)
     : undefined;
 
 const styles = StyleSheet.create({
   container: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
     gap: spacing.xxs,
     paddingBottom: spacing.xxs,
   },
@@ -120,9 +128,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
+  list: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
   listContent: {
     gap: spacing.sm,
-    paddingRight: spacing.md,
   },
   card: {
     width: 176,

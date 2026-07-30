@@ -69,7 +69,9 @@ function main() {
   record(results, "Feed screen scroll-to-top skips search reset", index.includes("scrollFeedListToTop") && index.includes("onSearchFocusScroll={scrollFeedListToTop}"));
   record(results, "Search focus only sets active state", section.includes("handleSearchFocus") && section.includes("setActive(true)"));
   record(results, "Feed shortcuts use equal flex columns", read("packages/ui/src/FeedQuickActionCards.tsx").includes("flex: 1"));
-  record(results, "Post actions use flexible equal items", read("packages/ui/src/feed-layout/FeedPostActionBar.tsx").includes("flex: 1"));
+  record(results, "Post actions use flexible equal items", read("packages/ui/src/feed-layout/FeedPostActionBar.tsx").includes("flex: 1") && !read("packages/ui/src/feed-layout/FeedPostActionBar.tsx").includes("onMore"));
+  record(results, "Post cards avoid width 100% margin overflow", !/root:[\s\S]*width:\s*"100%"[\s\S]*marginHorizontal/.test(read("packages/ui/src/feed-layout/tokens.ts")));
+  record(results, "More action lives in post header", read("packages/ui/src/FeedPostCard.tsx").includes("headerMoreButton"));
   record(results, "Feed avoids keyboard inset drift", !index.includes("automaticallyAdjustKeyboardInsets"));
   record(results, "Web CSS clamps feed/search width", webStyles.includes("#feed-search-section") && webStyles.includes("overflow-x: hidden"));
   record(results, "Feed header uses overflow hidden", header.includes('overflow: "hidden"'));

@@ -60,20 +60,24 @@ export const FeedHeader = memo(function FeedHeader({
 
   return (
     <View style={styles.container}>
-      <SectionErrorBoundary label="feed-search-bar" compact>
-        <FeedSearchSection
-          onActiveChange={setSearchActive}
-          onFocusScroll={onSearchFocusScroll}
-        />
-      </SectionErrorBoundary>
-
-      {chromeVisible && showHero ? (
-        <SectionErrorBoundary label="feed-hero-banner" compact>
-          <FeedHeroBanner
-            onFindAthletes={() => switchTab("/(tabs)/discover")}
-            onShareWorkout={openCreatePost}
+      <View style={styles.paddedSection}>
+        <SectionErrorBoundary label="feed-search-bar" compact>
+          <FeedSearchSection
+            onActiveChange={setSearchActive}
+            onFocusScroll={onSearchFocusScroll}
           />
         </SectionErrorBoundary>
+      </View>
+
+      {chromeVisible && showHero ? (
+        <View style={styles.paddedSection}>
+          <SectionErrorBoundary label="feed-hero-banner" compact>
+            <FeedHeroBanner
+              onFindAthletes={() => switchTab("/(tabs)/discover")}
+              onShareWorkout={openCreatePost}
+            />
+          </SectionErrorBoundary>
+        </View>
       ) : null}
 
       {chromeVisible && (showStories || showQuickActions) ? (
@@ -98,17 +102,19 @@ export const FeedHeader = memo(function FeedHeader({
       ) : null}
 
       {chromeVisible && showSuggestions && suggestions.length > 0 ? (
-        <SectionErrorBoundary label="feed-suggestions-carousel" compact>
-          <PeopleYouMayKnowCarousel
-            suggestions={suggestions}
-            followingIds={followingIds}
-            onProfilePress={(username) => pushScreen(`/user/${username}`)}
-            onFollowPress={onFollowPress}
-            onDismissPress={onDismissPress}
-            followLoadingId={followLoadingId}
-            dismissLoadingId={dismissLoadingId}
-          />
-        </SectionErrorBoundary>
+        <View style={styles.paddedSection}>
+          <SectionErrorBoundary label="feed-suggestions-carousel" compact>
+            <PeopleYouMayKnowCarousel
+              suggestions={suggestions}
+              followingIds={followingIds}
+              onProfilePress={(username) => pushScreen(`/user/${username}`)}
+              onFollowPress={onFollowPress}
+              onDismissPress={onDismissPress}
+              followLoadingId={followLoadingId}
+              dismissLoadingId={dismissLoadingId}
+            />
+          </SectionErrorBoundary>
+        </View>
       ) : null}
     </View>
   );
@@ -120,18 +126,24 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
+    alignSelf: "stretch",
     flexShrink: 1,
     overflow: "hidden",
-    paddingHorizontal: spacing.md,
     paddingTop: feedLayout.feedChrome.paddingTop,
     paddingBottom: feedLayout.feedChrome.paddingBottom,
     gap: feedLayout.feedChrome.sectionGap,
   },
+  paddedSection: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    paddingHorizontal: spacing.md,
+  },
   storiesShortcutsGroup: {
-    gap: spacing.xxs,
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
     overflow: "hidden",
+    gap: spacing.xxs,
   },
 });

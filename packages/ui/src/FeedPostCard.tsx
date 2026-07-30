@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { ScalePressable } from "./ScalePressable";
@@ -16,6 +16,7 @@ import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
 import { WorkoutStatsPills } from "./WorkoutStatsPills";
 import { WorkoutTypeChips } from "./WorkoutTypeChips";
 import { formatWorkoutTypeLabel } from "./formatRelativeTime";
+import { colors } from "./theme";
 import {
   FeedLayout,
   FeedMedia,
@@ -174,7 +175,7 @@ export const FeedPostCard = memo(function FeedPostCard({
 
       <FeedLayout.Header>
         <ScalePressable
-          containerStyle={{ flex: 1, flexDirection: "row", alignItems: "center", gap: feedLayout.header.gap }}
+          containerStyle={styles.headerMain}
           onPress={onAuthorPress}
           disabled={!onAuthorPress}
           accessibilityRole="button"
@@ -208,7 +209,20 @@ export const FeedPostCard = memo(function FeedPostCard({
             </Text>
           </FeedLayout.HeaderText>
         </ScalePressable>
-        <FeedLayout.HeaderTrailing>{slots?.headerTrailing}</FeedLayout.HeaderTrailing>
+        <FeedLayout.HeaderTrailing>
+          {slots?.headerTrailing}
+          {handleMorePress ? (
+            <Pressable
+              onPress={handleMorePress}
+              hitSlop={8}
+              style={styles.headerMoreButton}
+              accessibilityRole="button"
+              accessibilityLabel="More post actions"
+            >
+              <Text style={styles.headerMoreIcon}>⋯</Text>
+            </Pressable>
+          ) : null}
+        </FeedLayout.HeaderTrailing>
       </FeedLayout.Header>
 
       {isShared && sharedPost ? (
@@ -308,7 +322,6 @@ export const FeedPostCard = memo(function FeedPostCard({
         onStrongWork={handleStrongWork}
         onComment={onComment}
         onShare={onShare}
-        onMore={handleMorePress}
       />
 
       {showCaption && isShared ? (
@@ -376,13 +389,35 @@ export const FeedPostCard = memo(function FeedPostCard({
 
 export { getSharedPostTargetId };
 
-const styles = {
+const styles = StyleSheet.create({
+  headerMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: feedLayout.header.gap,
+  },
+  headerMoreButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  headerMoreIcon: {
+    fontSize: 22,
+    lineHeight: 24,
+    color: colors.textMuted,
+    fontWeight: "700",
+  },
   mediaTapShell: {
-    position: "relative" as const,
-    width: "100%" as const,
+    position: "relative",
+    alignSelf: "stretch",
+    maxWidth: "100%",
+    minWidth: 0,
   },
   likeHeartOverlay: {
-    position: "absolute" as const,
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -397,4 +432,4 @@ const styles = {
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
-};
+});

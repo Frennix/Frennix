@@ -53,7 +53,9 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
-    overflow: "hidden",
+    alignSelf: "stretch",
+    flexShrink: 1,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xxs,
   },
   item: {
