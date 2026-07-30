@@ -1,11 +1,11 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { claimPlatformBootstrap, getPlatformBootstrapStatus, getUserFriendlyErrorMessage } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { hashStaffToken } from "@/lib/founder/crypto";
-import { Button, EmptyState, colors, spacing, typography } from "@frennix/ui";
+import { Button, EmptyState, PasswordInput, colors, spacing, typography } from "@frennix/ui";
 
 export default function FounderBootstrapScreen() {
   const { session } = useAuth();
@@ -87,14 +87,13 @@ export default function FounderBootstrapScreen() {
       <Text style={styles.body}>
         One-time owner bootstrap. Enter the secret configured via the founder-bootstrap-init Edge Function.
       </Text>
-      <TextInput
+      <PasswordInput
         value={token}
         onChangeText={setToken}
         placeholder="Bootstrap secret"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-        secureTextEntry
         autoCapitalize="none"
+        autoComplete="off"
+        textContentType="password"
       />
       {message ? <Text style={status === "error" ? styles.error : styles.success}>{message}</Text> : null}
       <Button
@@ -110,15 +109,6 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
   title: { ...typography.heading, color: colors.text },
   body: { ...typography.body, color: colors.textSecondary },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
   error: { ...typography.caption, color: colors.danger },
   success: { ...typography.caption, color: colors.accent },
 });

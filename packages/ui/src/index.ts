@@ -1,6 +1,7 @@
 export * from "./theme";
 export * from "./Button";
 export * from "./Input";
+export * from "./PasswordInput";
 export * from "./Avatar";
 export * from "./EditableAvatar";
 export * from "./Chip";

@@ -4,7 +4,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, Vi
 import { formatAuthErrorForDisplay, updatePassword } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
-import { Button, Input, colors, spacing, typography } from "@frennix/ui";
+import { Button, PasswordInput, colors, spacing, typography } from "@frennix/ui";
 
 export default function ResetPasswordScreen() {
   const { session, loading, passwordRecovery, signOut } = useAuth();
@@ -78,19 +78,21 @@ export default function ResetPasswordScreen() {
       <Text style={styles.title}>Set a new password</Text>
       <Text style={styles.subtitle}>Choose a new password for your Frennix account.</Text>
 
-      <Input
+      <PasswordInput
         label="New password"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
         autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
       />
-      <Input
+      <PasswordInput
         label="Confirm password"
         value={confirmPassword}
         onChangeText={setConfirmPassword}
-        secureTextEntry
         autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
       />
 
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}

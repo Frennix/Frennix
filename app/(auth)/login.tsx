@@ -12,7 +12,7 @@ import {
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
-import { Button, Input, colors, spacing, typography } from "@frennix/ui";
+import { Button, Input, PasswordInput, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -123,11 +123,10 @@ export default function LoginScreen() {
         textContentType="emailAddress"
         placeholder="you@example.com"
       />
-      <Input
+      <PasswordInput
         label="Password"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
         autoComplete="current-password"
         textContentType="password"
         placeholder="Your password"

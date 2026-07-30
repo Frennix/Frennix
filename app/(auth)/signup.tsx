@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-na
 import { getUserFriendlyErrorMessage, signUpWithEmail } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { storePendingReferralCode } from "@/lib/referral-storage";
-import { Button, Input, colors, spacing, typography } from "@frennix/ui";
+import { Button, Input, PasswordInput, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
 
 export default function SignupScreen() {
@@ -51,7 +51,7 @@ export default function SignupScreen() {
       <Text style={styles.subtitle}>Build your fitness community</Text>
 
       <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      <PasswordInput label="Password" value={password} onChangeText={setPassword} autoComplete="new-password" textContentType="newPassword" />
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Button title="Create account" onPress={handleSignup} loading={loading} />
