@@ -1,0 +1,4 @@
+.playwright-browsers/
+scripts/output/
+**/*.png.snapshot
+**/.DS_Store
