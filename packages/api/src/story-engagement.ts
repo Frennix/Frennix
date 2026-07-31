@@ -39,26 +39,41 @@ export async function markDedicatedStoryViewed(
   slideId: string | null,
   storyOwnerId: string
 ) {
+  if (viewerId === storyOwnerId) return;
+
+  const viewedAt = new Date().toISOString();
+
   const { error } = await getSupabase().from("story_item_views").upsert(
     {
       story_id: storyId,
       viewer_id: viewerId,
       last_viewed_slide_id: slideId,
-      viewed_at: new Date().toISOString(),
+      viewed_at: viewedAt,
     },
     { onConflict: "story_id,viewer_id" }
   );
 
   if (error) throw error;
 
-  if (viewerId !== storyOwnerId) {
-    await trackStoryEngagementEvent({
-      viewerId,
-      storyUserId: storyOwnerId,
-      storyId,
-      eventType: "view",
-    }).catch(() => undefined);
+  if (slideId) {
+    const { error: slideError } = await getSupabase().from("story_slide_views").upsert(
+      {
+        story_id: storyId,
+        slide_id: slideId,
+        viewer_id: viewerId,
+        viewed_at: viewedAt,
+      },
+      { onConflict: "slide_id,viewer_id" }
+    );
+    if (slideError) throw slideError;
   }
+
+  await trackStoryEngagementEvent({
+    viewerId,
+    storyUserId: storyOwnerId,
+    storyId,
+    eventType: "view",
+  }).catch(() => undefined);
 }
 
 /** @deprecated Use markDedicatedStoryViewed */
@@ -368,21 +383,13 @@ export async function sendStoryEventInvite(
   return message;
 }
 
-export async function getStoryViewers(
+async function mapStoryViewerRows(
   storyOwnerId: string,
-  storyId: string
+  rows: Array<{ viewer_id: string; viewed_at: string }>
 ): Promise<StoryViewerRecord[]> {
-  const { data, error } = await getSupabase()
-    .from("story_item_views")
-    .select("viewer_id, viewed_at")
-    .eq("story_id", storyId)
-    .neq("viewer_id", storyOwnerId)
-    .order("viewed_at", { ascending: false });
+  if (!rows.length) return [];
 
-  if (error) throw error;
-  if (!data?.length) return [];
-
-  const viewerIds = data.map((row) => row.viewer_id as string);
+  const viewerIds = rows.map((row) => row.viewer_id as string);
 
   const [profiles, followingIds, { data: followerRows }] = await Promise.all([
     getProfilesByIds(viewerIds),
@@ -394,7 +401,7 @@ export async function getStoryViewers(
   const followsYouSet = new Set((followerRows ?? []).map((row) => row.follower_id as string));
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
-  return data.map((row) => {
+  return rows.map((row) => {
     const viewerId = row.viewer_id as string;
     const profile = profileById.get(viewerId);
     return {
@@ -412,6 +419,51 @@ export async function getStoryViewers(
       follows_you: followsYouSet.has(viewerId),
     };
   });
+}
+
+export async function getStoryViewerCount(
+  storyOwnerId: string,
+  storyId: string,
+  slideId?: string | null
+): Promise<number> {
+  const table = slideId ? "story_slide_views" : "story_item_views";
+  let query = getSupabase()
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq("story_id", storyId)
+    .neq("viewer_id", storyOwnerId);
+
+  if (slideId) {
+    query = query.eq("slide_id", slideId);
+  }
+
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function getStoryViewers(
+  storyOwnerId: string,
+  storyId: string,
+  options?: { slideId?: string | null }
+): Promise<StoryViewerRecord[]> {
+  const slideId = options?.slideId ?? null;
+  const table = slideId ? "story_slide_views" : "story_item_views";
+
+  let query = getSupabase()
+    .from(table)
+    .select("viewer_id, viewed_at")
+    .eq("story_id", storyId)
+    .neq("viewer_id", storyOwnerId)
+    .order("viewed_at", { ascending: false });
+
+  if (slideId) {
+    query = query.eq("slide_id", slideId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return mapStoryViewerRows(storyOwnerId, (data ?? []) as Array<{ viewer_id: string; viewed_at: string }>);
 }
 
 export async function getStoryReactions(
@@ -447,13 +499,29 @@ export async function getStoryReactions(
   });
 }
 
+async function getStoryOwnerId(storyId: string): Promise<string | null> {
+  const { data, error } = await getSupabase()
+    .from("stories")
+    .select("user_id")
+    .eq("id", storyId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.user_id as string | undefined) ?? null;
+}
+
 export async function getDedicatedStoryAnalytics(storyId: string): Promise<StoryAnalytics> {
+  const storyOwnerId = await getStoryOwnerId(storyId);
+
   const [viewsResult, reactionsResult, repliesResult, joinsResult, profileVisitsResult] =
     await Promise.all([
-    getSupabase()
-      .from("story_item_views")
-      .select("*", { count: "exact", head: true })
-      .eq("story_id", storyId),
+    (() => {
+      let query = getSupabase()
+        .from("story_item_views")
+        .select("*", { count: "exact", head: true })
+        .eq("story_id", storyId);
+      if (storyOwnerId) query = query.neq("viewer_id", storyOwnerId);
+      return query;
+    })(),
     getSupabase()
       .from("story_item_reactions")
       .select("*", { count: "exact", head: true })
@@ -495,6 +563,15 @@ export function subscribeStoryViewers(
         event: "*",
         schema: "public",
         table: "story_item_views",
+        filter: `story_id=eq.${storyId}`,
+      },
+      callback: () => onChange(),
+    },
+    {
+      config: {
+        event: "*",
+        schema: "public",
+        table: "story_slide_views",
         filter: `story_id=eq.${storyId}`,
       },
       callback: () => onChange(),

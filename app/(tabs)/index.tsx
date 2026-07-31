@@ -24,8 +24,6 @@ import {
   getStoryReactions,
   joinStoryChallenge,
   markDedicatedStoryViewed,
-  followUser,
-  getOrCreateConversation,
   markStoryCommitmentComplete,
   sendDedicatedStoryReaction,
   sendDedicatedStoryReply,
@@ -40,7 +38,6 @@ import {
   type Post,
   type StoryChallengeKey,
   type StoryQuickReactionEmoji,
-  type StoryViewerRecord,
 } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
@@ -52,7 +49,7 @@ import { FeedListItem, type FeedListItemActions } from "@/components/FeedListIte
 import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
 import { FeedStoryViewer } from "@/components/FeedStoryViewer";
 import { StoryAnalyticsModal } from "@/components/story/StoryAnalyticsModal";
-import { StoryViewersModal, type StoryViewerAction } from "@/components/story/StoryViewersModal";
+import { StoryViewersModal } from "@/components/story/StoryViewersModal";
 import { StoryReactionsModal } from "@/components/story/StoryReactionsModal";
 import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
 import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
@@ -123,6 +120,7 @@ export default function HomeScreen() {
   const [reactionsModalVisible, setReactionsModalVisible] = useState(false);
   const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
   const [activeInsightStoryId, setActiveInsightStoryId] = useState<string | null>(null);
+  const [activeInsightSlideId, setActiveInsightSlideId] = useState<string | null>(null);
   const { openShare, shareSheet, shareVisible } = useSharePost(userId);
   markFeedHook("share-post");
   const { openPostActions, postActionSheets } = usePostActions({
@@ -352,41 +350,6 @@ export default function HomeScreen() {
         showAlert("Completed", "Your workout commitment is marked complete.");
       } catch (error) {
         showAlert("Could not update", getErrorMessage(error));
-      }
-    },
-    [queryClient, userId]
-  );
-
-  const handleStoryViewerAction = useCallback(
-    async (viewer: StoryViewerRecord, action: StoryViewerAction) => {
-      if (!userId) return;
-      try {
-        if (action === "message") {
-          const conversationId = await getOrCreateConversation(userId, viewer.viewer_id);
-          pushScreen(`/chat/${conversationId}`);
-          setViewersModalVisible(false);
-          return;
-        }
-        if (action === "follow") {
-          await followUser(userId, viewer.viewer_id);
-          void queryClient.invalidateQueries({ queryKey: ["story-viewers", userId] });
-          showAlert("Following", `You are now following ${viewer.profile.display_name}.`);
-          return;
-        }
-        if (action === "invite") {
-          openStoryWorkoutInvite({
-            partnerId: viewer.viewer_id,
-            partnerUsername: viewer.profile.username,
-          });
-          setViewersModalVisible(false);
-          return;
-        }
-        if (action === "profile") {
-          pushScreen(`/user/${viewer.profile.username}`);
-          setViewersModalVisible(false);
-        }
-      } catch (error) {
-        showAlert("Action failed", getErrorMessage(error));
       }
     },
     [queryClient, userId]
@@ -825,17 +788,20 @@ export default function HomeScreen() {
     queryKey: ["story-insights", userId, activeInsightStoryIdResolved],
     queryFn: () => getDedicatedStoryInsights(activeInsightStoryIdResolved!),
     enabled: Boolean(
-      (viewersModalVisible || analyticsModalVisible || reactionsModalVisible) &&
-        activeStory?.is_self &&
-        activeInsightStoryIdResolved
+      activeStory?.is_self &&
+        activeInsightStoryIdResolved &&
+        (activeStoryIndex !== null || viewersModalVisible || analyticsModalVisible || reactionsModalVisible)
     ),
     staleTime: 30_000,
   });
   markFeedHook("story-insights-query");
 
   const { data: storyViewers = [], isLoading: storyViewersLoading } = useQuery({
-    queryKey: ["story-viewers", userId, activeInsightStoryIdResolved],
-    queryFn: () => getStoryViewers(userId, activeInsightStoryIdResolved!),
+    queryKey: ["story-viewers", userId, activeInsightStoryIdResolved, activeInsightSlideId],
+    queryFn: () =>
+      getStoryViewers(userId, activeInsightStoryIdResolved!, {
+        slideId: activeInsightSlideId,
+      }),
     enabled: Boolean(viewersModalVisible && activeInsightStoryIdResolved && activeStory?.is_self),
   });
 
@@ -855,7 +821,7 @@ export default function HomeScreen() {
   useStoryViewersRealtime(
     userId,
     activeInsightStoryIdResolved,
-    Boolean(viewersModalVisible && activeStory?.is_self)
+    Boolean((viewersModalVisible || activeStory?.is_self) && activeStoryIndex !== null)
   );
 
   const handleListLayout = useCallback(
@@ -1112,8 +1078,9 @@ export default function HomeScreen() {
         onInviteToEvent={handleStoryEventInvite}
         onDiscoverTag={handleDiscoverStoryTag}
         onDiscoverLocation={handleDiscoverStoryLocation}
-        onOpenViewers={() => {
+        onOpenViewers={(slideId) => {
           setActiveInsightStoryId(activeStory?.active_stories.at(-1)?.id ?? null);
+          setActiveInsightSlideId(slideId);
           setViewersModalVisible(true);
         }}
         onOpenAnalytics={() => {
@@ -1152,7 +1119,10 @@ export default function HomeScreen() {
         viewers={storyViewers}
         loading={storyViewersLoading}
         onClose={() => setViewersModalVisible(false)}
-        onViewerAction={handleStoryViewerAction}
+        onViewerPress={(viewer) => {
+          setViewersModalVisible(false);
+          pushScreen(`/user/${viewer.profile.username}`);
+        }}
       />
       ) : null}
       {analyticsModalVisible ? (

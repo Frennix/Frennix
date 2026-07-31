@@ -78,7 +78,20 @@ const checks: Array<{ name: string; run: () => void }> = [
   },
   {
     name: "ui:viewers modal",
-    run: () => mustInclude("components/story/StoryViewersModal.tsx", "Viewed By", "ui"),
+    run: () => mustInclude("components/story/StoryViewersModal.tsx", "Viewed by", "ui"),
+  },
+  {
+    name: "sql:story_slide_views",
+    run: () =>
+      mustInclude("supabase/migrations/20250731000001_story_slide_views.sql", "story_slide_views", "migration"),
+  },
+  {
+    name: "api:story viewer count",
+    run: () => mustInclude("packages/api/src/story-engagement.ts", "getStoryViewerCount", "api"),
+  },
+  {
+    name: "ui:story viewer eye button",
+    run: () => mustInclude("components/story/StoryViewerEyeButton.tsx", "Eye", "ui"),
   },
   {
     name: "ui:analytics modal",

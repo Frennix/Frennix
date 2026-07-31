@@ -41,6 +41,7 @@ import { StoryQuestionAnswersModal } from "./story/StoryQuestionAnswersModal";
 import {
   voteStoryPoll,
   getStoryInteractiveBundle,
+  getStoryViewerCount,
   subscribeStoryCountdown,
   answerStoryQuestion,
   getStoryQuestionAnswersForOwner,
@@ -48,6 +49,8 @@ import {
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
+import { StoryViewerEyeButton } from "./story/StoryViewerEyeButton";
+import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
 import {
   buildDedicatedStorySlides,
   prefetchStorySlide,
@@ -198,7 +201,7 @@ export interface WorkoutStoryViewerProps {
     storyId: string,
     options: { challengeId?: string | null; trainingChallengeId?: string | null }
   ) => void | Promise<void>;
-  onOpenViewers?: () => void;
+  onOpenViewers?: (slideId: string | null) => void;
   onOpenAnalytics?: () => void;
   onOpenReactions?: () => void;
   onFollow?: (storyUserId: string, isFollowing: boolean) => void | Promise<void>;
@@ -531,6 +534,23 @@ export function WorkoutStoryViewer({
   const challengePrompt =
     trainingChallenge?.prompt ?? currentDedicatedStory?.challenge_prompt ?? null;
 
+  const activeStoryIdForQuery = slideContext?.storyId ?? currentDedicatedStory?.id ?? null;
+  const activeSlideIdForQuery = slideContext?.slideId ?? null;
+
+  const { data: viewerCount = 0 } = useQuery({
+    queryKey: ["story-viewer-count", session?.user.id, activeStoryIdForQuery, activeSlideIdForQuery],
+    queryFn: () =>
+      getStoryViewerCount(session!.user.id, activeStoryIdForQuery!, activeSlideIdForQuery),
+    enabled: Boolean(visible && story?.is_self && session?.user.id && activeStoryIdForQuery),
+    staleTime: 10_000,
+  });
+
+  useStoryViewersRealtime(
+    session?.user.id,
+    activeStoryIdForQuery,
+    Boolean(visible && story?.is_self && activeStoryIdForQuery)
+  );
+
   if (!visible || !story || !activeStories.length) return null;
 
   const caption =
@@ -602,6 +622,13 @@ export function WorkoutStoryViewer({
                 </View>
               </Pressable>
 
+              {story.is_self && onOpenViewers ? (
+                <StoryViewerEyeButton
+                  count={viewerCount}
+                  onPress={() => onOpenViewers(activeSlideIdForQuery)}
+                />
+              ) : null}
+
               <Pressable
                 style={styles.closeButton}
                 onPress={onClose}
@@ -617,7 +644,7 @@ export function WorkoutStoryViewer({
             {story.is_self && storyInsights ? (
               <StoryInsightsStrip
                 insights={storyInsights}
-                onViewsPress={onOpenViewers}
+                onViewsPress={() => onOpenViewers?.(activeSlideIdForQuery)}
                 onReactionsPress={onOpenReactions}
                 onPress={onOpenAnalytics}
               />
@@ -731,12 +758,6 @@ export function WorkoutStoryViewer({
             {story.is_self && workoutCommitment && !workoutCommitment.completed_at && onMarkCommitmentComplete ? (
               <Pressable style={styles.viewersCta} onPress={() => onMarkCommitmentComplete()}>
                 <Text style={styles.viewersCtaText}>Mark commitment complete</Text>
-              </Pressable>
-            ) : null}
-
-            {story.is_self && onOpenViewers ? (
-              <Pressable style={styles.viewersCta} onPress={onOpenViewers}>
-                <Text style={styles.viewersCtaText}>See viewers</Text>
               </Pressable>
             ) : null}
 

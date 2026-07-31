@@ -15,6 +15,7 @@ export function useStoryViewersRealtime(
 
     const { unsubscribe } = subscribeStoryViewers(storyId, () => {
       void queryClient.invalidateQueries({ queryKey: ["story-viewers", storyOwnerId, storyId] });
+      void queryClient.invalidateQueries({ queryKey: ["story-viewer-count", storyOwnerId, storyId] });
       void queryClient.invalidateQueries({ queryKey: ["story-analytics", storyId] });
       void queryClient.invalidateQueries({ queryKey: ["story-insights", storyOwnerId, storyId] });
     });

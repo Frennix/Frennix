@@ -768,9 +768,9 @@ export default function MessagesScreen() {
   );
 
   const handleMarkStoryViewed = useCallback(
-    (storyUserId: string, storyId: string | null) => {
+    (storyUserId: string, storyId: string | null, slideId: string | null) => {
       if (!storyId || !userId) return;
-      void markDedicatedStoryViewed(userId, storyId, null, storyUserId).catch(() => undefined);
+      void markDedicatedStoryViewed(userId, storyId, slideId, storyUserId).catch(() => undefined);
       queryClient.setQueryData(
         ["favorite-partner-stories", userId, favoritePartnerIds],
         (current: typeof partnerStories | undefined) =>

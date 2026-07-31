@@ -72,10 +72,22 @@ export async function getDedicatedStoryInsights(storyId: string): Promise<StoryI
     }
   }
 
-  const { count: viewCount } = await getSupabase()
+  const { data: storyRow, error: storyError } = await getSupabase()
+    .from("stories")
+    .select("user_id")
+    .eq("id", storyId)
+    .maybeSingle();
+  if (storyError) throw storyError;
+  const storyOwnerId = (storyRow?.user_id as string | undefined) ?? null;
+
+  let viewCountQuery = getSupabase()
     .from("story_item_views")
     .select("*", { count: "exact", head: true })
     .eq("story_id", storyId);
+  if (storyOwnerId) {
+    viewCountQuery = viewCountQuery.neq("viewer_id", storyOwnerId);
+  }
+  const { count: viewCount } = await viewCountQuery;
 
   if (viewCount != null) counts.views = Math.max(counts.views, viewCount);
 
