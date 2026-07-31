@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
 
 type AppScreenProps = {
   children: ReactNode;
@@ -24,5 +24,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignSelf: "stretch",
     overflow: "hidden",
+    ...(Platform.OS === "web" ? ({ contain: "layout paint" } as ViewStyle) : null),
   },
 });

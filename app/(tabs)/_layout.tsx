@@ -127,6 +127,9 @@ const TabsShell = memo(function TabsShell() {
           alignSelf: "stretch",
           overflow: "hidden",
           backgroundColor: colors.backgroundFeed,
+          ...(Platform.OS === "web"
+            ? ({ contain: "layout paint", position: "relative" } as const)
+            : null),
         },
         lazy: false,
         freezeOnBlur: true,
