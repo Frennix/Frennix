@@ -5,12 +5,14 @@ import * as ImagePicker from "expo-image-picker";
 import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   STORY_LOCATION_TYPES,
   STORY_POLL_PRESETS,
@@ -64,6 +66,7 @@ function newDraftId() {
 
 export default function CreateStoryScreen() {
   const { session } = useAuth();
+  const insets = useSafeAreaInsets();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const submittingRef = useRef(false);
@@ -80,7 +83,7 @@ export default function CreateStoryScreen() {
   const [trainingChallengePrompt, setTrainingChallengePrompt] = useState("");
   const [countdownLabel, setCountdownLabel] = useState("");
   const [countdownDate, setCountdownDate] = useState("");
-  const [countdownTime, setCountdownTime] = useState("09:00");
+  const [countdownTime, setCountdownTime] = useState("");
   const [trainingQuestion, setTrainingQuestion] = useState("");
   const [workoutCommitment, setWorkoutCommitment] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
@@ -273,7 +276,13 @@ export default function CreateStoryScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.md },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
         <Text style={styles.lead}>
           Fitness-first stories disappear after 24 hours. Share workouts, challenges, and training invites — not feed posts.
         </Text>
@@ -458,7 +467,7 @@ export default function CreateStoryScreen() {
         </View>
 
         <Text style={styles.sectionLabel}>Workout tag</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        <View style={styles.chipRow}>
           {STORY_WORKOUT_TAGS.map((tag) => (
             <Pressable
               key={tag}
@@ -468,7 +477,7 @@ export default function CreateStoryScreen() {
               <Text style={[styles.chipText, workoutTag === tag && styles.chipTextActive]}>{tag}</Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
 
         <Input
           label="Location (optional)"
@@ -478,7 +487,7 @@ export default function CreateStoryScreen() {
           editable={!loading}
         />
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        <View style={styles.chipRow}>
           {STORY_LOCATION_TYPES.map((option) => (
             <Pressable
               key={option.value}
@@ -492,21 +501,23 @@ export default function CreateStoryScreen() {
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.actions}>
           <Button
             variant="secondary"
-            label={previewMode ? "Edit slides" : "Preview"}
+            title={previewMode ? "Edit slides" : "Preview"}
             onPress={() => setPreviewMode((current) => !current)}
             disabled={!slides.length || loading}
           />
           <Button
-            label={loading ? "Publishing…" : "Publish Story"}
+            title={loading ? "Publishing…" : "Publish Story"}
             onPress={publish}
             disabled={loading || !slides.length}
+            loading={loading}
+            loadingTitle="Publishing…"
           />
         </View>
 
@@ -550,6 +561,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.xs,
+    width: "100%",
+    maxWidth: "100%",
+    ...(Platform.OS === "web" ? ({ overflow: "hidden" } as const) : null),
   },
   chip: {
     borderWidth: 1,
@@ -558,6 +572,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     backgroundColor: colors.surface,
+    flexShrink: 0,
+    maxWidth: "100%",
   },
   chipActive: {
     borderColor: colors.accent,

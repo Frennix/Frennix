@@ -106,6 +106,18 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "ui:create-story action buttons",
+    run: () => {
+      const src = read("app/create-story.tsx");
+      if (!src.includes('title={loading ? "Publishing…" : "Publish Story"}')) {
+        throw new Error("create-story Publish button must use Button title prop");
+      }
+      if (/variant="secondary"[\s\S]{0,120}label=/.test(src)) {
+        throw new Error("create-story must not pass label to Button (use title)");
+      }
+    },
+  },
+  {
     name: "api:story viewer count uses slide views",
     run: () => {
       const src = read("packages/api/src/story-engagement.ts");
