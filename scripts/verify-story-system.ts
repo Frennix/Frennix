@@ -106,6 +106,36 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "api:story viewer count uses slide views",
+    run: () => {
+      const src = read("packages/api/src/story-engagement.ts");
+      if (!src.includes('from("story_slide_views")')) {
+        throw new Error("story viewer APIs must read story_slide_views");
+      }
+      if (src.includes('slideId ? "story_slide_views" : "story_item_views"')) {
+        throw new Error("story viewer APIs must not fall back to story_item_views");
+      }
+    },
+  },
+  {
+    name: "api:story viewer owner filter",
+    run: () => {
+      const src = read("packages/api/src/story-engagement.ts");
+      if (!src.includes("excludeOwnerViewerRows")) {
+        throw new Error("story viewer APIs must exclude owner rows");
+      }
+    },
+  },
+  {
+    name: "sql:story viewer owner cleanup",
+    run: () =>
+      mustInclude(
+        "supabase/migrations/20250731000002_story_viewer_owner_cleanup.sql",
+        "story_slide_views",
+        "migration"
+      ),
+  },
+  {
     name: "ui:analytics modal",
     run: () => mustInclude("components/story/StoryAnalyticsModal.tsx", "Story Analytics", "ui"),
   },

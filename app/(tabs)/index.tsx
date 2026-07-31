@@ -802,7 +802,12 @@ export default function HomeScreen() {
       getStoryViewers(userId, activeInsightStoryIdResolved!, {
         slideId: activeInsightSlideId,
       }),
-    enabled: Boolean(viewersModalVisible && activeInsightStoryIdResolved && activeStory?.is_self),
+    enabled: Boolean(
+      viewersModalVisible &&
+        activeInsightStoryIdResolved &&
+        activeInsightSlideId &&
+        activeStory?.is_self
+    ),
   });
 
   const { data: storyReactions = [], isLoading: storyReactionsLoading } = useQuery({
@@ -1083,9 +1088,13 @@ export default function HomeScreen() {
           setActiveInsightSlideId(slideId);
           setViewersModalVisible(true);
         }}
-        onOpenAnalytics={() => {
+        onOpenAnalytics={(slideId) => {
           setActiveInsightStoryId(activeStory?.active_stories.at(-1)?.id ?? null);
+          setActiveInsightSlideId(slideId);
           setAnalyticsModalVisible(true);
+        }}
+        onActiveSlideChange={(_storyId, slideId) => {
+          setActiveInsightSlideId(slideId);
         }}
         onOpenReactions={() => {
           setActiveInsightStoryId(activeStory?.active_stories.at(-1)?.id ?? null);
@@ -1132,7 +1141,9 @@ export default function HomeScreen() {
         onClose={() => setAnalyticsModalVisible(false)}
         onOpenViewers={() => {
           setAnalyticsModalVisible(false);
-          setViewersModalVisible(true);
+          if (activeInsightSlideId) {
+            setViewersModalVisible(true);
+          }
         }}
         onOpenReactions={() => {
           setAnalyticsModalVisible(false);

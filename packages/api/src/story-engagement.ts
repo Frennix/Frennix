@@ -383,25 +383,37 @@ export async function sendStoryEventInvite(
   return message;
 }
 
+function excludeOwnerViewerRows<T extends { viewer_id: string }>(
+  rows: T[],
+  storyOwnerId: string | null
+): T[] {
+  if (!storyOwnerId) return rows;
+  return rows.filter((row) => row.viewer_id !== storyOwnerId);
+}
+
 async function mapStoryViewerRows(
-  storyOwnerId: string,
+  storyOwnerId: string | null,
   rows: Array<{ viewer_id: string; viewed_at: string }>
 ): Promise<StoryViewerRecord[]> {
-  if (!rows.length) return [];
+  const filteredRows = excludeOwnerViewerRows(rows, storyOwnerId);
+  if (!filteredRows.length) return [];
 
-  const viewerIds = rows.map((row) => row.viewer_id as string);
+  const viewerIds = filteredRows.map((row) => row.viewer_id as string);
 
+  const ownerId = storyOwnerId ?? "";
   const [profiles, followingIds, { data: followerRows }] = await Promise.all([
     getProfilesByIds(viewerIds),
-    getFollowingIds(storyOwnerId),
-    getSupabase().from("follows").select("follower_id").eq("following_id", storyOwnerId),
+    ownerId ? getFollowingIds(ownerId) : Promise.resolve([]),
+    ownerId
+      ? getSupabase().from("follows").select("follower_id").eq("following_id", ownerId)
+      : Promise.resolve({ data: [] as Array<{ follower_id: string }> }),
   ]);
 
   const followingSet = new Set(followingIds ?? []);
   const followsYouSet = new Set((followerRows ?? []).map((row) => row.follower_id as string));
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
-  return rows.map((row) => {
+  return filteredRows.map((row) => {
     const viewerId = row.viewer_id as string;
     const profile = profileById.get(viewerId);
     return {
@@ -421,20 +433,31 @@ async function mapStoryViewerRows(
   });
 }
 
+async function resolveStoryOwnerId(
+  storyId: string,
+  hintedOwnerId?: string | null
+): Promise<string | null> {
+  const ownerFromStory = await getStoryOwnerId(storyId);
+  return ownerFromStory ?? hintedOwnerId ?? null;
+}
+
+/** Unique viewer count for one story slide — story_slide_views is the display source of truth. */
 export async function getStoryViewerCount(
   storyOwnerId: string,
   storyId: string,
   slideId?: string | null
 ): Promise<number> {
-  const table = slideId ? "story_slide_views" : "story_item_views";
+  if (!slideId) return 0;
+
+  const ownerId = await resolveStoryOwnerId(storyId, storyOwnerId);
   let query = getSupabase()
-    .from(table)
+    .from("story_slide_views")
     .select("*", { count: "exact", head: true })
     .eq("story_id", storyId)
-    .neq("viewer_id", storyOwnerId);
+    .eq("slide_id", slideId);
 
-  if (slideId) {
-    query = query.eq("slide_id", slideId);
+  if (ownerId) {
+    query = query.neq("viewer_id", ownerId);
   }
 
   const { count, error } = await query;
@@ -448,22 +471,25 @@ export async function getStoryViewers(
   options?: { slideId?: string | null }
 ): Promise<StoryViewerRecord[]> {
   const slideId = options?.slideId ?? null;
-  const table = slideId ? "story_slide_views" : "story_item_views";
+  if (!slideId) return [];
 
-  let query = getSupabase()
-    .from(table)
+  const ownerId = await resolveStoryOwnerId(storyId, storyOwnerId);
+
+  const { data, error } = await getSupabase()
+    .from("story_slide_views")
     .select("viewer_id, viewed_at")
     .eq("story_id", storyId)
-    .neq("viewer_id", storyOwnerId)
+    .eq("slide_id", slideId)
     .order("viewed_at", { ascending: false });
 
-  if (slideId) {
-    query = query.eq("slide_id", slideId);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
-  return mapStoryViewerRows(storyOwnerId, (data ?? []) as Array<{ viewer_id: string; viewed_at: string }>);
+
+  const rows = excludeOwnerViewerRows(
+    (data ?? []) as Array<{ viewer_id: string; viewed_at: string }>,
+    ownerId
+  );
+
+  return mapStoryViewerRows(ownerId, rows);
 }
 
 export async function getStoryReactions(
@@ -514,14 +540,7 @@ export async function getDedicatedStoryAnalytics(storyId: string): Promise<Story
 
   const [viewsResult, reactionsResult, repliesResult, joinsResult, profileVisitsResult] =
     await Promise.all([
-    (() => {
-      let query = getSupabase()
-        .from("story_item_views")
-        .select("*", { count: "exact", head: true })
-        .eq("story_id", storyId);
-      if (storyOwnerId) query = query.neq("viewer_id", storyOwnerId);
-      return query;
-    })(),
+    getSupabase().from("story_slide_views").select("viewer_id").eq("story_id", storyId),
     getSupabase()
       .from("story_item_reactions")
       .select("*", { count: "exact", head: true })
@@ -542,9 +561,16 @@ export async function getDedicatedStoryAnalytics(storyId: string): Promise<Story
       .eq("event_type", "profile_visit"),
   ]);
 
+  const uniqueViewers = new Set<string>();
+  for (const row of viewsResult.data ?? []) {
+    const viewerId = row.viewer_id as string;
+    if (!viewerId || (storyOwnerId && viewerId === storyOwnerId)) continue;
+    uniqueViewers.add(viewerId);
+  }
+
   return {
     story_id: storyId,
-    views: viewsResult.count ?? 0,
+    views: uniqueViewers.size,
     reactions: reactionsResult.count ?? 0,
     replies: repliesResult.count ?? 0,
     challenge_joins: joinsResult.count ?? 0,

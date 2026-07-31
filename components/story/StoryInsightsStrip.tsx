@@ -4,6 +4,8 @@ import { colors, overlays, spacing, typography } from "@frennix/ui";
 
 interface StoryInsightsStripProps {
   insights: StoryInsights;
+  /** Per-slide unique viewer count — overrides insights.views when set. */
+  viewCount?: number;
   onViewsPress?: () => void;
   onReactionsPress?: () => void;
   onPress?: () => void;
@@ -12,12 +14,14 @@ interface StoryInsightsStripProps {
 /** Compact creator insights — tap views for viewer list. */
 export function StoryInsightsStrip({
   insights,
+  viewCount,
   onViewsPress,
   onReactionsPress,
   onPress,
 }: StoryInsightsStripProps) {
+  const views = viewCount ?? insights.views;
   const items = [
-    { label: "Views", value: insights.views, onPress: onViewsPress ?? onPress },
+    { label: "Views", value: views, onPress: onViewsPress ?? onPress },
     { label: "Reactions", value: insights.reactions, onPress: onReactionsPress ?? onPress },
     { label: "Replies", value: insights.replies, onPress },
   ].filter((item) => item.value > 0 || item.label === "Views");

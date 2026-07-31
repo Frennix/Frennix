@@ -11,7 +11,7 @@ export async function trackStoryEngagementEvent(input: {
 }) {
   const refId = input.storyId ?? input.postId;
   if (!refId) return;
-  if (input.viewerId === input.storyUserId && input.eventType !== "view") return;
+  if (input.viewerId === input.storyUserId) return;
 
   const { error } = await getSupabase().from("story_engagement_events").insert({
     viewer_id: input.viewerId,
@@ -46,9 +46,6 @@ export async function getDedicatedStoryInsights(storyId: string): Promise<StoryI
 
   for (const row of data ?? []) {
     switch (row.event_type as StoryEngagementEventType) {
-      case "view":
-        counts.views += 1;
-        break;
       case "reply":
         counts.replies += 1;
         break;
@@ -80,16 +77,19 @@ export async function getDedicatedStoryInsights(storyId: string): Promise<StoryI
   if (storyError) throw storyError;
   const storyOwnerId = (storyRow?.user_id as string | undefined) ?? null;
 
-  let viewCountQuery = getSupabase()
-    .from("story_item_views")
-    .select("*", { count: "exact", head: true })
+  const { data: slideViewRows, error: slideViewsError } = await getSupabase()
+    .from("story_slide_views")
+    .select("viewer_id, slide_id")
     .eq("story_id", storyId);
-  if (storyOwnerId) {
-    viewCountQuery = viewCountQuery.neq("viewer_id", storyOwnerId);
-  }
-  const { count: viewCount } = await viewCountQuery;
+  if (slideViewsError) throw slideViewsError;
 
-  if (viewCount != null) counts.views = Math.max(counts.views, viewCount);
+  const uniqueViewers = new Set<string>();
+  for (const row of slideViewRows ?? []) {
+    const viewerId = row.viewer_id as string;
+    if (!viewerId || (storyOwnerId && viewerId === storyOwnerId)) continue;
+    uniqueViewers.add(viewerId);
+  }
+  counts.views = uniqueViewers.size;
 
   const { count: reactionCount } = await getSupabase()
     .from("story_item_reactions")

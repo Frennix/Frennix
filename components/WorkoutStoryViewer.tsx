@@ -202,8 +202,9 @@ export interface WorkoutStoryViewerProps {
     options: { challengeId?: string | null; trainingChallengeId?: string | null }
   ) => void | Promise<void>;
   onOpenViewers?: (slideId: string | null) => void;
-  onOpenAnalytics?: () => void;
+  onOpenAnalytics?: (slideId: string | null) => void;
   onOpenReactions?: () => void;
+  onActiveSlideChange?: (storyId: string | null, slideId: string | null) => void;
   onFollow?: (storyUserId: string, isFollowing: boolean) => void | Promise<void>;
   onInviteToTrain?: (storyUserId: string, postId: string | null) => void | Promise<void>;
   onInviteToEvent?: (storyUserId: string, storyId: string) => void | Promise<void>;
@@ -232,6 +233,7 @@ export function WorkoutStoryViewer({
   onOpenViewers,
   onOpenAnalytics,
   onOpenReactions,
+  onActiveSlideChange,
   onFollow,
   onInviteToTrain,
   onInviteToEvent,
@@ -290,6 +292,20 @@ export function WorkoutStoryViewer({
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
+
+  useEffect(() => {
+    if (!visible) return;
+    onActiveSlideChange?.(
+      slideContext?.storyId ?? currentDedicatedStory?.id ?? null,
+      slideContext?.slideId ?? null
+    );
+  }, [
+    visible,
+    slideContext?.storyId,
+    slideContext?.slideId,
+    currentDedicatedStory?.id,
+    onActiveSlideChange,
+  ]);
 
   useEffect(() => {
     if (!visible || !story) return;
@@ -644,9 +660,10 @@ export function WorkoutStoryViewer({
             {story.is_self && storyInsights ? (
               <StoryInsightsStrip
                 insights={storyInsights}
+                viewCount={viewerCount}
                 onViewsPress={() => onOpenViewers?.(activeSlideIdForQuery)}
                 onReactionsPress={onOpenReactions}
-                onPress={onOpenAnalytics}
+                onPress={() => onOpenAnalytics?.(activeSlideIdForQuery)}
               />
             ) : null}
           </View>
