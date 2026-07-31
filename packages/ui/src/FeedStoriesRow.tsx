@@ -190,14 +190,11 @@ export function FeedStoriesRow({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle} numberOfLines={1}>
-          Stories
-        </Text>
+        <Text style={styles.sectionTitle}>Stories</Text>
         {onViewAllPress ? (
           <Pressable
             onPress={onViewAllPress}
             hitSlop={8}
-            style={styles.viewAllButton}
             accessibilityRole="button"
             accessibilityLabel="View all stories"
           >
@@ -229,7 +226,6 @@ export function FeedStoriesRow({
           data={stories}
           horizontal
           nestedScrollEnabled
-          style={styles.nativeList}
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.user_id}
           contentContainerStyle={styles.listContent}
@@ -253,9 +249,6 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
   Platform.OS === "web"
     ? ({
         touchAction: "pan-x pinch-zoom",
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
         height: STORY_ROW_MIN_HEIGHT,
         minHeight: STORY_ROW_MIN_HEIGHT,
         flexGrow: 0,
@@ -265,13 +258,10 @@ const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
 
 const styles = StyleSheet.create({
   container: {
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    overflow: "hidden",
     paddingBottom: feedLayout.feedChrome.storiesPaddingBottom,
     gap: spacing.xs,
     flexShrink: 0,
+    overflow: "visible",
     ...(Platform.OS === "web"
       ? ({ minHeight: STORY_SECTION_HEIGHT, flexBasis: "auto" } as ViewStyle)
       : null),
@@ -280,23 +270,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
     paddingHorizontal: spacing.md,
-    ...(Platform.OS === "web" ? ({ boxSizing: "border-box" } as ViewStyle) : null),
   },
   sectionTitle: {
     ...typography.section,
-    flex: 1,
-    minWidth: 0,
     fontSize: 17,
     color: colors.text,
     fontWeight: "800",
-  },
-  viewAllButton: {
-    flexShrink: 0,
-    marginLeft: spacing.sm + spacing.xxs,
   },
   viewAll: {
     ...typography.bodySmall,
@@ -304,18 +284,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   webListShell: {
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
     height: STORY_ROW_MIN_HEIGHT,
     minHeight: STORY_ROW_MIN_HEIGHT,
     flexShrink: 0,
-    overflow: "hidden",
-  },
-  nativeList: {
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
+    overflow: "visible",
   },
   listContent: {
     paddingHorizontal: spacing.md,
@@ -409,7 +381,7 @@ const styles = StyleSheet.create({
   streakBadge: {
     position: "absolute",
     bottom: 0,
-    right: 0,
+    right: -2,
     minWidth: 34,
     height: 22,
     borderRadius: radius.full,

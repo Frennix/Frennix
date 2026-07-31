@@ -15,7 +15,17 @@ interface FeedQuickActionCardsProps {
   style?: ViewStyle;
 }
 
-const ICON_SIZE = 56;
+const ICON_SIZE = 60;
+
+const webLabelStyle: ViewStyle =
+  Platform.OS === "web"
+    ? ({
+        whiteSpace: "nowrap",
+        overflow: "visible",
+        textOverflow: "clip",
+        wordBreak: "normal",
+      } as ViewStyle)
+    : {};
 
 export const FeedQuickActionCards = memo(function FeedQuickActionCards({
   actions,
@@ -24,23 +34,22 @@ export const FeedQuickActionCards = memo(function FeedQuickActionCards({
   return (
     <View style={[styles.row, style]} nativeID="feed-shortcut-row">
       {actions.map((action) => (
-        <ScalePressable
-          key={action.key}
-          onPress={action.onPress}
-          pressedScale={0.96}
-          containerStyle={styles.item}
-          accessibilityRole="button"
-          accessibilityLabel={action.title}
-        >
-          <View style={styles.itemInner}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.emoji}>{action.emoji}</Text>
+        <View key={action.key} style={styles.itemWrap}>
+          <ScalePressable
+            onPress={action.onPress}
+            pressedScale={0.96}
+            containerStyle={styles.itemPressable}
+            accessibilityRole="button"
+            accessibilityLabel={action.title}
+          >
+            <View style={styles.item}>
+              <View style={styles.iconCircle}>
+                <Text style={styles.emoji}>{action.emoji}</Text>
+              </View>
+              <Text style={styles.label}>{action.title}</Text>
             </View>
-            <Text style={styles.label} numberOfLines={1}>
-              {action.title}
-            </Text>
-          </View>
-        </ScalePressable>
+          </ScalePressable>
+        </View>
       ))}
     </View>
   );
@@ -50,20 +59,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
+    justifyContent: "space-between",
     width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    alignSelf: "stretch",
-    flexShrink: 1,
-    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
     paddingVertical: spacing.xxs,
   },
-  item: {
-    flex: 1,
+  itemWrap: {
+    width: "25%",
     minWidth: 0,
-    alignItems: "center",
+    flexGrow: 0,
+    flexShrink: 0,
   },
-  itemInner: {
+  itemPressable: {
+    width: "100%",
+  },
+  item: {
     width: "100%",
     minWidth: 0,
     alignItems: "center",
@@ -86,16 +96,18 @@ const styles = StyleSheet.create({
       : null),
   },
   emoji: {
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 24,
+    lineHeight: 28,
   },
   label: {
     width: "100%",
     minWidth: 0,
     color: colors.textMuted,
     fontWeight: "600",
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 15,
     textAlign: "center",
+    flexShrink: 0,
+    ...webLabelStyle,
   },
 });

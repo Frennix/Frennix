@@ -13,6 +13,7 @@ export interface FeedPostActionBarProps {
   onStrongWork?: () => void;
   onComment?: () => void;
   onShare?: () => void;
+  onMore?: () => void;
 }
 
 export const FeedPostActionBar = memo(function FeedPostActionBar({
@@ -22,8 +23,9 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
   onStrongWork,
   onComment,
   onShare,
+  onMore,
 }: FeedPostActionBarProps) {
-  const hasActions = onLike || onStrongWork || onComment || onShare;
+  const hasActions = onLike || onStrongWork || onComment || onShare || onMore;
   if (!hasActions) return null;
 
   return (
@@ -43,7 +45,6 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={[styles.label, liked && styles.labelActive]}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            numberOfLines={1}
           >
             {liked ? "❤️" : "🤍"} Like
           </Text>
@@ -65,7 +66,6 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={[styles.label, strongWorkActive && styles.labelActive]}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            numberOfLines={1}
           >
             {STRONG_WORK_EMOJI} Respect
           </Text>
@@ -78,7 +78,6 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={styles.label}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            numberOfLines={1}
           >
             💬 Comment
           </Text>
@@ -91,9 +90,24 @@ export const FeedPostActionBar = memo(function FeedPostActionBar({
             style={styles.label}
             allowFontScaling
             maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
-            numberOfLines={1}
           >
             📤 Share
+          </Text>
+        </ActionButton>
+      ) : null}
+
+      {onMore ? (
+        <ActionButton
+          label="More post actions"
+          hint="Opens menu with save, reply, and more"
+          onPress={onMore}
+        >
+          <Text
+            style={styles.moreLabel}
+            allowFontScaling
+            maxFontSizeMultiplier={feedAccessibility.maxFontSizeMultiplier}
+          >
+            ⋯ More
           </Text>
         </ActionButton>
       ) : null}
@@ -133,10 +147,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    gap: spacing.xxs,
+    flexWrap: "wrap",
+    gap: feedLayout.actions.gap,
     minHeight: feedLayout.actions.rowHeight,
     borderTopWidth: 1,
     borderTopColor: colors.borderSubtle,
@@ -144,21 +156,25 @@ const styles = StyleSheet.create({
     paddingTop: feedLayout.actions.paddingTop,
   },
   button: {
-    flex: 1,
-    minWidth: 0,
+    minWidth: touchTarget,
     minHeight: touchTarget,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 1,
+    paddingHorizontal: 4,
   },
   label: {
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 14,
+    lineHeight: 18,
     color: colors.textSecondary,
     fontWeight: "700",
-    textAlign: "center",
   },
   labelActive: {
     color: colors.accent,
+  },
+  moreLabel: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: colors.textMuted,
+    fontWeight: "700",
   },
 });

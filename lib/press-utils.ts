@@ -1,10 +1,8 @@
 import { router, type Href } from "expo-router";
-import { scheduleWebViewportNormalize } from "@/lib/web-viewport-normalize";
 
 /** Push a stack/modal screen immediately (no deferred queue). */
 export function pushScreen(href: Href) {
   router.push(href);
-  scheduleWebViewportNormalize();
 }
 
 /** Switch an existing bottom tab without stacking duplicate tab routes. */
@@ -13,7 +11,6 @@ export function switchTab(href: Href) {
     router.dismissAll();
   }
   router.navigate(href);
-  scheduleWebViewportNormalize();
 }
 
 /** @deprecated Use pushScreen — kept for call-site compatibility. */
@@ -45,7 +42,6 @@ export function openCreatePost() {
   if (createPostNavLocked) return;
   createPostNavLocked = true;
   router.push("/create-post");
-  scheduleWebViewportNormalize();
   setTimeout(() => {
     createPostNavLocked = false;
   }, 400);
@@ -58,7 +54,6 @@ export function openCreateStory() {
   if (createStoryNavLocked) return;
   createStoryNavLocked = true;
   router.push("/create-story");
-  scheduleWebViewportNormalize();
   setTimeout(() => {
     createStoryNavLocked = false;
   }, 400);

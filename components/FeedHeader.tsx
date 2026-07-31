@@ -2,12 +2,12 @@ import { memo, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import type { FeedStory, SuggestedAthlete } from "@frennix/types";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
-import { FeedSearchSection } from "@/components/FeedSearchSection";
 import {
   FeedHeroBanner,
   FeedQuickActionCards,
   FeedStoriesRow,
   PeopleYouMayKnowCarousel,
+  colors,
   feedLayout,
   spacing,
 } from "@frennix/ui";
@@ -54,21 +54,13 @@ export const FeedHeader = memo(function FeedHeader({
 
   return (
     <View style={styles.container}>
-      <View style={styles.paddedSection}>
-        <SectionErrorBoundary label="feed-search-bar" compact>
-          <FeedSearchSection />
-        </SectionErrorBoundary>
-      </View>
-
       {showHero ? (
-        <View style={styles.paddedSection}>
-          <SectionErrorBoundary label="feed-hero-banner" compact>
-            <FeedHeroBanner
-              onFindAthletes={() => switchTab("/(tabs)/discover")}
-              onShareWorkout={openCreatePost}
-            />
-          </SectionErrorBoundary>
-        </View>
+        <SectionErrorBoundary label="feed-hero-banner" compact>
+          <FeedHeroBanner
+            onFindAthletes={() => switchTab("/(tabs)/discover")}
+            onShareWorkout={openCreatePost}
+          />
+        </SectionErrorBoundary>
       ) : null}
 
       {showStories || showQuickActions ? (
@@ -86,26 +78,26 @@ export const FeedHeader = memo(function FeedHeader({
 
           {showQuickActions ? (
             <SectionErrorBoundary label="feed-quick-actions" compact>
-              <FeedQuickActionCards actions={quickActions} />
+              <View nativeID="feed-shortcut-row">
+                <FeedQuickActionCards actions={quickActions} />
+              </View>
             </SectionErrorBoundary>
           ) : null}
         </View>
       ) : null}
 
       {showSuggestions && suggestions.length > 0 ? (
-        <View style={styles.paddedSection}>
-          <SectionErrorBoundary label="feed-suggestions-carousel" compact>
-            <PeopleYouMayKnowCarousel
-              suggestions={suggestions}
-              followingIds={followingIds}
-              onProfilePress={(username) => pushScreen(`/user/${username}`)}
-              onFollowPress={onFollowPress}
-              onDismissPress={onDismissPress}
-              followLoadingId={followLoadingId}
-              dismissLoadingId={dismissLoadingId}
-            />
-          </SectionErrorBoundary>
-        </View>
+        <SectionErrorBoundary label="feed-suggestions-carousel" compact>
+          <PeopleYouMayKnowCarousel
+            suggestions={suggestions}
+            followingIds={followingIds}
+            onProfilePress={(username) => pushScreen(`/user/${username}`)}
+            onFollowPress={onFollowPress}
+            onDismissPress={onDismissPress}
+            followLoadingId={followLoadingId}
+            dismissLoadingId={dismissLoadingId}
+          />
+        </SectionErrorBoundary>
       ) : null}
     </View>
   );
@@ -114,27 +106,12 @@ export const FeedHeader = memo(function FeedHeader({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "transparent",
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    alignSelf: "stretch",
-    flexShrink: 1,
-    overflow: "hidden",
+    paddingHorizontal: spacing.md,
     paddingTop: feedLayout.feedChrome.paddingTop,
     paddingBottom: feedLayout.feedChrome.paddingBottom,
     gap: feedLayout.feedChrome.sectionGap,
   },
-  paddedSection: {
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    paddingHorizontal: spacing.md,
-  },
   storiesShortcutsGroup: {
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    overflow: "hidden",
     gap: spacing.xxs,
   },
 });

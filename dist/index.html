@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 28b26bbf</title>
+    <title>Frennix · dae8631f</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="28b26bbff76744e912062913670e4146722dc5a7" />
-    <meta name="frennix-build-bundle" content="index-3b37f6e4098ae3e4b1fa9f28f625fbae.js" />
-    <meta name="frennix-build-at" content="2026-07-31T00:05:10.994Z" />
+    <meta name="frennix-build-sha" content="dae8631f4337c3a81965dbdaef016007ec279687" />
+    <meta name="frennix-build-bundle" content="index-10a9abe39b37582822fa00d59bead1fa.js" />
+    <meta name="frennix-build-at" content="2026-07-31T00:18:40.038Z" />
     <meta name="frennix-sw-version" content="20260727-pwa-auto-update-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -42,25 +42,7 @@
     height: 100%;
     height: -webkit-fill-available;
     min-height: 100%;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    overflow-x: clip;
-    overscroll-behavior-x: none;
-    box-sizing: border-box;
     background-color: #0A0A0B;
-  }
-  @supports not (overflow-x: clip) {
-    html {
-      overflow-x: hidden;
-    }
-  }
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
   }
   body {
     display: flex;
@@ -69,59 +51,19 @@
     min-height: 100dvh;
     min-height: -webkit-fill-available;
     margin: 0;
-    padding: 0;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: clip;
-    overscroll-behavior-x: none;
     background-color: #0A0A0B;
     overflow: hidden;
-  }
-  @supports not (overflow-x: clip) {
-    body {
-      overflow-x: hidden;
-    }
   }
   #root {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    position: relative;
     width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 0;
     height: 100%;
     min-height: 100%;
     min-height: 0;
-    overflow-x: clip;
-    overscroll-behavior-x: none;
-    box-sizing: border-box;
     background-color: #0A0A0B;
     pointer-events: auto;
-    transform: none;
-  }
-  @supports not (overflow-x: clip) {
-    #root {
-      overflow-x: hidden;
-    }
-  }
-  #root,
-  #app-root-shell,
-  #feed-tab-scene,
-  [id^="screen-"] {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    transform: none !important;
-    box-sizing: border-box !important;
   }
   #app-root-shell {
     position: relative !important;
@@ -129,11 +71,6 @@
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    transform: none !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
@@ -159,11 +96,6 @@
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    transform: none !important;
     min-height: var(--frennix-tab-scene-min-h) !important;
     min-height: var(--frennix-tab-scene-min-h-svh) !important;
     overflow: hidden !important;
@@ -175,54 +107,19 @@
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
     min-height: max(200px, calc(100dvh - var(--frennix-tab-chrome-h) - var(--frennix-tab-header-h))) !important;
     overflow: hidden !important;
-    overflow-x: hidden !important;
-    box-sizing: border-box !important;
     background-color: #0A0A0B !important;
   }
   #feed-scroll-list,
   #discover-scroll,
   #calendar-scroll {
     flex: 1 1 auto !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
     min-height: 0 !important;
-    overflow-x: hidden !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
-    box-sizing: border-box !important;
     background-color: #0A0A0B !important;
-  }
-  #feed-search-section,
-  #feed-search-bar {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow-x: hidden !important;
-    box-sizing: border-box !important;
-  }
-  #discover-scroll [data-focusable="true"],
-  #discover-scroll input,
-  #discover-scroll textarea {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-  #feed-search-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100dvh !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    box-sizing: border-box !important;
-    z-index: 9999 !important;
-    background-color: #0B0B0D !important;
   }
   /* Tab bar + home-indicator safe area — never show default white. */
   [role="tablist"] {
@@ -328,7 +225,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="28b26bbff76744e912062913670e4146722dc5a7" data-bundle="index-3b37f6e4098ae3e4b1fa9f28f625fbae.js" data-sw="20260727-pwa-auto-update-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="dae8631f4337c3a81965dbdaef016007ec279687" data-bundle="index-10a9abe39b37582822fa00d59bead1fa.js" data-sw="20260727-pwa-auto-update-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -374,7 +271,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-3b37f6e4098ae3e4b1fa9f28f625fbae.js?v=28b26bbf" defer></script>
+  <script src="/_expo/static/js/web/index-10a9abe39b37582822fa00d59bead1fa.js?v=dae8631f" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

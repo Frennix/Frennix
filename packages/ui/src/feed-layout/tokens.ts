@@ -161,10 +161,9 @@ export const feedLayoutTypography = {
 
 export const feedLayoutStyles = StyleSheet.create({
   root: {
-    alignSelf: "stretch",
-    maxWidth: Platform.OS === "web" ? feedLayout.maxContentWidth : "100%",
-    minWidth: 0,
-    flexShrink: 1,
+    width: "100%",
+    maxWidth: Platform.OS === "web" ? feedLayout.maxContentWidth : undefined,
+    alignSelf: Platform.OS === "web" ? "center" : undefined,
     backgroundColor: colors.surfaceCard,
     borderRadius: feedLayout.postRadius,
     borderWidth: 1,
@@ -183,21 +182,17 @@ export const feedLayoutStyles = StyleSheet.create({
   },
   /** Shared content column — every section is full width of the padded post root. */
   contentColumn: {
-    alignSelf: "stretch",
-    maxWidth: "100%",
-    minWidth: 0,
+    width: "100%",
+    alignSelf: "stretch" as const,
   },
   contentInset: {
-    alignSelf: "stretch",
-    maxWidth: "100%",
-    minWidth: 0,
+    width: "100%",
+    alignSelf: "stretch" as const,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "stretch",
-    maxWidth: "100%",
-    minWidth: 0,
+    width: "100%",
     paddingTop: feedLayout.header.paddingTop,
     paddingBottom: feedLayout.header.paddingBottom,
     gap: feedLayout.header.gap,
@@ -205,7 +200,6 @@ export const feedLayoutStyles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-    minWidth: 0,
     gap: feedLayout.header.nameGap,
   },
   media: {
@@ -224,9 +218,7 @@ export const feedLayoutStyles = StyleSheet.create({
     overflow: "hidden",
   },
   actions: {
-    alignSelf: "stretch",
-    maxWidth: "100%",
-    minWidth: 0,
+    width: "100%",
     paddingTop: feedLayout.actions.paddingTop,
     paddingBottom: feedLayout.actions.paddingBottom,
   },
@@ -252,10 +244,6 @@ export const feedLayoutStyles = StyleSheet.create({
   headerTrailing: {
     alignSelf: "flex-start" as const,
     marginTop: 2,
-    flexShrink: 0,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: spacing.xxs,
   },
   belowMedia: {
     width: "100%",

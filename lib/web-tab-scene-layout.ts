@@ -25,9 +25,6 @@ export function webTabSceneContainerStyle(): ViewStyle {
     minHeight: 0,
     flexBasis: 0,
     width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    alignSelf: "stretch",
     overflow: "hidden",
   };
 }

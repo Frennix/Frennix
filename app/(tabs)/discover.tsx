@@ -1,17 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import {
-  FlatList,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  ActivityIndicator,
-} from "react-native";
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
 import { DiscoverLifestyleFilters } from "@/components/DiscoverLifestyleFilters";
@@ -52,7 +42,6 @@ import {
   useTabScreenWebHeightStyle,
 } from "@/lib/screen-shell";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
-import { scheduleWebViewportNormalize } from "@/lib/web-viewport-normalize";
 import {
   DiscoverProfileCard,
   EmptyState,
@@ -85,14 +74,9 @@ const DISCOVER_LIST_PERF = {
 
 export default function DiscoverScreen() {
   const { session, profile: viewerProfile } = useAuth();
-  const { focusSearch, openFilters } = useLocalSearchParams<{
-    focusSearch?: string;
-    openFilters?: string;
-  }>();
   const userId = session?.user.id ?? "";
   const webContainerStyle = useTabScreenWebContainerStyle();
   const webHeightStyle = useTabScreenWebHeightStyle();
-  const peopleSearchRef = useRef<TextInput>(null);
   const [tab, setTab] = useState<Tab>("people");
   const [peopleSearch, setPeopleSearch] = useState("");
   const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
@@ -109,21 +93,6 @@ export default function DiscoverScreen() {
     const timer = setTimeout(() => setDebouncedPeopleSearch(peopleSearch.trim()), 300);
     return () => clearTimeout(timer);
   }, [peopleSearch]);
-
-  useEffect(() => {
-    if (focusSearch !== "1" && openFilters !== "1") return;
-    setTab("people");
-    let focusTimer: ReturnType<typeof setTimeout> | undefined;
-    if (focusSearch === "1") {
-      focusTimer = setTimeout(() => {
-        peopleSearchRef.current?.focus();
-      }, 120);
-    }
-    router.setParams({ focusSearch: undefined, openFilters: undefined });
-    return () => {
-      if (focusTimer) clearTimeout(focusTimer);
-    };
-  }, [focusSearch, openFilters]);
 
   const isSearchingPeople = debouncedPeopleSearch.length > 0;
   const lifestyleFiltersActive = hasActiveDiscoverFilters(discoverFilters);
@@ -319,12 +288,6 @@ export default function DiscoverScreen() {
     resetAtTop();
   }, [resetAtTop, tab]);
 
-  useFocusEffect(
-    useCallback(() => {
-      scheduleWebViewportNormalize();
-    }, [])
-  );
-
   useTabScrollRegistration(
     "discover",
     useCallback(() => {
@@ -379,14 +342,11 @@ export default function DiscoverScreen() {
         {tab === "people" ? (
           <View style={styles.searchBlock}>
             <Input
-              ref={peopleSearchRef}
               placeholder="Search by name, interests, workout type, or bio..."
               value={peopleSearch}
               onChangeText={setPeopleSearch}
               autoCapitalize="none"
               autoCorrect={false}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
             />
             <Text style={styles.searchHint}>
               Try &quot;basketball&quot;, &quot;yoga&quot;, or a name from someone&apos;s bio
@@ -663,16 +623,8 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    ...tabScreenContainer,
-    padding: spacing.md,
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    alignSelf: "stretch",
-    overflow: "hidden",
-  },
-  header: { ...typography.heading, marginBottom: spacing.sm, width: "100%", maxWidth: "100%" },
+  container: { ...tabScreenContainer, padding: spacing.md },
+  header: { ...typography.heading, marginBottom: spacing.sm },
   matchingSectionTitle: {
     ...typography.bodySmall,
     fontWeight: "700",
@@ -681,13 +633,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: spacing.sm,
   },
-  matchingCards: {
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-  },
+  matchingCards: { gap: spacing.sm, marginBottom: spacing.md },
   matchingCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -697,10 +643,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    overflow: "hidden",
   },
   matchingCardIcon: {
     width: 44,
@@ -710,29 +652,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  matchingCardCopy: { flex: 1, minWidth: 0, gap: 4 },
+  matchingCardCopy: { flex: 1, gap: 4 },
   matchingCardTitle: { ...typography.body, fontWeight: "700" },
   matchingCardBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
-  searchBlock: {
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    overflow: "hidden",
-  },
+  searchBlock: { gap: spacing.xs, marginBottom: spacing.xs },
   searchHint: { ...typography.caption, color: colors.textMuted },
-  tabRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginVertical: spacing.md,
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-  },
+  tabRow: { flexDirection: "row", gap: spacing.sm, marginVertical: spacing.md },
   tab: {
     flex: 1,
-    minWidth: 0,
     paddingVertical: spacing.sm,
     alignItems: "center",
     borderRadius: 8,
@@ -745,7 +672,7 @@ const styles = StyleSheet.create({
   sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   sectionTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   sectionBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
-  list: { paddingBottom: spacing.xxl, width: "100%", maxWidth: "100%", minWidth: 0 },
+  list: { paddingBottom: spacing.xxl },
   createLink: { color: colors.accent, fontWeight: "600", marginBottom: spacing.md },
   loader: { marginVertical: spacing.md },
 });

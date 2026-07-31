@@ -15,7 +15,6 @@ export * from "./feed-layout";
 export * from "./FeedMediaSlot";
 export * from "./FeedStoriesRow";
 export * from "./FeedHeroBanner";
-export * from "./FeedSearchBar";
 export * from "./FeedQuickActionCards";
 export * from "./WorkoutStatsPills";
 export * from "./PeopleYouMayKnowCarousel";
