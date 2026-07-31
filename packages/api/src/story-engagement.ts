@@ -397,7 +397,7 @@ async function mapStoryViewerRows(
     getSupabase().from("follows").select("follower_id").eq("following_id", storyOwnerId),
   ]);
 
-  const followingSet = new Set(followingIds);
+  const followingSet = new Set(followingIds ?? []);
   const followsYouSet = new Set((followerRows ?? []).map((row) => row.follower_id as string));
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 

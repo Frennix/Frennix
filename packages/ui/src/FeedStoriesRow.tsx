@@ -24,13 +24,13 @@ function storyLabel(item: FeedStory): string {
   if (!latest) return item.is_self ? "Your Story" : "No story yet";
   const time = formatRelativeTime(latest.created_at);
   if (latest.workout_tag) return `${latest.workout_tag} · ${time}`;
-  const slideCount = latest.slides.length;
+  const slideCount = latest.slides?.length ?? 0;
   if (slideCount > 1) return `${slideCount} slides · ${time}`;
   return `Story · ${time}`;
 }
 
 function storyProgress(item: FeedStory): number {
-  const slides = item.active_stories.at(-1)?.slides.length ?? 0;
+  const slides = item.active_stories.at(-1)?.slides?.length ?? 0;
   if (slides <= 1) return item.viewed ? 1 : 0.35;
   return Math.min(1, 0.25 + slides * 0.12);
 }

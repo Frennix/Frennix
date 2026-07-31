@@ -307,9 +307,13 @@ export default function CreateStoryScreen() {
 
             {slides.length ? (
               <ReorderablePhotoStrip
-                items={slides.map((slide) => slide.uri)}
+                photos={slides.map((slide) => ({
+                  uri: slide.uri,
+                  key: slide.localId,
+                }))}
                 onReorder={reorderSlides}
                 onRemove={removeSlideAt}
+                disabled={loading}
               />
             ) : null}
           </>

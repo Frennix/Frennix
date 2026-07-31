@@ -134,7 +134,7 @@ export function buildDedicatedStorySlides(stories: FrennixStory[]): WorkoutStory
 
   const slides: WorkoutStorySlide[] = [];
   for (const story of stories) {
-    for (const slide of story.slides) {
+    for (const slide of story.slides ?? []) {
       slides.push(dedicatedSlideToViewerSlide(slide, story, story.location_name));
     }
   }
@@ -181,7 +181,7 @@ export function resolveSlideContext(
 ): { storyId: string; slideId: string | null; storyOwnerId: string } | null {
   let cursor = 0;
   for (const story of stories) {
-    for (const slide of story.slides) {
+    for (const slide of story.slides ?? []) {
       if (cursor === flatIndex) {
         return { storyId: story.id, slideId: slide.id, storyOwnerId: story.user_id };
       }

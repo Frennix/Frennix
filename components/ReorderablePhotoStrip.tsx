@@ -128,17 +128,18 @@ function DraggablePhotoTile({
 }
 
 export function ReorderablePhotoStrip({
-  photos,
+  photos = [],
   onReorder,
   onRemove,
   disabled,
 }: ReorderablePhotoStripProps) {
+  const safePhotos = photos ?? [];
   const photoRows = useMemo(
-    () => photos.map((photo, index) => ({ ...photo, index })),
-    [photos]
+    () => safePhotos.map((photo, index) => ({ ...photo, index })),
+    [safePhotos]
   );
 
-  if (!photos.length) return null;
+  if (!safePhotos.length) return null;
 
   return (
     <View style={styles.strip}>
@@ -148,14 +149,14 @@ export function ReorderablePhotoStrip({
             key={key}
             photo={{ uri, key }}
             index={index}
-            total={photos.length}
+            total={safePhotos.length}
             disabled={disabled}
             onRemove={onRemove}
             onReorder={onReorder}
           />
         ))}
       </View>
-      {photos.length > 1 ? (
+      {safePhotos.length > 1 ? (
         <Text style={styles.hint}>
           {Platform.OS === "web"
             ? "Press and drag photos to reorder. The first photo is the cover."

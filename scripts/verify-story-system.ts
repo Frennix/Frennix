@@ -94,6 +94,18 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => mustInclude("components/story/StoryViewerEyeButton.tsx", "Eye", "ui"),
   },
   {
+    name: "ui:create-story photo strip",
+    run: () => {
+      const src = read("app/create-story.tsx");
+      if (!src.includes("photos={slides.map")) {
+        throw new Error("create-story must pass photos prop to ReorderablePhotoStrip");
+      }
+      if (src.includes("items={slides.map")) {
+        throw new Error("create-story must not use invalid items prop on ReorderablePhotoStrip");
+      }
+    },
+  },
+  {
     name: "ui:analytics modal",
     run: () => mustInclude("components/story/StoryAnalyticsModal.tsx", "Story Analytics", "ui"),
   },
