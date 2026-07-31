@@ -8,7 +8,7 @@ import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { TabPrefetchCoordinator } from "@/components/TabPrefetchCoordinator";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { FeedHeaderTitle } from "@/components/FeedHeaderTitle";
-import { FrennixBrandMark, FrennixLogo } from "@/components/FrennixLogo";
+import { FrennixTabHeaderLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
@@ -70,8 +70,7 @@ const TabsShell = memo(function TabsShell() {
     () => <FeedHeaderTitle displayName={profile?.display_name} />,
     [profile?.display_name]
   );
-  const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
-  const renderProfileHeaderTitle = useCallback(() => <FrennixBrandMark />, []);
+  const renderTabHeaderLogo = useCallback(() => <FrennixTabHeaderLogo />, []);
   const renderHeaderBell = useCallback(
     () => (isolateNotificationBadge ? null : <HeaderBell />),
     [isolateNotificationBadge]
@@ -154,7 +153,7 @@ const TabsShell = memo(function TabsShell() {
         name="events"
         options={{
           title: "Calendar",
-          headerTitle: renderEventsHeaderTitle,
+          headerTitle: renderTabHeaderLogo,
           tabBarLabel: "Calendar",
           tabBarIcon: ({ color, size }) => <AppIcon name="events" color={color} size={size} />,
           headerRight: renderHeaderBell,
@@ -195,8 +194,7 @@ const TabsShell = memo(function TabsShell() {
         name="profile"
         options={{
           title: "Profile",
-          headerTitle: renderProfileHeaderTitle,
-          headerTitleContainerStyle: styles.profileHeaderTitleContainer,
+          headerTitle: renderTabHeaderLogo,
           tabBarIcon: ({ color, size }) => <AppIcon name="profile" color={color} size={size} />,
           headerRight: renderProfileHeader,
           tabBarButton: (props) => (
@@ -236,10 +234,6 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   headerRight: { marginRight: 16 },
   profileHeaderWrap: { marginRight: 16 },
-  profileHeaderTitleContainer: {
-    overflow: "visible",
-    flexShrink: 0,
-  },
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",

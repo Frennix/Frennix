@@ -16,7 +16,10 @@ import { CachedAssetImage } from "@frennix/ui";
  */
 export type FrennixLogoVariant = "full" | "icon" | "mark";
 
-/** Shared compact symbol size for profile header, settings, and similar surfaces. */
+/** Tab header wordmark height — Calendar, Profile, and other top-bar logos. */
+export const FRENNIX_TAB_HEADER_LOGO_HEIGHT = 34;
+
+/** Shared compact symbol size for settings and similar in-content surfaces. */
 export const FRENNIX_BRAND_MARK_SIZE = 32;
 
 const SOURCES: Record<FrennixLogoVariant, number> = {
@@ -218,7 +221,25 @@ export function FrennixLogo({
   );
 }
 
-/** Profile header, settings, and other compact brand surfaces — same symbol sizing everywhere. */
+/** Calendar / Profile tab headers — full wordmark at the shared tab-bar size. */
+export function FrennixTabHeaderLogo({
+  style,
+  accessibilityLabel = "Frennix",
+}: {
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+}) {
+  return (
+    <FrennixLogo
+      variant="full"
+      height={FRENNIX_TAB_HEADER_LOGO_HEIGHT}
+      style={style}
+      accessibilityLabel={accessibilityLabel}
+    />
+  );
+}
+
+/** Settings and other compact brand surfaces — symbol only. */
 export function FrennixBrandMark({
   style,
   accessibilityLabel = "Frennix",
