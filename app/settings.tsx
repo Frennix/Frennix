@@ -17,7 +17,7 @@ import { config } from "@/lib/config";
 import { unregisterPushNotifications } from "@/lib/notifications";
 import { pushScreen } from "@/lib/press-utils";
 import { useStaffAccess } from "@/lib/founder/useStaffAccess";
-import { FrennixLogo } from "@/components/FrennixLogo";
+import { FrennixBrandMark } from "@/components/FrennixLogo";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
 function formatUsername(username: string | null | undefined) {
@@ -79,7 +79,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
+      <FrennixBrandMark style={styles.brandMark} />
       <Text style={styles.section}>Account</Text>
       <Text style={styles.row}>{formatUsername(profile?.username)}</Text>
 

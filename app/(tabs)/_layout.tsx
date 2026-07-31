@@ -8,7 +8,7 @@ import { FastTabBarButton } from "@/components/FastTabBarButton";
 import { TabPrefetchCoordinator } from "@/components/TabPrefetchCoordinator";
 import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { FeedHeaderTitle } from "@/components/FeedHeaderTitle";
-import { FrennixLogo } from "@/components/FrennixLogo";
+import { FrennixBrandMark, FrennixLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
@@ -71,7 +71,7 @@ const TabsShell = memo(function TabsShell() {
     [profile?.display_name]
   );
   const renderEventsHeaderTitle = useCallback(() => <FrennixLogo variant="full" height={34} />, []);
-  const renderProfileHeaderTitle = useCallback(() => <FrennixLogo variant="icon" height={24} />, []);
+  const renderProfileHeaderTitle = useCallback(() => <FrennixBrandMark />, []);
   const renderHeaderBell = useCallback(
     () => (isolateNotificationBadge ? null : <HeaderBell />),
     [isolateNotificationBadge]
@@ -196,6 +196,7 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Profile",
           headerTitle: renderProfileHeaderTitle,
+          headerTitleContainerStyle: styles.profileHeaderTitleContainer,
           tabBarIcon: ({ color, size }) => <AppIcon name="profile" color={color} size={size} />,
           headerRight: renderProfileHeader,
           tabBarButton: (props) => (
@@ -235,6 +236,10 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   headerRight: { marginRight: 16 },
   profileHeaderWrap: { marginRight: 16 },
+  profileHeaderTitleContainer: {
+    overflow: "visible",
+    flexShrink: 0,
+  },
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",
