@@ -20,7 +20,7 @@ export const LOGIN_HERO_ALT =
 const HERO_HEIGHT_RATIO = 0.34;
 const HERO_MIN_HEIGHT = 228;
 const HERO_MAX_HEIGHT = 340;
-const HERO_EXTRA_TOP_SAFE_AREA = 24;
+const HERO_COPY_BOTTOM_CLEARANCE = spacing.xxl;
 
 type LoginHeroSectionProps = {
   style?: StyleProp<ViewStyle>;
@@ -109,15 +109,10 @@ export function LoginHeroSection({
       <View
         style={[
           styles.overlayContent,
-          { paddingTop: topInset + spacing.lg + spacing.sm },
+          { paddingBottom: HERO_COPY_BOTTOM_CLEARANCE },
         ]}
       >
-        <View
-          style={[
-            styles.brandingStack,
-            { transform: [{ translateY: HERO_EXTRA_TOP_SAFE_AREA }] },
-          ]}
-        >
+        <View style={styles.brandingStack}>
           <Animated.View style={[styles.logoWrap, { opacity: logoOpacity }]}>
             <FrennixLogo variant="mark" height={tight ? 62 : 76} style={styles.logo} />
           </Animated.View>
@@ -134,7 +129,7 @@ export function LoginHeroSection({
             </Text>
 
             {showSupporting && !tight ? (
-              <Text style={styles.supporting}>
+              <Text style={styles.supporting} accessibilityRole="text">
                 A fitness community built to help real people stay motivated and consistent.
               </Text>
             ) : null}
@@ -208,7 +203,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: -1,
-    height: 48,
+    height: 24,
     backgroundColor: colors.background,
   },
   overlayContent: {
@@ -216,7 +211,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    zIndex: 2,
   },
   brandingStack: {
     width: "100%",
@@ -234,6 +229,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignItems: "center",
     gap: spacing.sm,
+    flexShrink: 1,
   },
   headlineStack: {
     alignItems: "center",
@@ -264,9 +260,19 @@ const styles = StyleSheet.create({
   },
   supporting: {
     ...typography.bodySmall,
+    width: "100%",
+    maxWidth: 420,
     textAlign: "center",
     color: colors.textSecondary,
     lineHeight: 20,
     paddingHorizontal: spacing.sm,
+    flexShrink: 1,
+    ...(Platform.OS === "web"
+      ? ({
+          overflow: "visible",
+          whiteSpace: "normal",
+          wordWrap: "break-word",
+        } as object)
+      : null),
   },
 });
