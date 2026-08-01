@@ -20,6 +20,7 @@ export const LOGIN_HERO_ALT =
 const HERO_HEIGHT_RATIO = 0.34;
 const HERO_MIN_HEIGHT = 228;
 const HERO_MAX_HEIGHT = 340;
+const HERO_EXTRA_TOP_SAFE_AREA = 24;
 
 type LoginHeroSectionProps = {
   style?: StyleProp<ViewStyle>;
@@ -105,29 +106,41 @@ export function LoginHeroSection({
       )}
       <View style={styles.heroScrimFade} pointerEvents="none" />
 
-      <View style={[styles.overlayContent, { paddingTop: topInset + spacing.lg + spacing.sm }]}>
-        <Animated.View style={[styles.logoWrap, { opacity: logoOpacity }]}>
-          <FrennixLogo variant="mark" height={tight ? 62 : 76} style={styles.logo} />
-        </Animated.View>
+      <View
+        style={[
+          styles.overlayContent,
+          { paddingTop: topInset + spacing.lg + spacing.sm },
+        ]}
+      >
+        <View
+          style={[
+            styles.brandingStack,
+            { transform: [{ translateY: HERO_EXTRA_TOP_SAFE_AREA }] },
+          ]}
+        >
+          <Animated.View style={[styles.logoWrap, { opacity: logoOpacity }]}>
+            <FrennixLogo variant="mark" height={tight ? 62 : 76} style={styles.logo} />
+          </Animated.View>
 
-        <Animated.View style={[styles.copyBlock, { opacity: copyOpacity }]}>
-          <View style={styles.headlineStack} accessibilityRole="header">
-            <Text style={styles.headlineLine}>CONNECT.</Text>
-            <Text style={[styles.headlineLine, styles.headlineAccent]}>TRAIN.</Text>
-            <Text style={styles.headlineLine}>ACHIEVE.</Text>
-          </View>
+          <Animated.View style={[styles.copyBlock, { opacity: copyOpacity }]}>
+            <View style={styles.headlineStack} accessibilityRole="header">
+              <Text style={styles.headlineLine}>CONNECT.</Text>
+              <Text style={[styles.headlineLine, styles.headlineAccent]}>TRAIN.</Text>
+              <Text style={styles.headlineLine}>ACHIEVE.</Text>
+            </View>
 
-          <Text style={[styles.lead, tight && styles.leadTight]}>
-            Find your training partner. Reach your goals together.
-          </Text>
-
-          {showSupporting && !tight ? (
-            <Text style={styles.supporting}>
-              A fitness community built to help real people stay accountable, motivated, and
-              consistent.
+            <Text style={[styles.lead, tight && styles.leadTight]}>
+              Find your training partner. Reach your goals together.
             </Text>
-          ) : null}
-        </Animated.View>
+
+            {showSupporting && !tight ? (
+              <Text style={styles.supporting}>
+                A fitness community built to help real people stay accountable, motivated, and
+                consistent.
+              </Text>
+            ) : null}
+          </Animated.View>
+        </View>
       </View>
     </View>
   );
@@ -205,6 +218,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
+  },
+  brandingStack: {
+    width: "100%",
+    alignItems: "center",
     gap: spacing.md,
   },
   logoWrap: {
