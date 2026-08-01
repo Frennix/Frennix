@@ -142,7 +142,7 @@ function IndexGate({
   }, [authReady, loading, profileLoading, profile, session]);
 
   if (!isSupabaseConfigured()) {
-    return <Redirect href="/(auth)/welcome" />;
+    return <Redirect href="/(auth)/login" />;
   }
 
   if (!authReady || (passwordRecovery && !session)) {

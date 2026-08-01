@@ -1,6 +1,13 @@
 import { Link, router } from "expo-router";
-import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
@@ -10,10 +17,10 @@ import {
   getSupabase,
   signInWithEmail,
 } from "@frennix/api";
+import { LoginHeroSection } from "@/components/auth/LoginHeroSection";
 import { useAuth } from "@/providers/AuthProvider";
 import { showAlert } from "@/lib/alerts";
-import { Button, Input, PasswordInput, colors, spacing, typography } from "@frennix/ui";
-import { FrennixLogo } from "@/components/FrennixLogo";
+import { Button, Input, PasswordInput, colors, radius, spacing, typography } from "@frennix/ui";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic, markDiagnosticFailure, markDiagnosticSuccess } from "@/lib/client-diagnostics";
@@ -29,11 +36,30 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const formOpacity = useRef(new Animated.Value(0)).current;
+  const formTranslateY = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
     logStartupStep("login:render:end");
     hideFrennixBootShell();
   }, []);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(formOpacity, {
+        toValue: 1,
+        duration: 480,
+        delay: 320,
+        useNativeDriver: true,
+      }),
+      Animated.timing(formTranslateY, {
+        toValue: 0,
+        duration: 480,
+        delay: 320,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [formOpacity, formTranslateY]);
 
   async function handleLogin() {
     setError("");
@@ -109,49 +135,70 @@ export default function LoginScreen() {
 
   const form = (
     <>
-      <FrennixLogo variant="full" height={56} style={styles.logo} />
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Train together. Grow together.</Text>
+      <LoginHeroSection topInset={insets.top} />
 
-      <Input
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
-        textContentType="emailAddress"
-        placeholder="you@example.com"
-      />
-      <PasswordInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        autoComplete="current-password"
-        textContentType="password"
-        placeholder="Your password"
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Button title="Sign in" onPress={handleLogin} loading={loading} disabled={!isSupabaseConfigured()} />
-
-      {Platform.OS === "ios" ? (
-        <AppleAuthentication.AppleAuthenticationButton
-          buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-          cornerRadius={12}
-          style={styles.apple}
-          onPress={handleApple}
+      <Animated.View
+        style={[
+          styles.formSheet,
+          {
+            opacity: formOpacity,
+            transform: [{ translateY: formTranslateY }],
+            paddingBottom: Math.max(insets.bottom, spacing.lg),
+          },
+        ]}
+      >
+        <Input
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
+          placeholder="you@example.com"
         />
-      ) : null}
+        <PasswordInput
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          autoComplete="current-password"
+          textContentType="password"
+          placeholder="Your password"
+        />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Link href="/(auth)/forgot-password" style={styles.link}>
-        <Text style={styles.linkText}>Forgot password?</Text>
-      </Link>
+        <Button
+          title="Sign In"
+          onPress={handleLogin}
+          loading={loading}
+          disabled={!isSupabaseConfigured()}
+        />
 
-      <Link href="/(auth)/signup" style={styles.link}>
-        <Text style={styles.linkText}>New to Frennix? Create account</Text>
-      </Link>
+        {Platform.OS === "ios" ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={12}
+            style={styles.apple}
+            onPress={handleApple}
+          />
+        ) : null}
+
+        {!isSupabaseConfigured() ? (
+          <Text style={styles.configHint}>
+            Configure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env to enable
+            the backend.
+          </Text>
+        ) : null}
+
+        <Link href="/(auth)/forgot-password" style={styles.link}>
+          <Text style={styles.linkText}>Forgot password?</Text>
+        </Link>
+
+        <Link href="/(auth)/signup" style={styles.link}>
+          <Text style={styles.linkText}>New to Frennix? Create account</Text>
+        </Link>
+      </Animated.View>
     </>
   );
 
@@ -161,21 +208,27 @@ export default function LoginScreen() {
         <ScrollView
           nativeID="auth-login-screen"
           style={styles.container}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: Math.max(insets.bottom, spacing.xl) },
-          ]}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {form}
         </ScrollView>
       ) : (
         <KeyboardAvoidingView
-          nativeID="auth-login-screen"
-          style={[styles.container, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}
+          style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         >
-          {form}
+          <ScrollView
+            nativeID="auth-login-screen"
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {form}
+          </ScrollView>
         </KeyboardAvoidingView>
       )}
     </StartupMountProbe>
@@ -190,15 +243,35 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
-    padding: spacing.xl,
-    gap: spacing.md,
   },
-  logo: { alignSelf: "center", marginBottom: spacing.sm },
-  title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.bodySmall, marginBottom: spacing.md, color: colors.textSecondary },
+  formSheet: {
+    marginTop: -spacing.lg,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.md,
+    maxWidth: 480,
+    width: "100%",
+    alignSelf: "center",
+    ...(Platform.OS === "web"
+      ? ({ boxShadow: "0 -12px 40px rgba(0,0,0,0.35)" } as object)
+      : null),
+  },
   error: { ...typography.bodySmall, color: colors.danger },
+  configHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 18,
+  },
   apple: { height: 48, width: "100%" },
-  link: { alignItems: "center", marginTop: spacing.md },
-  linkText: { ...typography.body, color: colors.accent },
+  link: {
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  linkText: { ...typography.body, color: colors.accent, fontWeight: "600" },
 });

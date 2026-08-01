@@ -74,7 +74,7 @@ async function probe(browser, base, label, options = {}) {
 
   await page.goto(`${base}/`, { waitUntil: "networkidle", timeout: 60_000 });
   await page.waitForFunction(
-    () => /Welcome back|Sign in|Email/i.test(document.body.innerText),
+    () => /CONNECT\.|Sign In|Sign in|Email/i.test(document.body.innerText),
     { timeout: 30_000 }
   ).catch(() => undefined);
   await page.waitForTimeout(2000);
@@ -82,7 +82,7 @@ async function probe(browser, base, label, options = {}) {
   const state = await page.evaluate(() => {
     const shell = document.getElementById("frennix-boot-shell");
     const inputs = [...document.querySelectorAll("input")];
-    const signInVisible = /Sign in/i.test(document.body.innerText);
+    const signInVisible = /Sign In|Sign in/i.test(document.body.innerText);
     const button = [...document.querySelectorAll("button, [role='button'], a, div")].find((el) =>
       /sign in/i.test(el.textContent ?? "")
     );
@@ -100,7 +100,7 @@ async function probe(browser, base, label, options = {}) {
     return {
       text: document.body.innerText.replace(/\s+/g, " ").trim().slice(0, 200),
       shellHidden: !shell || shell.style.display === "none",
-      hasWelcome: /Welcome back/i.test(document.body.innerText),
+      hasWelcome: /CONNECT\./i.test(document.body.innerText),
       hasEmailLabel: /Email/i.test(document.body.innerText),
       hasPasswordLabel: /Password/i.test(document.body.innerText),
       inputCount: inputs.length,
@@ -118,7 +118,7 @@ async function probe(browser, base, label, options = {}) {
 
   const results = [
     pass(`${label}: boot shell hidden`, state.shellHidden),
-    pass(`${label}: welcome visible`, state.hasWelcome, state.text.slice(0, 60)),
+    pass(`${label}: sign-in branding visible`, state.hasWelcome, state.text.slice(0, 60)),
     pass(`${label}: email + password labels`, state.hasEmailLabel && state.hasPasswordLabel),
     pass(`${label}: inputs rendered`, state.inputCount >= 2 && readableInputs),
     pass(`${label}: sign-in button visible`, state.buttonVisible),
