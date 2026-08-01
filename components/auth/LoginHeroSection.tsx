@@ -135,8 +135,7 @@ export function LoginHeroSection({
 
             {showSupporting && !tight ? (
               <Text style={styles.supporting}>
-                A fitness community built to help real people stay accountable, motivated, and
-                consistent.
+                A fitness community built to help real people stay motivated and consistent.
               </Text>
             ) : null}
           </Animated.View>
