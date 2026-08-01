@@ -17,9 +17,9 @@ const HERO_SOURCE = require("@/assets/brand/welcome-community-hero.png");
 export const LOGIN_HERO_ALT =
   "A diverse group of everyday adults in a gym, smiling and encouraging each other after a workout.";
 
-const HERO_HEIGHT_RATIO = 0.4;
-const HERO_MIN_HEIGHT = 260;
-const HERO_MAX_HEIGHT = 400;
+const HERO_HEIGHT_RATIO = 0.34;
+const HERO_MIN_HEIGHT = 228;
+const HERO_MAX_HEIGHT = 340;
 
 type LoginHeroSectionProps = {
   style?: StyleProp<ViewStyle>;
@@ -105,9 +105,9 @@ export function LoginHeroSection({
       )}
       <View style={styles.heroScrimFade} pointerEvents="none" />
 
-      <View style={[styles.overlayContent, { paddingTop: topInset + spacing.md }]}>
-        <Animated.View style={{ opacity: logoOpacity }}>
-          <FrennixLogo variant="mark" height={tight ? 56 : 68} style={styles.logo} />
+      <View style={[styles.overlayContent, { paddingTop: topInset + spacing.lg + spacing.sm }]}>
+        <Animated.View style={[styles.logoWrap, { opacity: logoOpacity }]}>
+          <FrennixLogo variant="mark" height={tight ? 62 : 76} style={styles.logo} />
         </Animated.View>
 
         <Animated.View style={[styles.copyBlock, { opacity: copyOpacity }]}>
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web"
       ? ({
           backgroundImage:
-            "linear-gradient(180deg, rgba(10,10,11,0) 0%, rgba(10,10,11,0.35) 32%, rgba(10,10,11,0.88) 68%, #0A0A0B 100%)",
+            "linear-gradient(180deg, rgba(10,10,11,0) 0%, rgba(10,10,11,0.48) 26%, rgba(10,10,11,0.94) 58%, #0A0A0B 100%)",
         } as object)
       : null),
   },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: "55%",
-    backgroundColor: "rgba(10, 10, 11, 0.25)",
+    backgroundColor: "rgba(10, 10, 11, 0.38)",
   },
   heroScrimBottomNativeB: {
     position: "absolute",
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: "38%",
-    backgroundColor: "rgba(10, 10, 11, 0.55)",
+    backgroundColor: "rgba(10, 10, 11, 0.68)",
   },
   heroScrimBottomNativeC: {
     position: "absolute",
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: "22%",
-    backgroundColor: "rgba(10, 10, 11, 0.82)",
+    backgroundColor: "rgba(10, 10, 11, 0.94)",
   },
   heroScrimFade: {
     position: "absolute",
@@ -204,8 +204,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     gap: spacing.md,
+  },
+  logoWrap: {
+    marginTop: spacing.sm,
   },
   logo: {
     alignSelf: "center",

@@ -39,6 +39,13 @@ export default function LoginScreen() {
   const formOpacity = useRef(new Animated.Value(0)).current;
   const formTranslateY = useRef(new Animated.Value(12)).current;
 
+  function focusLoginField() {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    requestAnimationFrame(() => {
+      document.activeElement?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    });
+  }
+
   useEffect(() => {
     logStartupStep("login:render:end");
     hideFrennixBootShell();
@@ -143,7 +150,7 @@ export default function LoginScreen() {
           {
             opacity: formOpacity,
             transform: [{ translateY: formTranslateY }],
-            paddingBottom: Math.max(insets.bottom, spacing.lg),
+            paddingBottom: Math.max(insets.bottom, spacing.sm),
           },
         ]}
       >
@@ -151,6 +158,7 @@ export default function LoginScreen() {
           label="Email"
           value={email}
           onChangeText={setEmail}
+          onFocus={focusLoginField}
           autoCapitalize="none"
           keyboardType="email-address"
           autoComplete="email"
@@ -161,6 +169,7 @@ export default function LoginScreen() {
           label="Password"
           value={password}
           onChangeText={setPassword}
+          onFocus={focusLoginField}
           autoComplete="current-password"
           textContentType="password"
           placeholder="Your password"
@@ -195,12 +204,17 @@ export default function LoginScreen() {
           <Text style={styles.linkText}>Forgot password?</Text>
         </Link>
 
-        <Link href="/(auth)/signup" style={styles.link}>
-          <Text style={styles.linkText}>New to Frennix? Create account</Text>
+        <Link href="/(auth)/signup" style={styles.linkLast}>
+          <Text style={styles.linkText}>New to Frennix? Create an account</Text>
         </Link>
       </Animated.View>
     </>
   );
+
+  const scrollContentStyle = [
+    styles.scrollContent,
+    { paddingBottom: Math.max(insets.bottom, spacing.md) },
+  ];
 
   return (
     <StartupMountProbe id="auth-login">
@@ -208,7 +222,7 @@ export default function LoginScreen() {
         <ScrollView
           nativeID="auth-login-screen"
           style={styles.container}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={scrollContentStyle}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -218,14 +232,15 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
         >
           <ScrollView
             nativeID="auth-login-screen"
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={scrollContentStyle}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces={false}
+            automaticallyAdjustKeyboardInsets
           >
             {form}
           </ScrollView>
@@ -245,12 +260,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   formSheet: {
-    marginTop: -spacing.lg,
+    marginTop: -spacing.md,
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     gap: spacing.md,
     maxWidth: 480,
     width: "100%",
@@ -269,8 +284,15 @@ const styles = StyleSheet.create({
   apple: { height: 48, width: "100%" },
   link: {
     alignItems: "center",
-    paddingVertical: spacing.sm,
-    minHeight: 44,
+    paddingVertical: spacing.xs,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  linkLast: {
+    alignItems: "center",
+    paddingTop: spacing.xs,
+    paddingBottom: 0,
+    minHeight: 40,
     justifyContent: "center",
   },
   linkText: { ...typography.body, color: colors.accent, fontWeight: "600" },
