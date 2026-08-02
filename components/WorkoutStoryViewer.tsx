@@ -60,6 +60,9 @@ import {
 
 const STORY_SLIDE_DURATION_MS = 5500;
 const HOLD_THRESHOLD_MS = 220;
+const NAV_DEBOUNCE_MS = 280;
+/** Transparent side tap targets (~35–40% each); center is hold-only. */
+const TAP_ZONE_SIDE_RATIO = 0.375;
 
 function StoryProgressBars({
   total,
@@ -104,11 +107,13 @@ function StoryProgressBars({
 function StorySlideContent({
   slide,
   shouldPlayVideo,
+  playbackEpoch,
   width,
   height,
 }: {
   slide: WorkoutStorySlide;
   shouldPlayVideo: boolean;
+  playbackEpoch: number;
   width: number;
   height: number;
 }) {
@@ -147,6 +152,7 @@ function StorySlideContent({
   if (slide.mediaKind === "video") {
     return (
       <FeedVideoPlayer
+        key={`story-video-${playbackEpoch}`}
         uri={slide.url}
         thumbnailUrl={slide.thumbnailUrl}
         shouldPlay={shouldPlayVideo}
@@ -261,6 +267,8 @@ export function WorkoutStoryViewer({
   const elapsedMsRef = useRef(0);
   const holdStartedAtRef = useRef<number | null>(null);
   const didHoldRef = useRef(false);
+  const lastNavAtRef = useRef(0);
+  const [playbackEpoch, setPlaybackEpoch] = useState(0);
 
   const story = stories[storyIndex] ?? null;
   const activeStories = story?.active_stories ?? [];
@@ -356,19 +364,6 @@ export function WorkoutStoryViewer({
     onClose();
   }, [onClose, slideIndex, slides.length, stories.length, storyIndex]);
 
-  const goPrev = useCallback(() => {
-    if (slideIndex > 0) {
-      setSlideIndex((current) => current - 1);
-      return;
-    }
-    if (storyIndex > 0) {
-      const prevStory = stories[storyIndex - 1];
-      const prevSlides = buildDedicatedStorySlides(prevStory?.active_stories ?? []);
-      setStoryIndex((current) => current - 1);
-      setSlideIndex(Math.max(prevSlides.length - 1, 0));
-    }
-  }, [slideIndex, storyIndex, stories]);
-
   const stopTimer = useCallback(() => {
     timerRef.current?.stop();
   }, []);
@@ -398,7 +393,37 @@ export function WorkoutStoryViewer({
   useEffect(() => {
     elapsedMsRef.current = 0;
     progress.setValue(0);
+    setPlaybackEpoch(0);
   }, [timerKey, progress]);
+
+  const restartCurrentSlide = useCallback(() => {
+    stopTimer();
+    elapsedMsRef.current = 0;
+    progress.setValue(0);
+    setPlaybackEpoch((epoch) => epoch + 1);
+    if (!paused && !interactionLocked && !showReply) {
+      startTimer(0);
+    }
+  }, [interactionLocked, paused, progress, showReply, startTimer, stopTimer]);
+
+  const handleLeftTap = useCallback(() => {
+    if (slideIndex > 0) {
+      setSlideIndex((current) => current - 1);
+      return;
+    }
+    restartCurrentSlide();
+  }, [restartCurrentSlide, slideIndex]);
+
+  const tryNavigate = useCallback(
+    (action: () => void) => {
+      if (didHoldRef.current || interactionLocked) return;
+      const now = Date.now();
+      if (now - lastNavAtRef.current < NAV_DEBOUNCE_MS) return;
+      lastNavAtRef.current = now;
+      action();
+    },
+    [interactionLocked]
+  );
 
   useEffect(() => {
     setInteractionLocked(false);
@@ -605,8 +630,10 @@ export function WorkoutStoryViewer({
         >
           <Animated.View style={[styles.mediaStage, { opacity: slideOpacity }]} pointerEvents="none">
             <StorySlideContent
+              key={`${timerKey}-${playbackEpoch}`}
               slide={activeSlide}
               shouldPlayVideo={visible && isVideoSlide && !autoAdvancePaused}
+              playbackEpoch={playbackEpoch}
               width={width}
               height={height}
             />
@@ -785,6 +812,7 @@ export function WorkoutStoryViewer({
                     disabled={paused}
                     compact
                     onCancel={() => setShowReply(false)}
+                    onFocusChange={setInteractionLocked}
                     onSend={async (text) => {
                       await onReply?.(story.user_id, text, activeStoryId);
                       setShowReply(false);
@@ -827,19 +855,24 @@ export function WorkoutStoryViewer({
           <View style={styles.tapZones} pointerEvents="box-none">
             <Pressable
               style={styles.tapZoneLeft}
-              onPress={() => {
-                if (!didHoldRef.current && !interactionLocked) goPrev();
-              }}
+              onPress={() => tryNavigate(handleLeftTap)}
               onPressIn={beginHold}
               onPressOut={endHold}
               accessibilityRole="button"
-              accessibilityLabel="Previous story slide"
+              accessibilityLabel="Previous story slide or restart"
+              accessibilityHint="On the first slide, restarts the story from the beginning."
+            />
+            <Pressable
+              style={styles.tapZoneCenter}
+              onPressIn={beginHold}
+              onPressOut={endHold}
+              accessibilityRole="button"
+              accessibilityLabel="Pause story"
+              accessibilityHint="Press and hold to pause playback."
             />
             <Pressable
               style={styles.tapZoneRight}
-              onPress={() => {
-                if (!didHoldRef.current && !interactionLocked) goNext();
-              }}
+              onPress={() => tryNavigate(goNext)}
               onPressIn={beginHold}
               onPressOut={endHold}
               accessibilityRole="button"
@@ -1028,10 +1061,40 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   tapZoneLeft: {
+    width: `${TAP_ZONE_SIDE_RATIO * 100}%`,
+    height: "100%",
+    ...(Platform.OS === "web"
+      ? ({
+          cursor: "default",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        } as object)
+      : null),
+  },
+  tapZoneCenter: {
     flex: 1,
+    height: "100%",
+    ...(Platform.OS === "web"
+      ? ({
+          cursor: "default",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        } as object)
+      : null),
   },
   tapZoneRight: {
-    flex: 1,
+    width: `${TAP_ZONE_SIDE_RATIO * 100}%`,
+    height: "100%",
+    ...(Platform.OS === "web"
+      ? ({
+          cursor: "default",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        } as object)
+      : null),
   },
   emptySlide: {
     alignItems: "center",

@@ -22,6 +22,7 @@
     "verify:media-polish": "npx tsx scripts/verify-media-polish.ts",
     "verify:media-architecture": "npx tsx scripts/verify-media-architecture.ts",
     "verify:workout-stories": "npx tsx scripts/verify-workout-stories.ts",
+    "verify:story-viewer-navigation": "npx tsx scripts/verify-story-viewer-navigation.ts",
     "verify:training-calendar": "npx tsx scripts/verify-training-calendar.ts",
     "verify:whats-new": "npx tsx scripts/verify-whats-new.ts",
     "verify:schema-sync": "npx tsx scripts/verify-schema-sync.ts",
