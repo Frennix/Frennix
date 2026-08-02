@@ -105,7 +105,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Tabs stay mounted for instant switching",
     run: () => {
       assertIncludes("app/(tabs)/_layout.tsx", "lazy: false", "tabs must stay mounted");
-      assertIncludes("app/(tabs)/_layout.tsx", "freezeOnBlur: true", "tabs must freeze when blurred");
+      assertIncludes(
+        "app/(tabs)/_layout.tsx",
+        'freezeOnBlur: Platform.OS !== "web"',
+        "tabs must freeze when blurred on native only (Safari web scroll regression)"
+      );
     },
   },
   {

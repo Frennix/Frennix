@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 9693f043</title>
+    <title>Frennix · 989a3817</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="9693f043a3d5bd4b91a07d987a7c965251ec8b65" />
-    <meta name="frennix-build-bundle" content="index-c4557dd50cabdc1a0c6d63899db62d9d.js" />
-    <meta name="frennix-build-at" content="2026-08-02T01:27:21.287Z" />
+    <meta name="frennix-build-sha" content="989a38172a25d1fba33e39d6f083870a973e4faf" />
+    <meta name="frennix-build-bundle" content="index-0f7ca9e40d81a58722040217f19e1eb5.js" />
+    <meta name="frennix-build-at" content="2026-08-02T02:03:54.907Z" />
     <meta name="frennix-sw-version" content="20260727-pwa-auto-update-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -103,22 +103,31 @@
   }
   #feed-root-container,
   #feed-scroll-shell {
-    flex: 1 1 auto !important;
+    flex: 1 1 0 !important;
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
     min-height: max(200px, calc(100dvh - var(--frennix-tab-chrome-h) - var(--frennix-tab-header-h))) !important;
+    max-height: 100% !important;
     overflow: hidden !important;
     background-color: #0A0A0B !important;
   }
+  /*
+   * Safari / iOS PWA: scrollport must be a bounded flex child (flex-basis 0 + height 0),
+   * display:block, and no compositor transform — otherwise touch pan-y never moves scrollTop.
+   */
   #feed-scroll-list,
   #discover-scroll,
   #calendar-scroll {
-    flex: 1 1 auto !important;
+    flex: 1 1 0 !important;
+    height: 0 !important;
     min-height: 0 !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    max-height: 100% !important;
+    overflow-y: scroll !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    display: block !important;
+    transform: none !important;
     background-color: #0A0A0B !important;
   }
   /* Tab bar + home-indicator safe area — never show default white. */
@@ -225,7 +234,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="9693f043a3d5bd4b91a07d987a7c965251ec8b65" data-bundle="index-c4557dd50cabdc1a0c6d63899db62d9d.js" data-sw="20260727-pwa-auto-update-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="989a38172a25d1fba33e39d6f083870a973e4faf" data-bundle="index-0f7ca9e40d81a58722040217f19e1eb5.js" data-sw="20260727-pwa-auto-update-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -271,7 +280,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-c4557dd50cabdc1a0c6d63899db62d9d.js?v=9693f043" defer></script>
+  <script src="/_expo/static/js/web/index-0f7ca9e40d81a58722040217f19e1eb5.js?v=989a3817" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

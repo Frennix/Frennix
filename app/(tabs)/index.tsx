@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
@@ -97,6 +98,8 @@ import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
+import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
+import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -461,6 +464,14 @@ export default function HomeScreen() {
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
   const feedScrollEnabled = !(storyVisible || interactionVisible);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "web") return;
+      restoreWebDocumentScrollLock();
+      requestSafariVisualViewportRemeasure();
+    }, [])
+  );
 
   const {
     enabled: feedDebugEnabled,
@@ -961,7 +972,6 @@ export default function HomeScreen() {
             style={styles.feedList}
             contentContainerStyle={styles.list}
             scrollEnabled={feedScrollEnabled}
-            touchLock={storyVisible}
             data={listRows}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}

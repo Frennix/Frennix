@@ -123,7 +123,7 @@ const TabsShell = memo(function TabsShell() {
           backgroundColor: colors.backgroundFeed,
         },
         lazy: false,
-        freezeOnBlur: true,
+        freezeOnBlur: Platform.OS !== "web",
         headerTitleContainerStyle: { overflow: "visible" },
       }}
     >
