@@ -9,8 +9,18 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { CachedAssetImage, colors, spacing, typography } from "@frennix/ui";
+
+const HERO_SCRIM_STOPS: { offset: string; opacity: number }[] = [
+  { offset: "0%", opacity: 0.45 },
+  { offset: "18%", opacity: 0.22 },
+  { offset: "36%", opacity: 0.1 },
+  { offset: "56%", opacity: 0.5 },
+  { offset: "82%", opacity: 0.94 },
+  { offset: "100%", opacity: 1 },
+];
 
 const HERO_SOURCE = require("@/assets/brand/welcome-community-hero.png");
 
@@ -94,17 +104,23 @@ export function LoginHeroSection({
         />
       </Animated.View>
 
-      <View style={styles.heroScrimTop} pointerEvents="none" />
-      {Platform.OS === "web" ? (
-        <View style={styles.heroScrimBottom} pointerEvents="none" />
-      ) : (
-        <>
-          <View style={styles.heroScrimBottomNativeA} pointerEvents="none" />
-          <View style={styles.heroScrimBottomNativeB} pointerEvents="none" />
-          <View style={styles.heroScrimBottomNativeC} pointerEvents="none" />
-        </>
-      )}
-      <View style={styles.heroScrimFade} pointerEvents="none" />
+      <View style={styles.heroOverlay} pointerEvents="none">
+        <Svg width="100%" height="100%" preserveAspectRatio="none">
+          <Defs>
+            <LinearGradient id="loginHeroScrim" x1="0" y1="0" x2="0" y2="1">
+              {HERO_SCRIM_STOPS.map((stop) => (
+                <Stop
+                  key={stop.offset}
+                  offset={stop.offset}
+                  stopColor={colors.background}
+                  stopOpacity={stop.opacity}
+                />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#loginHeroScrim)" />
+        </Svg>
+      </View>
 
       <View
         style={[
@@ -153,58 +169,9 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  heroScrimTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "30%",
-    backgroundColor: "rgba(10, 10, 11, 0.45)",
-  },
-  heroScrimBottom: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "72%",
-    ...(Platform.OS === "web"
-      ? ({
-          backgroundImage:
-            "linear-gradient(180deg, rgba(10,10,11,0) 0%, rgba(10,10,11,0.48) 26%, rgba(10,10,11,0.94) 58%, #0A0A0B 100%)",
-        } as object)
-      : null),
-  },
-  heroScrimBottomNativeA: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "55%",
-    backgroundColor: "rgba(10, 10, 11, 0.38)",
-  },
-  heroScrimBottomNativeB: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "38%",
-    backgroundColor: "rgba(10, 10, 11, 0.68)",
-  },
-  heroScrimBottomNativeC: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "22%",
-    backgroundColor: "rgba(10, 10, 11, 0.94)",
-  },
-  heroScrimFade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: -1,
-    height: 24,
-    backgroundColor: colors.background,
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   overlayContent: {
     flex: 1,
