@@ -2,6 +2,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { Stack, router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -48,6 +49,8 @@ import { useAuth } from "@/providers/AuthProvider";
 import { Button, EmptyState, ScreenSpinner, applyShadow, prefetchCachedImage, colors, radius, spacing, typography } from "@frennix/ui";
 
 const TRAINING_PARTNERS_HEADER_LOGO_HEIGHT = 41;
+/** Fallback until deck footer onLayout reports actual height (incl. safe area). */
+const DECK_FOOTER_FALLBACK_HEIGHT = 220;
 
 function MatchingHeaderActions() {
   return (
@@ -83,6 +86,7 @@ export default function TrainingPartnerDiscoveryScreen() {
   const [actionError, setActionError] = useState("");
   const [matchExplainerVisible, setMatchExplainerVisible] = useState(false);
   const [connectConfirmation, setConnectConfirmation] = useState<string | null>(null);
+  const [deckFooterHeight, setDeckFooterHeight] = useState(DECK_FOOTER_FALLBACK_HEIGHT);
   const connectConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { enabled: matchmakingEnabled, isLoading: flagLoading } = useFeatureFlag(
@@ -402,7 +406,12 @@ export default function TrainingPartnerDiscoveryScreen() {
           </Text>
         </View>
 
-        <View style={styles.deckArea}>
+        <View
+          style={[
+            styles.deckArea,
+            { paddingBottom: deckFooterHeight + spacing.xs },
+          ]}
+        >
           {deck[1] ? (
             <View style={styles.backCard} pointerEvents="none">
               <View style={styles.backCardInner} />
@@ -415,6 +424,7 @@ export default function TrainingPartnerDiscoveryScreen() {
               viewer={profile}
               onLearnMoreMatch={() => setMatchExplainerVisible(true)}
               onReportOrBlock={openUserModeration}
+              scrollBottomInset={spacing.md}
               accessibilityLabel={`Training partner ${currentCandidate.display_name}`}
             />
           </View>
@@ -425,6 +435,12 @@ export default function TrainingPartnerDiscoveryScreen() {
             styles.deckFooter,
             { paddingBottom: Math.max(insets.bottom, spacing.sm) },
           ]}
+          onLayout={(event) => {
+            const height = event.nativeEvent.layout.height;
+            if (height > 0) {
+              setDeckFooterHeight(height);
+            }
+          }}
           testID="training-partner-deck-footer"
         >
           {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
@@ -468,6 +484,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
+    position: "relative",
   },
   header: {
     paddingTop: spacing.xs,
@@ -523,11 +540,29 @@ const styles = StyleSheet.create({
     ...applyShadow("md"),
   },
   deckFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
     backgroundColor: colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    paddingTop: spacing.xs,
-    gap: 2,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.xs,
+    ...Platform.select({
+      web: {
+        boxShadow: "0 -4px 16px rgba(0, 0, 0, 0.2)",
+      },
+      default: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.14,
+        shadowRadius: 8,
+        elevation: 10,
+      },
+    }),
   },
   error: {
     color: colors.danger,

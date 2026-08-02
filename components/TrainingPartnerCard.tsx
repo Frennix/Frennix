@@ -38,6 +38,8 @@ type TrainingPartnerCardProps = {
   onPressProfile?: () => void;
   onLearnMoreMatch?: () => void;
   onReportOrBlock?: () => void;
+  /** Extra scroll padding so pinned deck actions never cover the last rows. */
+  scrollBottomInset?: number;
   accessibilityLabel?: string;
 };
 
@@ -255,6 +257,7 @@ export function TrainingPartnerCard({
   onPressProfile,
   onLearnMoreMatch,
   onReportOrBlock,
+  scrollBottomInset = 0,
   accessibilityLabel,
 }: TrainingPartnerCardProps) {
   const sharedGoals = formatSharedGoalLabels(viewer, candidate);
@@ -300,7 +303,10 @@ export function TrainingPartnerCard({
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          scrollBottomInset > 0 ? { paddingBottom: spacing.lg + scrollBottomInset } : null,
+        ]}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         testID="training-partner-card-scroll"
