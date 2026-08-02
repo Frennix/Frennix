@@ -1,19 +1,16 @@
 import { useEffect, useRef } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useModeration } from "@/lib/useModeration";
-import { colors, spacing, typography } from "@frennix/ui";
 
 type TrainingPartnerDeckSafetyProps = {
   userId: string;
   partnerId: string;
-  partnerName: string;
   onPartnerRemoved: () => void;
 };
 
-export function TrainingPartnerDeckSafety({
+/** Moderation sheets + block handling for the training partner deck. */
+export function useTrainingPartnerDeckSafety({
   userId,
   partnerId,
-  partnerName,
   onPartnerRemoved,
 }: TrainingPartnerDeckSafetyProps) {
   const { openUserModeration, moderationSheets, blockMutation } = useModeration(userId);
@@ -30,29 +27,8 @@ export function TrainingPartnerDeckSafety({
     }
   }, [blockMutation, blockMutation.isSuccess, onPartnerRemoved]);
 
-  return (
-    <>
-      <View style={styles.row}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Report or block ${partnerName}`}
-          onPress={() => openUserModeration(partnerId)}
-          hitSlop={8}
-        >
-          <Text style={styles.link}>Report or block</Text>
-        </Pressable>
-      </View>
-      {moderationSheets}
-    </>
-  );
+  return {
+    openUserModeration: () => openUserModeration(partnerId),
+    moderationSheets,
+  };
 }
-
-const styles = StyleSheet.create({
-  row: {
-    alignItems: "center",
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  link: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
-});

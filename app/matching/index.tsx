@@ -24,9 +24,10 @@ import type { MatchCandidate } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { TrainingPartnerDeckActions } from "@/components/TrainingMatchModal";
 import { TrainingPartnerCard } from "@/components/TrainingPartnerCard";
+import { TrainingPartnerConnectToast } from "@/components/TrainingPartnerConnectToast";
 import { FrennixMatchExplainerModal } from "@/components/FrennixMatchExplainerModal";
 import { TrainingPartnerReadinessCard } from "@/components/TrainingPartnerReadinessCard";
-import { TrainingPartnerDeckSafety } from "@/components/TrainingPartnerDeckSafety";
+import { useTrainingPartnerDeckSafety } from "@/components/TrainingPartnerDeckSafety";
 import { TrainingPartnerLoadDiagnosticPanel } from "@/components/TrainingPartnerLoadDiagnosticPanel";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { pushScreen } from "@/lib/press-utils";
@@ -44,7 +45,7 @@ import { isTrainingPartnerDiscoveryReady } from "@/lib/training-partner-readines
 import { isTrainingPartnerDiscoveryEnabled } from "@/lib/training-partner-discovery-toggle";
 import { isTrainingPartnerLoadDiagnosticsVisible } from "@/lib/training-partner-load-diagnostics";
 import { useAuth } from "@/providers/AuthProvider";
-import { Button, EmptyState, ScreenSpinner, prefetchCachedImage, colors, spacing, typography } from "@frennix/ui";
+import { Button, EmptyState, ScreenSpinner, applyShadow, prefetchCachedImage, colors, radius, spacing, typography } from "@frennix/ui";
 
 const TRAINING_PARTNERS_HEADER_LOGO_HEIGHT = 41;
 
@@ -81,6 +82,8 @@ export default function TrainingPartnerDiscoveryScreen() {
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState("");
   const [matchExplainerVisible, setMatchExplainerVisible] = useState(false);
+  const [connectConfirmation, setConnectConfirmation] = useState<string | null>(null);
+  const connectConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { enabled: matchmakingEnabled, isLoading: flagLoading } = useFeatureFlag(
     "training_matchmaking",
@@ -104,6 +107,25 @@ export default function TrainingPartnerDiscoveryScreen() {
     queryFn: () => getMatchCandidates(userId, 20),
     enabled: !!userId && discoveryEnabled,
   });
+
+  useEffect(() => {
+    return () => {
+      if (connectConfirmationTimer.current) {
+        clearTimeout(connectConfirmationTimer.current);
+      }
+    };
+  }, []);
+
+  function showConnectConfirmation() {
+    setConnectConfirmation("Connection request sent");
+    if (connectConfirmationTimer.current) {
+      clearTimeout(connectConfirmationTimer.current);
+    }
+    connectConfirmationTimer.current = setTimeout(() => {
+      setConnectConfirmation(null);
+      connectConfirmationTimer.current = null;
+    }, 2200);
+  }
 
   const syncDeck = useCallback((incoming: MatchCandidate[]) => {
     setDeck(Array.isArray(incoming) ? incoming : []);
@@ -143,6 +165,17 @@ export default function TrainingPartnerDiscoveryScreen() {
   const nextCandidate = deck[1] ?? null;
   const remainingCount = Math.max(deck.length - 1, 0);
 
+  const advanceDeck = useCallback(async () => {
+    setDeck((prev) => prev.slice(1));
+    await queryClient.invalidateQueries({ queryKey: ["training-partner-candidates", userId] });
+  }, [queryClient, userId]);
+
+  const { openUserModeration, moderationSheets } = useTrainingPartnerDeckSafety({
+    userId,
+    partnerId: currentCandidate?.id ?? "",
+    onPartnerRemoved: () => void advanceDeck(),
+  });
+
   useEffect(() => {
     if (nextCandidate?.avatar_url) {
       void prefetchCachedImage(nextCandidate.avatar_url);
@@ -158,13 +191,12 @@ export default function TrainingPartnerDiscoveryScreen() {
     }
   }
 
-  async function advanceDeck() {
-    setDeck((prev) => prev.slice(1));
-    await queryClient.invalidateQueries({ queryKey: ["training-partner-candidates", userId] });
-  }
-
   async function handleDecision(direction: "left" | "right") {
     if (!currentCandidate || acting) return;
+
+    if (direction === "right") {
+      showConnectConfirmation();
+    }
 
     setActing(true);
     setActionError("");
@@ -363,7 +395,6 @@ export default function TrainingPartnerDiscoveryScreen() {
 
       <View style={styles.screen}>
         <View style={styles.header}>
-          <FrennixLogo variant="full" height={TRAINING_PARTNERS_HEADER_LOGO_HEIGHT} />
           <Text style={styles.headerHint}>
             {remainingCount > 0
               ? `${remainingCount + 1} athletes in your deck`
@@ -383,6 +414,7 @@ export default function TrainingPartnerDiscoveryScreen() {
               candidate={currentCandidate}
               viewer={profile}
               onLearnMoreMatch={() => setMatchExplainerVisible(true)}
+              onReportOrBlock={openUserModeration}
               accessibilityLabel={`Training partner ${currentCandidate.display_name}`}
             />
           </View>
@@ -391,17 +423,15 @@ export default function TrainingPartnerDiscoveryScreen() {
         <View
           style={[
             styles.deckFooter,
-            { paddingBottom: Math.max(insets.bottom, spacing.md) },
+            { paddingBottom: Math.max(insets.bottom, spacing.sm) },
           ]}
           testID="training-partner-deck-footer"
         >
           {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
 
-          <TrainingPartnerDeckSafety
-            userId={userId}
-            partnerId={currentCandidate.id}
-            partnerName={currentCandidate.display_name}
-            onPartnerRemoved={() => void advanceDeck()}
+          <TrainingPartnerConnectToast
+            visible={Boolean(connectConfirmation)}
+            message={connectConfirmation ?? ""}
           />
 
           <TrainingPartnerDeckActions
@@ -423,6 +453,8 @@ export default function TrainingPartnerDiscoveryScreen() {
         </View>
       </View>
 
+      {moderationSheets}
+
       <FrennixMatchExplainerModal
         visible={matchExplainerVisible}
         onClose={() => setMatchExplainerVisible(false)}
@@ -438,9 +470,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   header: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    gap: spacing.xs,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
   },
   headerHint: { ...typography.caption, color: colors.textMuted },
   headerActions: {
@@ -480,7 +511,7 @@ const styles = StyleSheet.create({
   backCardInner: {
     flex: 1,
     backgroundColor: colors.surfaceElevated,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     opacity: 0.55,
@@ -488,13 +519,15 @@ const styles = StyleSheet.create({
   frontCard: {
     flex: 1,
     minHeight: 0,
+    borderRadius: radius.lg,
+    ...applyShadow("md"),
   },
   deckFooter: {
     backgroundColor: colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    paddingTop: spacing.sm,
-    gap: spacing.xs,
+    paddingTop: spacing.xs,
+    gap: 2,
   },
   error: {
     color: colors.danger,

@@ -3,7 +3,8 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Profile } from "@frennix/types";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
-import { Avatar, Button, colors, spacing, typography } from "@frennix/ui";
+import { hapticLight, hapticMedium } from "@/lib/haptics";
+import { Avatar, Button, applyShadow, colors, ScalePressable, spacing, typography } from "@frennix/ui";
 
 type TrainingMatchModalProps = {
   visible: boolean;
@@ -79,29 +80,45 @@ export function TrainingPartnerDeckActions({
   disabled,
   loading,
 }: TrainingPartnerDeckActionsProps) {
+  const actionDisabled = disabled || loading;
+
+  function handleSkip() {
+    if (actionDisabled) return;
+    hapticLight();
+    onSkip();
+  }
+
+  function handleConnect() {
+    if (actionDisabled) return;
+    hapticMedium();
+    onConnect();
+  }
+
   return (
     <View style={styles.actionsRow}>
       <View style={styles.actionItem}>
-        <Pressable
-          style={[styles.circleButton, styles.skipButton, disabled && styles.actionDisabled]}
-          onPress={onSkip}
-          disabled={disabled || loading}
+        <ScalePressable
+          containerStyle={[styles.circleButton, styles.skipButton, actionDisabled && styles.actionDisabled]}
+          onPress={handleSkip}
+          disabled={actionDisabled}
           accessibilityLabel="Skip training partner"
+          pressedScale={0.94}
         >
           <AppIcon name="close" color={colors.textSecondary} size={28} />
-        </Pressable>
+        </ScalePressable>
         <Text style={styles.skipLabel}>Skip</Text>
       </View>
 
       <View style={styles.actionItem}>
-        <Pressable
-          style={[styles.circleButton, styles.connectButton, disabled && styles.actionDisabled]}
-          onPress={onConnect}
-          disabled={disabled || loading}
+        <ScalePressable
+          containerStyle={[styles.circleButton, styles.connectButton, actionDisabled && styles.actionDisabled]}
+          onPress={handleConnect}
+          disabled={actionDisabled}
           accessibilityLabel="Connect with training partner"
+          pressedScale={0.92}
         >
-          <AppIcon name="users" color={colors.background} size={28} />
-        </Pressable>
+          <AppIcon name="users" color={colors.background} size={32} />
+        </ScalePressable>
         <Text style={styles.connectLabel}>Connect</Text>
       </View>
     </View>
@@ -144,12 +161,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "center",
     gap: spacing.xxl,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   actionItem: {
     alignItems: "center",
     gap: spacing.xs,
-    minWidth: 88,
+    minWidth: 100,
   },
   circleButton: {
     alignItems: "center",
@@ -164,10 +181,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   connectButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: colors.accent,
+    ...applyShadow("accent"),
   },
   skipLabel: { ...typography.caption, color: colors.textMuted, fontWeight: "600" },
   connectLabel: { ...typography.caption, color: colors.text, fontWeight: "700" },
