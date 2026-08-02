@@ -2,66 +2,62 @@ import { StyleSheet, Text, View } from "react-native";
 import type { SuggestedAthlete } from "@frennix/types";
 import { BottomActionSheet } from "@/components/BottomActionSheet";
 import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
-import { ProfileIdentityBadges } from "@/components/ProfileIdentityBadges";
-import { buildMutualConnectionsCopy } from "@/lib/discover-mutual-copy";
-import { formatActivity, formatGoal } from "@/lib/labels";
-import { getLifestyleBadges } from "@/lib/lifestyle-matching";
+import {
+  getDiscoverAvailability,
+  getDiscoverDistanceLabel,
+  getDiscoverFirstName,
+  getDiscoverFitnessGoal,
+  getDiscoverPartnerStatusInfo,
+  getDiscoverRecentActivityLabel,
+  getDiscoverStreakLabel,
+  getDiscoverWorkoutStyle,
+} from "@/lib/discover-profile-display";
 import { DiscoverProfileCard } from "@frennix/ui";
 
 type DiscoverProfilePreviewSheetProps = {
   visible: boolean;
   athlete: SuggestedAthlete | null;
-  highlightQuery?: string;
-  viewerUserId?: string;
+  workoutStreak?: number;
   onClose: () => void;
   onViewFullProfile: () => void;
   onFollow?: () => void;
   followLabel?: string;
   followLoading?: boolean;
-  onMessage?: () => void;
-  messageLoading?: boolean;
   onLearnMatch?: () => void;
 };
 
 export function DiscoverProfilePreviewSheet({
   visible,
   athlete,
-  highlightQuery,
-  viewerUserId,
+  workoutStreak = 0,
   onClose,
   onViewFullProfile,
   onFollow,
   followLabel,
   followLoading,
-  onMessage,
-  messageLoading,
   onLearnMatch,
 }: DiscoverProfilePreviewSheetProps) {
   if (!athlete) return null;
 
   const profile = athlete.profile;
-  const locationLabel = profile.city?.trim() || profile.home_gym?.trim() || null;
-  const mutualCopy = buildMutualConnectionsCopy({
-    mutualFollowers: athlete.mutual_count,
-    mutualTrainingPartners: athlete.mutualTrainingPartners ?? 0,
-    mutualGroups: athlete.mutualGroups ?? 0,
-    mutualChallenges: athlete.mutualChallenges ?? 0,
-  });
+  const partnerStatus = getDiscoverPartnerStatusInfo(profile);
 
   return (
     <BottomActionSheet visible={visible} onClose={onClose} fitToContent scrollEnabled>
       <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Profile preview</Text>
+        <Text style={styles.sheetTitle}>Training partner preview</Text>
         <DiscoverProfileCard
           profile={profile}
-          interestLabels={(profile.activities ?? []).slice(0, 4).map(formatActivity)}
-          goalLabels={(profile.fitness_goals ?? []).slice(0, 3).map(formatGoal)}
-          locationLabel={locationLabel}
-          lifestyleBadges={getLifestyleBadges(profile)}
-          identityBadges={<ProfileIdentityBadges badges={athlete.badges ?? []} compact />}
-          mutualConnectionsCopy={mutualCopy}
-          highlightQuery={highlightQuery}
-          presenceVariant="discover"
+          firstName={getDiscoverFirstName(profile)}
+          distanceLabel={getDiscoverDistanceLabel(profile)}
+          workoutStyleLabel={getDiscoverWorkoutStyle(profile)}
+          fitnessGoalLabel={getDiscoverFitnessGoal(profile)}
+          availabilityLabel={getDiscoverAvailability(profile)}
+          partnerStatusLabel={partnerStatus.label}
+          partnerStatusTone={partnerStatus.tone}
+          activityLabel={getDiscoverRecentActivityLabel(profile)}
+          streakLabel={getDiscoverStreakLabel(workoutStreak)}
+          variant="detail"
           matchDisplay={
             athlete.compatibility_score > 0 ? (
               <FrennixMatchDisplay
@@ -76,8 +72,6 @@ export function DiscoverProfilePreviewSheet({
           followLabel={followLabel}
           onFollow={onFollow}
           followLoading={followLoading}
-          onMessage={profile.id !== viewerUserId ? onMessage : undefined}
-          messageLoading={messageLoading}
         />
       </View>
     </BottomActionSheet>

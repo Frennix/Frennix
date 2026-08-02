@@ -1,46 +1,72 @@
 import { StyleSheet, View } from "react-native";
 import { Skeleton, colors, spacing } from "@frennix/ui";
 
+const PHOTO_HEIGHT = 116;
+
 export function DiscoverProfileSkeleton() {
   return (
     <View style={styles.card}>
-      <Skeleton width={64} height={64} style={styles.avatar} />
-      <View style={styles.body}>
-        <Skeleton width="50%" height={16} />
-        <Skeleton width="35%" height={12} />
-        <Skeleton width="90%" height={12} />
-        <View style={styles.chips}>
-          <Skeleton width={64} height={24} />
-          <Skeleton width={72} height={24} />
-          <Skeleton width={56} height={24} />
+      <Skeleton width="100%" height={PHOTO_HEIGHT} style={styles.photo} />
+      <View style={styles.content}>
+        <Skeleton width="56%" height={18} />
+        <Skeleton width="40%" height={12} />
+        <Skeleton width="88%" height={14} />
+        <Skeleton width="76%" height={14} />
+        <Skeleton width="82%" height={14} />
+        <Skeleton width="70%" height={14} />
+        <View style={styles.statsRow}>
+          <Skeleton width="42%" height={12} />
+          <Skeleton width="28%" height={12} />
         </View>
       </View>
-      <Skeleton width={80} height={36} style={styles.button} />
     </View>
   );
 }
 
-export function DiscoverPeopleSkeleton({ count = 5 }: { count?: number }) {
+export function DiscoverPeopleSkeleton({ count = 6 }: { count?: number }) {
+  const rows = Math.ceil(count / 2);
   return (
-    <View>
-      {Array.from({ length: count }, (_, index) => (
-        <DiscoverProfileSkeleton key={index} />
+    <View style={styles.grid}>
+      {Array.from({ length: rows }, (_, rowIndex) => (
+        <View key={rowIndex} style={styles.gridRow}>
+          <DiscoverProfileSkeleton />
+          {rowIndex * 2 + 1 < count ? <DiscoverProfileSkeleton /> : <View style={styles.gridSpacer} />}
+        </View>
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  grid: {
+    gap: spacing.sm,
   },
-  avatar: { borderRadius: 32 },
-  body: { flex: 1, gap: spacing.xs },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.xs },
-  button: { borderRadius: 18, alignSelf: "center" },
+  gridRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  gridSpacer: {
+    flex: 1,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  photo: {
+    borderRadius: 0,
+  },
+  content: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
 });

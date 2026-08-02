@@ -5,8 +5,6 @@ import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View, 
 import { DiscoverPeopleSkeleton } from "@/components/DiscoverProfileSkeleton";
 import { DiscoverListSkeleton } from "@/components/DiscoverListSkeleton";
 import { DiscoverLifestyleFilters } from "@/components/DiscoverLifestyleFilters";
-import { FrennixMatchDisplay } from "@/components/FrennixMatchDisplay";
-import { FrennixMatchExplainerModal } from "@/components/FrennixMatchExplainerModal";
 import { AppIcon } from "@/components/AppIcon";
 import { scrollFlatListToTop, handleTabRetap } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
@@ -16,22 +14,30 @@ import {
   getChallenges,
   getGroups,
   getSuggestedAthletes,
+  getWorkoutStreaksForUserIds,
   searchProfiles,
   discoverProfiles,
   scoreProfileCompatibility,
 } from "@frennix/api";
 import type { DiscoverCompatibilityFilters, Profile, SuggestedAthlete } from "@frennix/types";
-import { FRENIX_MATCH_BRAND } from "@frennix/matching";
 import {
-  getLifestyleBadges,
   hasActiveDiscoverFilters,
   LIFESTYLE_BRAND,
   matchesDiscoverFilters,
 } from "@/lib/lifestyle-matching";
 import { useAuth } from "@/providers/AuthProvider";
 import { DiscoverChallengeRow } from "@/components/DiscoverChallengeRow";
-import { useSuggestedFollow } from "@/lib/useSuggestedFollow";
-import { formatActivity } from "@/lib/labels";
+import {
+  getDiscoverAvailability,
+  getDiscoverCompactDistanceLabel,
+  getDiscoverCompactStreakLabel,
+  getDiscoverFirstName,
+  getDiscoverFitnessGoal,
+  getDiscoverPartnerStatusInfo,
+  getDiscoverPeopleSectionTitle,
+  getDiscoverRecentActivityLabel,
+  getDiscoverWorkoutStyle,
+} from "@/lib/discover-profile-display";
 import { pushScreen } from "@/lib/press-utils";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import {
@@ -54,10 +60,6 @@ import {
 } from "@frennix/ui";
 
 type Tab = "people" | "groups" | "challenges";
-
-function profileInterestLabels(activities: string[] | undefined, limit = 4) {
-  return (activities ?? []).slice(0, limit).map(formatActivity);
-}
 
 function scoreProfilesForDiscover(viewer: Profile, profiles: Profile[]): SuggestedAthlete[] {
   return profiles
@@ -82,12 +84,7 @@ export default function DiscoverScreen() {
   const [debouncedPeopleSearch, setDebouncedPeopleSearch] = useState("");
   const [discoverFilters, setDiscoverFilters] = useState<DiscoverCompatibilityFilters>({});
   const [groupQuery, setGroupQuery] = useState("");
-  const [frennixMatchExplainerVisible, setFrennixMatchExplainerVisible] = useState(false);
-  const { isFollowing, toggleFollow, followMutation } = useSuggestedFollow(userId);
-
-  const openFrennixMatchExplainer = useCallback(() => {
-    setFrennixMatchExplainerVisible(true);
-  }, []);
+  const [workoutStreaks, setWorkoutStreaks] = useState<Map<string, number>>(() => new Map());
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedPeopleSearch(peopleSearch.trim()), 300);
@@ -258,6 +255,8 @@ export default function DiscoverScreen() {
       ? lifestyleScored
       : suggestions;
 
+  const peopleStreakIdsKey = peopleData.map((item) => item.profile.id).join("|");
+
   const peopleLoading = isSearchingPeople
     ? searchLoading
     : lifestyleFiltersActive
@@ -287,6 +286,24 @@ export default function DiscoverScreen() {
   useEffect(() => {
     resetAtTop();
   }, [resetAtTop, tab]);
+
+  useEffect(() => {
+    if (tab !== "people" || !peopleStreakIdsKey) {
+      setWorkoutStreaks(new Map());
+      return;
+    }
+
+    const profileIds = peopleStreakIdsKey.split("|").filter(Boolean);
+    let cancelled = false;
+
+    void getWorkoutStreaksForUserIds(profileIds).then((streakMap) => {
+      if (!cancelled) setWorkoutStreaks(streakMap);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [peopleStreakIdsKey, tab]);
 
   useTabScrollRegistration(
     "discover",
@@ -381,9 +398,12 @@ export default function DiscoverScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <Text style={styles.sectionTitle}>
-                {lifestyleFiltersActive
-                  ? LIFESTYLE_BRAND.discoverFilteredHeading
-                  : FRENIX_MATCH_BRAND.sections.discoverSuggested}
+                {getDiscoverPeopleSectionTitle({
+                  lifestyleFiltersActive,
+                  lifestyleFilteredHeading: LIFESTYLE_BRAND.discoverFilteredHeading,
+                  viewer: viewerProfile,
+                  people: peopleData,
+                })}
               </Text>
               {peopleRefetching && peopleData.length > 0 ? (
                 <ActivityIndicator
@@ -396,13 +416,13 @@ export default function DiscoverScreen() {
             <Text style={styles.sectionBody}>
               {lifestyleFiltersActive
                 ? LIFESTYLE_BRAND.discoverFilteredBody
-                : FRENIX_MATCH_BRAND.sections.discoverSuggestedBody}
+                : "Browse athletes by workout style, goals, and schedule — find someone who trains like you."}
             </Text>
           </View>
         ) : null}
       </>
     ),
-    [isSearchingPeople, lifestyleFiltersActive, peopleData.length, peopleRefetching, sharedListHeader]
+    [isSearchingPeople, lifestyleFiltersActive, peopleData, peopleRefetching, sharedListHeader, viewerProfile]
   );
 
   const groupsListHeader = useMemo(
@@ -475,6 +495,8 @@ export default function DiscoverScreen() {
           nativeID="discover-scroll"
           {...discoverScrollProps}
           {...DISCOVER_LIST_PERF}
+          numColumns={2}
+          columnWrapperStyle={styles.gridRow}
           style={discoverListStyle}
           data={peopleData}
           onScroll={onScroll}
@@ -509,28 +531,24 @@ export default function DiscoverScreen() {
           }
           renderItem={({ item }) => {
             const profile = item.profile;
-            const following = isFollowing(profile.id);
+            const workoutStreak = workoutStreaks.get(profile.id) ?? 0;
+            const partnerStatus = getDiscoverPartnerStatusInfo(profile);
             return (
               <DiscoverProfileCard
                 profile={profile}
-                interestLabels={profileInterestLabels(profile.activities)}
-                lifestyleBadges={getLifestyleBadges(profile)}
-                matchDisplay={
-                  item.compatibility_score > 0 ? (
-                    <FrennixMatchDisplay
-                      score={item.compatibility_score}
-                      variant="compact"
-                      onLearnMore={openFrennixMatchExplainer}
-                    />
-                  ) : null
-                }
-                reason={item.reason || undefined}
+                firstName={getDiscoverFirstName(profile)}
+                distanceLabel={getDiscoverCompactDistanceLabel(profile)}
+                workoutStyleLabel={getDiscoverWorkoutStyle(profile)}
+                fitnessGoalLabel={getDiscoverFitnessGoal(profile)}
+                availabilityLabel={getDiscoverAvailability(profile)}
+                partnerStatusLabel={partnerStatus.label}
+                partnerStatusTone={partnerStatus.tone}
+                activityLabel={getDiscoverRecentActivityLabel(profile)}
+                streakLabel={getDiscoverCompactStreakLabel(workoutStreak)}
+                matchPercent={item.compatibility_score > 0 ? item.compatibility_score : null}
+                variant="grid"
+                onPress={() => router.push(`/user/${profile.username}`)}
                 onViewProfile={() => router.push(`/user/${profile.username}`)}
-                followLabel={following ? "Following" : "Follow"}
-                onFollow={() => toggleFollow(profile.id)}
-                followLoading={
-                  followMutation.isPending && followMutation.variables?.targetUserId === profile.id
-                }
               />
             );
           }}
@@ -613,10 +631,6 @@ export default function DiscoverScreen() {
         />
       ) : null}
 
-      <FrennixMatchExplainerModal
-        visible={frennixMatchExplainerVisible}
-        onClose={() => setFrennixMatchExplainerVisible(false)}
-      />
     </View>
     </TabScreenBoundary>
   );
@@ -673,6 +687,7 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   sectionBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   list: { paddingBottom: spacing.xxl },
+  gridRow: { gap: spacing.sm, marginBottom: spacing.sm },
   createLink: { color: colors.accent, fontWeight: "600", marginBottom: spacing.md },
   loader: { marginVertical: spacing.md },
 });
