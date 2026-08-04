@@ -16,9 +16,9 @@ import { CachedAssetImage, colors, spacing, typography } from "@frennix/ui";
 const HERO_SCRIM_STOPS: { offset: string; opacity: number }[] = [
   { offset: "0%", opacity: 0.45 },
   { offset: "18%", opacity: 0.22 },
-  { offset: "36%", opacity: 0.1 },
-  { offset: "56%", opacity: 0.5 },
-  { offset: "82%", opacity: 0.94 },
+  { offset: "34%", opacity: 0.14 },
+  { offset: "52%", opacity: 0.55 },
+  { offset: "80%", opacity: 0.94 },
   { offset: "100%", opacity: 1 },
 ];
 
@@ -34,9 +34,17 @@ const HERO_DESKTOP_MIN_WIDTH = 768;
 const HERO_DESKTOP_HEIGHT_RATIO = 0.38;
 const HERO_DESKTOP_MAX_HEIGHT = 380;
 /** Anchor cover crop on the upper-center faces in welcome-community-hero.png */
-const HERO_CONTENT_POSITION_MOBILE = { top: "20%", left: "50%" } as const;
-const HERO_CONTENT_POSITION_DESKTOP = { top: "28%", left: "50%" } as const;
+const HERO_CONTENT_POSITION_MOBILE = { top: "15%", left: "50%" } as const;
+const HERO_CONTENT_POSITION_DESKTOP = { top: "22%", left: "50%" } as const;
+const LOGO_HEIGHT_DEFAULT = 90;
+const LOGO_HEIGHT_TIGHT = 72;
+const LOGO_HEIGHT_WIDE = 96;
 const HERO_COPY_BOTTOM_CLEARANCE = spacing.xxl;
+const HERO_BRANDING_BOTTOM_RATIO = 0.11;
+const BRANDING_SHIFT_X_MOBILE = -16;
+const BRANDING_SHIFT_X_DESKTOP = -24;
+const BRANDING_SHIFT_Y_MOBILE = 10;
+const BRANDING_SHIFT_Y_DESKTOP = 12;
 
 type LoginHeroSectionProps = {
   style?: StyleProp<ViewStyle>;
@@ -59,7 +67,14 @@ export function LoginHeroSection({
   );
   const tight = windowHeight < 640;
   const heroContentPosition = isWide ? HERO_CONTENT_POSITION_DESKTOP : HERO_CONTENT_POSITION_MOBILE;
-  const heroObjectPosition = isWide ? "50% 28%" : "50% 20%";
+  const heroObjectPosition = isWide ? "50% 22%" : "50% 15%";
+  const logoHeight = tight ? LOGO_HEIGHT_TIGHT : isWide ? LOGO_HEIGHT_WIDE : LOGO_HEIGHT_DEFAULT;
+  const brandingBottomPad = Math.max(
+    HERO_COPY_BOTTOM_CLEARANCE - spacing.sm,
+    Math.round(heroHeight * HERO_BRANDING_BOTTOM_RATIO)
+  );
+  const brandingShiftX = isWide ? BRANDING_SHIFT_X_DESKTOP : BRANDING_SHIFT_X_MOBILE;
+  const brandingShiftY = isWide ? BRANDING_SHIFT_Y_DESKTOP : BRANDING_SHIFT_Y_MOBILE;
 
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const heroScale = useRef(new Animated.Value(1.06)).current;
@@ -150,12 +165,23 @@ export function LoginHeroSection({
       <View
         style={[
           styles.overlayContent,
-          { paddingBottom: HERO_COPY_BOTTOM_CLEARANCE },
+          { paddingBottom: brandingBottomPad },
         ]}
       >
-        <View style={styles.brandingStack}>
+        <View
+          style={[
+            styles.brandingStack,
+            isWide && styles.brandingStackWide,
+            {
+              transform: [
+                { translateX: brandingShiftX },
+                { translateY: brandingShiftY },
+              ],
+            },
+          ]}
+        >
           <Animated.View style={[styles.logoWrap, { opacity: logoOpacity }]}>
-            <FrennixLogo variant="mark" height={tight ? 62 : 76} style={styles.logo} />
+            <FrennixLogo variant="mark" height={logoHeight} style={styles.logo} />
           </Animated.View>
 
           <Animated.View style={[styles.copyBlock, { opacity: copyOpacity }]}>
@@ -196,12 +222,12 @@ const styles = StyleSheet.create({
     right: 0,
   },
   heroMediaFrameMobile: {
-    top: "-9%",
-    height: "112%",
+    top: "-11%",
+    height: "114%",
   },
   heroMediaFrameWide: {
-    top: "-14%",
-    height: "118%",
+    top: "-16%",
+    height: "120%",
     left: "-8%",
     right: "-8%",
     ...(Platform.OS === "web"
@@ -227,10 +253,13 @@ const styles = StyleSheet.create({
   brandingStack: {
     width: "100%",
     alignItems: "center",
-    gap: spacing.md,
+    gap: spacing.lg,
+  },
+  brandingStackWide: {
+    gap: spacing.lg + 4,
   },
   logoWrap: {
-    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   logo: {
     alignSelf: "center",
