@@ -30,6 +30,12 @@ export const LOGIN_HERO_ALT =
 const HERO_HEIGHT_RATIO = 0.34;
 const HERO_MIN_HEIGHT = 228;
 const HERO_MAX_HEIGHT = 340;
+const HERO_DESKTOP_MIN_WIDTH = 768;
+const HERO_DESKTOP_HEIGHT_RATIO = 0.38;
+const HERO_DESKTOP_MAX_HEIGHT = 380;
+/** Anchor cover crop on the upper-center faces in welcome-community-hero.png */
+const HERO_CONTENT_POSITION_MOBILE = { top: "20%", left: "50%" } as const;
+const HERO_CONTENT_POSITION_DESKTOP = { top: "28%", left: "50%" } as const;
 const HERO_COPY_BOTTOM_CLEARANCE = spacing.xxl;
 
 type LoginHeroSectionProps = {
@@ -43,11 +49,17 @@ export function LoginHeroSection({
   topInset = 0,
   showSupporting = true,
 }: LoginHeroSectionProps) {
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isWide = windowWidth >= HERO_DESKTOP_MIN_WIDTH;
   const heroHeight = Math.round(
-    Math.min(HERO_MAX_HEIGHT, Math.max(HERO_MIN_HEIGHT, windowHeight * HERO_HEIGHT_RATIO))
+    Math.min(
+      isWide ? HERO_DESKTOP_MAX_HEIGHT : HERO_MAX_HEIGHT,
+      Math.max(HERO_MIN_HEIGHT, windowHeight * (isWide ? HERO_DESKTOP_HEIGHT_RATIO : HERO_HEIGHT_RATIO))
+    )
   );
   const tight = windowHeight < 640;
+  const heroContentPosition = isWide ? HERO_CONTENT_POSITION_DESKTOP : HERO_CONTENT_POSITION_MOBILE;
+  const heroObjectPosition = isWide ? "50% 28%" : "50% 20%";
 
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const heroScale = useRef(new Animated.Value(1.06)).current;
@@ -96,12 +108,25 @@ export function LoginHeroSection({
           },
         ]}
       >
-        <CachedAssetImage
-          source={HERO_SOURCE}
-          style={styles.heroImage}
-          contentFit="cover"
-          accessibilityLabel={LOGIN_HERO_ALT}
-        />
+        <View
+          style={[
+            styles.heroMediaFrame,
+            isWide ? styles.heroMediaFrameWide : styles.heroMediaFrameMobile,
+          ]}
+        >
+          <CachedAssetImage
+            source={HERO_SOURCE}
+            style={[
+              styles.heroImage,
+              Platform.OS === "web"
+                ? ({ objectPosition: heroObjectPosition } as object)
+                : null,
+            ]}
+            contentFit="cover"
+            contentPosition={heroContentPosition}
+            accessibilityLabel={LOGIN_HERO_ALT}
+          />
+        </View>
       </Animated.View>
 
       <View style={styles.heroOverlay} pointerEvents="none">
@@ -165,9 +190,28 @@ const styles = StyleSheet.create({
   mediaLayer: {
     ...StyleSheet.absoluteFillObject,
   },
+  heroMediaFrame: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
+  heroMediaFrameMobile: {
+    top: "-9%",
+    height: "112%",
+  },
+  heroMediaFrameWide: {
+    top: "-14%",
+    height: "118%",
+    left: "-8%",
+    right: "-8%",
+    ...(Platform.OS === "web"
+      ? ({ transform: [{ scale: 0.93 }] } as object)
+      : ({ transform: [{ scale: 0.95 }] } as object)),
+  },
   heroImage: {
     width: "100%",
     height: "100%",
+    ...(Platform.OS === "web" ? ({ objectFit: "cover" } as object) : null),
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,

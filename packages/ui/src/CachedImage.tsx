@@ -55,17 +55,20 @@ export function CachedAssetImage({
   source,
   style,
   contentFit = "contain",
+  contentPosition,
   accessibilityLabel,
 }: {
   source: ImageProps["source"];
   style?: StyleProp<ImageStyle>;
   contentFit?: ImageProps["contentFit"];
+  contentPosition?: ImageProps["contentPosition"];
   accessibilityLabel?: string;
 }) {
   return (
     <Image
       source={source}
       contentFit={contentFit}
+      contentPosition={contentPosition}
       cachePolicy="memory-disk"
       style={style}
       accessibilityLabel={accessibilityLabel}
