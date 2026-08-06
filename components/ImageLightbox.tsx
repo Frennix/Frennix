@@ -14,9 +14,8 @@ import {
   type ViewStyle,
 } from "react-native";
 import { createPortal } from "react-dom";
-import { prefetchCachedImages } from "../packages/ui/src/CachedImage";
+import { prefetchCachedImages, CachedImage } from "../packages/ui/src/CachedImage";
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
-import { ProgressiveImage } from "../packages/ui/src/ProgressiveImage";
 import { colors, spacing, touchTarget, typography } from "../packages/ui/src/theme";
 import type { PostMediaItem } from "@frennix/types";
 import { galleryNeighborImageUris } from "@frennix/types";
@@ -71,14 +70,67 @@ const LIGHTBOX_WEB_ROOT: ViewStyle = Platform.select({
     bottom: 0,
     width: "100vw",
     height: "100dvh",
+    flex: 1,
     zIndex: 99999,
     backgroundColor: colors.black,
+    overflow: "hidden",
   },
   default: {
     flex: 1,
     backgroundColor: colors.black,
   },
 }) as ViewStyle;
+
+const LIGHTBOX_IMAGE_STYLE = [
+  StyleSheet.absoluteFillObject,
+  { width: "100%", height: "100%", flex: 1 },
+] as const;
+
+const LIGHTBOX_WEB_IMAGE_STYLE =
+  Platform.OS === "web"
+    ? ({
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        maxWidth: "none",
+        maxHeight: "none",
+        objectFit: "cover",
+        objectPosition: "center",
+      } as object)
+    : null;
+
+const LIGHTBOX_WEB_STYLE_ID = "frennix-lightbox-web-styles";
+
+function ensureLightboxWebStyles() {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  if (document.getElementById(LIGHTBOX_WEB_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = LIGHTBOX_WEB_STYLE_ID;
+  style.textContent = `
+    [data-frennix-lightbox],
+    [data-frennix-lightbox] [data-testid="image"],
+    [data-frennix-lightbox] img {
+      width: 100vw !important;
+      height: 100dvh !important;
+      max-width: none !important;
+      max-height: none !important;
+    }
+    [data-frennix-lightbox] img {
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      object-position: center !important;
+      aspect-ratio: unset !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function clampScale(value: number) {
   return Math.min(Math.max(value, 1), 4);
@@ -87,15 +139,11 @@ function clampScale(value: number) {
 function NativeZoomableImage({
   uri,
   placeholderUri,
-  stageWidth,
-  stageHeight,
   isActive,
   onZoomChange,
 }: {
   uri: string;
   placeholderUri?: string | null;
-  stageWidth: number;
-  stageHeight: number;
   isActive: boolean;
   onZoomChange: (zoomed: boolean) => void;
 }) {
@@ -177,19 +225,13 @@ function NativeZoomableImage({
   }));
 
   return (
-    <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
+    <View style={styles.imageStage}>
       <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
-        <AnimatedReanimated.View
-          style={[
-            styles.zoomLayer,
-            { width: stageWidth, height: stageHeight },
-            animatedStyle,
-          ]}
-        >
-          <ProgressiveImage
+        <AnimatedReanimated.View style={[styles.zoomLayer, animatedStyle]}>
+          <CachedImage
             uri={uri}
             placeholderUri={placeholderUri}
-            style={{ width: stageWidth, height: stageHeight }}
+            style={LIGHTBOX_IMAGE_STYLE}
             contentFit="cover"
             recyclingKey={`lightbox-${uri}`}
           />
@@ -202,14 +244,10 @@ function NativeZoomableImage({
 function WebZoomableImage({
   uri,
   placeholderUri,
-  stageWidth,
-  stageHeight,
   onZoomChange,
 }: {
   uri: string;
   placeholderUri?: string | null;
-  stageWidth: number;
-  stageHeight: number;
   onZoomChange: (zoomed: boolean) => void;
 }) {
   const [scale, setScale] = useState(1);
@@ -267,7 +305,7 @@ function WebZoomableImage({
 
   return (
     <View
-      style={[styles.stage, { width: stageWidth, height: stageHeight }]}
+      style={styles.imageStage}
       collapsable={false}
       onTouchStart={(event) => {
         const touches = event.nativeEvent.touches;
@@ -323,24 +361,14 @@ function WebZoomableImage({
         style={[
           styles.zoomLayer,
           {
-            width: stageWidth,
-            height: stageHeight,
             transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale }],
           },
         ]}
       >
-        <ProgressiveImage
+        <CachedImage
           uri={uri}
           placeholderUri={placeholderUri}
-          style={[
-            { width: stageWidth, height: stageHeight },
-            Platform.OS === "web"
-              ? ({
-                  objectFit: "cover",
-                  objectPosition: "center",
-                } as object)
-              : null,
-          ]}
+          style={[LIGHTBOX_IMAGE_STYLE, LIGHTBOX_WEB_IMAGE_STYLE]}
           contentFit="cover"
           recyclingKey={`lightbox-web-${uri}`}
           accessibilityLabel="Full size image"
@@ -368,8 +396,15 @@ function LightboxSurface({
 
   const items = gallery ? resolveGalleryItems(gallery) : [];
   const visible = items.length > 0;
-  const stageWidth = pageWidth;
-  const stageHeight = pageHeight;
+
+  const syncViewportSize = useCallback(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const viewport = window.visualViewport;
+      setPageWidth(Math.round(viewport?.width ?? window.innerWidth));
+      setPageHeight(Math.round(viewport?.height ?? window.innerHeight));
+      return;
+    }
+  }, []);
 
   const dismiss = useCallback(() => {
     dismissY.setValue(0);
@@ -386,6 +421,18 @@ function LightboxSurface({
       listRef.current?.scrollToOffset({ offset: pageWidth * gallery.index, animated: false });
     }
   }, [gallery, dismissY, pageWidth]);
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
+    ensureLightboxWebStyles();
+    syncViewportSize();
+    window.addEventListener("resize", syncViewportSize);
+    window.visualViewport?.addEventListener("resize", syncViewportSize);
+    return () => {
+      window.removeEventListener("resize", syncViewportSize);
+      window.visualViewport?.removeEventListener("resize", syncViewportSize);
+    };
+  }, [syncViewportSize, visible]);
 
   useEffect(() => {
     if (items[index]?.kind === "video") {
@@ -527,9 +574,15 @@ function LightboxSurface({
   return (
     <View
       style={[styles.root, LIGHTBOX_WEB_ROOT]}
+      {...(Platform.OS === "web" ? ({ "data-frennix-lightbox": "true" } as object) : null)}
       onLayout={(event) => {
-        setPageWidth(event.nativeEvent.layout.width);
-        setPageHeight(event.nativeEvent.layout.height);
+        if (Platform.OS === "web") {
+          syncViewportSize();
+          return;
+        }
+        const { width, height } = event.nativeEvent.layout;
+        if (width > 0) setPageWidth(Math.round(width));
+        if (height > 0) setPageHeight(Math.round(height));
       }}
       {...(Platform.OS !== "web" ? panResponder.panHandlers : {})}
       onTouchStart={Platform.OS === "web" ? handleWebTouchStart : undefined}
@@ -540,7 +593,7 @@ function LightboxSurface({
         style={[styles.stageShell, { transform: [{ translateY: dismissY }] }]}
         pointerEvents="box-none"
       >
-        {pageWidth > 0 && stageHeight > 0 ? (
+        {pageWidth > 0 && pageHeight > 0 ? (
           <FlatList
             ref={listRef}
             data={items}
@@ -562,30 +615,35 @@ function LightboxSurface({
             maxToRenderPerBatch={2}
             windowSize={3}
             style={styles.galleryList}
+            contentContainerStyle={styles.galleryListContent}
             renderItem={({ item, index: itemIndex }) => (
-              <View style={[styles.galleryPage, { width: pageWidth, height: stageHeight }]}>
+              <View
+                style={[
+                  styles.galleryPage,
+                  { width: pageWidth },
+                  Platform.OS === "web" ? null : { height: pageHeight },
+                ]}
+              >
                 {item.kind === "video" ? (
-                  <FullscreenVideoSlide
-                    uri={item.url}
-                    thumbnailUrl={item.thumbnailUrl}
-                    stageWidth={stageWidth}
-                    stageHeight={stageHeight}
-                    isActive={itemIndex === index}
-                  />
+                  <View style={styles.imageStage}>
+                    <FullscreenVideoSlide
+                      uri={item.url}
+                      thumbnailUrl={item.thumbnailUrl}
+                      stageWidth={pageWidth}
+                      stageHeight={pageHeight}
+                      isActive={itemIndex === index}
+                    />
+                  </View>
                 ) : Platform.OS === "web" ? (
                   <WebZoomableImage
                     uri={item.url}
                     placeholderUri={item.thumbnailUrl}
-                    stageWidth={stageWidth}
-                    stageHeight={stageHeight}
                     onZoomChange={handleZoomChange}
                   />
                 ) : (
                   <NativeZoomableImage
                     uri={item.url}
                     placeholderUri={item.thumbnailUrl}
-                    stageWidth={stageWidth}
-                    stageHeight={stageHeight}
                     isActive={itemIndex === index}
                     onZoomChange={handleZoomChange}
                   />
@@ -656,26 +714,62 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
 const styles = StyleSheet.create({
   root: {
     backgroundColor: colors.black,
+    ...(Platform.OS === "web"
+      ? ({
+          width: "100vw",
+          height: "100dvh",
+          flex: 1,
+        } as object)
+      : { flex: 1 }),
   },
   stageShell: {
     ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    flex: 1,
   },
   galleryList: {
     flex: 1,
     width: "100%",
     height: "100%",
   },
-  galleryPage: {
-    justifyContent: "center",
-    alignItems: "center",
+  galleryListContent: {
+    flexGrow: 1,
+    height: "100%",
+    ...(Platform.OS === "web" ? ({ minHeight: "100dvh" } as object) : null),
   },
-  stage: {
-    justifyContent: "center",
-    alignItems: "center",
+  galleryPage: {
+    flex: 1,
+    overflow: "hidden",
+    ...(Platform.OS === "web"
+      ? ({
+          width: "100vw",
+          height: "100dvh",
+        } as object)
+      : null),
+  },
+  imageStage: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    flex: 1,
+    overflow: "hidden",
+    ...(Platform.OS === "web"
+      ? ({
+          width: "100vw",
+          height: "100dvh",
+        } as object)
+      : null),
   },
   zoomLayer: {
-    justifyContent: "center",
-    alignItems: "center",
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    flex: 1,
   },
   chromeLayer: {
     ...StyleSheet.absoluteFillObject,

@@ -26,16 +26,19 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Native stage uses measured bounds (no percent sizing crop)",
+    name: "Native image stage fills measured viewport",
     run: () => {
       if (!lightbox.includes("NativeZoomableImage")) {
         throw new Error("NativeZoomableImage component required");
       }
-      if (lightbox.includes('width: "100%"') && lightbox.includes("imageFill")) {
-        throw new Error("Percent-sized image fill causes cropping");
+      if (!lightbox.includes("imageStage")) {
+        throw new Error("imageStage wrapper required");
       }
-      if (!lightbox.includes("stageWidth") || !lightbox.includes("stageHeight")) {
-        throw new Error("Stage dimensions must be measured");
+      if (!lightbox.includes("StyleSheet.absoluteFillObject")) {
+        throw new Error("Lightbox image must use absoluteFillObject");
+      }
+      if (/aspectRatio:\s*[^u]/.test(lightbox)) {
+        throw new Error("Lightbox must not constrain image with aspectRatio");
       }
     },
   },
