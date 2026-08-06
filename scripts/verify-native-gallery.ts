@@ -84,7 +84,9 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Close button remains accessible above gallery",
     run: () => {
       if (!lightbox.includes("closeButton")) throw new Error("Close button missing");
-      if (!lightbox.includes("zIndex: 20")) throw new Error("Close button must sit above gallery");
+      if (!lightbox.includes("chromeLayer") && !lightbox.includes("zIndex: 20")) {
+        throw new Error("Close button must sit above gallery");
+      }
       if (!lightbox.includes('accessibilityLabel="Close"')) {
         throw new Error("Close button needs accessibility label");
       }

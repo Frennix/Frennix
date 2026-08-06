@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   FlatList,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,20 +11,24 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ViewStyle,
 } from "react-native";
+import { createPortal } from "react-dom";
 import { prefetchCachedImages } from "../packages/ui/src/CachedImage";
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
 import { ProgressiveImage } from "../packages/ui/src/ProgressiveImage";
-import { colors, spacing, typography } from "../packages/ui/src/theme";
+import { colors, spacing, touchTarget, typography } from "../packages/ui/src/theme";
 import type { PostMediaItem } from "@frennix/types";
 import { galleryNeighborImageUris } from "@frennix/types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
+import AnimatedReanimated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { setLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
+import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
 
 /** @deprecated Use MediaGalleryState with typed items. */
 export interface ImageGalleryState {
@@ -55,6 +61,24 @@ interface ImageLightboxProps {
   gallery: GalleryState | null;
   onClose: (index: number) => void;
 }
+
+const LIGHTBOX_WEB_ROOT: ViewStyle = Platform.select({
+  web: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100vw",
+    height: "100dvh",
+    zIndex: 99999,
+    backgroundColor: colors.black,
+  },
+  default: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+}) as ViewStyle;
 
 function clampScale(value: number) {
   return Math.min(Math.max(value, 1), 4);
@@ -155,7 +179,7 @@ function NativeZoomableImage({
   return (
     <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
-        <Animated.View
+        <AnimatedReanimated.View
           style={[
             styles.zoomLayer,
             { width: stageWidth, height: stageHeight },
@@ -169,7 +193,7 @@ function NativeZoomableImage({
             contentFit="contain"
             recyclingKey={`lightbox-${uri}`}
           />
-        </Animated.View>
+        </AnimatedReanimated.View>
       </GestureDetector>
     </View>
   );
@@ -308,7 +332,15 @@ function WebZoomableImage({
         <ProgressiveImage
           uri={uri}
           placeholderUri={placeholderUri}
-          style={{ width: stageWidth, height: stageHeight }}
+          style={[
+            { width: stageWidth, height: stageHeight },
+            Platform.OS === "web"
+              ? ({
+                  objectFit: "contain",
+                  objectPosition: "center",
+                } as object)
+              : null,
+          ]}
           contentFit="contain"
           recyclingKey={`lightbox-web-${uri}`}
           accessibilityLabel="Full size image"
@@ -318,32 +350,48 @@ function WebZoomableImage({
   );
 }
 
-export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
+function LightboxSurface({
+  gallery,
+  onClose,
+  onRegisterDismiss,
+}: ImageLightboxProps & { onRegisterDismiss?: (dismiss: () => void) => void }) {
   const insets = useSafeAreaInsets();
-  const chromeTop = Math.max(insets.top, spacing.lg);
-  const topInset = chromeTop + spacing.lg + 40;
+  const chromeTop = Math.max(insets.top, Platform.OS === "web" ? 12 : spacing.sm);
   const [index, setIndex] = useState(0);
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [zoomed, setZoomed] = useState(false);
   const [pageWidth, setPageWidth] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
   const listRef = useRef<FlatList<PostMediaItem>>(null);
+  const dismissY = useRef(new Animated.Value(0)).current;
+  const webSwipeStartY = useRef<number | null>(null);
 
   const items = gallery ? resolveGalleryItems(gallery) : [];
   const visible = items.length > 0;
   const stageWidth = pageWidth;
-  const stageHeight = Math.max(pageHeight - topInset, 0);
+  const stageHeight = pageHeight;
+
+  const dismiss = useCallback(() => {
+    dismissY.setValue(0);
+    onClose(index);
+  }, [dismissY, index, onClose]);
 
   useEffect(() => {
     if (!gallery || !pageWidth) return;
     setIndex(gallery.index);
     setScrollEnabled(true);
+    setZoomed(false);
+    dismissY.setValue(0);
     if (gallery.index > 0) {
       listRef.current?.scrollToOffset({ offset: pageWidth * gallery.index, animated: false });
     }
-  }, [gallery, pageWidth]);
+  }, [gallery, dismissY, pageWidth]);
 
   useEffect(() => {
-    if (items[index]?.kind === "video") setScrollEnabled(true);
+    if (items[index]?.kind === "video") {
+      setScrollEnabled(true);
+      setZoomed(false);
+    }
   }, [index, items]);
 
   useEffect(() => {
@@ -351,6 +399,39 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
     const neighbors = galleryNeighborImageUris(items, index);
     if (neighbors.length) void prefetchCachedImages(neighbors);
   }, [items, index]);
+
+  useEffect(() => {
+    setLightboxOverlayOpen(visible);
+    if (!visible) return;
+
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const previousBodyOverflow = document.body.style.overflow;
+      const previousHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = previousBodyOverflow;
+        document.documentElement.style.overflow = previousHtmlOverflow;
+        restoreWebDocumentScrollLock();
+        setLightboxOverlayOpen(false);
+      };
+    }
+
+    return () => {
+      setLightboxOverlayOpen(false);
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") dismiss();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dismiss, visible]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -363,162 +444,269 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
   );
 
   const handleZoomChange = useCallback((zoomed: boolean) => {
+    setZoomed(zoomed);
     setScrollEnabled(!zoomed);
   }, []);
 
-  const dismiss = useCallback(() => {
-    onClose(index);
-  }, [index, onClose]);
+  useEffect(() => {
+    onRegisterDismiss?.(dismiss);
+    return () => onRegisterDismiss?.(() => undefined);
+  }, [dismiss, onRegisterDismiss]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          !zoomed && gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dy > 0) dismissY.setValue(gesture.dy);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 120 || gesture.vy > 1.2) {
+            dismiss();
+            return;
+          }
+          Animated.spring(dismissY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 0,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(dismissY, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+        },
+      }),
+    [dismiss, dismissY, zoomed]
+  );
+
+  const handleWebTouchStart = useCallback(
+    (event: { nativeEvent: { touches: Array<{ pageY: number }> } }) => {
+      if (zoomed || event.nativeEvent.touches.length !== 1) {
+        webSwipeStartY.current = null;
+        return;
+      }
+      webSwipeStartY.current = event.nativeEvent.touches[0].pageY;
+    },
+    [zoomed]
+  );
+
+  const handleWebTouchMove = useCallback(
+    (event: {
+      nativeEvent: { touches: Array<{ pageY: number; pageX: number }> };
+    }) => {
+      if (zoomed || webSwipeStartY.current === null || event.nativeEvent.touches.length !== 1) {
+        return;
+      }
+      const touch = event.nativeEvent.touches[0];
+      const dy = touch.pageY - webSwipeStartY.current;
+      if (dy > 8) dismissY.setValue(dy);
+    },
+    [dismissY, zoomed]
+  );
+
+  const handleWebTouchEnd = useCallback(
+    (event: { nativeEvent: { changedTouches: Array<{ pageY: number }> } }) => {
+      if (zoomed || webSwipeStartY.current === null) {
+        webSwipeStartY.current = null;
+        return;
+      }
+      const endY = event.nativeEvent.changedTouches[0]?.pageY ?? webSwipeStartY.current;
+      const dy = endY - webSwipeStartY.current;
+      webSwipeStartY.current = null;
+      if (dy > 120) {
+        dismiss();
+        return;
+      }
+      Animated.spring(dismissY, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+    },
+    [dismiss, dismissY, zoomed]
+  );
 
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={dismiss} statusBarTranslucent>
-      <View
-        style={styles.backdrop}
-        onLayout={(event) => {
-          setPageWidth(event.nativeEvent.layout.width);
-          setPageHeight(event.nativeEvent.layout.height);
-        }}
+    <View
+      style={[styles.root, LIGHTBOX_WEB_ROOT]}
+      onLayout={(event) => {
+        setPageWidth(event.nativeEvent.layout.width);
+        setPageHeight(event.nativeEvent.layout.height);
+      }}
+      {...(Platform.OS !== "web" ? panResponder.panHandlers : {})}
+      onTouchStart={Platform.OS === "web" ? handleWebTouchStart : undefined}
+      onTouchMove={Platform.OS === "web" ? handleWebTouchMove : undefined}
+      onTouchEnd={Platform.OS === "web" ? handleWebTouchEnd : undefined}
+    >
+      <Animated.View
+        style={[styles.stageShell, { transform: [{ translateY: dismissY }] }]}
+        pointerEvents="box-none"
       >
-        <Pressable style={styles.dismissArea} onPress={dismiss} accessibilityLabel="Dismiss image preview" />
+        {pageWidth > 0 && stageHeight > 0 ? (
+          <FlatList
+            ref={listRef}
+            data={items}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            scrollEnabled={scrollEnabled}
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
+            getItemLayout={(_, itemIndex) => ({
+              length: pageWidth,
+              offset: pageWidth * itemIndex,
+              index: itemIndex,
+            })}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={handleScroll}
+            initialNumToRender={Math.min(3, items.length)}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+            style={styles.galleryList}
+            renderItem={({ item, index: itemIndex }) => (
+              <View style={[styles.galleryPage, { width: pageWidth, height: stageHeight }]}>
+                {item.kind === "video" ? (
+                  <FullscreenVideoSlide
+                    uri={item.url}
+                    thumbnailUrl={item.thumbnailUrl}
+                    stageWidth={stageWidth}
+                    stageHeight={stageHeight}
+                    isActive={itemIndex === index}
+                  />
+                ) : Platform.OS === "web" ? (
+                  <WebZoomableImage
+                    uri={item.url}
+                    placeholderUri={item.thumbnailUrl}
+                    stageWidth={stageWidth}
+                    stageHeight={stageHeight}
+                    onZoomChange={handleZoomChange}
+                  />
+                ) : (
+                  <NativeZoomableImage
+                    uri={item.url}
+                    placeholderUri={item.thumbnailUrl}
+                    stageWidth={stageWidth}
+                    stageHeight={stageHeight}
+                    isActive={itemIndex === index}
+                    onZoomChange={handleZoomChange}
+                  />
+                )}
+              </View>
+            )}
+          />
+        ) : null}
+      </Animated.View>
 
-        <View style={styles.content} pointerEvents="box-none">
-          <Pressable
-            style={[styles.closeButton, { top: chromeTop }]}
-            onPress={dismiss}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-          >
-            <Text style={styles.closeText}>✕</Text>
-          </Pressable>
+      <View style={styles.chromeLayer} pointerEvents="box-none">
+        <Pressable
+          style={[styles.closeButton, { top: chromeTop }]}
+          onPress={dismiss}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          accessibilityHint="Closes the photo viewer"
+        >
+          <Text style={styles.closeText}>✕</Text>
+        </Pressable>
 
-          {items.length > 1 ? (
-            <View style={[styles.galleryCounter, { top: chromeTop }]} pointerEvents="none">
-              <Text style={styles.galleryCounterText}>
-                {index + 1}/{items.length}
-              </Text>
-            </View>
-          ) : null}
-
-          {pageWidth > 0 && stageHeight > 0 ? (
-            <FlatList
-              ref={listRef}
-              data={items}
-              horizontal
-              pagingEnabled
-              nestedScrollEnabled
-              scrollEnabled={scrollEnabled}
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
-              getItemLayout={(_, itemIndex) => ({
-                length: pageWidth,
-                offset: pageWidth * itemIndex,
-                index: itemIndex,
-              })}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              onMomentumScrollEnd={handleScroll}
-              initialNumToRender={Math.min(3, items.length)}
-              maxToRenderPerBatch={2}
-              windowSize={3}
-              style={styles.galleryList}
-              renderItem={({ item, index: itemIndex }) => (
-                <View style={[styles.galleryPage, { width: pageWidth, height: stageHeight }]}>
-                  {item.kind === "video" ? (
-                    <FullscreenVideoSlide
-                      uri={item.url}
-                      thumbnailUrl={item.thumbnailUrl}
-                      stageWidth={stageWidth}
-                      stageHeight={stageHeight}
-                      isActive={itemIndex === index}
-                    />
-                  ) : Platform.OS === "web" ? (
-                    <WebZoomableImage
-                      uri={item.url}
-                      placeholderUri={item.thumbnailUrl}
-                      stageWidth={stageWidth}
-                      stageHeight={stageHeight}
-                      onZoomChange={handleZoomChange}
-                    />
-                  ) : (
-                    <NativeZoomableImage
-                      uri={item.url}
-                      placeholderUri={item.thumbnailUrl}
-                      stageWidth={stageWidth}
-                      stageHeight={stageHeight}
-                      isActive={itemIndex === index}
-                      onZoomChange={handleZoomChange}
-                    />
-                  )}
-                </View>
-              )}
-            />
-          ) : null}
-        </View>
+        {items.length > 1 ? (
+          <View style={[styles.galleryCounter, { top: chromeTop }]} pointerEvents="none">
+            <Text style={styles.galleryCounterText}>
+              {index + 1}/{items.length}
+            </Text>
+          </View>
+        ) : null}
       </View>
+    </View>
+  );
+}
+
+export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
+  const visible = Boolean(gallery && resolveGalleryItems(gallery).length > 0);
+  const dismissRef = useRef<() => void>(() => onClose(gallery?.index ?? 0));
+
+  if (!visible) return null;
+
+  const surface = (
+    <LightboxSurface
+      gallery={gallery}
+      onClose={onClose}
+      onRegisterDismiss={(dismiss) => {
+        dismissRef.current = dismiss;
+      }}
+    />
+  );
+
+  if (Platform.OS === "web" && typeof document !== "undefined") {
+    return createPortal(surface, document.body);
+  }
+
+  return (
+    <Modal
+      visible
+      transparent={false}
+      animationType="fade"
+      onRequestClose={() => dismissRef.current()}
+      statusBarTranslucent
+      presentationStyle="fullScreen"
+    >
+      {surface}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(10, 10, 11, 0.96)",
+  root: {
+    backgroundColor: colors.black,
   },
-  dismissArea: {
+  stageShell: {
     ...StyleSheet.absoluteFillObject,
-  },
-  content: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
   },
   galleryList: {
     flex: 1,
     width: "100%",
-    ...(Platform.OS === "web" ? { overflow: "visible" as const } : null),
+    height: "100%",
   },
   galleryPage: {
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible",
   },
   stage: {
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible",
   },
   zoomLayer: {
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible",
+  },
+  chromeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 30,
   },
   closeButton: {
     position: "absolute",
-    right: spacing.lg,
-    zIndex: 20,
-    elevation: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
+    right: spacing.md,
+    zIndex: 31,
+    width: touchTarget,
+    height: touchTarget,
+    borderRadius: touchTarget / 2,
+    backgroundColor: "rgba(10, 10, 11, 0.82)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.88)",
     alignItems: "center",
     justifyContent: "center",
+    ...(Platform.OS === "web"
+      ? ({ boxShadow: "0 2px 12px rgba(0,0,0,0.45)" } as object)
+      : null),
   },
   closeText: {
-    ...typography.body,
     color: colors.text,
-    fontSize: 18,
-    lineHeight: 20,
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: "800",
   },
   galleryCounter: {
     position: "absolute",
-    left: spacing.lg,
-    zIndex: 20,
+    left: spacing.md,
+    zIndex: 31,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 999,
