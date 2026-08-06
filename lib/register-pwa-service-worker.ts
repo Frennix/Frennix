@@ -8,7 +8,7 @@ import { isWebStandalone } from "@/lib/pwa";
 import { pushLog } from "@/lib/web-push-diagnostics";
 
 /** Keep in sync with FRENNIX_SW_VERSION in public/sw.js */
-export const PWA_SW_VERSION = "20260727-pwa-auto-update-v1";
+export const PWA_SW_VERSION = "20260730-lightbox-debug-v4";
 
 const SW_PATH = "/sw.js";
 const VERSION_PATTERN = /FRENNIX_SW_VERSION\s*=\s*["']([^"']+)["']/;

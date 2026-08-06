@@ -28,7 +28,7 @@ function loadEnvVar(name) {
 }
 
 const PWA_PATCH_ID = "frennix-pwa-shell";
-const SW_VERSION = "20260727-pwa-auto-update-v1";
+const SW_VERSION = "20260730-lightbox-debug-v4";
 
 function resolveBuildSha() {
   try {

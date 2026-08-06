@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { Platform } from "react-native";
 import type { PostMediaItem, PostType } from "@frennix/types";
 import { buildMediaGalleryState, normalizePostMediaItems } from "@frennix/types";
 import { ImageLightbox, type ImageGalleryState, type MediaGalleryState } from "@/components/ImageLightbox";
@@ -40,6 +41,13 @@ export function useMediaGallery() {
       onClosed?: GalleryCloseHandler,
       options?: OpenGalleryOptions
     ) => {
+      console.log("LIGHTBOX DEBUG V4 openGallery", {
+        component: "useMediaGallery.tsx",
+        index,
+        firstUrl: mediaUrls[index] ?? mediaUrls[0] ?? null,
+        count: mediaUrls.length,
+        platform: Platform.OS,
+      });
       closeHandlerRef.current = onClosed ?? null;
       setGallery(
         buildMediaGalleryState(mediaUrls, {
