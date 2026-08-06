@@ -664,13 +664,6 @@ export default function HomeScreen() {
       openPostActions(post);
     },
     onMediaPress: (post: Post, uri: string, index: number) => {
-      console.log("LIGHTBOX DEBUG V4 feed onMediaPress", {
-        component: "app/(tabs)/index.tsx",
-        postId: post.id,
-        uri,
-        index,
-        platform: Platform.OS,
-      });
       const displayPost = post.shared_post ?? post;
       setCarouselIndex(post.id, index);
       openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {

@@ -246,15 +246,7 @@ function FeedImage({
       <TouchableOpacity
         activeOpacity={0.95}
         delayPressIn={pressDelayMs ?? 0}
-        onPress={() => {
-          if (Platform.OS === "web") {
-            console.log("LIGHTBOX DEBUG V4 feed image tap", {
-              component: "packages/ui/src/PostMedia.tsx",
-              uri,
-            });
-          }
-          onImagePress();
-        }}
+        onPress={onImagePress}
         accessibilityRole="button"
         accessibilityLabel="View full image"
       >

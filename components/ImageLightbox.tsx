@@ -61,9 +61,6 @@ interface ImageLightboxProps {
   onClose: (index: number) => void;
 }
 
-const LIGHTBOX_DEBUG_V4 = "LIGHTBOX DEBUG V4";
-const LIGHTBOX_DEBUG_COMPONENT = "ImageLightbox.tsx";
-
 const LIGHTBOX_WEB_ROOT: ViewStyle = Platform.select({
   web: {
     position: "fixed",
@@ -98,7 +95,7 @@ const WEB_LIGHTBOX_PLAIN_IMG_STYLE = {
   minHeight: "100dvh",
   maxWidth: "none",
   maxHeight: "none",
-  objectFit: "cover",
+  objectFit: "contain",
   objectPosition: "center",
   display: "block",
   margin: 0,
@@ -210,7 +207,7 @@ function NativeZoomableImage({
             uri={uri}
             placeholderUri={placeholderUri}
             style={LIGHTBOX_IMAGE_STYLE}
-            contentFit="cover"
+            contentFit="contain"
             recyclingKey={`lightbox-${uri}`}
           />
         </AnimatedReanimated.View>
@@ -232,23 +229,12 @@ function WebZoomableImage({
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
   const lastTap = useRef(0);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-
-  const logImageBounds = useCallback(() => {
-    const img = imgRef.current;
-    if (!img) return;
-    console.log(img.getBoundingClientRect());
-  }, []);
 
   useEffect(() => {
     setScale(1);
     setPan({ x: 0, y: 0 });
     onZoomChange(false);
   }, [uri, onZoomChange]);
-
-  useEffect(() => {
-    requestAnimationFrame(() => logImageBounds());
-  }, [uri, logImageBounds]);
 
   useEffect(() => {
     function onWheel(event: WheelEvent) {
@@ -346,19 +332,13 @@ function WebZoomableImage({
       onDoubleClick={handleDoubleTap}
     >
       {createElement("img", {
-        ref: imgRef,
         src: uri,
         alt: "",
         draggable: false,
         style: {
           ...WEB_LIGHTBOX_PLAIN_IMG_STYLE,
-          border: "8px solid red",
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
           transformOrigin: "center center",
-        },
-        onLoad: () => {
-          logImageBounds();
-          requestAnimationFrame(() => logImageBounds());
         },
       })}
     </View>
@@ -383,18 +363,6 @@ function LightboxSurface({
 
   const items = gallery ? resolveGalleryItems(gallery) : [];
   const visible = items.length > 0;
-  const activeImageUrl = items[index]?.url ?? null;
-
-  useEffect(() => {
-    if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
-    console.log("LIGHTBOX DEBUG V4 mounted", {
-      component: LIGHTBOX_DEBUG_COMPONENT,
-      uri: activeImageUrl,
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-      visualViewportHeight: window.visualViewport?.height,
-    });
-  }, [activeImageUrl, visible]);
 
   const syncViewportSize = useCallback(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -653,9 +621,6 @@ function LightboxSurface({
       </Animated.View>
 
       <View style={styles.chromeLayer} pointerEvents="box-none">
-        <View style={styles.debugBanner} pointerEvents="none">
-          <Text style={styles.debugBannerText}>{LIGHTBOX_DEBUG_V4}</Text>
-        </View>
         <Pressable
           style={[styles.closeButton, { top: chromeTop }]}
           onPress={dismiss}
@@ -683,12 +648,6 @@ export function ImageLightbox({ gallery, onClose }: ImageLightboxProps) {
   const dismissRef = useRef<() => void>(() => onClose(gallery?.index ?? 0));
 
   if (!visible) return null;
-
-  if (Platform.OS === "web" && typeof document !== "undefined") {
-    console.log("LIGHTBOX DEBUG V4 branch", { branch: "web-portal", component: LIGHTBOX_DEBUG_COMPONENT });
-  } else {
-    console.log("LIGHTBOX DEBUG V4 branch", { branch: "native-modal", component: LIGHTBOX_DEBUG_COMPONENT });
-  }
 
   const surface = (
     <LightboxSurface
@@ -781,22 +740,6 @@ const styles = StyleSheet.create({
   chromeLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 30,
-  },
-  debugBanner: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    zIndex: 40,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
-  },
-  debugBannerText: {
-    color: "#ff0000",
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: "900",
-    letterSpacing: 0.5,
   },
   closeButton: {
     position: "absolute",

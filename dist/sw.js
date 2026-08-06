@@ -2,8 +2,8 @@
  * Frennix PWA service worker — push + click + shell cache.
  * Bump FRENNIX_SW_VERSION on deploy to refresh installed PWAs.
  */
-const FRENNIX_SW_VERSION = "20260730-lightbox-debug-v4";
-const SHELL_CACHE = "frennix-shell-v9";
+const FRENNIX_SW_VERSION = "20260730-lightbox-contain-v1";
+const SHELL_CACHE = "frennix-shell-v10";
 const SHELL_ASSETS = ["/manifest.webmanifest"];
 
 self.addEventListener("message", (event) => {
