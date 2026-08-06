@@ -190,7 +190,7 @@ function NativeZoomableImage({
             uri={uri}
             placeholderUri={placeholderUri}
             style={{ width: stageWidth, height: stageHeight }}
-            contentFit="contain"
+            contentFit="cover"
             recyclingKey={`lightbox-${uri}`}
           />
         </AnimatedReanimated.View>
@@ -336,12 +336,12 @@ function WebZoomableImage({
             { width: stageWidth, height: stageHeight },
             Platform.OS === "web"
               ? ({
-                  objectFit: "contain",
+                  objectFit: "cover",
                   objectPosition: "center",
                 } as object)
               : null,
           ]}
-          contentFit="contain"
+          contentFit="cover"
           recyclingKey={`lightbox-web-${uri}`}
           accessibilityLabel="Full size image"
         />

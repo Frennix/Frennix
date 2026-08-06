@@ -29,7 +29,7 @@ let ok = true;
 ok = pass("Lightbox renders through web portal", lightbox.includes("createPortal") && lightbox.includes("document.body")) && ok;
 ok = pass("Web root uses fixed full viewport", lightbox.includes("100dvh") && lightbox.includes("100vw")) && ok;
 ok = pass("Solid black full-screen backdrop", lightbox.includes("colors.black")) && ok;
-ok = pass("Images use contain fit", lightbox.includes('contentFit="contain"')) && ok;
+ok = pass("Images use cover fit", lightbox.includes('contentFit="cover"') && lightbox.includes('objectFit: "cover"')) && ok;
 ok = pass("Close button above gallery chrome", lightbox.includes("chromeLayer") && lightbox.includes("zIndex: 31")) && ok;
 ok = pass("Swipe-down dismiss when not zoomed", lightbox.includes("panResponder") && lightbox.includes("gesture.dy > 120")) && ok;
 ok = pass("Escape closes on web", lightbox.includes('event.key === "Escape"')) && ok;

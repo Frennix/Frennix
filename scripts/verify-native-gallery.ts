@@ -18,13 +18,10 @@ const feed = read("app/(tabs)/index.tsx");
 
 const checks: Array<{ name: string; run: () => void }> = [
   {
-    name: "Gallery images use contain fit (portrait, landscape, square)",
+    name: "Gallery images use cover fit (edge-to-edge fullscreen)",
     run: () => {
-      if (!lightbox.includes('contentFit="contain"')) {
-        throw new Error("CachedImage must use contentFit contain");
-      }
-      if (lightbox.includes('contentFit="cover"')) {
-        throw new Error("Gallery must not use cover");
+      if (!lightbox.includes('contentFit="cover"')) {
+        throw new Error("CachedImage must use contentFit cover");
       }
     },
   },

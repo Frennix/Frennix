@@ -92,7 +92,7 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!lightbox.includes("scrollEnabled={scrollEnabled}")) {
         throw new Error("gallery scroll must disable while image zoomed");
       }
-      if (!lightbox.includes('contentFit="contain"')) throw new Error("gallery images must use contain");
+      if (!lightbox.includes('contentFit="cover"')) throw new Error("gallery images must use cover");
     },
   },
 ];
