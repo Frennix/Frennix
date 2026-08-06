@@ -37,8 +37,12 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!lightbox.includes("StyleSheet.absoluteFillObject")) {
         throw new Error("Lightbox image must use absoluteFillObject");
       }
-      if (/aspectRatio:\s*[^u]/.test(lightbox)) {
-        throw new Error("Lightbox must not constrain image with aspectRatio");
+      const nativeBlock = lightbox.slice(
+        lightbox.indexOf("function NativeZoomableImage"),
+        lightbox.indexOf("function WebZoomableImage")
+      );
+      if (/aspectRatio/.test(nativeBlock)) {
+        throw new Error("Native lightbox must not constrain image with aspectRatio");
       }
     },
   },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, createElement } from "react";
 import {
   Animated,
   FlatList,
@@ -86,51 +86,26 @@ const LIGHTBOX_IMAGE_STYLE = [
   { width: "100%", height: "100%", flex: 1 },
 ] as const;
 
-const LIGHTBOX_WEB_IMAGE_STYLE =
-  Platform.OS === "web"
-    ? ({
-        position: "absolute",
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        maxWidth: "none",
-        maxHeight: "none",
-        objectFit: "cover",
-        objectPosition: "center",
-      } as object)
-    : null;
-
-const LIGHTBOX_WEB_STYLE_ID = "frennix-lightbox-web-styles";
-
-function ensureLightboxWebStyles() {
-  if (Platform.OS !== "web" || typeof document === "undefined") return;
-  if (document.getElementById(LIGHTBOX_WEB_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = LIGHTBOX_WEB_STYLE_ID;
-  style.textContent = `
-    [data-frennix-lightbox],
-    [data-frennix-lightbox] [data-testid="image"],
-    [data-frennix-lightbox] img {
-      width: 100vw !important;
-      height: 100dvh !important;
-      max-width: none !important;
-      max-height: none !important;
-    }
-    [data-frennix-lightbox] img {
-      position: absolute !important;
-      inset: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-      object-position: center !important;
-      aspect-ratio: unset !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
+const WEB_LIGHTBOX_PLAIN_IMG_STYLE = {
+  position: "absolute",
+  inset: 0,
+  width: "100vw",
+  height: "100dvh",
+  minWidth: "100vw",
+  minHeight: "100dvh",
+  maxWidth: "none",
+  maxHeight: "none",
+  objectFit: "cover",
+  objectPosition: "center",
+  display: "block",
+  margin: 0,
+  padding: 0,
+  borderRadius: 0,
+  aspectRatio: "auto",
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  touchAction: "none",
+} as const;
 
 function clampScale(value: number) {
   return Math.min(Math.max(value, 1), 4);
@@ -243,7 +218,6 @@ function NativeZoomableImage({
 
 function WebZoomableImage({
   uri,
-  placeholderUri,
   onZoomChange,
 }: {
   uri: string;
@@ -255,12 +229,23 @@ function WebZoomableImage({
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
   const lastTap = useRef(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  const logImageBounds = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    console.log(img.getBoundingClientRect());
+  }, []);
 
   useEffect(() => {
     setScale(1);
     setPan({ x: 0, y: 0 });
     onZoomChange(false);
   }, [uri, onZoomChange]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => logImageBounds());
+  }, [uri, logImageBounds]);
 
   useEffect(() => {
     function onWheel(event: WheelEvent) {
@@ -357,23 +342,21 @@ function WebZoomableImage({
       // @ts-expect-error web double-click zoom
       onDoubleClick={handleDoubleTap}
     >
-      <View
-        style={[
-          styles.zoomLayer,
-          {
-            transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale }],
-          },
-        ]}
-      >
-        <CachedImage
-          uri={uri}
-          placeholderUri={placeholderUri}
-          style={[LIGHTBOX_IMAGE_STYLE, LIGHTBOX_WEB_IMAGE_STYLE]}
-          contentFit="cover"
-          recyclingKey={`lightbox-web-${uri}`}
-          accessibilityLabel="Full size image"
-        />
-      </View>
+      {createElement("img", {
+        ref: imgRef,
+        src: uri,
+        alt: "",
+        draggable: false,
+        style: {
+          ...WEB_LIGHTBOX_PLAIN_IMG_STYLE,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+          transformOrigin: "center center",
+        },
+        onLoad: () => {
+          logImageBounds();
+          requestAnimationFrame(() => logImageBounds());
+        },
+      })}
     </View>
   );
 }
@@ -424,7 +407,6 @@ function LightboxSurface({
 
   useEffect(() => {
     if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
-    ensureLightboxWebStyles();
     syncViewportSize();
     window.addEventListener("resize", syncViewportSize);
     window.visualViewport?.addEventListener("resize", syncViewportSize);

@@ -31,8 +31,9 @@ ok = pass("Web root uses fixed full viewport", lightbox.includes("100dvh") && li
 ok = pass("Solid black full-screen backdrop", lightbox.includes("colors.black")) && ok;
 ok = pass("Images use cover fit", lightbox.includes('contentFit="cover"') && lightbox.includes('objectFit: "cover"')) && ok;
 ok = pass("Image stage uses absolute fill", lightbox.includes("imageStage") && lightbox.includes("StyleSheet.absoluteFillObject")) && ok;
+ok = pass("Web lightbox uses plain HTML img", lightbox.includes('createElement("img"') && lightbox.includes("WEB_LIGHTBOX_PLAIN_IMG_STYLE")) && ok;
+ok = pass("Web img logs bounding rect on open", lightbox.includes("getBoundingClientRect()")) && ok;
 ok = pass("Web syncs visual viewport height", lightbox.includes("visualViewport") && lightbox.includes("100dvh")) && ok;
-ok = pass("Web img forced to cover viewport", lightbox.includes("data-frennix-lightbox") && lightbox.includes("object-fit: cover")) && ok;
 ok = pass("Close button above gallery chrome", lightbox.includes("chromeLayer") && lightbox.includes("zIndex: 31")) && ok;
 ok = pass("Swipe-down dismiss when not zoomed", lightbox.includes("panResponder") && lightbox.includes("gesture.dy > 120")) && ok;
 ok = pass("Escape closes on web", lightbox.includes('event.key === "Escape"')) && ok;
