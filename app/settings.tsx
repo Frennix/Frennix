@@ -2,7 +2,6 @@ import { Link } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -12,8 +11,8 @@ import {
 } from "react-native";
 import { useState } from "react";
 import { redirectToLogin } from "@/lib/auth-navigation";
+import { LEGAL_ROUTES } from "@/lib/legal/routes";
 import { useAuth } from "@/providers/AuthProvider";
-import { config } from "@/lib/config";
 import { unregisterPushNotifications } from "@/lib/notifications";
 import { pushScreen } from "@/lib/press-utils";
 import { useStaffAccess } from "@/lib/founder/useStaffAccess";
@@ -71,10 +70,6 @@ export default function SettingsScreen() {
 
   function confirmSignOut() {
     confirmAction("Sign out", "Are you sure you want to sign out?", handleSignOut);
-  }
-
-  function openUrl(url: string) {
-    Linking.openURL(url).catch(() => Alert.alert("Could not open link"));
   }
 
   return (
@@ -199,12 +194,16 @@ export default function SettingsScreen() {
       </Link>
 
       <Text style={styles.section}>Legal</Text>
-      <Pressable onPress={() => openUrl(config.privacyPolicyUrl)}>
-        <Text style={styles.link}>Privacy Policy</Text>
-      </Pressable>
-      <Pressable onPress={() => openUrl(config.termsUrl)}>
-        <Text style={styles.link}>Terms of Service</Text>
-      </Pressable>
+      <Link href={LEGAL_ROUTES.privacyPolicy} asChild>
+        <Pressable>
+          <Text style={styles.link}>Privacy Policy</Text>
+        </Pressable>
+      </Link>
+      <Link href={LEGAL_ROUTES.termsOfService} asChild>
+        <Pressable>
+          <Text style={styles.link}>Terms of Service</Text>
+        </Pressable>
+      </Link>
 
       <Text style={styles.section}>Coming soon</Text>
       <Text style={styles.muted}>Marketplace · Premium · Live stream</Text>

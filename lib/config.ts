@@ -19,17 +19,15 @@ function resolveVapidPublicKey(): string {
   );
 }
 
+import { LEGAL_ROUTES } from "@/lib/legal/routes";
+
 export const config = {
   supabaseUrl: (extra.supabaseUrl as string) || process.env.EXPO_PUBLIC_SUPABASE_URL || "",
   supabaseAnonKey:
     (extra.supabaseAnonKey as string) || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "",
   sentryDsn: (extra.sentryDsn as string) || process.env.EXPO_PUBLIC_SENTRY_DSN || "",
-  privacyPolicyUrl:
-    (extra.privacyPolicyUrl as string) ||
-    process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ||
-    "/privacy-policy",
-  termsUrl:
-    (extra.termsUrl as string) || process.env.EXPO_PUBLIC_TERMS_URL || "/terms-of-service",
+  privacyPolicyUrl: LEGAL_ROUTES.privacyPolicy,
+  termsUrl: LEGAL_ROUTES.termsOfService,
   appUrl:
     (extra.appUrl as string) || process.env.EXPO_PUBLIC_APP_URL || "https://frennix.vercel.app",
   get vapidPublicKey() {

@@ -278,6 +278,8 @@ export default function RootLayout() {
             />
             <Stack.Screen name="notification-settings" options={backScreen("Notifications")} />
             <Stack.Screen name="privacy-settings" options={backScreen("Privacy & Discovery")} />
+            <Stack.Screen name="privacy-policy" options={backScreen("Privacy Policy")} />
+            <Stack.Screen name="terms-of-service" options={backScreen("Terms of Service")} />
             <Stack.Screen name="stories/discover" options={backScreen("Discover Stories", fadeScreen)} />
             <Stack.Screen name="stories/explore" options={backScreen("Explore Stories", fadeScreen)} />
             <Stack.Screen name="invite-friends" options={backScreen("Invite Friends")} />
