@@ -21,16 +21,19 @@ function read(path: string): string {
   return fs.readFileSync(nodePath.join(__dirname, "..", path), "utf8");
 }
 
-const PWA_SW_VERSION = "20260727-pwa-auto-update-v1";
+const PWA_SW_VERSION = "20260808-pwa-fetch-safe-v1";
 
 function testServiceWorker() {
   const sw = read("public/sw.js");
   assertIncludes(sw, `FRENNIX_SW_VERSION = "${PWA_SW_VERSION}"`, "sw version");
-  assertIncludes(sw, "frennix-shell-v8", "shell cache version");
+  assertIncludes(sw, "frennix-shell-v11", "shell cache version");
   assertIncludes(sw, 'SHELL_ASSETS = ["/manifest.webmanifest"]', "shell precache scope");
   assert(!sw.includes('"/", "/manifest'), "shell precache excludes root html");
   assertIncludes(sw, 'cache: "no-store"', "navigate network-only");
   assertIncludes(sw, "SKIP_WAITING", "skip waiting message");
+  assertIncludes(sw, "shouldHandleFetch", "fetch protocol guard");
+  assertIncludes(sw, "safeRespond", "respondWith error guard");
+  assertIncludes(sw, "offlineHtmlResponse", "offline html fallback");
 }
 
 function testRegisterModule() {
@@ -71,7 +74,7 @@ function testPatchPipeline() {
 
 function testPhase2Compat() {
   const phase2 = read("scripts/verify-notification-engine-phase2.ts");
-  assertIncludes(phase2, "frennix-shell-v8", "phase2 shell cache expectation");
+  assertIncludes(phase2, "frennix-shell-v11", "phase2 shell cache expectation");
   assertIncludes(phase2, "frennix-pwa-early-update", "phase2 early update expectation");
 }
 

@@ -32,7 +32,7 @@ import { useProfilesPresence } from "@/lib/useProfilesPresence";
 import { ChatComposer, type ChatComposerHandle, type ChatReplyTarget, type ChatSendPayload } from "@/components/ChatComposer";
 import { ChatMessageRow } from "@/components/ChatMessageRow";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
-import { ImageLightbox } from "@/components/ImageLightbox";
+import { useImageLightbox } from "@/lib/useImageLightbox";
 import { TrainerBadge } from "@/components/TrainerBadge";
 import type { EntityActionId } from "@/lib/entity-actions";
 import { buildMessageMenuActions } from "@/lib/conversation-menu-actions";
@@ -113,7 +113,7 @@ export default function ChatScreen() {
   const userId = session?.user.id ?? "";
   const chatReady = !loading && !!conversationId && !!userId;
   const [otherTyping, setOtherTyping] = useState(false);
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const { openImage, lightbox } = useImageLightbox();
   const [realtimeDegraded, setRealtimeDegraded] = useState(false);
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
@@ -301,8 +301,8 @@ export default function ChatScreen() {
   }, []);
 
   const handleMediaPress = useCallback((uri: string) => {
-    setPreviewUri(uri);
-  }, []);
+    openImage(uri);
+  }, [openImage]);
 
   const handleReaction = useCallback(
     (messageId: string, emoji: string, currentEmoji?: string | null) => {
@@ -485,7 +485,7 @@ export default function ChatScreen() {
           ),
         }}
       />
-      <ImageLightbox uri={previewUri} onClose={() => setPreviewUri(null)} />
+      {lightbox}
       {realtimeDegraded || presenceUnavailable ? (
         <View style={styles.realtimeBanner}>
           <Text style={styles.realtimeBannerText}>

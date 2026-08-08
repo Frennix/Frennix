@@ -30,7 +30,7 @@ function testPublicAssets() {
   const sw = read("public/sw.js");
   assertIncludes(sw, "skipWaiting", "sw install");
   assertIncludes(sw, "clients.claim", "sw activate");
-  assertIncludes(sw, "frennix-shell-v8", "sw cache version");
+  assertIncludes(sw, "frennix-shell-v11", "sw cache version");
   assertIncludes(sw, "FRENNIX_SW_VERSION", "sw version constant");
 }
 

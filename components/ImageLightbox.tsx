@@ -104,6 +104,7 @@ const WEB_LIGHTBOX_PLAIN_IMG_STYLE = {
   aspectRatio: "auto",
   userSelect: "none",
   WebkitUserSelect: "none",
+  WebkitTouchCallout: "none",
   touchAction: "none",
 } as const;
 
@@ -339,6 +340,9 @@ function WebZoomableImage({
           ...WEB_LIGHTBOX_PLAIN_IMG_STYLE,
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
           transformOrigin: "center center",
+        },
+        onContextMenu: (event: Event) => {
+          event.preventDefault();
         },
       })}
     </View>
