@@ -27,9 +27,9 @@ export const config = {
   privacyPolicyUrl:
     (extra.privacyPolicyUrl as string) ||
     process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ||
-    "https://frennix.app/privacy",
+    "/privacy-policy",
   termsUrl:
-    (extra.termsUrl as string) || process.env.EXPO_PUBLIC_TERMS_URL || "https://frennix.app/terms",
+    (extra.termsUrl as string) || process.env.EXPO_PUBLIC_TERMS_URL || "/terms-of-service",
   appUrl:
     (extra.appUrl as string) || process.env.EXPO_PUBLIC_APP_URL || "https://frennix.vercel.app",
   get vapidPublicKey() {
