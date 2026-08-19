@@ -44,7 +44,22 @@ interface FullscreenVideoSlideProps {
   playbackHandoff?: FeedVideoFullscreenHandoff;
 }
 
-/** Full-screen gallery video slide — native controls minus mute; chrome mute left of lightbox ✕. */
+function configureInlineWebVideo(video: HTMLVideoElement) {
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "true");
+  video.setAttribute("x-webkit-airplay", "deny");
+  video.disablePictureInPicture = true;
+  video.disableRemotePlayback = true;
+  try {
+    video.controlsList.add("nofullscreen");
+    video.controlsList.add("noremoteplayback");
+    video.controlsList.add("nodownload");
+  } catch {
+    // controlsList unsupported — CSS/webkitbeginfullscreen guard still applies.
+  }
+}
+
+/** Full-screen gallery video slide — inline WebKit controls only; no native fullscreen step. */
 export function FullscreenVideoSlide({
   uri,
   thumbnailUrl,
@@ -64,12 +79,15 @@ export function FullscreenVideoSlide({
   const [controlsPinned, setControlsPinned] = useState(false);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlsPinnedRef = useRef(false);
   const handoffAppliedRef = useRef(false);
   const nativeVideoRef = useRef<{
     pauseAsync: () => Promise<void>;
     playAsync: () => Promise<void>;
     setIsMutedAsync: (v: boolean) => Promise<void>;
   } | null>(null);
+
+  controlsPinnedRef.current = controlsPinned;
 
   const clearHideControlsTimer = useCallback(() => {
     if (hideControlsTimerRef.current) {
@@ -80,11 +98,12 @@ export function FullscreenVideoSlide({
 
   const scheduleControlsHide = useCallback(() => {
     clearHideControlsTimer();
-    if (controlsPinned) return;
     hideControlsTimerRef.current = setTimeout(() => {
-      setControlsVisible(false);
+      if (!controlsPinnedRef.current) {
+        setControlsVisible(false);
+      }
     }, FULLSCREEN_CONTROLS_HIDE_MS);
-  }, [clearHideControlsTimer, controlsPinned]);
+  }, [clearHideControlsTimer]);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -124,9 +143,24 @@ export function FullscreenVideoSlide({
     if (!video) return;
 
     video.classList.add("fullscreen-video-slide");
+    configureInlineWebVideo(video);
     video.controls = true;
+
+    const blockNativeFullscreen = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof video.webkitExitFullscreen === "function") {
+        void video.webkitExitFullscreen();
+      }
+    };
+
+    video.addEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
     setControlsReady(true);
     scheduleControlsHide();
+
+    return () => {
+      video.removeEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
+    };
   }, [isActive, retryKey, uri, scheduleControlsHide]);
 
   useEffect(() => {
@@ -190,8 +224,9 @@ export function FullscreenVideoSlide({
   }, [scheduleControlsHide]);
 
   const SpeakerIcon = muted ? VolumeX : Volume2;
+  const chromeControlsVisible = controlsVisible || controlsPinned;
 
-  const controlsClassName = controlsVisible || controlsPinned
+  const controlsClassName = chromeControlsVisible
     ? "fullscreen-controls-visible"
     : "fullscreen-controls-hidden";
 
@@ -202,7 +237,7 @@ export function FullscreenVideoSlide({
     typeof document !== "undefined"
       ? createPortal(
           <Pressable
-            className="fullscreen-video-mute-button"
+            className={`fullscreen-video-mute-button${chromeControlsVisible ? "" : " fullscreen-chrome-hidden"}`}
             style={styles.webChromeMute}
             onPress={toggleMute}
             accessibilityRole="button"
@@ -230,10 +265,18 @@ export function FullscreenVideoSlide({
           className: `fullscreen-video-slide ${controlsClassName}`,
           ref: (node: HTMLVideoElement | null) => {
             webVideoRef.current = node;
+            if (node) configureInlineWebVideo(node);
           },
           src: uri,
           muted,
           playsInline: true,
+          // @ts-expect-error RN web passes through to DOM
+          "webkit-playsinline": "true",
+          // @ts-expect-error legacy AirPlay guard
+          "x-webkit-airplay": "deny",
+          controlsList: "nodownload nofullscreen noremoteplayback",
+          disablePictureInPicture: true,
+          disableRemotePlayback: true,
           preload: isActive ? "auto" : "metadata",
           poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
           style: {
@@ -250,8 +293,8 @@ export function FullscreenVideoSlide({
           onWaiting: () => setBuffering(true),
           onPlaying: () => {
             setBuffering(false);
-            handleWebPlay();
           },
+          onPlay: handleWebPlay,
           onPause: handleWebPause,
           onClick: revealControls,
           onError: () => setFailed(true),

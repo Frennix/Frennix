@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 1be1d022</title>
+    <title>Frennix · 91e71d26</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="1be1d022542fce72375877268ae9c418c97d40f3" />
-    <meta name="frennix-build-bundle" content="index-e3dbff99ff186f1be85a5c1a0fdca421.js" />
-    <meta name="frennix-build-at" content="2026-08-19T18:27:39.132Z" />
+    <meta name="frennix-build-sha" content="91e71d268e7fc75e59ab469e111c5f3bb54d3229" />
+    <meta name="frennix-build-bundle" content="index-28546c8cb5dbd1e419cf20d76d4f299d.js" />
+    <meta name="frennix-build-at" content="2026-08-19T18:51:10.148Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -144,25 +144,66 @@
     z-index: 51 !important;
     pointer-events: auto !important;
   }
-  /* Fullscreen lightbox — hide native mute; chrome mute is fixed left of the ✕. */
+  /* Fullscreen lightbox — single-layer inline player; no native fullscreen/AirPlay entry. */
+  video.fullscreen-video-slide::-webkit-media-controls-fullscreen-button {
+    display: none !important;
+  }
+  video.fullscreen-video-slide::-webkit-media-controls-wireless-playback-picker-button {
+    display: none !important;
+  }
   video.fullscreen-video-slide::-webkit-media-controls-mute-button {
     display: none !important;
   }
   video.fullscreen-video-slide::-webkit-media-controls-volume-slider {
     display: none !important;
   }
+  video.fullscreen-video-slide.fullscreen-controls-hidden::-webkit-media-controls {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.35s ease;
+  }
+  video.fullscreen-video-slide.fullscreen-controls-hidden::-webkit-media-controls-panel {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.35s ease;
+  }
   video.fullscreen-video-slide.fullscreen-controls-hidden::-webkit-media-controls-enclosure {
     opacity: 0 !important;
     pointer-events: none !important;
     transition: opacity 0.35s ease;
+  }
+  video.fullscreen-video-slide.fullscreen-controls-hidden::-webkit-media-controls-overlay-play-button {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.35s ease;
+  }
+  video.fullscreen-video-slide.fullscreen-controls-visible::-webkit-media-controls {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition: opacity 0.2s ease;
+  }
+  video.fullscreen-video-slide.fullscreen-controls-visible::-webkit-media-controls-panel {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition: opacity 0.2s ease;
   }
   video.fullscreen-video-slide.fullscreen-controls-visible::-webkit-media-controls-enclosure {
     opacity: 1 !important;
     pointer-events: auto !important;
     transition: opacity 0.2s ease;
   }
+  video.fullscreen-video-slide.fullscreen-controls-visible::-webkit-media-controls-overlay-play-button {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition: opacity 0.2s ease;
+  }
   .fullscreen-video-mute-button {
     pointer-events: auto !important;
+    transition: opacity 0.35s ease;
+  }
+  .fullscreen-video-mute-button.fullscreen-chrome-hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
   /* Tab bar + home-indicator safe area — never show default white. */
   [role="tablist"] {
@@ -268,7 +309,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="1be1d022542fce72375877268ae9c418c97d40f3" data-bundle="index-e3dbff99ff186f1be85a5c1a0fdca421.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="91e71d268e7fc75e59ab469e111c5f3bb54d3229" data-bundle="index-28546c8cb5dbd1e419cf20d76d4f299d.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -314,7 +355,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-e3dbff99ff186f1be85a5c1a0fdca421.js?v=1be1d022" defer></script>
+  <script src="/_expo/static/js/web/index-28546c8cb5dbd1e419cf20d76d4f299d.js?v=91e71d26" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
