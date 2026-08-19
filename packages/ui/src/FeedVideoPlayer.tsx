@@ -13,23 +13,30 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Volume2, VolumeX } from "lucide-react-native";
 import {
   isActiveFeedVideo,
   isFeedVideoPlaybackAllowed,
+  isFeedVideoSoundEnabled,
   registerFeedVideoPauseHandler,
   releaseFeedVideoDueToVisibility,
   requestFeedVideoPlay,
+  setFeedVideoSoundEnabled,
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { FEED_VIDEO_FALLBACK_RATIO } from "./mediaLayout";
-import { colors, spacing } from "./theme";
+import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
 import { VideoPreview } from "./VideoPreview";
+
+/** Instagram-scale speaker control for inline feed video. */
+const MUTE_BUTTON_SIZE = 36;
+const MUTE_ICON_SIZE = 17;
+const MUTE_INSET = 14;
 
 interface FeedVideoPlayerProps {
   uri: string;
@@ -59,7 +66,7 @@ export function FeedVideoPlayer({
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
   const [isPlaying, setIsPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(() => !isFeedVideoSoundEnabled());
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -174,7 +181,11 @@ export function FeedVideoPlayer({
   }, [playbackId]);
 
   const toggleMute = useCallback(() => {
-    setMuted((current) => !current);
+    setMuted((current) => {
+      const next = !current;
+      setFeedVideoSoundEnabled(!next);
+      return next;
+    });
   }, []);
 
   const handleRetry = useCallback(() => {
@@ -183,19 +194,22 @@ export function FeedVideoPlayer({
     setRetryKey((key) => key + 1);
   }, []);
 
+  const SpeakerIcon = muted ? VolumeX : Volume2;
+
   const muteControl = (
     <Pressable
+      {...(Platform.OS === "web" ? { className: "feed-video-mute-button" } : null)}
       style={styles.muteButton}
       onPress={(event) => {
         event.stopPropagation?.();
         toggleMute();
       }}
-      hitSlop={8}
+      hitSlop={6}
       pointerEvents="auto"
       accessibilityRole="button"
       accessibilityLabel={muted ? "Unmute video" : "Mute video"}
     >
-      <Text style={styles.muteIcon}>{muted ? "🔇" : "🔊"}</Text>
+      <SpeakerIcon color="#FFFFFF" size={MUTE_ICON_SIZE} strokeWidth={2} />
     </Pressable>
   );
 
@@ -273,73 +287,77 @@ export function FeedVideoPlayer({
     );
 
   return (
-    <MediaAspectFrame
-      dimensionsUri={dimensionsUri}
-      layout="feed"
-      style={style}
-      fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
-    >
-      {() => (
-        <View
-          ref={Platform.OS === "web" ? undefined : nativeIntersectionRef}
-          collapsable={false}
-          style={styles.container}
-        >
-          <View style={styles.mediaLayer} pointerEvents="box-none">
-            {showPoster ? (
-              <VideoPreview
-                videoUri={uri}
-                posterState={resolvedPoster}
-                thumbnailUrl={thumbnailUrl}
-                layout="feed"
-                unframed
-                showPlayButton={false}
-                onPlay={handleTapPlay}
-              />
-            ) : (
-              <Pressable
-                style={styles.mediaTapArea}
-                onPress={onOpenFullscreen}
-                accessibilityRole="button"
-                accessibilityLabel="Open video full screen"
-              >
-                {videoBody}
+    <View style={styles.shell} collapsable={false}>
+      <MediaAspectFrame
+        dimensionsUri={dimensionsUri}
+        layout="feed"
+        style={style}
+        fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
+      >
+        {() => (
+          <View
+            ref={Platform.OS === "web" ? undefined : nativeIntersectionRef}
+            collapsable={false}
+            style={styles.container}
+          >
+            <View style={styles.mediaLayer} pointerEvents="box-none">
+              {showPoster ? (
+                <VideoPreview
+                  videoUri={uri}
+                  posterState={resolvedPoster}
+                  thumbnailUrl={thumbnailUrl}
+                  layout="feed"
+                  unframed
+                  showPlayButton={false}
+                  onPlay={handleTapPlay}
+                />
+              ) : (
+                <Pressable
+                  style={styles.mediaTapArea}
+                  onPress={onOpenFullscreen}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open video full screen"
+                >
+                  {videoBody}
 
-                {buffering ? (
-                  <View
-                    style={styles.bufferingOverlay}
-                    pointerEvents="none"
-                    accessibilityLabel="Video loading"
-                    accessibilityRole="progressbar"
-                  >
-                    <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
-                  </View>
-                ) : null}
-              </Pressable>
-            )}
+                  {buffering ? (
+                    <View
+                      style={styles.bufferingOverlay}
+                      pointerEvents="none"
+                      accessibilityLabel="Video loading"
+                      accessibilityRole="progressbar"
+                    >
+                      <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              )}
+            </View>
           </View>
+        )}
+      </MediaAspectFrame>
 
-          <View style={styles.muteLayer} pointerEvents="box-none">
-            {muteControl}
-          </View>
-        </View>
-      )}
-    </MediaAspectFrame>
+      <View
+        {...(Platform.OS === "web" ? { className: "feed-video-mute-layer" } : null)}
+        style={styles.muteLayer}
+        pointerEvents="box-none"
+      >
+        {muteControl}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  shell: {
+    width: "100%",
+    position: "relative",
+  },
   container: {
     width: "100%",
     height: "100%",
     backgroundColor: colors.background,
     position: "relative",
-    ...(Platform.OS === "web"
-      ? ({
-          overflow: "visible",
-          isolation: "isolate",
-        } as const)
-      : null),
   },
   mediaLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -372,16 +390,14 @@ const styles = StyleSheet.create({
   },
   muteButton: {
     position: "absolute",
-    bottom: spacing.sm,
-    right: spacing.sm,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    bottom: MUTE_INSET,
+    right: MUTE_INSET,
+    width: MUTE_BUTTON_SIZE,
+    height: MUTE_BUTTON_SIZE,
+    borderRadius: MUTE_BUTTON_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(10, 10, 11, 0.75)",
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
     zIndex: 101,
     elevation: 101,
     ...(Platform.OS === "web"
@@ -390,9 +406,5 @@ const styles = StyleSheet.create({
           transform: [{ translateZ: 1 }],
         } as const)
       : null),
-  },
-  muteIcon: {
-    fontSize: 16,
-    lineHeight: 18,
   },
 });

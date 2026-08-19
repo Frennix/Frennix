@@ -52,3 +52,14 @@ export function pauseAllFeedVideos() {
   pauseHandlers.forEach((pause) => pause());
   activeVideoId = null;
 }
+
+/** Session flag — true after the user explicitly unmutes any feed video. */
+let feedVideoSoundEnabled = false;
+
+export function isFeedVideoSoundEnabled() {
+  return feedVideoSoundEnabled;
+}
+
+export function setFeedVideoSoundEnabled(enabled: boolean) {
+  feedVideoSoundEnabled = enabled;
+}
