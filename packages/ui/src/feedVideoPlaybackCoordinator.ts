@@ -8,12 +8,23 @@ export function buildFeedVideoPlaybackId(scopeId: string, mediaIndex: number) {
   return `${scopeId}:${mediaIndex}`;
 }
 
+type PlaybackAllowedListener = () => void;
+const playbackAllowedListeners = new Set<PlaybackAllowedListener>();
+
+export function subscribeFeedVideoPlaybackAllowed(listener: PlaybackAllowedListener) {
+  playbackAllowedListeners.add(listener);
+  return () => {
+    playbackAllowedListeners.delete(listener);
+  };
+}
+
 export function setFeedVideoPlaybackAllowed(allowed: boolean) {
   if (playbackAllowed === allowed) return;
   playbackAllowed = allowed;
   if (!allowed) {
     pauseAllFeedVideos();
   }
+  playbackAllowedListeners.forEach((listener) => listener());
 }
 
 export function isFeedVideoPlaybackAllowed() {

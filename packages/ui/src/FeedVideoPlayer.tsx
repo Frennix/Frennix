@@ -24,6 +24,7 @@ import {
   releaseFeedVideoDueToVisibility,
   requestFeedVideoPlay,
   setFeedVideoSoundEnabled,
+  subscribeFeedVideoPlaybackAllowed,
   subscribeFeedVideoSoundPreference,
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
@@ -69,6 +70,7 @@ export function FeedVideoPlayer({
   const inViewRef = useRef(false);
   inViewRef.current = inView;
   const [muted, setMuted] = useState(() => !isFeedVideoSoundEnabled());
+  const [playbackAllowed, setPlaybackAllowed] = useState(() => isFeedVideoPlaybackAllowed());
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -198,6 +200,12 @@ export function FeedVideoPlayer({
   useEffect(() => {
     return subscribeFeedVideoSoundPreference(() => {
       setMuted(!isFeedVideoSoundEnabled());
+    });
+  }, []);
+
+  useEffect(() => {
+    return subscribeFeedVideoPlaybackAllowed(() => {
+      setPlaybackAllowed(isFeedVideoPlaybackAllowed());
     });
   }, []);
 
@@ -401,13 +409,15 @@ export function FeedVideoPlayer({
         )}
       </MediaAspectFrame>
 
-      <View
-        {...(Platform.OS === "web" ? { className: "feed-video-mute-layer" } : null)}
-        style={styles.muteLayer}
-        pointerEvents="box-none"
-      >
-        {muteControl}
-      </View>
+      {playbackAllowed ? (
+        <View
+          {...(Platform.OS === "web" ? { className: "feed-video-mute-layer" } : null)}
+          style={styles.muteLayer}
+          pointerEvents="box-none"
+        >
+          {muteControl}
+        </View>
+      ) : null}
     </View>
   );
 }
