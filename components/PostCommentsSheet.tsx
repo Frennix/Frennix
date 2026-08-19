@@ -154,11 +154,17 @@ export function PostCommentsSheet({
     ? `Comments (${post.comment_count})`
     : "Comments";
 
+  // Match PostInteractionSheet: on web, do not mount BottomActionSheet while closed.
+  // BottomActionSheet early-returns before a useMemo when visible=false on web (React #310).
+  if ((Platform.OS === "web" && !visible) || !post) {
+    return <>{commentActionSheets}</>;
+  }
+
   return (
     <>
       {commentActionSheets}
       <BottomActionSheet
-        visible={visible}
+        visible
         onClose={onClose}
         expanded
         fitToContent={false}
