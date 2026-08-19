@@ -24,6 +24,8 @@ interface VideoPreviewProps {
   layout?: MediaLayout;
   compact?: boolean;
   onPlay?: () => void;
+  /** When false, show poster/thumbnail only (no center play overlay). */
+  showPlayButton?: boolean;
 }
 
 export function VideoPreview({
@@ -34,6 +36,7 @@ export function VideoPreview({
   layout = "inline",
   compact,
   onPlay,
+  showPlayButton = true,
 }: VideoPreviewProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : videoUri, posterState ? null : thumbnailUrl);
   const { posterUri, ready, useVideoFrameFallback } = posterState ?? internalPoster;
@@ -73,13 +76,15 @@ export function VideoPreview({
         <VideoPosterFallback style={styles.poster} compact={compact} />
       )}
 
-      <View style={[styles.overlay, isFeed && styles.overlayFeed]} pointerEvents="none">
-        <View style={[styles.playButton, isFeed && styles.playButtonFeed, compact && styles.playButtonCompact]}>
-          <Text style={[styles.playIcon, isFeed && styles.playIconFeed, compact && styles.playIconCompact]}>
-            ▶
-          </Text>
+      {showPlayButton ? (
+        <View style={[styles.overlay, isFeed && styles.overlayFeed]} pointerEvents="none">
+          <View style={[styles.playButton, isFeed && styles.playButtonFeed, compact && styles.playButtonCompact]}>
+            <Text style={[styles.playIcon, isFeed && styles.playIconFeed, compact && styles.playIconCompact]}>
+              ▶
+            </Text>
+          </View>
         </View>
-      </View>
+      ) : null}
     </>
   );
 

@@ -33,7 +33,7 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("video.pause()")) {
         throw new Error("FeedVideoPlayer must call video.pause() on the media element");
       }
-      if (!src.includes("registerPauseHandler")) {
+      if (!src.includes("registerFeedVideoPauseHandler")) {
         throw new Error("FeedVideoPlayer must register imperative pause handlers");
       }
       if (!src.includes("ActivityIndicator")) throw new Error("FeedVideoPlayer must show buffering indicator");
@@ -70,18 +70,27 @@ const checks: Array<{ name: string; run: () => void }> = [
   {
     name: "Feed coordinates a single active inline video",
     run: () => {
-      const ctx = read("packages/ui/src/FeedVideoPlaybackContext.tsx");
+      const coordinator = read("packages/ui/src/feedVideoPlaybackCoordinator.ts");
+      const gate = read("packages/ui/src/FeedVideoPlaybackGate.tsx");
       const feed = read("app/(tabs)/index.tsx");
       const observer = read("packages/ui/src/useFeedVideoIntersectionObserver.ts");
       if (!observer.includes('FEED_SCROLL_ROOT_ID = "feed-scroll-list"')) {
         throw new Error("feed video observer must use feed-scroll-list root");
       }
-      if (!ctx.includes("registerPauseHandler")) {
-        throw new Error("FeedVideoPlaybackContext must register pause handlers");
+      if (!coordinator.includes("registerFeedVideoPauseHandler")) {
+        throw new Error("feed video coordinator must register pause handlers");
       }
-      if (!ctx.includes("requestPlay")) throw new Error("FeedVideoPlaybackContext must expose requestPlay");
-      if (!feed.includes("FeedVideoPlaybackProvider")) {
-        throw new Error("Home feed must mount FeedVideoPlaybackProvider");
+      if (!coordinator.includes("requestFeedVideoPlay")) {
+        throw new Error("feed video coordinator must expose requestFeedVideoPlay");
+      }
+      if (!gate.includes("useIsFocused")) {
+        throw new Error("FeedVideoPlaybackGate must pause when leaving the Feed tab");
+      }
+      if (!feed.includes("FeedVideoPlaybackGate")) {
+        throw new Error("Home feed must mount FeedVideoPlaybackGate");
+      }
+      if (feed.includes("FeedVideoPlaybackProvider")) {
+        throw new Error("Home feed must not wrap startup in FeedVideoPlaybackProvider");
       }
     },
   },

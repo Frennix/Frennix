@@ -16,7 +16,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFeedVideoPlayback } from "./FeedVideoPlaybackContext";
+import {
+  isActiveFeedVideo,
+  isFeedVideoPlaybackAllowed,
+  registerFeedVideoPauseHandler,
+  releaseFeedVideoDueToVisibility,
+  requestFeedVideoPlay,
+} from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { FEED_VIDEO_FALLBACK_RATIO } from "./mediaLayout";
@@ -50,7 +56,6 @@ export function FeedVideoPlayer({
   style,
   onOpenFullscreen,
 }: FeedVideoPlayerProps) {
-  const playback = useFeedVideoPlayback();
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
   const [isPlaying, setIsPlaying] = useState(false);
@@ -66,7 +71,7 @@ export function FeedVideoPlayer({
     setIsMutedAsync: (v: boolean) => Promise<void>;
   } | null>(null);
 
-  const isActiveVideo = Boolean(playbackId && playback?.isActive(playbackId));
+  const isActiveVideo = Boolean(playbackId && isActiveFeedVideo(playbackId));
 
   const pauseMediaElement = useCallback(() => {
     if (Platform.OS === "web") {
@@ -83,14 +88,14 @@ export function FeedVideoPlayer({
   const handleScrollOutOfView = useCallback(() => {
     pauseMediaElement();
     if (playbackId) {
-      playback?.releaseDueToVisibility(playbackId);
+      releaseFeedVideoDueToVisibility(playbackId);
     }
-  }, [pauseMediaElement, playback, playbackId]);
+  }, [pauseMediaElement, playbackId]);
 
   const shouldPlay = Boolean(
     isPlaying &&
       playbackId &&
-      playback?.playbackAllowed &&
+      isFeedVideoPlaybackAllowed() &&
       isActiveVideo &&
       slideActive &&
       !failed
@@ -104,23 +109,23 @@ export function FeedVideoPlayer({
   useFeedVideoIntersectionObserver(intersectionTargetRef, shouldPlay, handleScrollOutOfView);
 
   useEffect(() => {
-    if (!playbackId || !playback) return;
-    return playback.registerPauseHandler(playbackId, pauseMediaElement);
-  }, [playback, playbackId, pauseMediaElement]);
+    if (!playbackId) return;
+    return registerFeedVideoPauseHandler(playbackId, pauseMediaElement);
+  }, [playbackId, pauseMediaElement]);
 
   useEffect(() => {
     if (!isPlaying || slideActive) return;
     pauseMediaElement();
     if (playbackId) {
-      playback?.releaseDueToVisibility(playbackId);
+      releaseFeedVideoDueToVisibility(playbackId);
     }
-  }, [isPlaying, slideActive, pauseMediaElement, playback, playbackId]);
+  }, [isPlaying, slideActive, pauseMediaElement, playbackId]);
 
   useEffect(() => {
-    if (isPlaying && playbackId && playback && !playback.isActive(playbackId)) {
+    if (isPlaying && playbackId && !isActiveFeedVideo(playbackId)) {
       pauseMediaElement();
     }
-  }, [isPlaying, playback, playbackId, pauseMediaElement, playback?.activeVideoId]);
+  }, [isPlaying, playbackId, pauseMediaElement, isActiveVideo]);
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
   const showPoster = !shouldPlay;
@@ -166,10 +171,10 @@ export function FeedVideoPlayer({
   }, [shouldPlay, muted, failed, uri, retryKey]);
 
   const handleTapPlay = useCallback(() => {
-    if (!playbackId || !playback) return;
-    playback.requestPlay(playbackId);
+    if (!playbackId) return;
+    requestFeedVideoPlay(playbackId);
     setIsPlaying(true);
-  }, [playback, playbackId]);
+  }, [playbackId]);
 
   const toggleMute = useCallback(() => {
     setMuted((current) => !current);
@@ -202,6 +207,7 @@ export function FeedVideoPlayer({
         thumbnailUrl={thumbnailUrl}
         style={style}
         layout="feed"
+        showPlayButton={false}
         onPlay={handleTapPlay}
       />
     );

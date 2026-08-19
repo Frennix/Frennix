@@ -10,7 +10,7 @@ import {
 import type { PostType } from "@frennix/types";
 import { inferPostMediaKind } from "@frennix/types";
 import { FeedVideoPlayer } from "./FeedVideoPlayer";
-import { buildFeedVideoPlaybackId } from "./FeedVideoPlaybackContext";
+import { buildFeedVideoPlaybackId } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
