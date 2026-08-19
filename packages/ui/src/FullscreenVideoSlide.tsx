@@ -1,20 +1,25 @@
 import { createElement, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   StyleSheet,
   View,
 } from "react-native";
+import { Volume2, VolumeX } from "lucide-react-native";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
 import { useVideoPoster } from "./useVideoPoster";
 
-/** Align with ImageLightbox close chrome — native mute sits left of the ✕. */
+/** Match ImageLightbox close chrome — fixed mute sits just left of the ✕. */
 const LIGHTBOX_CLOSE_SIZE = 34;
 const LIGHTBOX_CLOSE_RIGHT_INSET = 8;
 const LIGHTBOX_CONTROL_GAP = 12;
-const WEB_LIGHTBOX_TOP_RIGHT_GUTTER =
+const FULLSCREEN_MUTE_SIZE = 34;
+const FULLSCREEN_MUTE_ICON = 17;
+const FULLSCREEN_MUTE_RIGHT =
   LIGHTBOX_CLOSE_RIGHT_INSET + LIGHTBOX_CLOSE_SIZE + LIGHTBOX_CONTROL_GAP;
 
 interface FullscreenVideoSlideProps {
@@ -25,7 +30,7 @@ interface FullscreenVideoSlideProps {
   isActive: boolean;
 }
 
-/** Full-screen gallery video slide — native controls handle audio; no feed-style mute overlay. */
+/** Full-screen gallery video slide — native controls minus mute; chrome mute left of lightbox ✕. */
 export function FullscreenVideoSlide({
   uri,
   thumbnailUrl,
@@ -76,6 +81,28 @@ export function FullscreenVideoSlide({
     setRetryKey((key) => key + 1);
   }, []);
 
+  const toggleMute = useCallback(() => {
+    setMuted((current) => !current);
+  }, []);
+
+  const SpeakerIcon = muted ? VolumeX : Volume2;
+
+  const webChromeMute =
+    Platform.OS === "web" && isActive && typeof document !== "undefined"
+      ? createPortal(
+          <Pressable
+            className="fullscreen-video-mute-button"
+            style={styles.webChromeMute}
+            onPress={toggleMute}
+            accessibilityRole="button"
+            accessibilityLabel={muted ? "Unmute video" : "Mute video"}
+          >
+            <SpeakerIcon color="#FFFFFF" size={FULLSCREEN_MUTE_ICON} strokeWidth={2} />
+          </Pressable>,
+          document.body
+        )
+      : null;
+
   if (failed) {
     return (
       <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
@@ -87,30 +114,29 @@ export function FullscreenVideoSlide({
   return (
     <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       {Platform.OS === "web" ? (
-        <View style={[styles.webVideoChrome, { width: stageWidth, height: stageHeight }]}>
-          {createElement("video", {
-            key: retryKey,
-            ref: (node: HTMLVideoElement | null) => {
-              webVideoRef.current = node;
-            },
-            src: uri,
-            controls: true,
-            muted,
-            playsInline: true,
-            preload: isActive ? "auto" : "metadata",
-            poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
-            style: {
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              backgroundColor: colors.background,
-            },
-            onWaiting: () => setBuffering(true),
-            onPlaying: () => setBuffering(false),
-            onCanPlay: () => setBuffering(false),
-            onError: () => setFailed(true),
-          })}
-        </View>
+        createElement("video", {
+          key: retryKey,
+          className: "fullscreen-video-slide",
+          ref: (node: HTMLVideoElement | null) => {
+            webVideoRef.current = node;
+          },
+          src: uri,
+          controls: true,
+          muted,
+          playsInline: true,
+          preload: isActive ? "auto" : "metadata",
+          poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
+          style: {
+            width: stageWidth,
+            height: stageHeight,
+            objectFit: "contain",
+            backgroundColor: colors.background,
+          },
+          onWaiting: () => setBuffering(true),
+          onPlaying: () => setBuffering(false),
+          onCanPlay: () => setBuffering(false),
+          onError: () => setFailed(true),
+        })
       ) : (
         (() => {
           try {
@@ -163,6 +189,8 @@ export function FullscreenVideoSlide({
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : null}
+
+      {webChromeMute}
     </View>
   );
 }
@@ -174,15 +202,25 @@ const styles = StyleSheet.create({
     overflow: "visible",
     backgroundColor: colors.background,
   },
-  webVideoChrome: {
-    paddingRight: WEB_LIGHTBOX_TOP_RIGHT_GUTTER,
-    ...(Platform.OS === "web"
-      ? ({
-          paddingTop: "max(env(safe-area-inset-top, 0px), 12px)",
-          boxSizing: "border-box",
-        } as object)
-      : null),
-  },
+  webChromeMute: Platform.select({
+    web: {
+      position: "fixed",
+      top: "max(env(safe-area-inset-top, 0px), 12px)",
+      right: FULLSCREEN_MUTE_RIGHT,
+      width: FULLSCREEN_MUTE_SIZE,
+      height: FULLSCREEN_MUTE_SIZE,
+      borderRadius: FULLSCREEN_MUTE_SIZE / 2,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0, 0, 0, 0.55)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.28)",
+      zIndex: 100000,
+      boxShadow: "0 1px 6px rgba(0, 0, 0, 0.35)",
+      cursor: "pointer",
+    } as object,
+    default: {},
+  }),
   bufferingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

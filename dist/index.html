@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · ef587325</title>
+    <title>Frennix · 0b9003eb</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="ef587325b272d41bc3f2fc6dde5487901a2226c6" />
-    <meta name="frennix-build-bundle" content="index-926088b8a10dc5402c4ecea603f79b54.js" />
-    <meta name="frennix-build-at" content="2026-08-19T17:53:58.177Z" />
+    <meta name="frennix-build-sha" content="0b9003eb3eae89ad735130fd91e8a354a8205375" />
+    <meta name="frennix-build-bundle" content="index-02b4b2abbcea2c987a5988d9968de24f.js" />
+    <meta name="frennix-build-at" content="2026-08-19T18:08:34.576Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -144,6 +144,16 @@
     z-index: 51 !important;
     pointer-events: auto !important;
   }
+  /* Fullscreen lightbox — hide native mute; chrome mute is fixed left of the ✕. */
+  video.fullscreen-video-slide::-webkit-media-controls-mute-button {
+    display: none !important;
+  }
+  video.fullscreen-video-slide::-webkit-media-controls-volume-slider {
+    display: none !important;
+  }
+  .fullscreen-video-mute-button {
+    pointer-events: auto !important;
+  }
   /* Tab bar + home-indicator safe area — never show default white. */
   [role="tablist"] {
     background-color: #141416 !important;
@@ -248,7 +258,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="ef587325b272d41bc3f2fc6dde5487901a2226c6" data-bundle="index-926088b8a10dc5402c4ecea603f79b54.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="0b9003eb3eae89ad735130fd91e8a354a8205375" data-bundle="index-02b4b2abbcea2c987a5988d9968de24f.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -294,7 +304,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-926088b8a10dc5402c4ecea603f79b54.js?v=ef587325" defer></script>
+  <script src="/_expo/static/js/web/index-02b4b2abbcea2c987a5988d9968de24f.js?v=0b9003eb" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
