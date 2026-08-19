@@ -61,7 +61,8 @@ import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
-import { usePostInteraction, postReplyHref } from "@/lib/usePostInteraction";
+import { usePostInteraction } from "@/lib/usePostInteraction";
+import { useFeedCommentsSheet } from "@/lib/useFeedCommentsSheet";
 import { handleTabRetap, scrollFlatListToTop, scrollScrollViewToTop } from "@/lib/tab-scroll-registry";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
@@ -147,6 +148,12 @@ export default function HomeScreen() {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
   }, []);
 
+  const { openComments, commentsSheet } = useFeedCommentsSheet({
+    userId,
+    authorProfile: viewerProfile ?? undefined,
+  });
+  markFeedHook("feed-comments-sheet");
+
   const {
     activePost,
     interactionVisible,
@@ -163,7 +170,7 @@ export default function HomeScreen() {
       });
     },
     onReply: (post, draft) => {
-      pushScreen(postReplyHref(post, draft));
+      openComments(post, draft ? { draft } : undefined);
     },
     onShare: (post) => openShare(post.shared_post ?? post),
     onSave: (post) => toggleSavePost(post.id, !!post.saved_by_me),
@@ -642,7 +649,7 @@ export default function HomeScreen() {
       if (!post.liked_by_me) toggleLikePost(post.id);
     },
     onComment: (post: Post) => {
-      pushScreen(`/post/${getSharedPostTargetId(post)}`);
+      openComments(post);
     },
     onShare: (post: Post) => {
       openShare(post.shared_post ?? post);
@@ -1058,6 +1065,7 @@ export default function HomeScreen() {
       ) : null}
       <FeedRenderTraceProbe id="feed:ui:post-action-sheets">{postActionSheets}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:post-interaction-sheet">{interactionSheet}</FeedRenderTraceProbe>
+      <FeedRenderTraceProbe id="feed:ui:post-comments-sheet">{commentsSheet}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:share-sheet">{shareSheet}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:lightbox">{lightbox}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:story-viewer">

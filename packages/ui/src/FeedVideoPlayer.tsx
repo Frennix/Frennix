@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { Volume2, VolumeX } from "lucide-react-native";
 import {
+  getActiveFeedVideoId,
   isActiveFeedVideo,
   isFeedVideoPlaybackAllowed,
   isFeedVideoSoundEnabled,
@@ -24,6 +25,7 @@ import {
   releaseFeedVideoDueToVisibility,
   requestFeedVideoPlay,
   setFeedVideoSoundEnabled,
+  subscribeFeedVideoSoundPreference,
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
@@ -31,7 +33,6 @@ import { FEED_VIDEO_FALLBACK_RATIO } from "./mediaLayout";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
-import { VideoPreview } from "./VideoPreview";
 
 /** Instagram-scale speaker control for inline feed video. */
 const MUTE_BUTTON_SIZE = 36;
@@ -51,8 +52,8 @@ interface FeedVideoPlayerProps {
 }
 
 /**
- * Inline feed video — tap to play, pause when scrolled away, one active video at a time.
- * Muted by default; tap mute control to toggle audio. Tap playing video for fullscreen.
+ * Inline feed video — autoplay muted when visible, pause when scrolled away,
+ * one active video at a time. Tap toggles play/pause; speaker toggles sound.
  */
 export function FeedVideoPlayer({
   uri,
@@ -65,7 +66,13 @@ export function FeedVideoPlayer({
 }: FeedVideoPlayerProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [inView, setInView] = useState(false);
+  const [userPaused, setUserPausedState] = useState(false);
+  const userPausedRef = useRef(false);
+  const setUserPaused = useCallback((paused: boolean) => {
+    userPausedRef.current = paused;
+    setUserPausedState(paused);
+  }, []);
   const [muted, setMuted] = useState(() => !isFeedVideoSoundEnabled());
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -86,18 +93,27 @@ export function FeedVideoPlayer({
     } else {
       void nativeVideoRef.current?.pauseAsync();
     }
-    setIsPlaying(false);
   }, []);
 
   const handleScrollOutOfView = useCallback(() => {
     pauseMediaElement();
+    setInView(false);
+    setUserPaused(false);
     if (playbackId) {
       releaseFeedVideoDueToVisibility(playbackId);
     }
-  }, [pauseMediaElement, playbackId]);
+  }, [pauseMediaElement, playbackId, setUserPaused]);
+
+  const handleScrollIntoView = useCallback(() => {
+    setInView(true);
+    if (!userPausedRef.current && playbackId && isFeedVideoPlaybackAllowed()) {
+      requestFeedVideoPlay(playbackId);
+    }
+  }, [playbackId]);
 
   const shouldPlay = Boolean(
-    isPlaying &&
+    inView &&
+      !userPaused &&
       playbackId &&
       isFeedVideoPlaybackAllowed() &&
       isActiveVideo &&
@@ -105,12 +121,21 @@ export function FeedVideoPlayer({
       !failed
   );
 
+  const intersectionEnabled = Boolean(
+    playbackId && slideActive && !failed && isFeedVideoPlaybackAllowed()
+  );
+
   const intersectionTargetRef =
     Platform.OS === "web"
       ? (webVideoRef as RefObject<Element | null>)
       : (nativeIntersectionRef as unknown as RefObject<Element | null>);
 
-  useFeedVideoIntersectionObserver(intersectionTargetRef, shouldPlay, handleScrollOutOfView);
+  useFeedVideoIntersectionObserver(
+    intersectionTargetRef,
+    intersectionEnabled,
+    handleScrollOutOfView,
+    handleScrollIntoView
+  );
 
   useEffect(() => {
     if (!playbackId) return;
@@ -118,21 +143,33 @@ export function FeedVideoPlayer({
   }, [playbackId, pauseMediaElement]);
 
   useEffect(() => {
-    if (!isPlaying || slideActive) return;
+    if (!inView || userPaused || !playbackId || !slideActive || failed) return;
+    if (!isActiveFeedVideo(playbackId) && getActiveFeedVideoId() === null) {
+      requestFeedVideoPlay(playbackId);
+    }
+  }, [failed, inView, isActiveVideo, playbackId, slideActive, userPaused]);
+
+  useEffect(() => {
+    if (inView && slideActive) return;
     pauseMediaElement();
     if (playbackId) {
       releaseFeedVideoDueToVisibility(playbackId);
     }
-  }, [isPlaying, slideActive, pauseMediaElement, playbackId]);
+  }, [inView, slideActive, pauseMediaElement, playbackId]);
 
   useEffect(() => {
-    if (isPlaying && playbackId && !isActiveFeedVideo(playbackId)) {
+    if (inView && playbackId && !isActiveFeedVideo(playbackId)) {
       pauseMediaElement();
     }
-  }, [isPlaying, playbackId, pauseMediaElement, isActiveVideo]);
+  }, [inView, playbackId, pauseMediaElement, isActiveVideo]);
+
+  useEffect(() => {
+    return subscribeFeedVideoSoundPreference(() => {
+      setMuted(!isFeedVideoSoundEnabled());
+    });
+  }, []);
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
-  const showPoster = !shouldPlay;
 
   useEffect(() => {
     setFailed(false);
@@ -174,25 +211,33 @@ export function FeedVideoPlayer({
     })();
   }, [shouldPlay, muted, failed, uri, retryKey]);
 
-  const handleTapPlay = useCallback(() => {
-    if (!playbackId) return;
-    requestFeedVideoPlay(playbackId);
-    setIsPlaying(true);
-  }, [playbackId]);
+  const handleVideoTap = useCallback(() => {
+    if (!playbackId || !inView) return;
+    if (userPausedRef.current || !shouldPlay) {
+      setUserPaused(false);
+      requestFeedVideoPlay(playbackId);
+      return;
+    }
+    setUserPaused(true);
+    pauseMediaElement();
+  }, [inView, pauseMediaElement, playbackId, setUserPaused, shouldPlay]);
 
   const toggleMute = useCallback(() => {
     setMuted((current) => {
       const next = !current;
-      setFeedVideoSoundEnabled(!next);
+      if (!next) {
+        setFeedVideoSoundEnabled(true);
+      }
       return next;
     });
   }, []);
 
   const handleRetry = useCallback(() => {
     setFailed(false);
-    setIsPlaying(false);
+    setUserPaused(false);
+    setInView(false);
     setRetryKey((key) => key + 1);
-  }, []);
+  }, [setUserPaused]);
 
   const SpeakerIcon = muted ? VolumeX : Volume2;
 
@@ -301,37 +346,27 @@ export function FeedVideoPlayer({
             style={styles.container}
           >
             <View style={styles.mediaLayer} pointerEvents="box-none">
-              {showPoster ? (
-                <VideoPreview
-                  videoUri={uri}
-                  posterState={resolvedPoster}
-                  thumbnailUrl={thumbnailUrl}
-                  layout="feed"
-                  unframed
-                  showPlayButton={false}
-                  onPlay={handleTapPlay}
-                />
-              ) : (
-                <Pressable
-                  style={styles.mediaTapArea}
-                  onPress={onOpenFullscreen}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open video full screen"
-                >
-                  {videoBody}
+              <Pressable
+                style={styles.mediaTapArea}
+                onPress={handleVideoTap}
+                onLongPress={onOpenFullscreen}
+                delayLongPress={450}
+                accessibilityRole="button"
+                accessibilityLabel={shouldPlay ? "Pause video" : "Play video"}
+              >
+                {videoBody}
 
-                  {buffering ? (
-                    <View
-                      style={styles.bufferingOverlay}
-                      pointerEvents="none"
-                      accessibilityLabel="Video loading"
-                      accessibilityRole="progressbar"
-                    >
-                      <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
-                    </View>
-                  ) : null}
-                </Pressable>
-              )}
+                {buffering ? (
+                  <View
+                    style={styles.bufferingOverlay}
+                    pointerEvents="none"
+                    accessibilityLabel="Video loading"
+                    accessibilityRole="progressbar"
+                  >
+                    <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
+                  </View>
+                ) : null}
+              </Pressable>
             </View>
           </View>
         )}

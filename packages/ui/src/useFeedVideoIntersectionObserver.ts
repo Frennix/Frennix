@@ -25,16 +25,20 @@ function resolveDomNode(ref: RefObject<unknown>): Element | null {
 }
 
 /**
- * Observes a playing feed video against the feed scrollport (not the browser window).
- * Calls onBelowThreshold synchronously from the observer — callers must pause media there.
+ * Observes a feed video against the feed scrollport (not the browser window).
+ * Calls onAboveThreshold when visibility crosses upward past the threshold (autoplay).
+ * Calls onBelowThreshold synchronously when visibility drops — callers must pause media there.
  */
 export function useFeedVideoIntersectionObserver(
   targetRef: RefObject<Element | null>,
   enabled: boolean,
-  onBelowThreshold: () => void
+  onBelowThreshold: () => void,
+  onAboveThreshold?: () => void
 ) {
   const onBelowThresholdRef = useRef(onBelowThreshold);
   onBelowThresholdRef.current = onBelowThreshold;
+  const onAboveThresholdRef = useRef(onAboveThreshold);
+  onAboveThresholdRef.current = onAboveThreshold;
   const hasMetThresholdRef = useRef(false);
 
   useEffect(() => {
@@ -73,7 +77,11 @@ export function useFeedVideoIntersectionObserver(
               !entry.isIntersecting || ratio < FEED_VIDEO_VISIBILITY_THRESHOLD;
 
             if (!belowThreshold) {
+              const wasBelow = !hasMetThresholdRef.current;
               hasMetThresholdRef.current = true;
+              if (wasBelow) {
+                onAboveThresholdRef.current?.();
+              }
               return;
             }
 
@@ -126,19 +134,23 @@ export function useFeedVideoIntersectionObserver(
           const visibleHeight = Math.max(0, visibleBottom - visibleTop);
           const ratio = visibleHeight / height;
 
-          if (!entryIsVisibleInRoot(targetTop, targetBottom, rootRect) || ratio < FEED_VIDEO_VISIBILITY_THRESHOLD) {
-            if (ratio >= FEED_VIDEO_VISIBILITY_THRESHOLD && entryIsVisibleInRoot(targetTop, targetBottom, rootRect)) {
-              hasMetThresholdRef.current = true;
-              return;
-            }
-            if (hasMetThresholdRef.current) {
-              hasMetThresholdRef.current = false;
-              onBelowThresholdRef.current();
+          const aboveThreshold =
+            entryIsVisibleInRoot(targetTop, targetBottom, rootRect) &&
+            ratio >= FEED_VIDEO_VISIBILITY_THRESHOLD;
+
+          if (aboveThreshold) {
+            const wasBelow = !hasMetThresholdRef.current;
+            hasMetThresholdRef.current = true;
+            if (wasBelow) {
+              onAboveThresholdRef.current?.();
             }
             return;
           }
 
-          hasMetThresholdRef.current = true;
+          if (hasMetThresholdRef.current) {
+            hasMetThresholdRef.current = false;
+            onBelowThresholdRef.current();
+          }
           return;
         }
 
@@ -149,7 +161,11 @@ export function useFeedVideoIntersectionObserver(
         const ratio = visibleHeight / height;
 
         if (ratio >= FEED_VIDEO_VISIBILITY_THRESHOLD) {
+          const wasBelow = !hasMetThresholdRef.current;
           hasMetThresholdRef.current = true;
+          if (wasBelow) {
+            onAboveThresholdRef.current?.();
+          }
           return;
         }
 

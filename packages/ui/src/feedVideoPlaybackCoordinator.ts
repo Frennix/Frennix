@@ -48,6 +48,20 @@ export function isActiveFeedVideo(videoId: string) {
   return playbackAllowed && activeVideoId === videoId;
 }
 
+export function getActiveFeedVideoId() {
+  return activeVideoId;
+}
+
+type SoundPreferenceListener = () => void;
+const soundPreferenceListeners = new Set<SoundPreferenceListener>();
+
+export function subscribeFeedVideoSoundPreference(listener: SoundPreferenceListener) {
+  soundPreferenceListeners.add(listener);
+  return () => {
+    soundPreferenceListeners.delete(listener);
+  };
+}
+
 export function pauseAllFeedVideos() {
   pauseHandlers.forEach((pause) => pause());
   activeVideoId = null;
@@ -61,5 +75,7 @@ export function isFeedVideoSoundEnabled() {
 }
 
 export function setFeedVideoSoundEnabled(enabled: boolean) {
+  if (feedVideoSoundEnabled === enabled) return;
   feedVideoSoundEnabled = enabled;
+  soundPreferenceListeners.forEach((listener) => listener());
 }

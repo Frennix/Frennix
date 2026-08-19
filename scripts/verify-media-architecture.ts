@@ -23,7 +23,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed video player supports tap playback, visibility pause, and mute toggle",
+    name: "Feed video player supports autoplay, visibility pause, and mute toggle",
     run: () => {
       const src = read("packages/ui/src/FeedVideoPlayer.tsx");
       if (!src.includes("playbackId")) throw new Error("FeedVideoPlayer must accept playbackId");
@@ -36,9 +36,12 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("registerFeedVideoPauseHandler")) {
         throw new Error("FeedVideoPlayer must register imperative pause handlers");
       }
+      if (!src.includes("handleScrollIntoView")) {
+        throw new Error("FeedVideoPlayer must autoplay when scrolled into view");
+      }
       if (!src.includes("ActivityIndicator")) throw new Error("FeedVideoPlayer must show buffering indicator");
       if (!src.includes("Unmute video")) throw new Error("FeedVideoPlayer must expose mute toggle");
-      if (!src.includes("onOpenFullscreen")) throw new Error("FeedVideoPlayer must support fullscreen tap");
+      if (!src.includes("handleVideoTap")) throw new Error("FeedVideoPlayer must toggle play/pause on tap");
     },
   },
   {
@@ -83,11 +86,17 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!coordinator.includes("requestFeedVideoPlay")) {
         throw new Error("feed video coordinator must expose requestFeedVideoPlay");
       }
+      if (!observer.includes("onAboveThreshold")) {
+        throw new Error("feed video observer must support autoplay on visibility");
+      }
       if (!gate.includes("useIsFocused")) {
         throw new Error("FeedVideoPlaybackGate must pause when leaving the Feed tab");
       }
       if (!feed.includes("FeedVideoPlaybackGate")) {
         throw new Error("Home feed must mount FeedVideoPlaybackGate");
+      }
+      if (!feed.includes("useFeedCommentsSheet")) {
+        throw new Error("Home feed must open comments as an overlay sheet");
       }
       if (feed.includes("FeedVideoPlaybackProvider")) {
         throw new Error("Home feed must not wrap startup in FeedVideoPlaybackProvider");
