@@ -2,14 +2,12 @@ import { createElement, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
-import { colors, spacing } from "./theme";
+import { colors } from "./theme";
 import { useVideoPoster } from "./useVideoPoster";
 
 interface FullscreenVideoSlideProps {
@@ -20,7 +18,7 @@ interface FullscreenVideoSlideProps {
   isActive: boolean;
 }
 
-/** Full-screen gallery video slide with controls, mute toggle, and buffering state. */
+/** Full-screen gallery video slide — native controls handle audio; no feed-style mute overlay. */
 export function FullscreenVideoSlide({
   uri,
   thumbnailUrl,
@@ -156,16 +154,6 @@ export function FullscreenVideoSlide({
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : null}
-
-      <Pressable
-        style={styles.muteButton}
-        onPress={() => setMuted((current) => !current)}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={muted ? "Unmute video" : "Mute video"}
-      >
-        <Text style={styles.muteIcon}>{muted ? "🔇" : "🔊"}</Text>
-      </Pressable>
     </View>
   );
 }
@@ -182,23 +170,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(10, 10, 11, 0.35)",
-  },
-  muteButton: {
-    position: "absolute",
-    bottom: spacing.lg,
-    left: spacing.lg,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(10, 10, 11, 0.75)",
-    borderWidth: 1,
-    borderColor: colors.border,
-    zIndex: 10,
-  },
-  muteIcon: {
-    fontSize: 18,
-    lineHeight: 20,
   },
 });
