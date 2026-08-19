@@ -191,6 +191,7 @@ export function FeedVideoPlayer({
         toggleMute();
       }}
       hitSlop={8}
+      pointerEvents="auto"
       accessibilityRole="button"
       accessibilityLabel={muted ? "Unmute video" : "Mute video"}
     >
@@ -284,39 +285,41 @@ export function FeedVideoPlayer({
           collapsable={false}
           style={styles.container}
         >
-          {showPoster ? (
-            <VideoPreview
-              videoUri={uri}
-              posterState={resolvedPoster}
-              thumbnailUrl={thumbnailUrl}
-              layout="feed"
-              unframed
-              showPlayButton={false}
-              onPlay={handleTapPlay}
-            />
-          ) : (
-            <Pressable
-              style={styles.mediaTapArea}
-              onPress={onOpenFullscreen}
-              accessibilityRole="button"
-              accessibilityLabel="Open video full screen"
-            >
-              {videoBody}
+          <View style={styles.mediaLayer} pointerEvents="box-none">
+            {showPoster ? (
+              <VideoPreview
+                videoUri={uri}
+                posterState={resolvedPoster}
+                thumbnailUrl={thumbnailUrl}
+                layout="feed"
+                unframed
+                showPlayButton={false}
+                onPlay={handleTapPlay}
+              />
+            ) : (
+              <Pressable
+                style={styles.mediaTapArea}
+                onPress={onOpenFullscreen}
+                accessibilityRole="button"
+                accessibilityLabel="Open video full screen"
+              >
+                {videoBody}
 
-              {buffering ? (
-                <View
-                  style={styles.bufferingOverlay}
-                  pointerEvents="none"
-                  accessibilityLabel="Video loading"
-                  accessibilityRole="progressbar"
-                >
-                  <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
-                </View>
-              ) : null}
-            </Pressable>
-          )}
+                {buffering ? (
+                  <View
+                    style={styles.bufferingOverlay}
+                    pointerEvents="none"
+                    accessibilityLabel="Video loading"
+                    accessibilityRole="progressbar"
+                  >
+                    <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
+                  </View>
+                ) : null}
+              </Pressable>
+            )}
+          </View>
 
-          <View style={styles.muteOverlaySlot} pointerEvents="box-none">
+          <View style={styles.muteLayer} pointerEvents="box-none">
             {muteControl}
           </View>
         </View>
@@ -331,6 +334,16 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: colors.background,
     position: "relative",
+    ...(Platform.OS === "web"
+      ? ({
+          overflow: "visible",
+          isolation: "isolate",
+        } as const)
+      : null),
+  },
+  mediaLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   mediaTapArea: {
     width: "100%",
@@ -346,11 +359,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(10, 10, 11, 0.35)",
   },
-  muteOverlaySlot: {
+  muteLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
-    elevation: 10,
+    zIndex: 100,
+    elevation: 100,
     pointerEvents: "box-none",
+    ...(Platform.OS === "web"
+      ? ({
+          transform: [{ translateZ: 0 }],
+        } as const)
+      : null),
   },
   muteButton: {
     position: "absolute",
@@ -364,6 +382,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(10, 10, 11, 0.75)",
     borderWidth: 1,
     borderColor: colors.border,
+    zIndex: 101,
+    elevation: 101,
+    ...(Platform.OS === "web"
+      ? ({
+          pointerEvents: "auto",
+          transform: [{ translateZ: 1 }],
+        } as const)
+      : null),
   },
   muteIcon: {
     fontSize: 16,

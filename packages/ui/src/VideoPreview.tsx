@@ -116,7 +116,11 @@ export function VideoPreview({
   if (isFeed && unframed) {
     return (
       <Pressable
-        style={({ pressed }) => [styles.containerFeed, styles.feedFill, pressed && onPlay && styles.pressed]}
+        style={({ pressed }) => [
+          StyleSheet.absoluteFillObject,
+          styles.containerFeed,
+          pressed && onPlay && styles.pressed,
+        ]}
         onPress={onPlay}
         disabled={!onPlay}
         accessibilityRole={onPlay ? "button" : undefined}
