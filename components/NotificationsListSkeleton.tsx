@@ -15,7 +15,7 @@ function NotificationRowSkeleton() {
 
 export function NotificationsListSkeleton({ count = 10 }: { count?: number }) {
   return (
-    <View style={styles.container}>
+    <View style={styles.container} nativeID="notifications-screen">
       <View style={styles.summary}>
         <Skeleton width="68%" height={16} />
         <Skeleton width="92%" height={12} />

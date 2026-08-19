@@ -15,6 +15,7 @@ const DESTINATION_MARKERS: ReadonlyArray<{ id: string; minHeight: number }> = [
   { id: "auth-login-screen", minHeight: 200 },
   { id: "login-failure-screen", minHeight: 120 },
   { id: "create-post-screen", minHeight: 120 },
+  { id: "notifications-screen", minHeight: 120 },
 ];
 
 /** True when the user can see feed, onboarding, or an explicit error/retry screen. */
