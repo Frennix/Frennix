@@ -211,21 +211,6 @@ export function FeedVideoPlayer({
     );
   }
 
-  if (showPoster) {
-    return (
-      <VideoPreview
-        videoUri={uri}
-        posterState={resolvedPoster}
-        thumbnailUrl={thumbnailUrl}
-        style={style}
-        layout="feed"
-        showPlayButton={false}
-        onPlay={handleTapPlay}
-        bottomRightOverlay={muteControl}
-      />
-    );
-  }
-
   const videoBody =
     Platform.OS === "web" ? (
       createElement("video", {
@@ -293,41 +278,49 @@ export function FeedVideoPlayer({
       style={style}
       fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
     >
-      {() => {
-        const player = (
-          <Pressable
-            style={styles.container}
-            onPress={onOpenFullscreen}
-            accessibilityRole="button"
-            accessibilityLabel="Open video full screen"
-          >
-            {videoBody}
+      {() => (
+        <View
+          ref={Platform.OS === "web" ? undefined : nativeIntersectionRef}
+          collapsable={false}
+          style={styles.container}
+        >
+          {showPoster ? (
+            <VideoPreview
+              videoUri={uri}
+              posterState={resolvedPoster}
+              thumbnailUrl={thumbnailUrl}
+              layout="feed"
+              unframed
+              showPlayButton={false}
+              onPlay={handleTapPlay}
+            />
+          ) : (
+            <Pressable
+              style={styles.mediaTapArea}
+              onPress={onOpenFullscreen}
+              accessibilityRole="button"
+              accessibilityLabel="Open video full screen"
+            >
+              {videoBody}
 
-            {buffering ? (
-              <View
-                style={styles.bufferingOverlay}
-                pointerEvents="none"
-                accessibilityLabel="Video loading"
-                accessibilityRole="progressbar"
-              >
-                <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
-              </View>
-            ) : null}
+              {buffering ? (
+                <View
+                  style={styles.bufferingOverlay}
+                  pointerEvents="none"
+                  accessibilityLabel="Video loading"
+                  accessibilityRole="progressbar"
+                >
+                  <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
+                </View>
+              ) : null}
+            </Pressable>
+          )}
 
+          <View style={styles.muteOverlaySlot} pointerEvents="box-none">
             {muteControl}
-          </Pressable>
-        );
-
-        if (Platform.OS === "web") {
-          return player;
-        }
-
-        return (
-          <View ref={nativeIntersectionRef} collapsable={false} style={styles.container}>
-            {player}
           </View>
-        );
-      }}
+        </View>
+      )}
     </MediaAspectFrame>
   );
 }
@@ -337,6 +330,11 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: colors.background,
+    position: "relative",
+  },
+  mediaTapArea: {
+    width: "100%",
+    height: "100%",
   },
   videoFill: {
     width: "100%",
@@ -347,6 +345,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(10, 10, 11, 0.35)",
+  },
+  muteOverlaySlot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    elevation: 10,
+    pointerEvents: "box-none",
   },
   muteButton: {
     position: "absolute",

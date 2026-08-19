@@ -28,6 +28,8 @@ interface VideoPreviewProps {
   showPlayButton?: boolean;
   /** Optional control pinned to the bottom-right (feed mute button, etc.). */
   bottomRightOverlay?: ReactNode;
+  /** Feed poster content only — caller provides MediaAspectFrame. */
+  unframed?: boolean;
 }
 
 export function VideoPreview({
@@ -40,6 +42,7 @@ export function VideoPreview({
   onPlay,
   showPlayButton = true,
   bottomRightOverlay,
+  unframed = false,
 }: VideoPreviewProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : videoUri, posterState ? null : thumbnailUrl);
   const { posterUri, ready, useVideoFrameFallback } = posterState ?? internalPoster;
@@ -110,6 +113,20 @@ export function VideoPreview({
     </Pressable>
   );
 
+  if (isFeed && unframed) {
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.containerFeed, styles.feedFill, pressed && onPlay && styles.pressed]}
+        onPress={onPlay}
+        disabled={!onPlay}
+        accessibilityRole={onPlay ? "button" : undefined}
+        accessibilityLabel={onPlay ? "Play video" : undefined}
+      >
+        {previewBody}
+      </Pressable>
+    );
+  }
+
   if (isFeed) {
     return (
       <MediaAspectFrame
@@ -119,7 +136,7 @@ export function VideoPreview({
         fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
       >
         {() => (
-          <View style={[styles.containerFeed, styles.feedFill]}>
+          <View style={[styles.containerFeed, styles.feedFill, styles.feedShell]}>
             <Pressable
               style={({ pressed }) => [styles.feedFill, pressed && onPlay && styles.pressed]}
               onPress={onPlay}
@@ -129,7 +146,11 @@ export function VideoPreview({
             >
               {previewBody}
             </Pressable>
-            {bottomRightOverlay}
+            {bottomRightOverlay ? (
+              <View style={styles.bottomRightOverlaySlot} pointerEvents="box-none">
+                {bottomRightOverlay}
+              </View>
+            ) : null}
           </View>
         )}
       </MediaAspectFrame>
@@ -158,6 +179,15 @@ const styles = StyleSheet.create({
   feedFill: {
     width: "100%",
     height: "100%",
+  },
+  feedShell: {
+    position: "relative",
+  },
+  bottomRightOverlaySlot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    elevation: 10,
+    pointerEvents: "box-none",
   },
   compact: {
     height: "100%",
