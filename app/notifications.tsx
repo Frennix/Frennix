@@ -24,7 +24,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { openNotificationTargetAsync } from "@/lib/notification-navigation";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
-import { showAlert, confirmBulkDismissNotifications } from "@/lib/alerts";
+import { showAlert } from "@/lib/alerts";
 import { useDismissWithAnimation } from "@/lib/useDismissWithAnimation";
 import { syncNotificationBadgeCount } from "@/lib/notifications";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
@@ -255,9 +255,10 @@ export default function NotificationsScreen() {
       }
       return { removedWasUnread };
     },
-    onError: () => {
+    onError: (mutationError) => {
       void queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+      showAlert("Could not delete notification", getErrorMessage(mutationError));
     },
     onSuccess: (_data, _id, context) => {
       if (context?.removedWasUnread) {
@@ -271,7 +272,10 @@ export default function NotificationsScreen() {
   });
 
   const { requestDismiss: requestNotificationDismiss, isDismissing: isNotificationDismissing } =
-    useDismissWithAnimation((notificationId) => dismissMutation.mutate(notificationId));
+    useDismissWithAnimation(
+      (notificationId) => dismissMutation.mutate(notificationId),
+      (onConfirm) => onConfirm()
+    );
 
   const clearAllMutation = useMutation({
     mutationFn: () => dismissAllNotifications(userId),
@@ -311,9 +315,10 @@ export default function NotificationsScreen() {
       }
       return { removedUnread };
     },
-    onError: () => {
+    onError: (mutationError) => {
       void queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
+      showAlert("Could not delete notifications", getErrorMessage(mutationError));
     },
     onSuccess: (_data, _ids, context) => {
       if (context?.removedUnread) {
@@ -345,7 +350,7 @@ export default function NotificationsScreen() {
   const handleBulkDelete = useCallback(() => {
     const ids = [...selectedIds];
     if (!ids.length) return;
-    confirmBulkDismissNotifications(ids.length, () => bulkDismissMutation.mutate(ids));
+    bulkDismissMutation.mutate(ids);
   }, [bulkDismissMutation, selectedIds]);
 
   const handleDeleteNotification = useCallback(
@@ -483,11 +488,7 @@ export default function NotificationsScreen() {
               <Text style={styles.markAll}>Edit</Text>
             </Pressable>
             <Pressable
-              onPress={() =>
-                confirmBulkDismissNotifications(notifications.length, () =>
-                  clearAllMutation.mutate()
-                )
-              }
+              onPress={() => clearAllMutation.mutate()}
               disabled={clearAllMutation.isPending}
               hitSlop={8}
             >
