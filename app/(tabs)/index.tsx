@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -14,6 +14,9 @@ import {
 import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getFeed,
+  getFeedCore,
+  enrichPostsWithInteractions,
+  applyDefaultPostInteractions,
   getFeedStories,
   getSuggestedAthletes,
   getDismissedSuggestionIds,
@@ -71,10 +74,12 @@ import { useFeedInfiniteScroll } from "@/lib/useFeedInfiniteScroll";
 import { useFeedNewPostsBanner } from "@/lib/useFeedNewPostsBanner";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import type { FeedListRow } from "@/lib/feed-list-rows";
-import { hydrateFeedCache, writeFeedCache } from "@/lib/feed-cache";
+import { hydrateFeedCache, hydrateFeedCacheSync, writeFeedCache } from "@/lib/feed-cache";
+import { mergeEnrichedFeedPage } from "@/lib/feed-enrichment-merge";
 import {
   markFeedCacheHydrated,
   markFeedPerf,
+  markFirstFeedMediaReady,
   reportFeedPerfReady,
   startFeedPerfSession,
 } from "@/lib/feed-performance";
@@ -118,6 +123,9 @@ export default function HomeScreen() {
   const isolateVideo = isFeedIsolateDisabled("video");
   const isolatePullRefresh = isFeedIsolateDisabled("pull-to-refresh");
   const queryClient = useQueryClient();
+  const feedStartupRef = useRef<string | null>(null);
+  const feedEnrichGenRef = useRef(0);
+  const firstPostPaintMarkedRef = useRef(false);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyInviteUserId, setStoryInviteUserId] = useState<string | null>(null);
   const [viewersModalVisible, setViewersModalVisible] = useState(false);
@@ -391,11 +399,42 @@ export default function HomeScreen() {
   } = useInfiniteQuery({
     queryKey: ["feed", userId],
     queryFn: async ({ pageParam }) => {
-      markFeedPerf(pageParam ? "feed_page_next_start" : "feed_page_1_start");
-      const page = await getFeed(userId, pageParam);
-      markFeedPerf(pageParam ? "feed_page_next_ready" : "feed_page_1_ready", {
-        post_count: page.posts.length,
+      if (pageParam) {
+        markFeedPerf("feed_page_next_start");
+        const page = await getFeed(userId, pageParam);
+        markFeedPerf("feed_page_next_ready", { post_count: page.posts.length });
+        return page;
+      }
+
+      markFeedPerf("feed_query_start");
+      const enrichGen = ++feedEnrichGenRef.current;
+      const core = await getFeedCore(userId, undefined, undefined, (phase, detail) => {
+        if (phase === "scope" && detail?.start) markFeedPerf("feed_scope_start");
+        if (phase === "scope" && detail?.author_count != null) markFeedPerf("feed_scope_ready", detail);
+        if (phase === "posts" && detail?.start) markFeedPerf("feed_posts_query_start");
+        if (phase === "posts" && detail?.count != null) markFeedPerf("feed_posts_query_ready", detail);
       });
+      markFeedPerf("feed_filtering_ready", { post_count: core.posts.length });
+
+      const page = {
+        posts: core.posts.map(applyDefaultPostInteractions),
+        nextCursor: core.nextCursor,
+      };
+      markFeedPerf("feed_data_in_react", { post_count: page.posts.length });
+      markFeedPerf("feed_page_1_ready", { post_count: page.posts.length, enriched: false });
+
+      if (core.posts.length) {
+        void enrichPostsWithInteractions(core.posts, userId)
+          .then((enrichedPosts) => {
+            if (enrichGen !== feedEnrichGenRef.current) return;
+            mergeEnrichedFeedPage(queryClient, userId, 0, enrichedPosts);
+            markFeedPerf("feed_enrichment_complete", { post_count: enrichedPosts.length });
+          })
+          .catch((enrichmentError) => {
+            console.warn("[feed] background enrichment failed", enrichmentError);
+          });
+      }
+
       return page;
     },
     initialPageParam: undefined as string | undefined,
@@ -446,7 +485,7 @@ export default function HomeScreen() {
     }
   }, [userId, isLoading, isFetching, isError, isFeedReady, error, posts.length]);
 
-  const showFeedSkeleton = posts.length === 0 && (!isFeedReady || isLoading || isFetching);
+  const showFeedSkeleton = posts.length === 0 && isLoading;
   const pageCount = data?.pages.length ?? 0;
   const { onScroll, onScrollEnd, isAtTop } = useScrollAtTop();
   const [feedAtTop, setFeedAtTop] = useState(true);
@@ -559,9 +598,25 @@ export default function HomeScreen() {
   );
   markFeedHook("tab-scroll");
 
+  // Never call queryClient.setQueryData during render — it breaks React startup on Safari web.
+  useLayoutEffect(() => {
+    if (!userId || feedStartupRef.current === userId) return;
+    feedStartupRef.current = userId;
+    startFeedPerfSession(userId);
+    markFeedPerf("route_mount");
+    if (session) markFeedPerf("auth_session_ready");
+    if (viewerProfile) markFeedPerf("profile_ready");
+    if (hydrateFeedCacheSync(queryClient, userId)) {
+      const cachedPosts =
+        queryClient
+          .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+          ?.pages.flatMap((page) => page.posts) ?? [];
+      markFeedCacheHydrated(cachedPosts.length);
+    }
+  }, [queryClient, session, userId, viewerProfile]);
+
   useEffect(() => {
     if (!userId) return;
-    startFeedPerfSession(userId);
     void hydrateFeedCache(queryClient, userId).then((hydrated) => {
       if (!hydrated) return;
       const cachedPosts =
@@ -571,6 +626,17 @@ export default function HomeScreen() {
       markFeedCacheHydrated(cachedPosts.length);
     });
   }, [queryClient, userId]);
+
+  useEffect(() => {
+    if (!posts.length || firstPostPaintMarkedRef.current) return;
+    firstPostPaintMarkedRef.current = true;
+    markFeedPerf("first_post_mount", { post_id: posts[0].id.slice(0, 8) });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        markFeedPerf("first_post_paint");
+      });
+    });
+  }, [posts.length > 0 ? posts[0]?.id : null]);
 
   useEffect(() => {
     if (!userId || !data?.pages.length) return;
@@ -720,8 +786,15 @@ export default function HomeScreen() {
       }
 
       markFeedRender("feed:ui:first-post-card", "data", item.post.id.slice(0, 8));
+      if (posts[0]?.id === item.post.id) {
+        markFeedPerf("first_post_render");
+      }
 
       const mediaActive = !isolateVideo && visiblePostIds.has(item.post.id);
+      const onPrimaryMediaReady =
+        posts[0]?.id === item.post.id
+          ? (source: "image" | "video") => markFirstFeedMediaReady(source)
+          : undefined;
 
       return (
         <SectionErrorBoundary label={`feed-post:${item.post.id.slice(0, 8)}`} compact>
@@ -733,6 +806,7 @@ export default function HomeScreen() {
             mediaActive={mediaActive}
             mediaPageIndex={carouselIndices[item.post.id] ?? 0}
             onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
+            onPrimaryMediaReady={onPrimaryMediaReady}
           />
         </SectionErrorBoundary>
       );
@@ -746,6 +820,7 @@ export default function HomeScreen() {
       activePost?.id,
       isolatePostCards,
       isolateVideo,
+      posts,
     ]
   );
 
