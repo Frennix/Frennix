@@ -50,6 +50,7 @@ interface FeedVideoPlayerProps {
   slideActive?: boolean;
   style?: ViewStyle;
   onOpenFullscreen?: () => void;
+  onVisualReady?: () => void;
 }
 
 /**
@@ -64,6 +65,7 @@ export function FeedVideoPlayer({
   slideActive = true,
   style,
   onOpenFullscreen,
+  onVisualReady,
 }: FeedVideoPlayerProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
@@ -85,6 +87,13 @@ export function FeedVideoPlayer({
     playAsync: () => Promise<void>;
     setIsMutedAsync: (v: boolean) => Promise<void>;
   } | null>(null);
+  const visualReadyRef = useRef(false);
+
+  const notifyVisualReady = useCallback(() => {
+    if (visualReadyRef.current) return;
+    visualReadyRef.current = true;
+    onVisualReady?.();
+  }, [onVisualReady]);
 
   const isActiveVideo = Boolean(playbackId && isActiveFeedVideo(playbackId));
 
@@ -343,6 +352,7 @@ export function FeedVideoPlayer({
           backgroundColor: colors.background,
         },
         onLoadedMetadata: () => {
+          notifyVisualReady();
           if (shouldPlayRef.current) attemptWebAutoplay();
         },
         onCanPlay: () => {

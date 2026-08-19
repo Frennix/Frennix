@@ -19,6 +19,7 @@ export type FeedMediaProps = {
   embedded?: boolean;
   /** Extension: overlay on media — premium gate, play badge, ad marker. */
   overlay?: ReactNode;
+  onPrimaryMediaReady?: (source: "image" | "video") => void;
 };
 
 /**
@@ -36,6 +37,7 @@ export const FeedMedia = memo(function FeedMedia({
   playbackScopeId,
   embedded = false,
   overlay,
+  onPrimaryMediaReady,
 }: FeedMediaProps) {
   if (!mediaUrls.length) return null;
 
@@ -51,6 +53,7 @@ export const FeedMedia = memo(function FeedMedia({
           onPageIndexChange={onPageIndexChange}
           visible={visible}
           playbackScopeId={playbackScopeId}
+          onPrimaryMediaReady={onPrimaryMediaReady}
         />
         {overlay ? <FeedLayout.MediaOverlay>{overlay}</FeedLayout.MediaOverlay> : null}
       </View>

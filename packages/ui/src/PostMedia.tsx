@@ -39,6 +39,7 @@ interface PostMediaProps {
   mediaIndex?: number;
   /** @deprecated Row visibility no longer autoplays feed video. */
   mediaVisible?: boolean;
+  onVisualReady?: () => void;
 }
 
 function isVideoMedia(postType?: PostType, uri?: string) {
@@ -122,6 +123,7 @@ export function PostMedia({
   playbackScopeId,
   mediaIndex = 0,
   mediaVisible = true,
+  onVisualReady,
 }: PostMediaProps) {
   const isVideo = isVideoMedia(postType, uri);
   const [playing, setPlaying] = useState(false);
@@ -145,6 +147,7 @@ export function PostMedia({
         slideActive={slideActive && mediaVisible}
         style={style}
         onOpenFullscreen={onVideoPress}
+        onVisualReady={onVisualReady}
       />
     );
   }
@@ -195,6 +198,7 @@ export function PostMedia({
       onImagePress={onImagePress}
       pressDelayMs={pressDelayMs}
       maxHeight={maxHeight}
+      onVisualReady={onVisualReady}
     />
   );
 }
@@ -207,6 +211,7 @@ function FeedImage({
   onImagePress,
   pressDelayMs,
   maxHeight,
+  onVisualReady,
 }: {
   uri: string;
   thumbnailUrl?: string | null;
@@ -215,6 +220,7 @@ function FeedImage({
   onImagePress?: () => void;
   pressDelayMs?: number;
   maxHeight?: number;
+  onVisualReady?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -246,6 +252,7 @@ function FeedImage({
               contentFit="contain"
               accessibilityLabel="Post photo"
               onError={() => setImageFailed(true)}
+              onLoad={onVisualReady}
             />
           )}
         </>

@@ -11,7 +11,7 @@ import {
 import { enrichPostsWithReactions } from "./reactions";
 import { getSupabase } from "./supabase";
 
-export const FEED_INITIAL_PAGE_SIZE = 12;
+export const FEED_INITIAL_PAGE_SIZE = 8;
 export const FEED_PAGE_SIZE = 20;
 
 type FeedScope = {
@@ -259,17 +259,28 @@ export async function enrichPostsWithInteractions(
   return enrichPosts(posts, userId);
 }
 
-export async function getFeed(
+export type FeedCorePhase = "scope" | "posts";
+
+/** Fast path: feed scope + post rows with author profiles — no likes/comments/reactions yet. */
+export async function getFeedCore(
   userId: string,
   cursor?: string,
-  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
+  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE,
+  onPhase?: (phase: FeedCorePhase, detail?: Record<string, unknown>) => void
 ): Promise<FeedPage> {
+  onPhase?.("scope", { start: true });
   const { authorIds, groupIds, challengeIds } = await getFeedScope(userId);
+  onPhase?.("scope", {
+    author_count: authorIds.length,
+    group_count: groupIds.length,
+    challenge_count: challengeIds.length,
+  });
 
   const orParts = [`author_id.in.(${authorIds.join(",")})`];
   if (groupIds.length) orParts.push(`group_id.in.(${groupIds.join(",")})`);
   if (challengeIds.length) orParts.push(`challenge_id.in.(${challengeIds.join(",")})`);
 
+  onPhase?.("posts", { start: true });
   let q = getSupabase()
     .from("posts")
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
@@ -283,12 +294,42 @@ export async function getFeed(
 
   const { data, error } = await q;
   if (error) throw error;
-  if (!data?.length) return { posts: [], nextCursor: null };
+  if (!data?.length) {
+    onPhase?.("posts", { count: 0 });
+    return { posts: [], nextCursor: null };
+  }
 
-  const posts = await enrichPosts(data as Post[], userId);
+  const posts = (data as Post[]).map((post) => normalizePostWorkoutFields(post));
   const nextCursor = data.length === limit ? data[data.length - 1].created_at : null;
+  onPhase?.("posts", { count: posts.length });
 
   return { posts, nextCursor };
+}
+
+/** Placeholder interaction fields so post cards can render before enrichment finishes. */
+export function applyDefaultPostInteractions(post: Post): Post {
+  return normalizePostWorkoutFields({
+    ...post,
+    like_count: post.like_count ?? 0,
+    comment_count: post.comment_count ?? 0,
+    liked_by_me: post.liked_by_me ?? false,
+    saved_by_me: post.saved_by_me ?? false,
+    preview_comments: post.preview_comments ?? [],
+    reactions: post.reactions ?? [],
+    my_reaction: post.my_reaction ?? null,
+  });
+}
+
+export async function getFeed(
+  userId: string,
+  cursor?: string,
+  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
+): Promise<FeedPage> {
+  const core = await getFeedCore(userId, cursor, limit);
+  if (!core.posts.length) return core;
+
+  const posts = await enrichPosts(core.posts, userId);
+  return { posts, nextCursor: core.nextCursor };
 }
 
 export async function getPostsByUser(

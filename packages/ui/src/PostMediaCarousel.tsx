@@ -27,6 +27,7 @@ interface PostMediaCarouselProps {
   mediaVisible?: boolean;
   /** Scope id for feed video playback coordination (typically post id). */
   playbackScopeId?: string;
+  onPrimaryMediaReady?: (source: "image" | "video") => void;
 }
 
 export function PostMediaCarousel({
@@ -39,6 +40,7 @@ export function PostMediaCarousel({
   onPageIndexChange,
   mediaVisible = true,
   playbackScopeId,
+  onPrimaryMediaReady,
 }: PostMediaCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -123,6 +125,11 @@ export function PostMediaCarousel({
               ? () => onMediaPress(item.url, 0)
               : undefined
           }
+          onVisualReady={
+            onPrimaryMediaReady
+              ? () => onPrimaryMediaReady(item.kind === "video" ? "video" : "image")
+              : undefined
+          }
         />
       </View>
     );
@@ -184,6 +191,11 @@ export function PostMediaCarousel({
                     ? () => onMediaPress(item.url, itemIndex)
                     : undefined
                 }
+                onVisualReady={
+                  itemIndex === 0 && onPrimaryMediaReady
+                    ? () => onPrimaryMediaReady(item.kind === "video" ? "video" : "image")
+                    : undefined
+                }
               />
             </View>
           )}
@@ -208,6 +220,12 @@ export function PostMediaCarousel({
           onVideoPress={
             mediaItems[0].kind === "video" && onMediaPress
               ? () => onMediaPress(mediaItems[0].url, 0)
+              : undefined
+          }
+          onVisualReady={
+            onPrimaryMediaReady
+              ? () =>
+                  onPrimaryMediaReady(mediaItems[0].kind === "video" ? "video" : "image")
               : undefined
           }
         />

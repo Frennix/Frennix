@@ -20,6 +20,7 @@ interface FeedMediaSlotProps {
   visible?: boolean;
   /** Scope id for feed video playback coordination (typically post id). */
   playbackScopeId?: string;
+  onPrimaryMediaReady?: (source: "image" | "video") => void;
 }
 
 function FeedMediaSkeleton({ style }: { style?: ViewStyle }) {
@@ -41,6 +42,7 @@ export function FeedMediaSlot({
   onPageIndexChange,
   visible = true,
   playbackScopeId,
+  onPrimaryMediaReady,
 }: FeedMediaSlotProps) {
   const containerRef = useRef<View>(null);
   const [active, setActive] = useState(false);
@@ -92,6 +94,7 @@ export function FeedMediaSlot({
       /** Once mounted (near viewport), allow feed video autoplay — do not also require mediaActive, which is not updated on web scroll. */
       mediaVisible={active}
       playbackScopeId={playbackScopeId}
+      onPrimaryMediaReady={onPrimaryMediaReady}
     />
   );
 }

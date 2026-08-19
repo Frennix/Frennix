@@ -50,6 +50,7 @@ interface FeedPostCardProps {
   mediaActive?: boolean;
   mediaPageIndex?: number;
   onMediaPageIndexChange?: (index: number) => void;
+  onPrimaryMediaReady?: (source: "image" | "video") => void;
 }
 
 const STRONG_WORK_EMOJI = "💪";
@@ -84,6 +85,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   mediaActive = true,
   mediaPageIndex,
   onMediaPageIndexChange,
+  onPrimaryMediaReady,
   slots,
 }: FeedPostCardProps) {
   const author = post.author;
@@ -232,6 +234,7 @@ export const FeedPostCard = memo(function FeedPostCard({
               visible={mediaActive}
               playbackScopeId={displayPost.id}
               overlay={slots?.mediaOverlay}
+              onPrimaryMediaReady={onPrimaryMediaReady}
             />
           </Pressable>
           {heartVisible ? (
