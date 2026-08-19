@@ -10,6 +10,13 @@ import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
 import { useVideoPoster } from "./useVideoPoster";
 
+/** Align with ImageLightbox close chrome — native mute sits left of the ✕. */
+const LIGHTBOX_CLOSE_SIZE = 34;
+const LIGHTBOX_CLOSE_RIGHT_INSET = 8;
+const LIGHTBOX_CONTROL_GAP = 12;
+const WEB_LIGHTBOX_TOP_RIGHT_GUTTER =
+  LIGHTBOX_CLOSE_RIGHT_INSET + LIGHTBOX_CLOSE_SIZE + LIGHTBOX_CONTROL_GAP;
+
 interface FullscreenVideoSlideProps {
   uri: string;
   thumbnailUrl?: string | null;
@@ -80,28 +87,30 @@ export function FullscreenVideoSlide({
   return (
     <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       {Platform.OS === "web" ? (
-        createElement("video", {
-          key: retryKey,
-          ref: (node: HTMLVideoElement | null) => {
-            webVideoRef.current = node;
-          },
-          src: uri,
-          controls: true,
-          muted,
-          playsInline: true,
-          preload: isActive ? "auto" : "metadata",
-          poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
-          style: {
-            width: stageWidth,
-            height: stageHeight,
-            objectFit: "contain",
-            backgroundColor: colors.background,
-          },
-          onWaiting: () => setBuffering(true),
-          onPlaying: () => setBuffering(false),
-          onCanPlay: () => setBuffering(false),
-          onError: () => setFailed(true),
-        })
+        <View style={[styles.webVideoChrome, { width: stageWidth, height: stageHeight }]}>
+          {createElement("video", {
+            key: retryKey,
+            ref: (node: HTMLVideoElement | null) => {
+              webVideoRef.current = node;
+            },
+            src: uri,
+            controls: true,
+            muted,
+            playsInline: true,
+            preload: isActive ? "auto" : "metadata",
+            poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
+            style: {
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              backgroundColor: colors.background,
+            },
+            onWaiting: () => setBuffering(true),
+            onPlaying: () => setBuffering(false),
+            onCanPlay: () => setBuffering(false),
+            onError: () => setFailed(true),
+          })}
+        </View>
       ) : (
         (() => {
           try {
@@ -164,6 +173,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "visible",
     backgroundColor: colors.background,
+  },
+  webVideoChrome: {
+    paddingRight: WEB_LIGHTBOX_TOP_RIGHT_GUTTER,
+    ...(Platform.OS === "web"
+      ? ({
+          paddingTop: "max(env(safe-area-inset-top, 0px), 12px)",
+          boxSizing: "border-box",
+        } as object)
+      : null),
   },
   bufferingOverlay: {
     ...StyleSheet.absoluteFillObject,
