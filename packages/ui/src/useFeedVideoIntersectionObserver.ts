@@ -33,12 +33,16 @@ export function useFeedVideoIntersectionObserver(
   targetRef: RefObject<Element | null>,
   enabled: boolean,
   onBelowThreshold: () => void,
-  onAboveThreshold?: () => void
+  onAboveThreshold?: () => void,
+  /** When true while above threshold, fires enter even if IO already marked visible (fixes inView desync). */
+  shouldEnterAbove?: () => boolean
 ) {
   const onBelowThresholdRef = useRef(onBelowThreshold);
   onBelowThresholdRef.current = onBelowThreshold;
   const onAboveThresholdRef = useRef(onAboveThreshold);
   onAboveThresholdRef.current = onAboveThreshold;
+  const shouldEnterAboveRef = useRef(shouldEnterAbove);
+  shouldEnterAboveRef.current = shouldEnterAbove;
   const hasMetThresholdRef = useRef(false);
 
   useEffect(() => {
@@ -79,7 +83,8 @@ export function useFeedVideoIntersectionObserver(
             if (!belowThreshold) {
               const wasBelow = !hasMetThresholdRef.current;
               hasMetThresholdRef.current = true;
-              if (wasBelow) {
+              const needsEnter = wasBelow || shouldEnterAboveRef.current?.() === true;
+              if (needsEnter) {
                 onAboveThresholdRef.current?.();
               }
               return;
@@ -141,7 +146,8 @@ export function useFeedVideoIntersectionObserver(
           if (aboveThreshold) {
             const wasBelow = !hasMetThresholdRef.current;
             hasMetThresholdRef.current = true;
-            if (wasBelow) {
+            const needsEnter = wasBelow || shouldEnterAboveRef.current?.() === true;
+            if (needsEnter) {
               onAboveThresholdRef.current?.();
             }
             return;
@@ -163,7 +169,8 @@ export function useFeedVideoIntersectionObserver(
         if (ratio >= FEED_VIDEO_VISIBILITY_THRESHOLD) {
           const wasBelow = !hasMetThresholdRef.current;
           hasMetThresholdRef.current = true;
-          if (wasBelow) {
+          const needsEnter = wasBelow || shouldEnterAboveRef.current?.() === true;
+          if (needsEnter) {
             onAboveThresholdRef.current?.();
           }
           return;

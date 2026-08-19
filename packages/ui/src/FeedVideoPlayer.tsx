@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { Volume2, VolumeX } from "lucide-react-native";
 import {
-  getActiveFeedVideoId,
   isActiveFeedVideo,
   isFeedVideoPlaybackAllowed,
   isFeedVideoSoundEnabled,
@@ -53,7 +52,7 @@ interface FeedVideoPlayerProps {
 
 /**
  * Inline feed video — autoplay muted when visible, pause when scrolled away,
- * one active video at a time. Tap toggles play/pause; speaker toggles sound.
+ * one active video at a time. Tap opens fullscreen; speaker toggles sound.
  */
 export function FeedVideoPlayer({
   uri,
@@ -67,12 +66,8 @@ export function FeedVideoPlayer({
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
   const [inView, setInView] = useState(false);
-  const [userPaused, setUserPausedState] = useState(false);
-  const userPausedRef = useRef(false);
-  const setUserPaused = useCallback((paused: boolean) => {
-    userPausedRef.current = paused;
-    setUserPausedState(paused);
-  }, []);
+  const inViewRef = useRef(false);
+  inViewRef.current = inView;
   const [muted, setMuted] = useState(() => !isFeedVideoSoundEnabled());
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -98,22 +93,20 @@ export function FeedVideoPlayer({
   const handleScrollOutOfView = useCallback(() => {
     pauseMediaElement();
     setInView(false);
-    setUserPaused(false);
     if (playbackId) {
       releaseFeedVideoDueToVisibility(playbackId);
     }
-  }, [pauseMediaElement, playbackId, setUserPaused]);
+  }, [pauseMediaElement, playbackId]);
 
   const handleScrollIntoView = useCallback(() => {
     setInView(true);
-    if (!userPausedRef.current && playbackId && isFeedVideoPlaybackAllowed()) {
+    if (playbackId && isFeedVideoPlaybackAllowed()) {
       requestFeedVideoPlay(playbackId);
     }
   }, [playbackId]);
 
   const shouldPlay = Boolean(
     inView &&
-      !userPaused &&
       playbackId &&
       isFeedVideoPlaybackAllowed() &&
       isActiveVideo &&
@@ -125,6 +118,8 @@ export function FeedVideoPlayer({
     playbackId && slideActive && !failed && isFeedVideoPlaybackAllowed()
   );
 
+  const shouldEnterAbove = useCallback(() => !inViewRef.current, []);
+
   const intersectionTargetRef =
     Platform.OS === "web"
       ? (webVideoRef as RefObject<Element | null>)
@@ -134,7 +129,8 @@ export function FeedVideoPlayer({
     intersectionTargetRef,
     intersectionEnabled,
     handleScrollOutOfView,
-    handleScrollIntoView
+    handleScrollIntoView,
+    shouldEnterAbove
   );
 
   useEffect(() => {
@@ -142,12 +138,23 @@ export function FeedVideoPlayer({
     return registerFeedVideoPauseHandler(playbackId, pauseMediaElement);
   }, [playbackId, pauseMediaElement]);
 
+  /** Re-claim coordinator ownership whenever visible but no longer the active player. */
   useEffect(() => {
-    if (!inView || userPaused || !playbackId || !slideActive || failed) return;
-    if (!isActiveFeedVideo(playbackId) && getActiveFeedVideoId() === null) {
+    if (!inView || !playbackId || !slideActive || failed) return;
+    if (!isActiveFeedVideo(playbackId)) {
       requestFeedVideoPlay(playbackId);
     }
-  }, [failed, inView, isActiveVideo, playbackId, slideActive, userPaused]);
+  }, [failed, inView, isActiveVideo, playbackId, slideActive]);
+
+  /** Sync React state when observation is disabled (e.g. slide/media gate) without a below-threshold event. */
+  useEffect(() => {
+    if (intersectionEnabled) return;
+    pauseMediaElement();
+    setInView(false);
+    if (playbackId) {
+      releaseFeedVideoDueToVisibility(playbackId);
+    }
+  }, [intersectionEnabled, pauseMediaElement, playbackId]);
 
   useEffect(() => {
     if (inView && slideActive) return;
@@ -212,15 +219,9 @@ export function FeedVideoPlayer({
   }, [shouldPlay, muted, failed, uri, retryKey]);
 
   const handleVideoTap = useCallback(() => {
-    if (!playbackId || !inView) return;
-    if (userPausedRef.current || !shouldPlay) {
-      setUserPaused(false);
-      requestFeedVideoPlay(playbackId);
-      return;
-    }
-    setUserPaused(true);
-    pauseMediaElement();
-  }, [inView, pauseMediaElement, playbackId, setUserPaused, shouldPlay]);
+    if (!onOpenFullscreen) return;
+    onOpenFullscreen();
+  }, [onOpenFullscreen]);
 
   const toggleMute = useCallback(() => {
     setMuted((current) => {
@@ -234,10 +235,9 @@ export function FeedVideoPlayer({
 
   const handleRetry = useCallback(() => {
     setFailed(false);
-    setUserPaused(false);
     setInView(false);
     setRetryKey((key) => key + 1);
-  }, [setUserPaused]);
+  }, []);
 
   const SpeakerIcon = muted ? VolumeX : Volume2;
 
@@ -349,10 +349,9 @@ export function FeedVideoPlayer({
               <Pressable
                 style={styles.mediaTapArea}
                 onPress={handleVideoTap}
-                onLongPress={onOpenFullscreen}
-                delayLongPress={450}
+                disabled={!onOpenFullscreen}
                 accessibilityRole="button"
-                accessibilityLabel={shouldPlay ? "Pause video" : "Play video"}
+                accessibilityLabel="Open video full screen"
               >
                 {videoBody}
 

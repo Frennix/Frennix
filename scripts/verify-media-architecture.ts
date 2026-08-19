@@ -41,7 +41,7 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
       if (!src.includes("ActivityIndicator")) throw new Error("FeedVideoPlayer must show buffering indicator");
       if (!src.includes("Unmute video")) throw new Error("FeedVideoPlayer must expose mute toggle");
-      if (!src.includes("handleVideoTap")) throw new Error("FeedVideoPlayer must toggle play/pause on tap");
+      if (!src.includes("onOpenFullscreen")) throw new Error("FeedVideoPlayer must open fullscreen on video tap");
     },
   },
   {
