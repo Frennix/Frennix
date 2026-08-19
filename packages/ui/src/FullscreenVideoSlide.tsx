@@ -12,9 +12,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
-import { Volume2, VolumeX } from "lucide-react-native";
+import { FastForward, Pause, Play, Rewind, Volume2, VolumeX } from "lucide-react-native";
 import {
   restoreFeedVideoFromFullscreen,
   type FeedVideoFullscreenHandoff,
@@ -33,6 +34,9 @@ const FULLSCREEN_MUTE_ICON = 17;
 const FULLSCREEN_MUTE_RIGHT =
   LIGHTBOX_CLOSE_RIGHT_INSET + LIGHTBOX_CLOSE_SIZE + LIGHTBOX_CONTROL_GAP;
 const FULLSCREEN_CONTROLS_HIDE_MS = 2500;
+const SEEK_STEP_SECONDS = 10;
+const TRANSPORT_ICON = 28;
+const TRANSPORT_BUTTON = 52;
 
 interface FullscreenVideoSlideProps {
   uri: string;
@@ -44,22 +48,25 @@ interface FullscreenVideoSlideProps {
   playbackHandoff?: FeedVideoFullscreenHandoff;
 }
 
+function formatVideoTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const whole = Math.floor(seconds);
+  const minutes = Math.floor(whole / 60);
+  const secs = whole % 60;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+}
+
 function configureInlineWebVideo(video: HTMLVideoElement) {
+  video.controls = false;
+  video.removeAttribute("controls");
   video.setAttribute("playsinline", "");
   video.setAttribute("webkit-playsinline", "true");
   video.setAttribute("x-webkit-airplay", "deny");
   video.disablePictureInPicture = true;
   video.disableRemotePlayback = true;
-  try {
-    video.controlsList.add("nofullscreen");
-    video.controlsList.add("noremoteplayback");
-    video.controlsList.add("nodownload");
-  } catch {
-    // controlsList unsupported — CSS/webkitbeginfullscreen guard still applies.
-  }
 }
 
-/** Full-screen gallery video slide — inline WebKit controls only; no native fullscreen step. */
+/** Full-screen gallery video — Frennix-owned controls only; no native controls layer. */
 export function FullscreenVideoSlide({
   uri,
   thumbnailUrl,
@@ -74,7 +81,9 @@ export function FullscreenVideoSlide({
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [handoffReady, setHandoffReady] = useState(!playbackHandoff);
-  const [controlsReady, setControlsReady] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsPinned, setControlsPinned] = useState(false);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -114,9 +123,11 @@ export function FullscreenVideoSlide({
     setFailed(false);
     handoffAppliedRef.current = false;
     setHandoffReady(!playbackHandoff);
-    setControlsReady(false);
     setControlsVisible(true);
     setControlsPinned(false);
+    setIsPaused(true);
+    setCurrentTime(0);
+    setDuration(0);
     clearHideControlsTimer();
   }, [uri, retryKey, playbackHandoff, clearHideControlsTimer]);
 
@@ -125,17 +136,29 @@ export function FullscreenVideoSlide({
     const video = webVideoRef.current;
     if (!video || video.readyState < HTMLMediaElement.HAVE_METADATA) return;
 
-    const duration = video.duration;
-    const target = Number.isFinite(duration)
-      ? Math.min(playbackHandoff.currentTime, Math.max(0, duration - 0.05))
+    const videoDuration = video.duration;
+    const target = Number.isFinite(videoDuration)
+      ? Math.min(playbackHandoff.currentTime, Math.max(0, videoDuration - 0.05))
       : playbackHandoff.currentTime;
 
     video.currentTime = target;
     video.muted = playbackHandoff.muted;
     setMuted(playbackHandoff.muted);
+    setCurrentTime(target);
+    setDuration(Number.isFinite(videoDuration) ? videoDuration : 0);
     handoffAppliedRef.current = true;
     setHandoffReady(true);
   }, [playbackHandoff]);
+
+  const syncVideoState = useCallback(() => {
+    const video = webVideoRef.current;
+    if (!video) return;
+    setIsPaused(video.paused);
+    setCurrentTime(video.currentTime);
+    if (Number.isFinite(video.duration)) {
+      setDuration(video.duration);
+    }
+  }, []);
 
   useLayoutEffect(() => {
     if (Platform.OS !== "web" || !isActive) return;
@@ -144,18 +167,17 @@ export function FullscreenVideoSlide({
 
     video.classList.add("fullscreen-video-slide");
     configureInlineWebVideo(video);
-    video.controls = true;
 
     const blockNativeFullscreen = (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
+      configureInlineWebVideo(video);
       if (typeof video.webkitExitFullscreen === "function") {
         void video.webkitExitFullscreen();
       }
     };
 
     video.addEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
-    setControlsReady(true);
     scheduleControlsHide();
 
     return () => {
@@ -209,37 +231,95 @@ export function FullscreenVideoSlide({
 
   const toggleMute = useCallback(() => {
     setMuted((current) => !current);
-  }, []);
+    revealControls();
+  }, [revealControls]);
+
+  const togglePlayPause = useCallback(() => {
+    const video = webVideoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play().catch(() => setFailed(true));
+    } else {
+      video.pause();
+    }
+    revealControls();
+  }, [revealControls]);
+
+  const seekBy = useCallback(
+    (delta: number) => {
+      const video = webVideoRef.current;
+      if (!video) return;
+      const max = Number.isFinite(video.duration) ? video.duration : duration;
+      const next = Math.min(Math.max(0, video.currentTime + delta), Math.max(0, max - 0.05));
+      video.currentTime = next;
+      setCurrentTime(next);
+      revealControls();
+    },
+    [duration, revealControls]
+  );
+
+  const seekTo = useCallback(
+    (value: number) => {
+      const video = webVideoRef.current;
+      if (!video) return;
+      const max = Number.isFinite(video.duration) ? video.duration : duration;
+      const next = Math.min(Math.max(0, value), Math.max(0, max));
+      video.currentTime = next;
+      setCurrentTime(next);
+      revealControls();
+    },
+    [duration, revealControls]
+  );
 
   const handleWebPause = useCallback(() => {
+    setIsPaused(true);
     setControlsPinned(true);
     setControlsVisible(true);
     clearHideControlsTimer();
-  }, [clearHideControlsTimer]);
+    syncVideoState();
+  }, [clearHideControlsTimer, syncVideoState]);
 
   const handleWebPlay = useCallback(() => {
+    setIsPaused(false);
     setControlsPinned(false);
     setControlsVisible(true);
     scheduleControlsHide();
-  }, [scheduleControlsHide]);
+    syncVideoState();
+  }, [scheduleControlsHide, syncVideoState]);
+
+  const handleTimeUpdate = useCallback(() => {
+    syncVideoState();
+  }, [syncVideoState]);
+
+  const handleLoadedMetadata = useCallback(() => {
+    syncVideoState();
+    applyPlaybackHandoff();
+  }, [applyPlaybackHandoff, syncVideoState]);
 
   const SpeakerIcon = muted ? VolumeX : Volume2;
   const chromeControlsVisible = controlsVisible || controlsPinned;
-
-  const controlsClassName = chromeControlsVisible
-    ? "fullscreen-controls-visible"
-    : "fullscreen-controls-hidden";
+  const progressMax = duration > 0 ? duration : 1;
 
   const webChromeMute =
     Platform.OS === "web" &&
     isActive &&
-    controlsReady &&
     typeof document !== "undefined"
       ? createPortal(
           <Pressable
             className={`fullscreen-video-mute-button${chromeControlsVisible ? "" : " fullscreen-chrome-hidden"}`}
-            style={styles.webChromeMute}
-            onPress={toggleMute}
+            style={[
+              styles.webChromeMute,
+              Platform.OS === "web"
+                ? ({
+                    opacity: chromeControlsVisible ? 1 : 0,
+                    transition: "opacity 0.35s ease",
+                  } as object)
+                : null,
+            ]}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              toggleMute();
+            }}
             accessibilityRole="button"
             accessibilityLabel={muted ? "Unmute video" : "Mute video"}
           >
@@ -260,45 +340,129 @@ export function FullscreenVideoSlide({
   return (
     <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       {Platform.OS === "web" ? (
-        createElement("video", {
-          key: retryKey,
-          className: `fullscreen-video-slide ${controlsClassName}`,
-          ref: (node: HTMLVideoElement | null) => {
-            webVideoRef.current = node;
-            if (node) configureInlineWebVideo(node);
-          },
-          src: uri,
-          muted,
-          playsInline: true,
-          // @ts-expect-error RN web passes through to DOM
-          "webkit-playsinline": "true",
-          // @ts-expect-error legacy AirPlay guard
-          "x-webkit-airplay": "deny",
-          controlsList: "nodownload nofullscreen noremoteplayback",
-          disablePictureInPicture: true,
-          disableRemotePlayback: true,
-          preload: isActive ? "auto" : "metadata",
-          poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
-          style: {
-            width: stageWidth,
-            height: stageHeight,
-            objectFit: "contain",
-            backgroundColor: colors.background,
-          },
-          onLoadedMetadata: applyPlaybackHandoff,
-          onCanPlay: () => {
-            setBuffering(false);
-            applyPlaybackHandoff();
-          },
-          onWaiting: () => setBuffering(true),
-          onPlaying: () => {
-            setBuffering(false);
-          },
-          onPlay: handleWebPlay,
-          onPause: handleWebPause,
-          onClick: revealControls,
-          onError: () => setFailed(true),
-        })
+        <>
+          {createElement("video", {
+            key: retryKey,
+            className: "fullscreen-video-slide",
+            ref: (node: HTMLVideoElement | null) => {
+              webVideoRef.current = node;
+              if (node) configureInlineWebVideo(node);
+            },
+            src: uri,
+            muted,
+            playsInline: true,
+            // @ts-expect-error RN web passes through to DOM
+            "webkit-playsinline": "true",
+            // @ts-expect-error legacy AirPlay guard
+            "x-webkit-airplay": "deny",
+            disablePictureInPicture: true,
+            disableRemotePlayback: true,
+            preload: isActive ? "auto" : "metadata",
+            poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
+            style: {
+              width: stageWidth,
+              height: stageHeight,
+              objectFit: "contain",
+              backgroundColor: colors.background,
+            },
+            onLoadedMetadata: handleLoadedMetadata,
+            onCanPlay: () => {
+              setBuffering(false);
+              applyPlaybackHandoff();
+            },
+            onWaiting: () => setBuffering(true),
+            onPlaying: () => setBuffering(false),
+            onPlay: handleWebPlay,
+            onPause: handleWebPause,
+            onTimeUpdate: handleTimeUpdate,
+            onError: () => setFailed(true),
+          })}
+
+          <Pressable
+            style={styles.tapSurface}
+            onPress={revealControls}
+            accessibilityRole="button"
+            accessibilityLabel="Show video controls"
+          />
+
+          <View
+            pointerEvents={chromeControlsVisible ? "box-none" : "none"}
+            style={[
+              styles.controlsOverlay,
+              Platform.OS === "web"
+                ? ({
+                    opacity: chromeControlsVisible ? 1 : 0,
+                    transition: "opacity 0.35s ease",
+                  } as object)
+                : { opacity: chromeControlsVisible ? 1 : 0 },
+            ]}
+          >
+            <View style={styles.centerTransport} pointerEvents="box-none">
+              <Pressable
+                style={styles.transportButton}
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  seekBy(-SEEK_STEP_SECONDS);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Rewind 10 seconds"
+              >
+                <Rewind color="#FFFFFF" size={TRANSPORT_ICON} strokeWidth={2} />
+              </Pressable>
+
+              <Pressable
+                style={styles.transportButtonPrimary}
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  togglePlayPause();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={isPaused ? "Play video" : "Pause video"}
+              >
+                {isPaused ? (
+                  <Play color="#FFFFFF" size={TRANSPORT_ICON + 4} strokeWidth={2} fill="#FFFFFF" />
+                ) : (
+                  <Pause color="#FFFFFF" size={TRANSPORT_ICON + 4} strokeWidth={2} fill="#FFFFFF" />
+                )}
+              </Pressable>
+
+              <Pressable
+                style={styles.transportButton}
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  seekBy(SEEK_STEP_SECONDS);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Forward 10 seconds"
+              >
+                <FastForward color="#FFFFFF" size={TRANSPORT_ICON} strokeWidth={2} />
+              </Pressable>
+            </View>
+
+            <View style={styles.bottomBar} pointerEvents="auto">
+              <Text style={styles.timeText}>{formatVideoTime(currentTime)}</Text>
+              {createElement("input", {
+                type: "range",
+                min: 0,
+                max: progressMax,
+                step: 0.1,
+                value: currentTime,
+                "aria-label": "Video progress",
+                className: "fullscreen-video-scrubber",
+                style: styles.scrubberInput as object,
+                onChange: (event: Event) => {
+                  const target = event.target as HTMLInputElement;
+                  seekTo(Number(target.value));
+                },
+                onInput: (event: Event) => {
+                  const target = event.target as HTMLInputElement;
+                  seekTo(Number(target.value));
+                },
+              })}
+              <Text style={styles.timeText}>{formatVideoTime(duration)}</Text>
+            </View>
+          </View>
+        </>
       ) : (
         (() => {
           try {
@@ -361,9 +525,83 @@ const styles = StyleSheet.create({
   stage: {
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible",
+    overflow: "hidden",
     backgroundColor: colors.background,
   },
+  tapSurface: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  controlsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  centerTransport: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 28,
+    ...(Platform.OS === "web"
+      ? ({
+          transform: "translate(-50%, -50%)",
+        } as object)
+      : {
+          transform: [{ translateX: -120 }, { translateY: -26 }],
+        }),
+  },
+  transportButton: {
+    width: TRANSPORT_BUTTON,
+    height: TRANSPORT_BUTTON,
+    borderRadius: TRANSPORT_BUTTON / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+  },
+  transportButtonPrimary: {
+    width: TRANSPORT_BUTTON + 8,
+    height: TRANSPORT_BUTTON + 8,
+    borderRadius: (TRANSPORT_BUTTON + 8) / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+  },
+  bottomBar: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: Platform.OS === "web" ? "max(env(safe-area-inset-bottom, 0px), 18px)" : 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    zIndex: 3,
+  },
+  timeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 14,
+    fontVariant: ["tabular-nums"],
+    minWidth: 36,
+    textAlign: "center",
+  },
+  scrubberInput: Platform.select({
+    web: {
+      flex: 1,
+      height: 28,
+      margin: 0,
+      appearance: "none",
+      WebkitAppearance: "none",
+      background: "transparent",
+      position: "relative",
+      zIndex: 2,
+      cursor: "pointer",
+    } as object,
+    default: { flex: 1 },
+  }),
   webChromeMute: Platform.select({
     web: {
       position: "fixed",
@@ -388,5 +626,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(10, 10, 11, 0.35)",
+    zIndex: 4,
   },
 });
