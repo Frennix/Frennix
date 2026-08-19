@@ -1,4 +1,13 @@
-import { createElement, useCallback, useEffect, useRef, useState } from "react";
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+  type ViewStyle,
+} from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -6,12 +15,13 @@ import {
   StyleSheet,
   Text,
   View,
-  type ViewStyle,
 } from "react-native";
+import { useFeedVideoPlayback } from "./FeedVideoPlaybackContext";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { FEED_VIDEO_FALLBACK_RATIO } from "./mediaLayout";
 import { colors, spacing } from "./theme";
+import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
 import { VideoPreview } from "./VideoPreview";
 
@@ -19,51 +29,124 @@ interface FeedVideoPlayerProps {
   uri: string;
   thumbnailUrl?: string | null;
   posterState?: VideoPosterState;
-  /** Autoplay muted when true (feed visibility + active carousel slide). */
-  shouldPlay?: boolean;
+  /** Unique id for single-active-video coordination. */
+  playbackId?: string;
+  /** Active carousel slide — inactive slides cannot keep playing. */
+  slideActive?: boolean;
   style?: ViewStyle;
   onOpenFullscreen?: () => void;
 }
 
 /**
- * Inline feed video — poster first, autoplay when mostly visible, tap for fullscreen.
- * Muted by default; tap mute control to toggle audio.
+ * Inline feed video — tap to play, pause when scrolled away, one active video at a time.
+ * Muted by default; tap mute control to toggle audio. Tap playing video for fullscreen.
  */
 export function FeedVideoPlayer({
   uri,
   thumbnailUrl,
   posterState,
-  shouldPlay = false,
+  playbackId,
+  slideActive = true,
   style,
   onOpenFullscreen,
 }: FeedVideoPlayerProps) {
+  const playback = useFeedVideoPlayback();
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
+  const [isPlaying, setIsPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
-  const nativeVideoRef = useRef<{ pauseAsync: () => Promise<void>; playAsync: () => Promise<void>; setIsMutedAsync: (v: boolean) => Promise<void> } | null>(null);
+  const nativeIntersectionRef = useRef<View>(null);
+  const nativeVideoRef = useRef<{
+    pauseAsync: () => Promise<void>;
+    playAsync: () => Promise<void>;
+    setIsMutedAsync: (v: boolean) => Promise<void>;
+  } | null>(null);
+
+  const isActiveVideo = Boolean(playbackId && playback?.isActive(playbackId));
+
+  const pauseMediaElement = useCallback(() => {
+    if (Platform.OS === "web") {
+      const video = webVideoRef.current;
+      if (video) {
+        video.pause();
+      }
+    } else {
+      void nativeVideoRef.current?.pauseAsync();
+    }
+    setIsPlaying(false);
+  }, []);
+
+  const handleScrollOutOfView = useCallback(() => {
+    pauseMediaElement();
+    if (playbackId) {
+      playback?.releaseDueToVisibility(playbackId);
+    }
+  }, [pauseMediaElement, playback, playbackId]);
+
+  const shouldPlay = Boolean(
+    isPlaying &&
+      playbackId &&
+      playback?.playbackAllowed &&
+      isActiveVideo &&
+      slideActive &&
+      !failed
+  );
+
+  const intersectionTargetRef =
+    Platform.OS === "web"
+      ? (webVideoRef as RefObject<Element | null>)
+      : (nativeIntersectionRef as unknown as RefObject<Element | null>);
+
+  useFeedVideoIntersectionObserver(intersectionTargetRef, shouldPlay, handleScrollOutOfView);
+
+  useEffect(() => {
+    if (!playbackId || !playback) return;
+    return playback.registerPauseHandler(playbackId, pauseMediaElement);
+  }, [playback, playbackId, pauseMediaElement]);
+
+  useEffect(() => {
+    if (!isPlaying || slideActive) return;
+    pauseMediaElement();
+    if (playbackId) {
+      playback?.releaseDueToVisibility(playbackId);
+    }
+  }, [isPlaying, slideActive, pauseMediaElement, playback, playbackId]);
+
+  useEffect(() => {
+    if (isPlaying && playbackId && playback && !playback.isActive(playbackId)) {
+      pauseMediaElement();
+    }
+  }, [isPlaying, playback, playbackId, pauseMediaElement, playback?.activeVideoId]);
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
-  const showPoster = !shouldPlay || failed;
+  const showPoster = !shouldPlay;
 
   useEffect(() => {
     setFailed(false);
   }, [uri, retryKey]);
+
+  useLayoutEffect(() => {
+    return () => {
+      webVideoRef.current?.pause();
+    };
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const video = webVideoRef.current;
     if (!video) return;
 
-    if (shouldPlay && !failed) {
+    if (shouldPlay) {
       video.muted = muted;
       void video.play().catch(() => setFailed(true));
-    } else {
-      video.pause();
+      return;
     }
+
+    video.pause();
   }, [shouldPlay, muted, failed, uri, retryKey]);
 
   useEffect(() => {
@@ -74,7 +157,7 @@ export function FeedVideoPlayer({
     void (async () => {
       try {
         await video.setIsMutedAsync(muted);
-        if (shouldPlay && !failed) await video.playAsync();
+        if (shouldPlay) await video.playAsync();
         else await video.pauseAsync();
       } catch {
         setFailed(true);
@@ -82,12 +165,19 @@ export function FeedVideoPlayer({
     })();
   }, [shouldPlay, muted, failed, uri, retryKey]);
 
+  const handleTapPlay = useCallback(() => {
+    if (!playbackId || !playback) return;
+    playback.requestPlay(playbackId);
+    setIsPlaying(true);
+  }, [playback, playbackId]);
+
   const toggleMute = useCallback(() => {
     setMuted((current) => !current);
   }, []);
 
   const handleRetry = useCallback(() => {
     setFailed(false);
+    setIsPlaying(false);
     setRetryKey((key) => key + 1);
   }, []);
 
@@ -104,7 +194,7 @@ export function FeedVideoPlayer({
     );
   }
 
-  if (showPoster && !shouldPlay) {
+  if (showPoster) {
     return (
       <VideoPreview
         videoUri={uri}
@@ -112,7 +202,7 @@ export function FeedVideoPlayer({
         thumbnailUrl={thumbnailUrl}
         style={style}
         layout="feed"
-        onPlay={onOpenFullscreen}
+        onPlay={handleTapPlay}
       />
     );
   }
@@ -184,40 +274,52 @@ export function FeedVideoPlayer({
       style={style}
       fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
     >
-      {() => (
-        <Pressable
-          style={styles.container}
-          onPress={onOpenFullscreen}
-          accessibilityRole="button"
-          accessibilityLabel="Open video full screen"
-        >
-          {videoBody}
-
-          {buffering ? (
-            <View
-              style={styles.bufferingOverlay}
-              pointerEvents="none"
-              accessibilityLabel="Video loading"
-              accessibilityRole="progressbar"
-            >
-              <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
-            </View>
-          ) : null}
-
+      {() => {
+        const player = (
           <Pressable
-            style={styles.muteButton}
-            onPress={(event) => {
-              event.stopPropagation?.();
-              toggleMute();
-            }}
-            hitSlop={8}
+            style={styles.container}
+            onPress={onOpenFullscreen}
             accessibilityRole="button"
-            accessibilityLabel={muted ? "Unmute video" : "Mute video"}
+            accessibilityLabel="Open video full screen"
           >
-            <Text style={styles.muteIcon}>{muted ? "🔇" : "🔊"}</Text>
+            {videoBody}
+
+            {buffering ? (
+              <View
+                style={styles.bufferingOverlay}
+                pointerEvents="none"
+                accessibilityLabel="Video loading"
+                accessibilityRole="progressbar"
+              >
+                <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
+              </View>
+            ) : null}
+
+            <Pressable
+              style={styles.muteButton}
+              onPress={(event) => {
+                event.stopPropagation?.();
+                toggleMute();
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={muted ? "Unmute video" : "Mute video"}
+            >
+              <Text style={styles.muteIcon}>{muted ? "🔇" : "🔊"}</Text>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      )}
+        );
+
+        if (Platform.OS === "web") {
+          return player;
+        }
+
+        return (
+          <View ref={nativeIntersectionRef} collapsable={false} style={styles.container}>
+            {player}
+          </View>
+        );
+      }}
     </MediaAspectFrame>
   );
 }

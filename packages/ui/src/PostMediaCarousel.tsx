@@ -23,8 +23,10 @@ interface PostMediaCarouselProps {
   onMediaPress?: (uri: string, index: number) => void;
   pageIndex?: number;
   onPageIndexChange?: (index: number) => void;
-  /** Post row is near viewport — gates lazy load and video autoplay. */
+  /** Post row is near viewport — gates lazy load. */
   mediaVisible?: boolean;
+  /** Scope id for feed video playback coordination (typically post id). */
+  playbackScopeId?: string;
 }
 
 export function PostMediaCarousel({
@@ -36,6 +38,7 @@ export function PostMediaCarousel({
   pageIndex,
   onPageIndexChange,
   mediaVisible = true,
+  playbackScopeId,
 }: PostMediaCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -108,6 +111,8 @@ export function PostMediaCarousel({
           layout="feed"
           slideActive
           mediaVisible={mediaVisible}
+          playbackScopeId={playbackScopeId}
+          mediaIndex={0}
           onImagePress={
             item.kind === "image" && onMediaPress
               ? () => onMediaPress(item.url, 0)
@@ -167,6 +172,8 @@ export function PostMediaCarousel({
                 pressDelayMs={200}
                 slideActive={itemIndex === activeIndex}
                 mediaVisible={mediaVisible}
+                playbackScopeId={playbackScopeId}
+                mediaIndex={itemIndex}
                 onImagePress={
                   item.kind === "image" && onMediaPress
                     ? () => onMediaPress(item.url, itemIndex)
@@ -191,6 +198,8 @@ export function PostMediaCarousel({
           pressDelayMs={200}
           slideActive
           mediaVisible={mediaVisible}
+          playbackScopeId={playbackScopeId}
+          mediaIndex={0}
           onImagePress={
             mediaItems[0].kind === "image" && onMediaPress
               ? () => onMediaPress(mediaItems[0].url, 0)

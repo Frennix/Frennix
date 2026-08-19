@@ -10,6 +10,7 @@ import {
 import type { PostType } from "@frennix/types";
 import { inferPostMediaKind } from "@frennix/types";
 import { FeedVideoPlayer } from "./FeedVideoPlayer";
+import { buildFeedVideoPlaybackId } from "./FeedVideoPlaybackContext";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
@@ -30,9 +31,13 @@ interface PostMediaProps {
   onVideoPress?: () => void;
   pressDelayMs?: number;
   maxHeight?: number;
-  /** Active carousel slide — controls feed video autoplay. */
+  /** Active carousel slide — inactive slides stop feed video playback. */
   slideActive?: boolean;
-  /** Post row is near viewport — gates lazy load and autoplay. */
+  /** Scope id for feed video playback coordination (typically post id). */
+  playbackScopeId?: string;
+  /** Index within the post media carousel. */
+  mediaIndex?: number;
+  /** @deprecated Row visibility no longer autoplays feed video. */
   mediaVisible?: boolean;
 }
 
@@ -114,6 +119,8 @@ export function PostMedia({
   pressDelayMs,
   maxHeight,
   slideActive = true,
+  playbackScopeId,
+  mediaIndex = 0,
   mediaVisible = true,
 }: PostMediaProps) {
   const isVideo = isVideoMedia(postType, uri);
@@ -124,13 +131,18 @@ export function PostMedia({
     : uri;
 
   if (isVideo && layout === "feed") {
-    const shouldPlay = Boolean(mediaVisible && slideActive);
+    const playbackId =
+      playbackScopeId != null
+        ? buildFeedVideoPlaybackId(playbackScopeId, mediaIndex)
+        : undefined;
+
     return (
       <FeedVideoPlayer
         uri={uri}
         thumbnailUrl={thumbnailUrl}
         posterState={posterState}
-        shouldPlay={shouldPlay}
+        playbackId={playbackId}
+        slideActive={slideActive && mediaVisible}
         style={style}
         onOpenFullscreen={onVideoPress}
       />

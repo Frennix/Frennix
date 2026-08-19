@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   FlatList,
   Platform,
   RefreshControl,
@@ -84,7 +86,7 @@ import { useLocationFeedBanner } from "@/lib/useLocationFeedBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
-import { FeedPostCardSkeleton, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { FeedPostCardSkeleton, FeedVideoPlaybackProvider, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
@@ -464,6 +466,27 @@ export default function HomeScreen() {
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
   const feedScrollEnabled = !(storyVisible || interactionVisible || lightboxVisible);
+  const isFocused = useIsFocused();
+  const [appVisible, setAppVisible] = useState(true);
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const onVisibilityChange = () => {
+        setAppVisible(document.visibilityState === "visible");
+      };
+      onVisibilityChange();
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      setAppVisible(nextState === "active");
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const feedVideoPlaybackAllowed =
+    isFocused && appVisible && !storyVisible && !lightboxVisible;
 
   useFocusEffect(
     useCallback(() => {
@@ -947,6 +970,7 @@ export default function HomeScreen() {
 
   return (
     <StartupMountProbe id="feed-route">
+    <FeedVideoPlaybackProvider playbackAllowed={feedVideoPlaybackAllowed}>
     <TabScreenBoundary label="feed">
     <FeedRenderTraceProbe id="feed:ui:container">
       <FeedBackground
@@ -1184,6 +1208,7 @@ export default function HomeScreen() {
       </FeedBackground>
     </FeedRenderTraceProbe>
     </TabScreenBoundary>
+    </FeedVideoPlaybackProvider>
     </StartupMountProbe>
   );
 }

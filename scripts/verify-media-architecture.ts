@@ -23,10 +23,19 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed video player supports visibility autoplay and mute toggle",
+    name: "Feed video player supports tap playback, visibility pause, and mute toggle",
     run: () => {
       const src = read("packages/ui/src/FeedVideoPlayer.tsx");
-      if (!src.includes("shouldPlay")) throw new Error("FeedVideoPlayer must accept shouldPlay");
+      if (!src.includes("playbackId")) throw new Error("FeedVideoPlayer must accept playbackId");
+      if (!src.includes("useFeedVideoIntersectionObserver")) {
+        throw new Error("FeedVideoPlayer must pause using feed scrollport IntersectionObserver");
+      }
+      if (!src.includes("video.pause()")) {
+        throw new Error("FeedVideoPlayer must call video.pause() on the media element");
+      }
+      if (!src.includes("registerPauseHandler")) {
+        throw new Error("FeedVideoPlayer must register imperative pause handlers");
+      }
       if (!src.includes("ActivityIndicator")) throw new Error("FeedVideoPlayer must show buffering indicator");
       if (!src.includes("Unmute video")) throw new Error("FeedVideoPlayer must expose mute toggle");
       if (!src.includes("onOpenFullscreen")) throw new Error("FeedVideoPlayer must support fullscreen tap");
@@ -45,14 +54,34 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Carousel passes visibility and slide active state for video autoplay",
+    name: "Carousel passes playback scope and slide active state for feed videos",
     run: () => {
       const carousel = read("packages/ui/src/PostMediaCarousel.tsx");
       const slot = read("packages/ui/src/FeedMediaSlot.tsx");
-      if (!carousel.includes("mediaVisible")) throw new Error("carousel must accept mediaVisible");
+      const postMedia = read("packages/ui/src/PostMedia.tsx");
+      if (!carousel.includes("playbackScopeId")) throw new Error("carousel must accept playbackScopeId");
       if (!carousel.includes("slideActive")) throw new Error("carousel must pass slideActive to PostMedia");
-      if (!slot.includes("mediaVisible={visible && active}")) {
-        throw new Error("FeedMediaSlot must gate video autoplay on viewport visibility");
+      if (!slot.includes("playbackScopeId")) throw new Error("FeedMediaSlot must pass playbackScopeId");
+      if (!postMedia.includes("buildFeedVideoPlaybackId")) {
+        throw new Error("PostMedia must build feed video playback ids");
+      }
+    },
+  },
+  {
+    name: "Feed coordinates a single active inline video",
+    run: () => {
+      const ctx = read("packages/ui/src/FeedVideoPlaybackContext.tsx");
+      const feed = read("app/(tabs)/index.tsx");
+      const observer = read("packages/ui/src/useFeedVideoIntersectionObserver.ts");
+      if (!observer.includes('FEED_SCROLL_ROOT_ID = "feed-scroll-list"')) {
+        throw new Error("feed video observer must use feed-scroll-list root");
+      }
+      if (!ctx.includes("registerPauseHandler")) {
+        throw new Error("FeedVideoPlaybackContext must register pause handlers");
+      }
+      if (!ctx.includes("requestPlay")) throw new Error("FeedVideoPlaybackContext must expose requestPlay");
+      if (!feed.includes("FeedVideoPlaybackProvider")) {
+        throw new Error("Home feed must mount FeedVideoPlaybackProvider");
       }
     },
   },

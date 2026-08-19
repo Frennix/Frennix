@@ -13,6 +13,8 @@ export type FeedMediaProps = {
   onPageIndexChange?: (index: number) => void;
   /** Defer heavy media until the row is near the viewport. */
   visible?: boolean;
+  /** Scope id for feed video playback coordination (typically post id). */
+  playbackScopeId?: string;
   /** Inset embedded card (shared posts) instead of edge-to-edge. */
   embedded?: boolean;
   /** Extension: overlay on media — premium gate, play badge, ad marker. */
@@ -31,6 +33,7 @@ export const FeedMedia = memo(function FeedMedia({
   pageIndex,
   onPageIndexChange,
   visible = true,
+  playbackScopeId,
   embedded = false,
   overlay,
 }: FeedMediaProps) {
@@ -47,6 +50,7 @@ export const FeedMedia = memo(function FeedMedia({
           pageIndex={pageIndex}
           onPageIndexChange={onPageIndexChange}
           visible={visible}
+          playbackScopeId={playbackScopeId}
         />
         {overlay ? <FeedLayout.MediaOverlay>{overlay}</FeedLayout.MediaOverlay> : null}
       </View>

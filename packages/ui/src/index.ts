@@ -56,6 +56,17 @@ export { ProgressiveImage } from "./ProgressiveImage";
 export { MediaLoadError } from "./MediaLoadError";
 export { FeedVideoPlayer } from "./FeedVideoPlayer";
 export { FullscreenVideoSlide } from "./FullscreenVideoSlide";
+export {
+  FeedVideoPlaybackProvider,
+  buildFeedVideoPlaybackId,
+  useFeedVideoPlayback,
+} from "./FeedVideoPlaybackContext";
+export {
+  useFeedVideoIntersectionObserver,
+  FEED_VIDEO_VISIBILITY_THRESHOLD,
+  FEED_SCROLL_ROOT_ID,
+} from "./useFeedVideoIntersectionObserver";
+export { useFeedVideoViewportVisibility } from "./useFeedVideoViewportVisibility";
 export { useMediaVisibility, MEDIA_AUTOPLAY_VISIBILITY_THRESHOLD } from "./useMediaVisibility";
 export { QueryErrorState } from "./QueryErrorState";
 export { MenuIconButton } from "./MenuIconButton";

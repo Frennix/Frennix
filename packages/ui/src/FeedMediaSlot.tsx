@@ -18,6 +18,8 @@ interface FeedMediaSlotProps {
   onPageIndexChange?: (index: number) => void;
   /** When false, show a skeleton until the row is near the viewport. Once active, stays mounted. */
   visible?: boolean;
+  /** Scope id for feed video playback coordination (typically post id). */
+  playbackScopeId?: string;
 }
 
 function FeedMediaSkeleton({ style }: { style?: ViewStyle }) {
@@ -38,6 +40,7 @@ export function FeedMediaSlot({
   pageIndex,
   onPageIndexChange,
   visible = true,
+  playbackScopeId,
 }: FeedMediaSlotProps) {
   const containerRef = useRef<View>(null);
   const [active, setActive] = useState(false);
@@ -87,6 +90,7 @@ export function FeedMediaSlot({
       pageIndex={pageIndex}
       onPageIndexChange={onPageIndexChange}
       mediaVisible={visible && active}
+      playbackScopeId={playbackScopeId}
     />
   );
 }

@@ -230,6 +230,7 @@ export const FeedPostCard = memo(function FeedPostCard({
               pageIndex={mediaPageIndex}
               onPageIndexChange={onMediaPageIndexChange}
               visible={mediaActive}
+              playbackScopeId={displayPost.id}
               overlay={slots?.mediaOverlay}
             />
           </Pressable>
