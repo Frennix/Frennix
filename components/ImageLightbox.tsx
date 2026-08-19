@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import { prefetchCachedImages, CachedImage } from "../packages/ui/src/CachedImage";
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
+import type { FeedVideoFullscreenHandoff } from "../packages/ui/src/feedVideoPlaybackCoordinator";
 import { colors, spacing, typography } from "../packages/ui/src/theme";
 
 /** Compact Instagram-style lightbox close control (smaller than global touchTarget). */
@@ -43,6 +44,7 @@ export interface ImageGalleryState {
 export interface MediaGalleryState {
   items: PostMediaItem[];
   index: number;
+  videoHandoff?: FeedVideoFullscreenHandoff;
 }
 
 export type GalleryState = ImageGalleryState | MediaGalleryState;
@@ -371,6 +373,8 @@ function LightboxSurface({
 
   const items = gallery ? resolveGalleryItems(gallery) : [];
   const visible = items.length > 0;
+  const videoHandoff =
+    gallery && isMediaGalleryState(gallery) ? gallery.videoHandoff : undefined;
 
   const syncViewportSize = useCallback(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -606,6 +610,13 @@ function LightboxSurface({
                       stageWidth={pageWidth}
                       stageHeight={pageHeight}
                       isActive={itemIndex === index}
+                      playbackHandoff={
+                        itemIndex === index &&
+                        videoHandoff &&
+                        videoHandoff.mediaIndex === itemIndex
+                          ? videoHandoff
+                          : undefined
+                      }
                     />
                   </View>
                 ) : Platform.OS === "web" ? (

@@ -1,4 +1,11 @@
-import { createElement, useCallback, useEffect, useRef, useState } from "react";
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   ActivityIndicator,
@@ -8,6 +15,10 @@ import {
   View,
 } from "react-native";
 import { Volume2, VolumeX } from "lucide-react-native";
+import {
+  restoreFeedVideoFromFullscreen,
+  type FeedVideoFullscreenHandoff,
+} from "./feedVideoPlaybackCoordinator";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
@@ -21,6 +32,7 @@ const FULLSCREEN_MUTE_SIZE = 34;
 const FULLSCREEN_MUTE_ICON = 17;
 const FULLSCREEN_MUTE_RIGHT =
   LIGHTBOX_CLOSE_RIGHT_INSET + LIGHTBOX_CLOSE_SIZE + LIGHTBOX_CONTROL_GAP;
+const FULLSCREEN_CONTROLS_HIDE_MS = 2500;
 
 interface FullscreenVideoSlideProps {
   uri: string;
@@ -28,6 +40,8 @@ interface FullscreenVideoSlideProps {
   stageWidth: number;
   stageHeight: number;
   isActive: boolean;
+  /** Feed → fullscreen timestamp handoff for the active slide. */
+  playbackHandoff?: FeedVideoFullscreenHandoff;
 }
 
 /** Full-screen gallery video slide — native controls minus mute; chrome mute left of lightbox ✕. */
@@ -37,28 +51,96 @@ export function FullscreenVideoSlide({
   stageWidth,
   stageHeight,
   isActive,
+  playbackHandoff,
 }: FullscreenVideoSlideProps) {
   const posterState = useVideoPoster(uri, thumbnailUrl);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(playbackHandoff?.muted ?? false);
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [handoffReady, setHandoffReady] = useState(!playbackHandoff);
+  const [controlsReady, setControlsReady] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsPinned, setControlsPinned] = useState(false);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
-  const nativeVideoRef = useRef<{ pauseAsync: () => Promise<void>; playAsync: () => Promise<void>; setIsMutedAsync: (v: boolean) => Promise<void> } | null>(null);
+  const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handoffAppliedRef = useRef(false);
+  const nativeVideoRef = useRef<{
+    pauseAsync: () => Promise<void>;
+    playAsync: () => Promise<void>;
+    setIsMutedAsync: (v: boolean) => Promise<void>;
+  } | null>(null);
+
+  const clearHideControlsTimer = useCallback(() => {
+    if (hideControlsTimerRef.current) {
+      clearTimeout(hideControlsTimerRef.current);
+      hideControlsTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleControlsHide = useCallback(() => {
+    clearHideControlsTimer();
+    if (controlsPinned) return;
+    hideControlsTimerRef.current = setTimeout(() => {
+      setControlsVisible(false);
+    }, FULLSCREEN_CONTROLS_HIDE_MS);
+  }, [clearHideControlsTimer, controlsPinned]);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    scheduleControlsHide();
+  }, [scheduleControlsHide]);
 
   useEffect(() => {
     setFailed(false);
-  }, [uri, retryKey]);
+    handoffAppliedRef.current = false;
+    setHandoffReady(!playbackHandoff);
+    setControlsReady(false);
+    setControlsVisible(true);
+    setControlsPinned(false);
+    clearHideControlsTimer();
+  }, [uri, retryKey, playbackHandoff, clearHideControlsTimer]);
+
+  const applyPlaybackHandoff = useCallback(() => {
+    if (handoffAppliedRef.current || !playbackHandoff) return;
+    const video = webVideoRef.current;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_METADATA) return;
+
+    const duration = video.duration;
+    const target = Number.isFinite(duration)
+      ? Math.min(playbackHandoff.currentTime, Math.max(0, duration - 0.05))
+      : playbackHandoff.currentTime;
+
+    video.currentTime = target;
+    video.muted = playbackHandoff.muted;
+    setMuted(playbackHandoff.muted);
+    handoffAppliedRef.current = true;
+    setHandoffReady(true);
+  }, [playbackHandoff]);
+
+  useLayoutEffect(() => {
+    if (Platform.OS !== "web" || !isActive) return;
+    const video = webVideoRef.current;
+    if (!video) return;
+
+    video.classList.add("fullscreen-video-slide");
+    video.controls = true;
+    setControlsReady(true);
+    scheduleControlsHide();
+  }, [isActive, retryKey, uri, scheduleControlsHide]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const video = webVideoRef.current;
-    if (!video) return;
+    if (!video || !handoffReady) return;
 
     video.muted = muted;
-    if (isActive && !failed) void video.play().catch(() => setFailed(true));
-    else video.pause();
-  }, [isActive, muted, failed, uri, retryKey]);
+    if (isActive && !failed) {
+      void video.play().catch(() => setFailed(true));
+      return;
+    }
+    video.pause();
+  }, [handoffReady, isActive, muted, failed, uri, retryKey]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -76,6 +158,16 @@ export function FullscreenVideoSlide({
     })();
   }, [isActive, muted, failed, uri, retryKey]);
 
+  useEffect(() => {
+    return () => {
+      clearHideControlsTimer();
+      if (!playbackHandoff?.playbackId || Platform.OS !== "web") return;
+      const video = webVideoRef.current;
+      if (!video) return;
+      restoreFeedVideoFromFullscreen(playbackHandoff.playbackId, video.currentTime, video.muted);
+    };
+  }, [playbackHandoff, clearHideControlsTimer]);
+
   const handleRetry = useCallback(() => {
     setFailed(false);
     setRetryKey((key) => key + 1);
@@ -85,10 +177,29 @@ export function FullscreenVideoSlide({
     setMuted((current) => !current);
   }, []);
 
+  const handleWebPause = useCallback(() => {
+    setControlsPinned(true);
+    setControlsVisible(true);
+    clearHideControlsTimer();
+  }, [clearHideControlsTimer]);
+
+  const handleWebPlay = useCallback(() => {
+    setControlsPinned(false);
+    setControlsVisible(true);
+    scheduleControlsHide();
+  }, [scheduleControlsHide]);
+
   const SpeakerIcon = muted ? VolumeX : Volume2;
 
+  const controlsClassName = controlsVisible || controlsPinned
+    ? "fullscreen-controls-visible"
+    : "fullscreen-controls-hidden";
+
   const webChromeMute =
-    Platform.OS === "web" && isActive && typeof document !== "undefined"
+    Platform.OS === "web" &&
+    isActive &&
+    controlsReady &&
+    typeof document !== "undefined"
       ? createPortal(
           <Pressable
             className="fullscreen-video-mute-button"
@@ -116,12 +227,11 @@ export function FullscreenVideoSlide({
       {Platform.OS === "web" ? (
         createElement("video", {
           key: retryKey,
-          className: "fullscreen-video-slide",
+          className: `fullscreen-video-slide ${controlsClassName}`,
           ref: (node: HTMLVideoElement | null) => {
             webVideoRef.current = node;
           },
           src: uri,
-          controls: true,
           muted,
           playsInline: true,
           preload: isActive ? "auto" : "metadata",
@@ -132,9 +242,18 @@ export function FullscreenVideoSlide({
             objectFit: "contain",
             backgroundColor: colors.background,
           },
+          onLoadedMetadata: applyPlaybackHandoff,
+          onCanPlay: () => {
+            setBuffering(false);
+            applyPlaybackHandoff();
+          },
           onWaiting: () => setBuffering(true),
-          onPlaying: () => setBuffering(false),
-          onCanPlay: () => setBuffering(false),
+          onPlaying: () => {
+            setBuffering(false);
+            handleWebPlay();
+          },
+          onPause: handleWebPause,
+          onClick: revealControls,
           onError: () => setFailed(true),
         })
       ) : (

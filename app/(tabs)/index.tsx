@@ -85,7 +85,7 @@ import { useLocationFeedBanner } from "@/lib/useLocationFeedBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
-import { FeedPostCardSkeleton, FeedVideoPlaybackGate, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
+import { FeedPostCardSkeleton, FeedVideoPlaybackGate, QueryErrorState, getSharedPostTargetId, colors, spacing, buildFeedVideoPlaybackId, captureFeedVideoForFullscreen } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
@@ -672,12 +672,15 @@ export default function HomeScreen() {
     },
     onMediaPress: (post: Post, uri: string, index: number) => {
       const displayPost = post.shared_post ?? post;
+      const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
+      const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
       setCarouselIndex(post.id, index);
       openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
         setCarouselIndex(post.id, finalIndex);
       }, {
         postType: displayPost.post_type,
         thumbnailUrl: displayPost.thumbnail_url,
+        videoHandoff,
       });
     },
   };

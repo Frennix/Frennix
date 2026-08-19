@@ -56,7 +56,12 @@ export { ProgressiveImage } from "./ProgressiveImage";
 export { MediaLoadError } from "./MediaLoadError";
 export { FeedVideoPlayer } from "./FeedVideoPlayer";
 export { FullscreenVideoSlide } from "./FullscreenVideoSlide";
-export { buildFeedVideoPlaybackId } from "./feedVideoPlaybackCoordinator";
+export {
+  buildFeedVideoPlaybackId,
+  captureFeedVideoForFullscreen,
+  restoreFeedVideoFromFullscreen,
+  type FeedVideoFullscreenHandoff,
+} from "./feedVideoPlaybackCoordinator";
 export { FeedVideoPlaybackGate } from "./FeedVideoPlaybackGate";
 export {
   useFeedVideoIntersectionObserver,

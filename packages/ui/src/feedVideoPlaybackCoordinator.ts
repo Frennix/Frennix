@@ -1,8 +1,25 @@
 type PauseHandler = () => void;
 
+export type FeedVideoFullscreenHandoff = {
+  playbackId: string;
+  mediaIndex: number;
+  currentTime: number;
+  muted: boolean;
+  wasPlaying: boolean;
+};
+
+type FeedVideoSyncHandlers = {
+  getCurrentTime: () => number;
+  setCurrentTime: (time: number) => void;
+  getMuted: () => boolean;
+  setMuted: (muted: boolean) => void;
+  isPaused: () => boolean;
+};
+
 let playbackAllowed = true;
 let activeVideoId: string | null = null;
 const pauseHandlers = new Map<string, PauseHandler>();
+const syncHandlers = new Map<string, FeedVideoSyncHandlers>();
 
 export function buildFeedVideoPlaybackId(scopeId: string, mediaIndex: number) {
   return `${scopeId}:${mediaIndex}`;
@@ -39,6 +56,43 @@ export function registerFeedVideoPauseHandler(videoId: string, pause: PauseHandl
       pauseHandlers.delete(videoId);
     }
   };
+}
+
+export function registerFeedVideoSyncHandlers(videoId: string, handlers: FeedVideoSyncHandlers) {
+  syncHandlers.set(videoId, handlers);
+  return () => {
+    const current = syncHandlers.get(videoId);
+    if (current === handlers) {
+      syncHandlers.delete(videoId);
+    }
+  };
+}
+
+export function captureFeedVideoForFullscreen(playbackId: string): FeedVideoFullscreenHandoff | null {
+  const handlers = syncHandlers.get(playbackId);
+  if (!handlers) return null;
+
+  const colon = playbackId.lastIndexOf(":");
+  const mediaIndex = colon >= 0 ? Number(playbackId.slice(colon + 1)) : 0;
+
+  return {
+    playbackId,
+    mediaIndex: Number.isFinite(mediaIndex) ? mediaIndex : 0,
+    currentTime: handlers.getCurrentTime(),
+    muted: handlers.getMuted(),
+    wasPlaying: !handlers.isPaused(),
+  };
+}
+
+export function restoreFeedVideoFromFullscreen(
+  playbackId: string,
+  currentTime: number,
+  muted: boolean
+) {
+  const handlers = syncHandlers.get(playbackId);
+  if (!handlers) return;
+  handlers.setCurrentTime(currentTime);
+  handlers.setMuted(muted);
 }
 
 export function requestFeedVideoPlay(videoId: string) {

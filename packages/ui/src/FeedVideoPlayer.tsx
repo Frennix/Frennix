@@ -21,6 +21,7 @@ import {
   isFeedVideoPlaybackAllowed,
   isFeedVideoSoundEnabled,
   registerFeedVideoPauseHandler,
+  registerFeedVideoSyncHandlers,
   releaseFeedVideoDueToVisibility,
   requestFeedVideoPlay,
   setFeedVideoSoundEnabled,
@@ -164,6 +165,25 @@ export function FeedVideoPlayer({
     if (!playbackId) return;
     return registerFeedVideoPauseHandler(playbackId, pauseMediaElement);
   }, [playbackId, pauseMediaElement]);
+
+  useEffect(() => {
+    if (!playbackId || Platform.OS !== "web") return;
+    return registerFeedVideoSyncHandlers(playbackId, {
+      getCurrentTime: () => webVideoRef.current?.currentTime ?? 0,
+      setCurrentTime: (time) => {
+        const video = webVideoRef.current;
+        if (!video) return;
+        const duration = video.duration;
+        video.currentTime =
+          Number.isFinite(duration) && duration > 0
+            ? Math.min(time, Math.max(0, duration - 0.05))
+            : time;
+      },
+      getMuted: () => mutedRef.current,
+      setMuted: (next) => setMuted(next),
+      isPaused: () => webVideoRef.current?.paused ?? true,
+    });
+  }, [playbackId]);
 
   /** Re-claim coordinator ownership whenever visible but no longer the active player. */
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { PostMediaItem, PostType } from "@frennix/types";
 import { buildMediaGalleryState, normalizePostMediaItems } from "@frennix/types";
+import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 import { ImageLightbox, type ImageGalleryState, type MediaGalleryState } from "@/components/ImageLightbox";
 
 export type GalleryCloseHandler = (index: number) => void;
@@ -10,6 +11,8 @@ export type OpenGalleryOptions = {
   thumbnailUrl?: string | null;
   /** @deprecated Prefer passing PostMediaItem[] directly. */
   placeholderUris?: Array<string | null>;
+  /** Feed inline video timestamp when opening fullscreen from the home feed. */
+  videoHandoff?: FeedVideoFullscreenHandoff;
 };
 
 function isMediaGalleryState(
@@ -41,13 +44,14 @@ export function useMediaGallery() {
       options?: OpenGalleryOptions
     ) => {
       closeHandlerRef.current = onClosed ?? null;
-      setGallery(
-        buildMediaGalleryState(mediaUrls, {
+      setGallery({
+        ...buildMediaGalleryState(mediaUrls, {
           postType: options?.postType,
           thumbnailUrl: options?.thumbnailUrl,
           index,
-        })
-      );
+        }),
+        videoHandoff: options?.videoHandoff,
+      });
     },
     []
   );
