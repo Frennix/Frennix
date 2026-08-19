@@ -75,10 +75,7 @@ export function FeedVideoPlayer({
 
   const pauseMediaElement = useCallback(() => {
     if (Platform.OS === "web") {
-      const video = webVideoRef.current;
-      if (video) {
-        video.pause();
-      }
+      webVideoRef.current?.pause();
     } else {
       void nativeVideoRef.current?.pauseAsync();
     }
@@ -186,6 +183,21 @@ export function FeedVideoPlayer({
     setRetryKey((key) => key + 1);
   }, []);
 
+  const muteControl = (
+    <Pressable
+      style={styles.muteButton}
+      onPress={(event) => {
+        event.stopPropagation?.();
+        toggleMute();
+      }}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={muted ? "Unmute video" : "Mute video"}
+    >
+      <Text style={styles.muteIcon}>{muted ? "🔇" : "🔊"}</Text>
+    </Pressable>
+  );
+
   if (failed) {
     return (
       <MediaAspectFrame
@@ -209,6 +221,7 @@ export function FeedVideoPlayer({
         layout="feed"
         showPlayButton={false}
         onPlay={handleTapPlay}
+        bottomRightOverlay={muteControl}
       />
     );
   }
@@ -301,18 +314,7 @@ export function FeedVideoPlayer({
               </View>
             ) : null}
 
-            <Pressable
-              style={styles.muteButton}
-              onPress={(event) => {
-                event.stopPropagation?.();
-                toggleMute();
-              }}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={muted ? "Unmute video" : "Mute video"}
-            >
-              <Text style={styles.muteIcon}>{muted ? "🔇" : "🔊"}</Text>
-            </Pressable>
+            {muteControl}
           </Pressable>
         );
 

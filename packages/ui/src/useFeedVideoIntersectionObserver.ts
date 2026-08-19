@@ -1,11 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { Dimensions, Platform } from "react-native";
-import {
-  isFeedVideoDebugEnabled,
-  logFeedVideo,
-  recordFeedVideoIoAttached,
-  recordFeedVideoIoCallback,
-} from "./feedVideoPlaybackDebug";
 
 /** Pause feed video when less than 25% of it remains visible in the scrollport. */
 export const FEED_VIDEO_VISIBILITY_THRESHOLD = 0.25;
@@ -30,26 +24,6 @@ function resolveDomNode(ref: RefObject<unknown>): Element | null {
   return null;
 }
 
-function describeRoot(root: Element | null) {
-  if (!root || typeof root.getBoundingClientRect !== "function") return null;
-  const rect = root.getBoundingClientRect();
-  const htmlRoot = root as HTMLElement;
-  const style = typeof getComputedStyle !== "undefined" ? getComputedStyle(root) : null;
-  return {
-    id: root.id || null,
-    tag: root.tagName,
-    rect: {
-      top: Math.round(rect.top),
-      bottom: Math.round(rect.bottom),
-      height: Math.round(rect.height),
-    },
-    scrollTop: htmlRoot.scrollTop ?? null,
-    scrollHeight: htmlRoot.scrollHeight ?? null,
-    clientHeight: htmlRoot.clientHeight ?? null,
-    overflowY: style?.overflowY ?? null,
-  };
-}
-
 /**
  * Observes a playing feed video against the feed scrollport (not the browser window).
  * Calls onBelowThreshold synchronously from the observer — callers must pause media there.
@@ -57,20 +31,15 @@ function describeRoot(root: Element | null) {
 export function useFeedVideoIntersectionObserver(
   targetRef: RefObject<Element | null>,
   enabled: boolean,
-  onBelowThreshold: () => void,
-  playbackId?: string
+  onBelowThreshold: () => void
 ) {
   const onBelowThresholdRef = useRef(onBelowThreshold);
   onBelowThresholdRef.current = onBelowThreshold;
   const hasMetThresholdRef = useRef(false);
-  const attachAttemptsRef = useRef(0);
 
   useEffect(() => {
     if (!enabled) {
       hasMetThresholdRef.current = false;
-      if (isFeedVideoDebugEnabled()) {
-        logFeedVideo("io-disabled", playbackId, { enabled: false });
-      }
       return;
     }
 
@@ -81,44 +50,18 @@ export function useFeedVideoIntersectionObserver(
 
       const attach = () => {
         if (cancelled) return;
-        attachAttemptsRef.current += 1;
 
         const target = resolveDomNode(targetRef);
         if (!target) {
-          if (isFeedVideoDebugEnabled() && attachAttemptsRef.current % 30 === 1) {
-            logFeedVideo("io-attach-miss", playbackId, {
-              reason: "target-not-found",
-              attempts: attachAttemptsRef.current,
-              targetIsVideo: targetRef.current instanceof HTMLVideoElement,
-            });
-          }
           rafId = requestAnimationFrame(attach);
           return;
         }
 
         const root = resolveFeedScrollRoot();
         if (!root) {
-          if (isFeedVideoDebugEnabled() && attachAttemptsRef.current % 30 === 1) {
-            logFeedVideo("io-attach-miss", playbackId, {
-              reason: "feed-scroll-root-not-found",
-              attempts: attachAttemptsRef.current,
-              feedScrollRootId: FEED_SCROLL_ROOT_ID,
-            });
-          }
           rafId = requestAnimationFrame(attach);
           return;
         }
-
-        if (isFeedVideoDebugEnabled()) {
-          logFeedVideo("io-attached", playbackId, {
-            attempts: attachAttemptsRef.current,
-            targetTag: target.tagName,
-            targetId: target.id || null,
-            root: describeRoot(root),
-            threshold: FEED_VIDEO_VISIBILITY_THRESHOLD,
-          });
-        }
-        recordFeedVideoIoAttached(root);
 
         observer = new IntersectionObserver(
           (entries) => {
@@ -128,38 +71,6 @@ export function useFeedVideoIntersectionObserver(
             const ratio = entry.intersectionRatio;
             const belowThreshold =
               !entry.isIntersecting || ratio < FEED_VIDEO_VISIBILITY_THRESHOLD;
-            const ioRoot = entry.root instanceof Element ? entry.root : root;
-
-            recordFeedVideoIoCallback({
-              playbackId,
-              intersectionRatio: ratio,
-              isIntersecting: entry.isIntersecting,
-              belowThreshold,
-              hasMetThreshold: hasMetThresholdRef.current,
-              root: ioRoot,
-            });
-
-            if (isFeedVideoDebugEnabled()) {
-              logFeedVideo("io-callback", playbackId, {
-                intersectionRatio: ratio,
-                isIntersecting: entry.isIntersecting,
-                belowThreshold,
-                hasMetThreshold: hasMetThresholdRef.current,
-                root: describeRoot(entry.root instanceof Element ? entry.root : root),
-                boundingClientRect: {
-                  top: Math.round(entry.boundingClientRect.top),
-                  bottom: Math.round(entry.boundingClientRect.bottom),
-                  height: Math.round(entry.boundingClientRect.height),
-                },
-                rootBounds: entry.rootBounds
-                  ? {
-                      top: Math.round(entry.rootBounds.top),
-                      bottom: Math.round(entry.rootBounds.bottom),
-                      height: Math.round(entry.rootBounds.height),
-                    }
-                  : null,
-              });
-            }
 
             if (!belowThreshold) {
               hasMetThresholdRef.current = true;
@@ -168,13 +79,6 @@ export function useFeedVideoIntersectionObserver(
 
             if (hasMetThresholdRef.current) {
               hasMetThresholdRef.current = false;
-              if (isFeedVideoDebugEnabled()) {
-                logFeedVideo("scroll-out-trigger", playbackId, {
-                  source: "intersection-observer",
-                  intersectionRatio: ratio,
-                  isIntersecting: entry.isIntersecting,
-                });
-              }
               onBelowThresholdRef.current();
             }
           },
@@ -263,7 +167,7 @@ export function useFeedVideoIntersectionObserver(
       mounted = false;
       if (interval) clearInterval(interval);
     };
-  }, [enabled, targetRef, playbackId]);
+  }, [enabled, targetRef]);
 }
 
 function entryIsVisibleInRoot(

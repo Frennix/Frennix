@@ -84,7 +84,6 @@ import { useLocationFeedBanner } from "@/lib/useLocationFeedBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
-import { FeedVideoDebugPanel } from "@/components/FeedVideoDebugPanel";
 import { FeedPostCardSkeleton, FeedVideoPlaybackGate, QueryErrorState, getSharedPostTargetId, colors, spacing } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
@@ -1057,7 +1056,6 @@ export default function HomeScreen() {
           onDismiss={() => void dismissLocationBanner()}
         />
       ) : null}
-      <FeedVideoDebugPanel />
       <FeedRenderTraceProbe id="feed:ui:post-action-sheets">{postActionSheets}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:post-interaction-sheet">{interactionSheet}</FeedRenderTraceProbe>
       <FeedRenderTraceProbe id="feed:ui:share-sheet">{shareSheet}</FeedRenderTraceProbe>

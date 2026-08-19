@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -26,6 +26,8 @@ interface VideoPreviewProps {
   onPlay?: () => void;
   /** When false, show poster/thumbnail only (no center play overlay). */
   showPlayButton?: boolean;
+  /** Optional control pinned to the bottom-right (feed mute button, etc.). */
+  bottomRightOverlay?: ReactNode;
 }
 
 export function VideoPreview({
@@ -37,6 +39,7 @@ export function VideoPreview({
   compact,
   onPlay,
   showPlayButton = true,
+  bottomRightOverlay,
 }: VideoPreviewProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : videoUri, posterState ? null : thumbnailUrl);
   const { posterUri, ready, useVideoFrameFallback } = posterState ?? internalPoster;
@@ -116,15 +119,18 @@ export function VideoPreview({
         fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
       >
         {() => (
-          <Pressable
-            style={({ pressed }) => [styles.containerFeed, styles.feedFill, pressed && onPlay && styles.pressed]}
-            onPress={onPlay}
-            disabled={!onPlay}
-            accessibilityRole={onPlay ? "button" : undefined}
-            accessibilityLabel={onPlay ? "Play video" : undefined}
-          >
-            {previewBody}
-          </Pressable>
+          <View style={[styles.containerFeed, styles.feedFill]}>
+            <Pressable
+              style={({ pressed }) => [styles.feedFill, pressed && onPlay && styles.pressed]}
+              onPress={onPlay}
+              disabled={!onPlay}
+              accessibilityRole={onPlay ? "button" : undefined}
+              accessibilityLabel={onPlay ? "Play video" : undefined}
+            >
+              {previewBody}
+            </Pressable>
+            {bottomRightOverlay}
+          </View>
         )}
       </MediaAspectFrame>
     );
