@@ -89,7 +89,8 @@ export function FeedMediaSlot({
       onMediaPress={onMediaPress}
       pageIndex={pageIndex}
       onPageIndexChange={onPageIndexChange}
-      mediaVisible={visible && active}
+      /** Once mounted (near viewport), allow feed video autoplay — do not also require mediaActive, which is not updated on web scroll. */
+      mediaVisible={active}
       playbackScopeId={playbackScopeId}
     />
   );

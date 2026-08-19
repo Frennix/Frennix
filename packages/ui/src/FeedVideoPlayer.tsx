@@ -73,6 +73,9 @@ export function FeedVideoPlayer({
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  const shouldPlayRef = useRef(false);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
   const nativeIntersectionRef = useRef<View>(null);
   const nativeVideoRef = useRef<{
     pauseAsync: () => Promise<void>;
@@ -113,6 +116,28 @@ export function FeedVideoPlayer({
       slideActive &&
       !failed
   );
+  shouldPlayRef.current = shouldPlay;
+
+  const attemptWebAutoplay = useCallback(() => {
+    if (Platform.OS !== "web") return;
+    const video = webVideoRef.current;
+    if (!video || !shouldPlayRef.current) return;
+
+    video.muted = mutedRef.current;
+    void video.play().catch((error: unknown) => {
+      const videoEl = webVideoRef.current;
+      if (!videoEl || !shouldPlayRef.current) return;
+
+      const isAbort =
+        error instanceof DOMException &&
+        (error.name === "AbortError" || error.name === "NotAllowedError");
+      const notReady = videoEl.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
+
+      if (isAbort || notReady) return;
+
+      setFailed(true);
+    });
+  }, []);
 
   const intersectionEnabled = Boolean(
     playbackId && slideActive && !failed && isFeedVideoPlaybackAllowed()
@@ -194,13 +219,12 @@ export function FeedVideoPlayer({
     if (!video) return;
 
     if (shouldPlay) {
-      video.muted = muted;
-      void video.play().catch(() => setFailed(true));
+      attemptWebAutoplay();
       return;
     }
 
     video.pause();
-  }, [shouldPlay, muted, failed, uri, retryKey]);
+  }, [attemptWebAutoplay, shouldPlay, muted, failed, uri, retryKey]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -282,7 +306,7 @@ export function FeedVideoPlayer({
         muted,
         playsInline: true,
         loop: true,
-        preload: "metadata",
+        preload: inView ? "auto" : "metadata",
         poster: resolvedPoster.posterUri ?? thumbnailUrl ?? undefined,
         style: {
           width: "100%",
@@ -290,9 +314,15 @@ export function FeedVideoPlayer({
           objectFit: "contain",
           backgroundColor: colors.background,
         },
+        onLoadedMetadata: () => {
+          if (shouldPlayRef.current) attemptWebAutoplay();
+        },
+        onCanPlay: () => {
+          setBuffering(false);
+          if (shouldPlayRef.current) attemptWebAutoplay();
+        },
         onWaiting: () => setBuffering(true),
         onPlaying: () => setBuffering(false),
-        onCanPlay: () => setBuffering(false),
         onError: () => setFailed(true),
       })
     ) : (

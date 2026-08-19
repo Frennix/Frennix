@@ -16,7 +16,11 @@ import {
 import { createPortal } from "react-dom";
 import { prefetchCachedImages, CachedImage } from "../packages/ui/src/CachedImage";
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
-import { colors, spacing, touchTarget, typography } from "../packages/ui/src/theme";
+import { colors, spacing, typography } from "../packages/ui/src/theme";
+
+/** Compact Instagram-style lightbox close control (smaller than global touchTarget). */
+const LIGHTBOX_CLOSE_SIZE = 34;
+const LIGHTBOX_CLOSE_ICON = 17;
 import type { PostMediaItem } from "@frennix/types";
 import { galleryNeighborImageUris } from "@frennix/types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -747,25 +751,25 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: "absolute",
-    right: spacing.md,
+    right: spacing.sm,
     zIndex: 31,
-    width: touchTarget,
-    height: touchTarget,
-    borderRadius: touchTarget / 2,
-    backgroundColor: "rgba(10, 10, 11, 0.82)",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.88)",
+    width: LIGHTBOX_CLOSE_SIZE,
+    height: LIGHTBOX_CLOSE_SIZE,
+    borderRadius: LIGHTBOX_CLOSE_SIZE / 2,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.28)",
     alignItems: "center",
     justifyContent: "center",
     ...(Platform.OS === "web"
-      ? ({ boxShadow: "0 2px 12px rgba(0,0,0,0.45)" } as object)
+      ? ({ boxShadow: "0 1px 6px rgba(0, 0, 0, 0.35)" } as object)
       : null),
   },
   closeText: {
-    color: colors.text,
-    fontSize: 20,
-    lineHeight: 22,
-    fontWeight: "800",
+    color: "#FFFFFF",
+    fontSize: LIGHTBOX_CLOSE_ICON,
+    lineHeight: LIGHTBOX_CLOSE_ICON,
+    fontWeight: "600",
   },
   galleryCounter: {
     position: "absolute",
