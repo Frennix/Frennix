@@ -7,6 +7,7 @@ import {
 } from "@frennix/notifications";
 import { getBlockedIds } from "./moderation";
 import { getProfilesByIds } from "./profiles";
+import { getSupabaseErrorDetails } from "./profile-utils";
 import { getSupabase } from "./supabase";
 
 const NOTIFICATIONS_LIMIT = 50;
@@ -403,37 +404,45 @@ export async function markAllNotificationsRead(userId: string) {
 /** Soft-delete multiple notifications for the current user. */
 export async function dismissNotificationsBulk(ids: string[], userId: string) {
   if (!ids.length) return;
-  const { error } = await getSupabase()
-    .from("notifications")
-    .update({ deleted_at: new Date().toISOString() })
-    .in("id", ids)
-    .eq("user_id", userId)
-    .is("deleted_at", null);
-
-  if (error) throw error;
+  const { error } = await getSupabase().rpc("dismiss_user_notifications", {
+    p_notification_ids: ids,
+  });
+  if (error) {
+    console.error("[notifications] dismissNotificationsBulk failed", {
+      userId: userId.slice(0, 8),
+      count: ids.length,
+      ids: ids.map((id) => id.slice(0, 8)),
+      ...getSupabaseErrorDetails(error),
+    });
+    throw error;
+  }
 }
 
 /** Soft-delete all notifications for the current user. */
 export async function dismissAllNotifications(userId: string) {
-  const { error } = await getSupabase()
-    .from("notifications")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .is("deleted_at", null);
-
-  if (error) throw error;
+  const { error } = await getSupabase().rpc("dismiss_all_user_notifications");
+  if (error) {
+    console.error("[notifications] dismissAllNotifications failed", {
+      userId: userId.slice(0, 8),
+      ...getSupabaseErrorDetails(error),
+    });
+    throw error;
+  }
 }
 
 /** Soft-delete a notification for the current user. */
 export async function dismissNotification(id: string, userId: string) {
-  const { error } = await getSupabase()
-    .from("notifications")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .is("deleted_at", null);
-
-  if (error) throw error;
+  const { error } = await getSupabase().rpc("dismiss_user_notification", {
+    p_notification_id: id,
+  });
+  if (error) {
+    console.error("[notifications] dismissNotification failed", {
+      notificationId: id,
+      userId: userId.slice(0, 8),
+      ...getSupabaseErrorDetails(error),
+    });
+    throw error;
+  }
 }
 
 export async function createNotification(input: {

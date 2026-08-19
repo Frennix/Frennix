@@ -53,6 +53,24 @@ if (existsSync(MIGRATION)) {
   fail("migration", "20250709000001_message_notification_soft_delete.sql missing");
 }
 
+const dismissRlsMigration = join(
+  ROOT,
+  "supabase/migrations/20260819000001_fix_notification_dismiss_rls.sql"
+);
+if (existsSync(dismissRlsMigration)) {
+  const sql = readFileSync(dismissRlsMigration, "utf8");
+  for (const token of [
+    "dismiss_user_notification",
+    "WITH CHECK (user_id = auth.uid())",
+    "deleted_at IS NULL",
+  ]) {
+    if (sql.includes(token)) pass(`sql:dismiss-rls:${token}`, "present");
+    else fail(`sql:dismiss-rls:${token}`, "missing");
+  }
+} else {
+  fail("migration", "20260819000001_fix_notification_dismiss_rls.sql missing");
+}
+
 if (existsSync(CONVERSATION_HIDE_MIGRATION)) {
   const sql = readFileSync(CONVERSATION_HIDE_MIGRATION, "utf8");
   for (const token of ["conversation_user_hides", "Hide conversations for self", "hidden_at"]) {
@@ -200,7 +218,7 @@ if (existsSync(join(ROOT, "lib/messages-inbox-cache.ts"))) {
 }
 
 const notificationsApi = readFileSync(join(ROOT, "packages/api/src/notifications.ts"), "utf8");
-for (const token of ["dismissNotification", "deleted_at"]) {
+for (const token of ["dismissNotification", "deleted_at", "dismiss_user_notification"]) {
   if (notificationsApi.includes(token)) pass(`api:notifications:${token}`, "present");
   else fail(`api:notifications:${token}`, "missing");
 }
