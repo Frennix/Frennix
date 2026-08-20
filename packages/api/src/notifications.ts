@@ -405,13 +405,9 @@ export async function markAllNotificationsRead(userId: string) {
 export async function dismissNotificationsBulk(ids: string[], userId: string) {
   if (!ids.length || !userId) return;
 
-  const deletedAt = new Date().toISOString();
-  const { error } = await getSupabase()
-    .from("notifications")
-    .update({ deleted_at: deletedAt })
-    .in("id", ids)
-    .eq("user_id", userId)
-    .is("deleted_at", null);
+  const { error } = await getSupabase().rpc("dismiss_user_notifications", {
+    p_notification_ids: ids,
+  });
 
   if (error) {
     console.error("[notifications] dismissNotificationsBulk failed", {
@@ -428,12 +424,7 @@ export async function dismissNotificationsBulk(ids: string[], userId: string) {
 export async function dismissAllNotifications(userId: string) {
   if (!userId) return;
 
-  const deletedAt = new Date().toISOString();
-  const { error } = await getSupabase()
-    .from("notifications")
-    .update({ deleted_at: deletedAt })
-    .eq("user_id", userId)
-    .is("deleted_at", null);
+  const { error } = await getSupabase().rpc("dismiss_all_user_notifications");
 
   if (error) {
     console.error("[notifications] dismissAllNotifications failed", {
@@ -454,13 +445,9 @@ export async function dismissNotification(id: string, userId: string) {
     throw new Error("Missing notification id or user id for dismiss");
   }
 
-  const deletedAt = new Date().toISOString();
-  const { error } = await getSupabase()
-    .from("notifications")
-    .update({ deleted_at: deletedAt })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .is("deleted_at", null);
+  const { error } = await getSupabase().rpc("dismiss_user_notification", {
+    p_notification_id: id,
+  });
 
   if (error) {
     console.error("[notifications] dismissNotification failed", {
