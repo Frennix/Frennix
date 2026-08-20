@@ -403,10 +403,12 @@ export async function markAllNotificationsRead(userId: string) {
 
 /** Soft-delete multiple notifications for the current user. */
 export async function dismissNotificationsBulk(ids: string[], userId: string) {
-  if (!ids.length) return;
+  if (!ids.length || !userId) return;
+
   const { error } = await getSupabase().rpc("dismiss_user_notifications", {
     p_notification_ids: ids,
   });
+
   if (error) {
     console.error("[notifications] dismissNotificationsBulk failed", {
       userId: userId.slice(0, 8),
@@ -420,7 +422,10 @@ export async function dismissNotificationsBulk(ids: string[], userId: string) {
 
 /** Soft-delete all notifications for the current user. */
 export async function dismissAllNotifications(userId: string) {
+  if (!userId) return;
+
   const { error } = await getSupabase().rpc("dismiss_all_user_notifications");
+
   if (error) {
     console.error("[notifications] dismissAllNotifications failed", {
       userId: userId.slice(0, 8),
@@ -432,9 +437,18 @@ export async function dismissAllNotifications(userId: string) {
 
 /** Soft-delete a notification for the current user. */
 export async function dismissNotification(id: string, userId: string) {
+  if (!id || !userId) {
+    console.error("[notifications] dismissNotification invalid input", {
+      notificationId: id,
+      userId: userId ? userId.slice(0, 8) : userId,
+    });
+    throw new Error("Missing notification id or user id for dismiss");
+  }
+
   const { error } = await getSupabase().rpc("dismiss_user_notification", {
     p_notification_id: id,
   });
+
   if (error) {
     console.error("[notifications] dismissNotification failed", {
       notificationId: id,
