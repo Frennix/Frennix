@@ -22,6 +22,17 @@ export function notificationsQueryKey(
   return ["notifications", userId, { category }];
 }
 
+function isNotificationsInfiniteData(
+  data: unknown
+): data is InfiniteData<NotificationPageResult> {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    Array.isArray((data as InfiniteData<NotificationPageResult>).pages)
+  );
+}
+
 export function flattenNotificationPages(
   data: InfiniteData<NotificationPageResult> | undefined
 ): Notification[] {
@@ -48,7 +59,7 @@ export function updateNotificationPages(
   queryClient.setQueriesData<InfiniteData<NotificationPageResult>>(
     { queryKey: ["notifications", userId] },
     (current) => {
-      if (!current) return current;
+      if (!isNotificationsInfiniteData(current)) return current;
       return {
         ...current,
         pages: current.pages.map((page) => ({
@@ -68,7 +79,7 @@ export function prependNotificationToPages(
   queryClient.setQueriesData<InfiniteData<NotificationPageResult>>(
     { queryKey: ["notifications", userId] },
     (current) => {
-      if (!current?.pages.length) return current;
+      if (!isNotificationsInfiniteData(current) || !current.pages.length) return current;
       const [first, ...rest] = current.pages;
       if (first.items.some((item) => item.id === notification.id)) {
         return current;
@@ -95,7 +106,7 @@ export function clearNotificationPages(queryClient: QueryClient, userId: string)
   queryClient.setQueriesData<InfiniteData<NotificationPageResult>>(
     { queryKey: ["notifications", userId] },
     (current) => {
-      if (!current) return current;
+      if (!isNotificationsInfiniteData(current)) return current;
       return {
         ...current,
         pages: current.pages.map((page) => ({ ...page, items: [] })),
