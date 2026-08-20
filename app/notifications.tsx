@@ -18,6 +18,8 @@ import {
   dismissNotification,
   dismissNotificationsBulk,
   dismissAllNotifications,
+  getSupabaseErrorDetails,
+  getTechnicalErrorMessage,
 } from "@frennix/api";
 import type { Notification } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -255,10 +257,15 @@ export default function NotificationsScreen() {
       }
       return { removedWasUnread };
     },
-    onError: (mutationError) => {
+    onError: (mutationError, notificationId) => {
+      console.error("[notifications] dismiss mutation failed", {
+        notificationId,
+        userId: userId.slice(0, 8),
+        ...getSupabaseErrorDetails(mutationError),
+      });
       void queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
-      showAlert("Could not delete notification", getErrorMessage(mutationError));
+      showAlert("Could not delete notification", getTechnicalErrorMessage(mutationError));
     },
     onSuccess: (_data, _id, context) => {
       if (context?.removedWasUnread) {
@@ -287,7 +294,7 @@ export default function NotificationsScreen() {
       setSelectedIds(new Set());
     },
     onError: (mutationError) => {
-      showAlert("Could not clear notifications", getErrorMessage(mutationError));
+      showAlert("Could not clear notifications", getTechnicalErrorMessage(mutationError));
     },
   });
 
@@ -318,7 +325,7 @@ export default function NotificationsScreen() {
     onError: (mutationError) => {
       void queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
       void queryClient.invalidateQueries({ queryKey: ["unread-notifications", userId] });
-      showAlert("Could not delete notifications", getErrorMessage(mutationError));
+      showAlert("Could not delete notifications", getTechnicalErrorMessage(mutationError));
     },
     onSuccess: (_data, _ids, context) => {
       if (context?.removedUnread) {

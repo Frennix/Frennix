@@ -218,7 +218,7 @@ if (existsSync(join(ROOT, "lib/messages-inbox-cache.ts"))) {
 }
 
 const notificationsApi = readFileSync(join(ROOT, "packages/api/src/notifications.ts"), "utf8");
-for (const token of ["dismissNotification", "deleted_at", "dismiss_user_notification"]) {
+for (const token of ["dismissNotification", "deleted_at", '.update({ deleted_at: deletedAt })']) {
   if (notificationsApi.includes(token)) pass(`api:notifications:${token}`, "present");
   else fail(`api:notifications:${token}`, "missing");
 }
