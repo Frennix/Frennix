@@ -4,3 +4,4 @@ export * from "./activity";
 export * from "./health";
 export * from "./analytics";
 export * from "./beta-feedback";
+export * from "./beta-metrics";

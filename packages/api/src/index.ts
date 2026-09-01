@@ -54,3 +54,5 @@ export * from "./training-session-invites";
 export * from "./platform-activity";
 export * from "./platform-activity-engine";
 export * from "./reputation";
+export * from "./founder";
+export * from "./beta-motivation-survey";

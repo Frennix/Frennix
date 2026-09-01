@@ -4,6 +4,7 @@ export default function FounderLayout() {
   return (
     <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="beta-metrics" />
       <Stack.Screen name="community" />
       <Stack.Screen name="platform" />
       <Stack.Screen name="activity" />

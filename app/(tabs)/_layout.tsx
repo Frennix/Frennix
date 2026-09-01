@@ -12,6 +12,7 @@ import { FrennixTabHeaderLogo } from "@/components/FrennixLogo";
 import { AppIcon } from "@/components/AppIcon";
 import { PostLoginShellErrorBoundary } from "@/components/PostLoginShellErrorBoundary";
 import { WhatsNewLaunchPrompt } from "@/components/whats-new/WhatsNewLaunchPrompt";
+import { BetaMotivationSurveyPrompt } from "@/components/BetaMotivationSurveyPrompt";
 import { NotificationOnboardingPrompt } from "@/components/NotificationOnboardingPrompt";
 import { LocationDiscoveryPrompt } from "@/components/LocationDiscoveryPrompt";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
@@ -100,6 +101,7 @@ const TabsShell = memo(function TabsShell() {
         email={session?.user.email ?? undefined}
       >
         <WhatsNewLaunchPrompt />
+        <BetaMotivationSurveyPrompt />
         <NotificationOnboardingPrompt />
         <LocationDiscoveryPrompt />
       </PostLoginShellErrorBoundary>

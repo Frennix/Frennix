@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · f777e88a</title>
+    <title>Frennix · 65e0c534</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="f777e88a8b2931de3886bccf42f4fcfd22f1c0f3" />
-    <meta name="frennix-build-bundle" content="index-e24f0de160d9fbfed4c36afdc764529d.js" />
-    <meta name="frennix-build-at" content="2026-08-19T23:49:37.795Z" />
+    <meta name="frennix-build-sha" content="65e0c534cf43e9902f80c666a87253e696391cca" />
+    <meta name="frennix-build-bundle" content="index-c961774fbc628c2ca1d8b364ba1ce592.js" />
+    <meta name="frennix-build-at" content="2026-09-01T14:12:23.287Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -271,7 +271,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="f777e88a8b2931de3886bccf42f4fcfd22f1c0f3" data-bundle="index-e24f0de160d9fbfed4c36afdc764529d.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="65e0c534cf43e9902f80c666a87253e696391cca" data-bundle="index-c961774fbc628c2ca1d8b364ba1ce592.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -317,7 +317,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-e24f0de160d9fbfed4c36afdc764529d.js?v=f777e88a" defer></script>
+  <script src="/_expo/static/js/web/index-c961774fbc628c2ca1d8b364ba1ce592.js?v=65e0c534" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
@@ -380,7 +380,8 @@
       ["web-authenticated-startup-fallback", 120],
       ["frennix-startup-failure-overlay", 120],
       ["create-post-screen", 120],
-      ["notifications-screen", 120]
+      ["notifications-screen", 120],
+      ["founder-dashboard-screen", 120]
     ];
     for (var i = 0; i < markers.length; i++) {
       if (markerVisible(markers[i][0], markers[i][1])) return true;
@@ -468,6 +469,8 @@
     };
     el.addEventListener("transitionend", done, { once: true });
     setTimeout(done, 450);
+    var failure = document.getElementById("frennix-startup-failure-overlay");
+    if (failure) failure.remove();
   }
 
   function signedOutReady() {

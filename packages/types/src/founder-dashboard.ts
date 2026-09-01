@@ -171,6 +171,7 @@ export type FounderNavItem = {
 
 export const FOUNDER_NAV_ITEMS: FounderNavItem[] = [
   { key: "overview", label: "Overview", href: "/founder", icon: "◆", capability: "capability_view_executive" },
+  { key: "beta-metrics", label: "Beta Metrics", href: "/founder/beta-metrics", icon: "📊", capability: "capability_view_executive", milestone: "Beta" },
   { key: "community", label: "Community Health", href: "/founder/community", icon: "◎", capability: "capability_view_community" },
   { key: "platform", label: "Platform Health", href: "/founder/platform", icon: "⬡", capability: "capability_view_platform" },
   { key: "analytics", label: "User Analytics", href: "/founder/analytics/users", icon: "▤", capability: "capability_view_analytics", milestone: "M7.7" },
@@ -424,4 +425,75 @@ export type StaffAccess = {
   role: StaffRole | null;
   isStaff: boolean;
   canAccessDashboard: boolean;
+};
+
+export type BetaMotivationSurveyAnswer =
+  | "yes_a_lot"
+  | "yes_somewhat"
+  | "not_really"
+  | "not_yet_still_using";
+
+export type BetaMotivationSurveyPrompt = {
+  show: boolean;
+  reason?: string;
+  account_age_days?: number;
+  eligible_in_days?: number;
+};
+
+export type BetaMetricsWeekOverWeekMetric = {
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+};
+
+export type BetaMetricsSurveyBreakdownRow = {
+  answer: BetaMotivationSurveyAnswer;
+  count: number;
+  pct: number;
+};
+
+export type BetaMetricsDashboardSummary = {
+  total_registered_users: number;
+  new_users_this_week: number;
+  weekly_active_users: number;
+  multi_day_active_users: number;
+  total_matches: number;
+  users_matched: number;
+  match_rate_pct: number | null;
+  users_messaged_match: number;
+  conversation_rate_pct: number | null;
+  conversations_started: number;
+  survey_response_count: number;
+  survey_positive_pct: number | null;
+};
+
+export type BetaMetricsDashboard = {
+  computed_at: string;
+  summary: BetaMetricsDashboardSummary;
+  week_over_week: {
+    new_users: BetaMetricsWeekOverWeekMetric;
+    weekly_active_users: BetaMetricsWeekOverWeekMetric;
+    multi_day_active_users: BetaMetricsWeekOverWeekMetric;
+    match_rate_pct: BetaMetricsWeekOverWeekMetric;
+    conversation_rate_pct: BetaMetricsWeekOverWeekMetric;
+    survey_positive_pct: BetaMetricsWeekOverWeekMetric;
+  };
+  survey_breakdown: BetaMetricsSurveyBreakdownRow[];
+};
+
+export const BETA_MOTIVATION_SURVEY_OPTIONS: Array<{
+  value: BetaMotivationSurveyAnswer;
+  label: string;
+}> = [
+  { value: "yes_a_lot", label: "Yes, a lot" },
+  { value: "yes_somewhat", label: "Yes, somewhat" },
+  { value: "not_really", label: "Not really" },
+  { value: "not_yet_still_using", label: "Not yet, but I'm still using it" },
+];
+
+export const BETA_MOTIVATION_SURVEY_ANSWER_LABELS: Record<BetaMotivationSurveyAnswer, string> = {
+  yes_a_lot: "Yes, a lot",
+  yes_somewhat: "Yes, somewhat",
+  not_really: "Not really",
+  not_yet_still_using: "Not yet, but still using it",
 };
