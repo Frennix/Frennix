@@ -33,7 +33,7 @@ export default function ProfileTabScreen() {
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
   const { pickAndUploadCover, uploading: coverUploading, error: coverError, previewUri: coverPreviewUri } = useCoverUpload();
-  const { openImage, lightbox, lightboxVisible } = useImageLightbox();
+  const { openImage, lightbox } = useImageLightbox();
   const { openPostActions, postActionSheets } = usePostActions({ userId });
   const { openProfileActions, profileActionSheets } = useProfileActions({
     userId,
@@ -144,7 +144,6 @@ export default function ProfileTabScreen() {
       onScroll={onScroll}
       onRefresh={() => void onPullRefresh()}
       refreshing={profileRefreshing}
-      scrollEnabled={!lightboxVisible}
       webShellStyle={webShellStyle}
     />
     {lightbox}

@@ -34,6 +34,7 @@ export function PeopleYouMayKnowCarousel({
       <FlatList
         data={suggestions}
         horizontal
+        nestedScrollEnabled
         style={WEB_HORIZONTAL_SCROLL_STYLE}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.profile.id}

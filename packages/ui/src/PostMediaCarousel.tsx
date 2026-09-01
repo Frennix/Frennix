@@ -15,6 +15,13 @@ import { prefetchCachedImages } from "./CachedImage";
 import { PostMedia } from "./PostMedia";
 import { colors, spacing, typography } from "./theme";
 
+const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
+  Platform.OS === "web"
+    ? ({
+        touchAction: "pan-x pinch-zoom",
+      } as ViewStyle)
+    : undefined;
+
 interface PostMediaCarouselProps {
   mediaUrls: string[];
   postType?: PostType;
@@ -155,6 +162,7 @@ export function PostMediaCarousel({
           nestedScrollEnabled
           directionalLockEnabled={Platform.OS === "ios"}
           showsHorizontalScrollIndicator={false}
+          style={WEB_HORIZONTAL_SCROLL_STYLE}
           keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
           getItemLayout={getItemLayout}
           snapToInterval={containerWidth}

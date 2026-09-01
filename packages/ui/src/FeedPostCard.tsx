@@ -223,7 +223,11 @@ export const FeedPostCard = memo(function FeedPostCard({
         </FeedLayout.Media>
       ) : hasMedia ? (
         <View style={styles.mediaTapShell}>
-          <Pressable onPress={onDoubleTapLike ? handleMediaAreaPress : undefined} disabled={!onDoubleTapLike}>
+          <Pressable
+            onPress={onDoubleTapLike ? handleMediaAreaPress : undefined}
+            disabled={!onDoubleTapLike}
+            delayPressIn={onDoubleTapLike ? 280 : undefined}
+          >
             <FeedMedia
               mediaUrls={displayPost.media_urls ?? []}
               postType={displayPost.post_type}

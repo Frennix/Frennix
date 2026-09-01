@@ -106,6 +106,7 @@ import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
 import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
+import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -509,11 +510,13 @@ export default function HomeScreen() {
 
   const feedScrollTestMode = isFeedScrollTestMode();
   const storyVisible = activeStoryIndex !== null;
-  const feedScrollEnabled = !(storyVisible || interactionVisible || lightboxVisible);
+  /** Only hard-lock feed scroll for the story viewer. Modals/lightbox block touches via portal — toggling scrollEnabled causes Safari to drop pan-y binding (BUG-004). */
+  const feedScrollEnabled = !storyVisible;
 
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== "web") return;
+      hideFrennixBootShell();
       restoreWebDocumentScrollLock();
       requestSafariVisualViewportRemeasure();
     }, [])
@@ -928,6 +931,9 @@ export default function HomeScreen() {
   const handleListLayout = useCallback(
     (height: number) => {
       listLayoutHeightRef.current = height;
+      if (Platform.OS === "web" && height >= 60) {
+        hideFrennixBootShell();
+      }
       markFeedRender(
         "feed:ui:scroll-list-layout",
         "data",
@@ -1058,6 +1064,7 @@ export default function HomeScreen() {
             style={styles.feedList}
             contentContainerStyle={styles.list}
             scrollEnabled={feedScrollEnabled}
+            touchLock={storyVisible}
             data={listRows}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
