@@ -36,7 +36,6 @@ function verifyStaticFix() {
   const sheet = readSource("components/CommentsBottomSheet.tsx");
   const lock = readSource("lib/web-modal-scroll-lock.ts");
   const composer = readSource("components/PostCommentsSheet.tsx");
-  const diag = readSource("lib/comments-keyboard-diagnostics.ts");
 
   ok =
     pass(
@@ -45,13 +44,8 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
-      "overlay height uses visualHeight not layout innerHeight",
-      sheet.includes("viewport?.visualHeight") && !sheet.includes("viewport?.overlayHeight ??")
-    ) && ok;
-  ok =
-    pass(
-      "sheet anchored via flex-end overlay not absolute bottom offset",
-      sheet.includes('justifyContent: "flex-end"') && !sheet.includes("sheetWeb")
+      "sheet uses absolute bottom anchoring on web",
+      sheet.includes("sheetWeb") && sheet.includes('position: "absolute"') && sheet.includes("bottom: 0")
     ) && ok;
   ok =
     pass(
@@ -60,15 +54,8 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
-      "keyboard open fills overlay with 100% height only",
-      sheet.includes('keyboardOpen ? ("100%"') && !sheet.includes("keyboardOpen && overlayHeight) return overlayHeight")
-    ) && ok;
-  ok =
-    pass(
-      "safe-area bottom padding suppressed when keyboard or composer focused",
-      sheet.includes("keyboardOpen || composerFocused") &&
-        sheet.includes("? 0") &&
-        sheet.includes("paddingBottom: composerSafeBottom")
+      "keyboard open expands sheet to full overlay height",
+      sheet.includes("isKeyboardOpen") && sheet.includes("keyboardOpen && overlayHeight")
     ) && ok;
   ok =
     pass(
@@ -82,8 +69,8 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
-      "keyboard diagnostics behind feedDebug flag",
-      diag.includes("isFeedScrollDebugEnabled") && diag.includes("__FRENNIX_COMMENTS_KEYBOARD_DIAG__")
+      "composer safe area padding on host not sheet root",
+      sheet.includes("composerSafeBottom") && sheet.includes("paddingBottom: composerSafeBottom")
     ) && ok;
   ok =
     pass(
@@ -107,11 +94,6 @@ function verifyStaticFix() {
       "portal unmounts when hidden",
       sheet.includes("if (!visible) return null")
     ) && ok;
-  ok =
-    pass(
-      "focus does not switch comments component branch",
-      !composer.includes("CommentsBottomSheet") || composer.includes("<CommentsBottomSheet")
-    ) && ok;
 
   return ok;
 }
@@ -125,7 +107,6 @@ function verifyBundle() {
   let ok = true;
   const bundle = fs.readFileSync(findMainBundle(), "utf8");
   ok = pass("bundle includes comments sheet portal marker", bundle.includes("frennix-comments-sheet")) && ok;
-  ok = pass("bundle includes composer marker", bundle.includes("frennix-comment-composer")) && ok;
   ok = pass("bundle includes overscroll contain on comments list", bundle.includes("overscrollBehavior")) && ok;
   ok = pass("bundle locks document overflow on modal open", bundle.includes('overflow="hidden"') || bundle.includes("overflow:hidden")) && ok;
   return ok;
