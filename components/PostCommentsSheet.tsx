@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -13,6 +13,8 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { CommentsBottomSheet } from "@/components/CommentsBottomSheet";
 import { useCommentActions } from "@/lib/useCommentActions";
+import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
+import { restoreWebHorizontalScrollPosition } from "@/lib/web-horizontal-scroll-restore";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
@@ -57,7 +59,12 @@ function CommentComposerRow({
   placeholder,
   onPost,
   posting,
-}: CommentComposerRowProps) {
+  onComposerFocus,
+  onComposerBlur,
+}: CommentComposerRowProps & {
+  onComposerFocus?: () => void;
+  onComposerBlur?: () => void;
+}) {
   const canPost = Boolean(value.trim()) && !posting;
 
   return (
@@ -74,9 +81,12 @@ function CommentComposerRow({
           maxLength={2000}
           returnKeyType="default"
           blurOnSubmit={false}
+          onFocus={onComposerFocus}
+          onBlur={onComposerBlur}
           {...(Platform.OS === "web"
             ? ({
                 enterKeyHint: "send",
+                "data-frennix-comment-input": "true",
               } as object)
             : null)}
         />
@@ -111,6 +121,33 @@ export function PostCommentsSheet({
   const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const commentsOpenLoggedRef = useRef(false);
+
+  const handleComposerFocus = useCallback(() => {
+    if (Platform.OS !== "web") return;
+    logCommentsInputZoomSnapshot("after-focus");
+  }, []);
+
+  const handleComposerBlur = useCallback(() => {
+    if (Platform.OS !== "web") return;
+    logCommentsInputZoomSnapshot("after-blur");
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    if (visible && !commentsOpenLoggedRef.current) {
+      commentsOpenLoggedRef.current = true;
+      logCommentsInputZoomSnapshot("before-focus");
+      return;
+    }
+
+    if (!visible && commentsOpenLoggedRef.current) {
+      commentsOpenLoggedRef.current = false;
+      restoreWebHorizontalScrollPosition();
+      logCommentsInputZoomSnapshot("after-comments-close");
+    }
+  }, [visible]);
 
   const { openCommentActions, commentActionSheets, resetCommentActions } = useCommentActions({
     userId,
@@ -257,6 +294,8 @@ export function PostCommentsSheet({
               placeholder={commentPlaceholder}
               onPost={handlePost}
               posting={commentMutation.isPending}
+              onComposerFocus={handleComposerFocus}
+              onComposerBlur={handleComposerBlur}
             />
           </>
         }
@@ -301,8 +340,8 @@ const styles = StyleSheet.create({
     maxHeight: 96,
     paddingVertical: 0,
     color: colors.text,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: Platform.OS === "web" ? 16 : 15,
+    lineHeight: Platform.OS === "web" ? 22 : 20,
     ...(Platform.OS === "web"
       ? ({
           outlineStyle: "none",

@@ -1,3 +1,5 @@
+import { restoreWebHorizontalScrollPosition } from "@/lib/web-horizontal-scroll-restore";
+
 const FEED_SCROLL_LIST_ID = "feed-scroll-list";
 
 type SavedDocumentStyles = {
@@ -55,6 +57,8 @@ export function restoreWebDocumentScrollLock(): void {
   document.documentElement.style.removeProperty("touch-action");
   document.documentElement.style.removeProperty("overscroll-behavior");
 
+  restoreWebHorizontalScrollPosition();
+
   lockDepth = 0;
   savedDocument = null;
 }
@@ -110,6 +114,7 @@ export function unlockWebModalScroll(): void {
   restoreProp(document.documentElement, "overscroll-behavior", saved.htmlOverscrollBehavior);
 
   clearFeedScrollInlineLocks();
+  restoreWebHorizontalScrollPosition();
 }
 
 export function getWebModalScrollLockDepth(): number {

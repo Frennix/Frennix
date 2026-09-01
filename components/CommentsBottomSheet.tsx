@@ -50,7 +50,7 @@ const WEB_OVERLAY_ROOT: ViewStyle = Platform.select({
     position: "fixed",
     left: 0,
     right: 0,
-    width: "100vw",
+    width: "100%",
     zIndex: COMMENTS_SHEET_Z_INDEX,
     display: "flex",
     flexDirection: "column",
