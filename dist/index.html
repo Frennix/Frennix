@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · c7635475</title>
+    <title>Frennix · 42813b2b</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="c76354759ad34a8bbb234e2b2157c3be637d92d8" />
-    <meta name="frennix-build-bundle" content="index-207aa8413f91b2f520c79c17db49efe8.js" />
-    <meta name="frennix-build-at" content="2026-09-01T23:29:27.556Z" />
+    <meta name="frennix-build-sha" content="42813b2b17cf9007da2aeef10a28b6d85f4190d2" />
+    <meta name="frennix-build-bundle" content="index-721bbcea1ab76c161121373203fa4efe.js" />
+    <meta name="frennix-build-at" content="2026-09-01T23:47:41.172Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -150,6 +150,25 @@
     right: 14px !important;
     bottom: 14px !important;
     z-index: 51 !important;
+    pointer-events: auto !important;
+  }
+  /* Inline feed video must not capture taps — dedicated hit layer opens the viewer. */
+  video.feed-inline-video {
+    pointer-events: none !important;
+  }
+  .feed-video-open-hit-layer {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 2 !important;
+    touch-action: pan-y !important;
+    pointer-events: auto !important;
+    cursor: pointer;
+  }
+  .feed-video-expand-button {
+    position: absolute !important;
+    top: 14px !important;
+    left: 14px !important;
+    z-index: 52 !important;
     pointer-events: auto !important;
   }
   /* Fullscreen lightbox — native controls must never appear; Frennix renders its own UI. */
@@ -354,7 +373,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="c76354759ad34a8bbb234e2b2157c3be637d92d8" data-bundle="index-207aa8413f91b2f520c79c17db49efe8.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="42813b2b17cf9007da2aeef10a28b6d85f4190d2" data-bundle="index-721bbcea1ab76c161121373203fa4efe.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -400,7 +419,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-207aa8413f91b2f520c79c17db49efe8.js?v=c7635475" defer></script>
+  <script src="/_expo/static/js/web/index-721bbcea1ab76c161121373203fa4efe.js?v=42813b2b" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

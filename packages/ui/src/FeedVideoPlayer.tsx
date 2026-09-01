@@ -15,7 +15,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Volume2, VolumeX } from "lucide-react-native";
+import { Volume2, VolumeX, Maximize2 } from "lucide-react-native";
 import {
   isActiveFeedVideo,
   isFeedVideoPlaybackAllowed,
@@ -39,6 +39,8 @@ import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
 const MUTE_BUTTON_SIZE = 36;
 const MUTE_ICON_SIZE = 17;
 const MUTE_INSET = 14;
+/** Distinguish tap from vertical feed scroll on mobile web. */
+const OPEN_VIEWER_TAP_MOVE_PX = 10;
 
 interface FeedVideoPlayerProps {
   uri: string;
@@ -88,6 +90,7 @@ export function FeedVideoPlayer({
     setIsMutedAsync: (v: boolean) => Promise<void>;
   } | null>(null);
   const visualReadyRef = useRef(false);
+  const openTapStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const notifyVisualReady = useCallback(() => {
     if (visualReadyRef.current) return;
@@ -279,10 +282,36 @@ export function FeedVideoPlayer({
     })();
   }, [shouldPlay, muted, failed, uri, retryKey]);
 
-  const handleVideoTap = useCallback(() => {
+  const openViewer = useCallback(() => {
     if (!onOpenFullscreen) return;
     onOpenFullscreen();
   }, [onOpenFullscreen]);
+
+  const handleWebOpenPointerDown = useCallback(
+    (event: { clientX: number; clientY: number; stopPropagation?: () => void }) => {
+      event.stopPropagation?.();
+      openTapStartRef.current = { x: event.clientX, y: event.clientY };
+    },
+    []
+  );
+
+  const handleWebOpenPointerUp = useCallback(
+    (event: { clientX: number; clientY: number; stopPropagation?: () => void }) => {
+      event.stopPropagation?.();
+      const start = openTapStartRef.current;
+      openTapStartRef.current = null;
+      if (!start) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.hypot(dx, dy) > OPEN_VIEWER_TAP_MOVE_PX) return;
+      openViewer();
+    },
+    [openViewer]
+  );
+
+  const handleWebOpenPointerCancel = useCallback(() => {
+    openTapStartRef.current = null;
+  }, []);
 
   const toggleMute = useCallback(() => {
     setMuted((current) => {
@@ -319,6 +348,24 @@ export function FeedVideoPlayer({
     </Pressable>
   );
 
+  const expandControl =
+    onOpenFullscreen ? (
+      <Pressable
+        {...(Platform.OS === "web" ? { className: "feed-video-expand-button" } : null)}
+        style={styles.expandButton}
+        onPress={(event) => {
+          event.stopPropagation?.();
+          openViewer();
+        }}
+        hitSlop={6}
+        pointerEvents="auto"
+        accessibilityRole="button"
+        accessibilityLabel="Open video full screen"
+      >
+        <Maximize2 color="#FFFFFF" size={16} strokeWidth={2} />
+      </Pressable>
+    ) : null;
+
   if (failed) {
     return (
       <MediaAspectFrame
@@ -336,6 +383,7 @@ export function FeedVideoPlayer({
     Platform.OS === "web" ? (
       createElement("video", {
         key: retryKey,
+        className: "feed-inline-video",
         ref: (node: HTMLVideoElement | null) => {
           webVideoRef.current = node;
         },
@@ -350,6 +398,7 @@ export function FeedVideoPlayer({
           height: "100%",
           objectFit: "contain",
           backgroundColor: colors.background,
+          pointerEvents: "none",
         },
         onLoadedMetadata: () => {
           notifyVisualReady();
@@ -414,13 +463,7 @@ export function FeedVideoPlayer({
             style={styles.container}
           >
             <View style={styles.mediaLayer} pointerEvents="box-none">
-              <Pressable
-                style={styles.mediaTapArea}
-                onPress={handleVideoTap}
-                disabled={!onOpenFullscreen}
-                accessibilityRole="button"
-                accessibilityLabel="Open video full screen"
-              >
+              <View style={styles.videoSurface} pointerEvents="none">
                 {videoBody}
 
                 {buffering ? (
@@ -433,19 +476,43 @@ export function FeedVideoPlayer({
                     <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
                   </View>
                 ) : null}
-              </Pressable>
+              </View>
+
+              {onOpenFullscreen ? (
+                Platform.OS === "web" ? (
+                  <View
+                    style={styles.openHitLayer}
+                    {...({
+                      className: "feed-video-open-hit-layer",
+                      onPointerDown: handleWebOpenPointerDown,
+                      onPointerUp: handleWebOpenPointerUp,
+                      onPointerCancel: handleWebOpenPointerCancel,
+                    } as object)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open video full screen"
+                  />
+                ) : (
+                  <Pressable
+                    style={styles.openHitLayer}
+                    onPress={openViewer}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open video full screen"
+                  />
+                )
+              ) : null}
             </View>
           </View>
         )}
       </MediaAspectFrame>
 
-      {playbackAllowed ? (
+      {(onOpenFullscreen || playbackAllowed) ? (
         <View
           {...(Platform.OS === "web" ? { className: "feed-video-mute-layer" } : null)}
           style={styles.muteLayer}
           pointerEvents="box-none"
         >
-          {muteControl}
+          {expandControl}
+          {playbackAllowed ? muteControl : null}
         </View>
       ) : null}
     </View>
@@ -467,9 +534,18 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
   },
-  mediaTapArea: {
-    width: "100%",
-    height: "100%",
+  videoSurface: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  openHitLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+    ...(Platform.OS === "web"
+      ? ({
+          touchAction: "pan-y",
+          cursor: "pointer",
+        } as const)
+      : null),
   },
   videoFill: {
     width: "100%",
@@ -496,6 +572,25 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: MUTE_INSET,
     right: MUTE_INSET,
+    width: MUTE_BUTTON_SIZE,
+    height: MUTE_BUTTON_SIZE,
+    borderRadius: MUTE_BUTTON_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    zIndex: 101,
+    elevation: 101,
+    ...(Platform.OS === "web"
+      ? ({
+          pointerEvents: "auto",
+          transform: [{ translateZ: 1 }],
+        } as const)
+      : null),
+  },
+  expandButton: {
+    position: "absolute",
+    top: MUTE_INSET,
+    left: MUTE_INSET,
     width: MUTE_BUTTON_SIZE,
     height: MUTE_BUTTON_SIZE,
     borderRadius: MUTE_BUTTON_SIZE / 2,
