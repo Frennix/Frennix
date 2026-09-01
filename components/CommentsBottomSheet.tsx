@@ -20,6 +20,7 @@ import {
   BOTTOM_SHEET_SPRING_OPEN,
   BOTTOM_SHEET_SPRING_REBOUND,
 } from "@/components/BottomActionSheet";
+import { logCommentsKeyboardLayout } from "@/lib/comments-keyboard-diagnostics";
 import { setCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import {
   measureSafariVisualViewport,
@@ -53,6 +54,9 @@ const WEB_OVERLAY_ROOT: ViewStyle = Platform.select({
     right: 0,
     width: "100%",
     zIndex: COMMENTS_SHEET_Z_INDEX,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-end",
     overflow: "hidden",
     touchAction: "none",
   },
@@ -89,6 +93,7 @@ export function CommentsBottomSheet({
   const openedAtRef = useRef(0);
   /** Visual viewport height captured when the sheet opens — keeps closed height stable. */
   const baselineVisualHeightRef = useRef(0);
+  const [composerFocused, setComposerFocused] = useState(false);
   const [viewport, setViewport] = useState(() =>
     Platform.OS === "web" ? measureSafariVisualViewport() : null
   );
@@ -101,9 +106,8 @@ export function CommentsBottomSheet({
       setViewport((prev) =>
         prev &&
         prev.offsetTop === next.offsetTop &&
-        prev.overlayHeight === next.overlayHeight &&
-        prev.bottomChrome === next.bottomChrome &&
-        prev.visualHeight === next.visualHeight
+        prev.visualHeight === next.visualHeight &&
+        prev.bottomChrome === next.bottomChrome
           ? prev
           : next
       );
@@ -120,6 +124,7 @@ export function CommentsBottomSheet({
       dragY.setValue(0);
       dismissingRef.current = false;
       baselineVisualHeightRef.current = 0;
+      setComposerFocused(false);
       return;
     }
 
@@ -197,7 +202,7 @@ export function CommentsBottomSheet({
   const overlayTop = Platform.OS === "web" ? (viewport?.offsetTop ?? 0) : 0;
   const overlayHeight =
     Platform.OS === "web"
-      ? (viewport?.overlayHeight ?? (typeof window !== "undefined" ? window.innerHeight : 640))
+      ? (viewport?.visualHeight ?? (typeof window !== "undefined" ? window.innerHeight : 640))
       : undefined;
 
   const keyboardOpen = Platform.OS === "web" && isKeyboardOpen(viewport);
@@ -206,25 +211,58 @@ export function CommentsBottomSheet({
     viewport?.visualHeight ||
     (typeof window !== "undefined" ? window.innerHeight : 640);
 
-  const sheetHeight = useMemo(() => {
-    if (Platform.OS !== "web") return undefined;
-    if (keyboardOpen && overlayHeight) return overlayHeight;
-    return computeClosedSheetHeight(baselineVisualHeight);
-  }, [baselineVisualHeight, keyboardOpen, overlayHeight]);
+  const closedSheetHeight = computeClosedSheetHeight(baselineVisualHeight);
 
-  const openOffset = sheetHeight ?? 420;
+  /** Visual viewport already excludes the keyboard — do not stack safe-area padding on top. */
+  const composerSafeBottom =
+    keyboardOpen || composerFocused
+      ? 0
+      : Math.max(insets.bottom, viewport?.envSafeAreaBottom ?? 0, spacing.sm);
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web" || typeof document === "undefined") return;
+
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.closest('[data-frennix-comment-composer="true"]')) return;
+      if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA" && !target.isContentEditable) return;
+      window.scrollTo(0, 0);
+      setComposerFocused(true);
+    };
+
+    const onFocusOut = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.closest('[data-frennix-comment-composer="true"]')) return;
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active.closest('[data-frennix-comment-composer="true"]')) return;
+        setComposerFocused(false);
+      });
+    };
+
+    document.addEventListener("focusin", onFocusIn, true);
+    document.addEventListener("focusout", onFocusOut, true);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn, true);
+      document.removeEventListener("focusout", onFocusOut, true);
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web") return;
+    const phase = keyboardOpen ? "keyboard-open" : composerFocused ? "composer-focused" : "keyboard-closed";
+    logCommentsKeyboardLayout(phase, composerSafeBottom);
+  }, [composerFocused, composerSafeBottom, keyboardOpen, visible]);
+
+  const openOffset = keyboardOpen ? overlayHeight ?? closedSheetHeight : closedSheetHeight;
   const translateY = Animated.add(
     slide.interpolate({
       inputRange: [0, 1],
       outputRange: [openOffset, 0],
     }),
     dragY
-  );
-
-  const composerSafeBottom = Math.max(
-    insets.bottom,
-    viewport?.envSafeAreaBottom ?? 0,
-    spacing.sm
   );
 
   if (!visible) return null;
@@ -254,16 +292,13 @@ export function CommentsBottomSheet({
       <Animated.View
         style={[
           styles.sheet,
-          Platform.OS === "web" ? styles.sheetWeb : null,
           {
-            height: sheetHeight ?? ("70%" as const),
-            maxHeight:
-              Platform.OS === "web" && overlayHeight
-                ? overlayHeight
-                : ("75%" as const),
+            height: keyboardOpen ? ("100%" as const) : closedSheetHeight,
+            maxHeight: keyboardOpen ? ("100%" as const) : closedSheetHeight,
             transform: [{ translateY }],
           },
         ]}
+        {...(Platform.OS === "web" ? ({ "data-frennix-comments-sheet-panel": "true" } as object) : null)}
       >
         <View style={styles.sheetSolidFill} pointerEvents="none" />
 
@@ -297,7 +332,12 @@ export function CommentsBottomSheet({
           {children}
         </ScrollView>
 
-        <View style={[styles.composerHost, { paddingBottom: composerSafeBottom }]}>{composer}</View>
+        <View
+          style={[styles.composerHost, { paddingBottom: composerSafeBottom }]}
+          {...(Platform.OS === "web" ? ({ "data-frennix-comment-composer": "true" } as object) : null)}
+        >
+          {composer}
+        </View>
       </Animated.View>
     </View>
   );
@@ -345,19 +385,13 @@ const styles = StyleSheet.create({
     width: "100%",
     overflow: "hidden",
     flexDirection: "column",
+    flexShrink: 0,
     ...(Platform.OS === "web"
       ? ({
           boxShadow: "0 -12px 40px rgba(0, 0, 0, 0.5)",
+          touchAction: "none",
         } as object)
       : null),
-  },
-  sheetWeb: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexShrink: 0,
-    touchAction: "none",
   },
   sheetSolidFill: {
     ...StyleSheet.absoluteFillObject,
