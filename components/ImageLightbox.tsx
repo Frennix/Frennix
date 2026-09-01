@@ -118,6 +118,29 @@ function clampScale(value: number) {
   return Math.min(Math.max(value, 1), 4);
 }
 
+function isPointInsideContainedImage(
+  img: HTMLImageElement,
+  clientX: number,
+  clientY: number
+): boolean {
+  const bounds = img.getBoundingClientRect();
+  const { naturalWidth, naturalHeight } = img;
+  if (!naturalWidth || !naturalHeight || bounds.width <= 0 || bounds.height <= 0) {
+    return true;
+  }
+  const fitScale = Math.min(bounds.width / naturalWidth, bounds.height / naturalHeight);
+  const renderedWidth = naturalWidth * fitScale;
+  const renderedHeight = naturalHeight * fitScale;
+  const left = bounds.left + (bounds.width - renderedWidth) / 2;
+  const top = bounds.top + (bounds.height - renderedHeight) / 2;
+  return (
+    clientX >= left &&
+    clientX <= left + renderedWidth &&
+    clientY >= top &&
+    clientY <= top + renderedHeight
+  );
+}
+
 function NativeZoomableImage({
   uri,
   placeholderUri,
@@ -226,16 +249,21 @@ function NativeZoomableImage({
 function WebZoomableImage({
   uri,
   onZoomChange,
+  onLetterboxPress,
 }: {
   uri: string;
   placeholderUri?: string | null;
   onZoomChange: (zoomed: boolean) => void;
+  onLetterboxPress?: () => void;
 }) {
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
   const lastTap = useRef(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const movedDuringTouch = useRef(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setScale(1);
@@ -284,12 +312,26 @@ function WebZoomableImage({
     lastTap.current = now;
   }
 
+  function maybeDismissFromLetterbox(clientX: number, clientY: number) {
+    if (scale > 1.01 || movedDuringTouch.current || !onLetterboxPress) return;
+    const img = imgRef.current;
+    if (!img) return;
+    if (!isPointInsideContainedImage(img, clientX, clientY)) {
+      onLetterboxPress();
+    }
+  }
+
   return (
     <View
       style={styles.imageStage}
       collapsable={false}
       onTouchStart={(event) => {
+        movedDuringTouch.current = false;
+        touchStart.current = null;
         const touches = event.nativeEvent.touches;
+        if (touches.length === 1) {
+          touchStart.current = { x: touches[0].pageX, y: touches[0].pageY };
+        }
         if (touches.length === 2) {
           const dist = distance(touches as unknown as TouchList);
           pinchStart.current = { distance: dist, scale };
@@ -307,6 +349,11 @@ function WebZoomableImage({
       }}
       onTouchMove={(event) => {
         const touches = event.nativeEvent.touches;
+        if (touchStart.current && touches.length === 1) {
+          const dx = touches[0].pageX - touchStart.current.x;
+          const dy = touches[0].pageY - touchStart.current.y;
+          if (Math.hypot(dx, dy) > 8) movedDuringTouch.current = true;
+        }
         if (touches.length === 2 && pinchStart.current) {
           const dist = distance(touches as unknown as TouchList);
           if (!pinchStart.current.distance) return;
@@ -323,9 +370,14 @@ function WebZoomableImage({
           });
         }
       }}
-      onTouchEnd={() => {
+      onTouchEnd={(event) => {
+        const touch = event.nativeEvent.changedTouches[0];
+        if (touch) {
+          maybeDismissFromLetterbox(touch.pageX, touch.pageY);
+        }
         dragStart.current = null;
         pinchStart.current = null;
+        touchStart.current = null;
         setScale((current) => {
           if (current <= 1.01) {
             setPan({ x: 0, y: 0 });
@@ -339,6 +391,7 @@ function WebZoomableImage({
       onDoubleClick={handleDoubleTap}
     >
       {createElement("img", {
+        ref: imgRef,
         src: uri,
         alt: "",
         draggable: false,
@@ -346,6 +399,9 @@ function WebZoomableImage({
           ...WEB_LIGHTBOX_PLAIN_IMG_STYLE,
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
           transformOrigin: "center center",
+        },
+        onClick: (event: MouseEvent) => {
+          maybeDismissFromLetterbox(event.clientX, event.clientY);
         },
         onContextMenu: (event: Event) => {
           event.preventDefault();
@@ -624,6 +680,7 @@ function LightboxSurface({
                     uri={item.url}
                     placeholderUri={item.thumbnailUrl}
                     onZoomChange={handleZoomChange}
+                    onLetterboxPress={!zoomed ? dismiss : undefined}
                   />
                 ) : (
                   <NativeZoomableImage

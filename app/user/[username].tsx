@@ -19,6 +19,7 @@ import { useFollowUser } from "@/lib/useFollowUser";
 import { DetailLoading } from "@/components/DetailLoading";
 import { showAlert } from "@/lib/alerts";
 import { EmptyState, colors } from "@frennix/ui";
+import { useImageLightbox } from "@/lib/useImageLightbox";
 
 export default function UserProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
@@ -26,6 +27,7 @@ export default function UserProfileScreen() {
   const userId = session?.user.id ?? "";
   const [messaging, setMessaging] = useState(false);
   const { openPostActions, postActionSheets } = usePostActions({ userId });
+  const { openImage, lightbox } = useImageLightbox();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", username],
@@ -98,11 +100,13 @@ export default function UserProfileScreen() {
   const isOwn = profile.id === userId;
 
   return (
+    <>
     <ProfileScreenContent
       profile={profile}
       stats={stats ?? { posts: 0, followers: 0, following: 0, eventsJoined: 0, workoutStreak: 0 }}
       posts={postsPage?.posts ?? []}
       isOwn={isOwn}
+      onViewPhoto={openImage}
       matchReasons={compatibility?.match_reasons}
       frennixMatchScore={compatibility?.compatibility_score ?? null}
       following={following}
@@ -122,6 +126,8 @@ export default function UserProfileScreen() {
       postActionSheet={isOwn ? postActionSheets : undefined}
       profileActionSheet={profileActionSheets}
     />
+    {lightbox}
+    </>
   );
 }
 

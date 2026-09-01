@@ -17,6 +17,7 @@ import { useTabScreenWebHeightStyle } from "@/lib/screen-shell";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
 import { EmptyState, colors, spacing } from "@frennix/ui";
+import { useImageLightbox } from "@/lib/useImageLightbox";
 
 const EMPTY_STATS = {
   posts: 0,
@@ -32,6 +33,7 @@ export default function ProfileTabScreen() {
   const queryClient = useQueryClient();
   const { pickAndUploadAvatar, uploading, error } = useAvatarUpload();
   const { pickAndUploadCover, uploading: coverUploading, error: coverError, previewUri: coverPreviewUri } = useCoverUpload();
+  const { openImage, lightbox, lightboxVisible } = useImageLightbox();
   const { openPostActions, postActionSheets } = usePostActions({ userId });
   const { openProfileActions, profileActionSheets } = useProfileActions({
     userId,
@@ -126,6 +128,7 @@ export default function ProfileTabScreen() {
       posts={postsPage?.posts ?? []}
       isOwn
       onAvatarPress={pickAndUploadAvatar}
+      onViewPhoto={openImage}
       avatarUploading={uploading}
       avatarError={error}
       onCoverPress={pickAndUploadCover}
@@ -141,8 +144,10 @@ export default function ProfileTabScreen() {
       onScroll={onScroll}
       onRefresh={() => void onPullRefresh()}
       refreshing={profileRefreshing}
+      scrollEnabled={!lightboxVisible}
       webShellStyle={webShellStyle}
     />
+    {lightbox}
     </TabScreenBoundary>
   );
 }

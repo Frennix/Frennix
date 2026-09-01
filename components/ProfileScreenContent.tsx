@@ -55,6 +55,7 @@ interface ProfileScreenContentProps {
   posts: Post[];
   isOwn: boolean;
   onAvatarPress?: () => void;
+  onViewPhoto?: (uri: string) => void;
   avatarUploading?: boolean;
   avatarError?: string | null;
   onCoverPress?: () => void;
@@ -75,6 +76,7 @@ interface ProfileScreenContentProps {
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
+  scrollEnabled?: boolean;
   /** Safari web tab scene height (pass from tab screens only). */
   webShellStyle?: ViewStyle;
   /** Frennix Match reasons (other users' profiles). */
@@ -108,6 +110,7 @@ export function ProfileScreenContent({
   posts,
   isOwn,
   onAvatarPress,
+  onViewPhoto,
   avatarUploading,
   avatarError,
   onCoverPress,
@@ -128,6 +131,7 @@ export function ProfileScreenContent({
   onScroll,
   onRefresh,
   refreshing = false,
+  scrollEnabled = true,
   webShellStyle,
   matchReasons,
   frennixMatchScore,
@@ -164,11 +168,20 @@ export function ProfileScreenContent({
     void onCoverPress();
   }
 
+  function handleViewPhoto(uri: string | null) {
+    if (!uri || !onViewPhoto) return;
+    onViewPhoto(uri);
+  }
+
+  const canViewAvatar = Boolean(avatarUri && onViewPhoto);
+  const canViewCover = Boolean(coverUri && onViewPhoto);
+
   return (
     <ScrollView
       ref={scrollViewRef}
       onScroll={onScroll}
       scrollEventThrottle={16}
+      scrollEnabled={scrollEnabled}
       style={[styles.container, tabScreenScrollSurface, webShellStyle]}
       contentContainerStyle={styles.content}
       refreshControl={
@@ -186,10 +199,22 @@ export function ProfileScreenContent({
 
       <View style={styles.coverWrap}>
         {coverUri ? (
-          <View style={styles.cover}>
-            <CachedImage uri={coverUri} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={`cover-${coverUri}`} />
-            <View style={styles.coverOverlay} pointerEvents="none" />
-          </View>
+          canViewCover ? (
+            <Pressable
+              style={styles.cover}
+              onPress={() => handleViewPhoto(coverUri)}
+              accessibilityRole="button"
+              accessibilityLabel="View cover photo"
+            >
+              <CachedImage uri={coverUri} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={`cover-${coverUri}`} />
+              <View style={styles.coverOverlay} pointerEvents="none" />
+            </Pressable>
+          ) : (
+            <View style={styles.cover}>
+              <CachedImage uri={coverUri} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={`cover-${coverUri}`} />
+              <View style={styles.coverOverlay} pointerEvents="none" />
+            </View>
+          )
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <View style={styles.coverFallback} pointerEvents="none">
@@ -226,7 +251,8 @@ export function ProfileScreenContent({
             uri={avatarUri}
             name={profile.display_name}
             size={AVATAR_SIZE}
-            onPress={isOwn ? onAvatarPress : undefined}
+            onViewPress={canViewAvatar ? () => handleViewPhoto(avatarUri) : undefined}
+            onEditPress={isOwn ? onAvatarPress : undefined}
             uploading={avatarUploading}
           />
         </View>
