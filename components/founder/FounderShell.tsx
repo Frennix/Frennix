@@ -28,7 +28,7 @@ export function FounderShell({ title = "Founder Dashboard", children }: FounderS
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} nativeID="founder-dashboard-screen">
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
@@ -36,17 +36,19 @@ export function FounderShell({ title = "Founder Dashboard", children }: FounderS
 
   if (!canAccessDashboard) {
     return (
-      <EmptyState
-        title="Access denied"
-        description="You do not have permission to view this page."
-      />
+      <View style={styles.centered} nativeID="founder-dashboard-screen">
+        <EmptyState
+          title="Access denied"
+          description="You do not have permission to view this page."
+        />
+      </View>
     );
   }
 
   const roleLabel = role ? formatStaffRole(role) : "Staff";
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} nativeID="founder-dashboard-screen">
       <Stack.Screen options={{ headerShown: false }} />
       {!isMobile ? <FounderSidebar mobileOpen={false} onCloseMobile={() => undefined} /> : null}
       <View style={styles.main}>
