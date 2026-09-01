@@ -51,6 +51,8 @@ interface FeedPostCardProps {
   mediaPageIndex?: number;
   onMediaPageIndexChange?: (index: number) => void;
   onPrimaryMediaReady?: (source: "image" | "video") => void;
+  /** Hide inline feed composer while modal comments are open. */
+  inlineComposerEnabled?: boolean;
 }
 
 const STRONG_WORK_EMOJI = "💪";
@@ -87,6 +89,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   onMediaPageIndexChange,
   onPrimaryMediaReady,
   slots,
+  inlineComposerEnabled = true,
 }: FeedPostCardProps) {
   const author = post.author;
   const sharedPost = post.shared_post;
@@ -374,6 +377,7 @@ export const FeedPostCard = memo(function FeedPostCard({
           onCommentPress={onComment}
           onViewAllPress={onComment}
           onAuthorPress={onCommentAuthorPress}
+          inlineComposerEnabled={inlineComposerEnabled}
         />
       </FeedLayout.Comments>
 

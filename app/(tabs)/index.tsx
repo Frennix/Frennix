@@ -157,7 +157,7 @@ export default function HomeScreen() {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
   }, []);
 
-  const { openComments, commentsSheet } = useFeedCommentsSheet({
+  const { openComments, commentsSheet, commentsVisible } = useFeedCommentsSheet({
     userId,
     authorProfile: viewerProfile ?? undefined,
   });
@@ -806,6 +806,7 @@ export default function HomeScreen() {
             userId={userId}
             actions={feedActions}
             interactionActive={activePost?.id === item.post.id}
+            inlineComposerEnabled={!commentsVisible}
             mediaActive={mediaActive}
             mediaPageIndex={carouselIndices[item.post.id] ?? 0}
             onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
@@ -821,6 +822,7 @@ export default function HomeScreen() {
       carouselIndices,
       setCarouselIndex,
       activePost?.id,
+      commentsVisible,
       isolatePostCards,
       isolateVideo,
       posts,

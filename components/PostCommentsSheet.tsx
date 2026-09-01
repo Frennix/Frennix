@@ -13,6 +13,7 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { CommentsBottomSheet } from "@/components/CommentsBottomSheet";
 import { useCommentActions } from "@/lib/useCommentActions";
+import { logCommentsPortalInteraction } from "@/lib/comments-close-diagnostics";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import { restoreWebHorizontalScrollPosition } from "@/lib/web-horizontal-scroll-restore";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
@@ -87,6 +88,9 @@ function CommentComposerRow({
             ? ({
                 enterKeyHint: "send",
                 "data-frennix-comment-input": "true",
+                onPointerDown: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+                onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+                onTouchStart: (event: { stopPropagation: () => void }) => event.stopPropagation(),
               } as object)
             : null)}
         />
@@ -125,11 +129,13 @@ export function PostCommentsSheet({
 
   const handleComposerFocus = useCallback(() => {
     if (Platform.OS !== "web") return;
+    logCommentsPortalInteraction("modal-composer-focus");
     logCommentsInputZoomSnapshot("after-focus");
   }, []);
 
   const handleComposerBlur = useCallback(() => {
     if (Platform.OS !== "web") return;
+    logCommentsPortalInteraction("modal-composer-blur");
     logCommentsInputZoomSnapshot("after-blur");
   }, []);
 
@@ -273,6 +279,7 @@ export function PostCommentsSheet({
       <CommentsBottomSheet
         visible={visible}
         onClose={onClose}
+        postId={postId}
         title={title}
         composer={
           <>

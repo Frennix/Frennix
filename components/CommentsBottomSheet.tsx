@@ -22,6 +22,11 @@ import {
 } from "@/components/BottomActionSheet";
 import { setCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import {
+  logCommentsCloseRequest,
+  logCommentsPortalInteraction,
+  type CommentsCloseReason,
+} from "@/lib/comments-close-diagnostics";
+import {
   isMobileWeb,
   readVisualViewportHeight,
   requestSafariVisualViewportRemeasure,
@@ -39,6 +44,8 @@ type CommentsBottomSheetProps = {
   visible: boolean;
   onClose: () => void;
   title: string;
+  /** When set, blocks inline feed composers for this post while open. */
+  postId?: string | null;
   /** Scrollable comments list — only this region scrolls. */
   children: ReactNode;
   /** Fixed composer row rendered above the safe-area inset. */
@@ -92,10 +99,19 @@ const WEB_MOBILE_FULLSCREEN_ROOT: ViewStyle = Platform.select({
   default: {},
 }) as ViewStyle;
 
+function stopPointerEventPropagation(event: Event): void {
+  event.stopPropagation();
+}
+
+function stopReactPropagation(event: { stopPropagation?: () => void }): void {
+  event.stopPropagation?.();
+}
+
 export function CommentsBottomSheet({
   visible,
   onClose,
   title,
+  postId = null,
   children,
   composer,
   backdropAccessibilityLabel = "Close comments",
@@ -144,27 +160,79 @@ export function CommentsBottomSheet({
   useEffect(() => {
     if (!visible) return;
 
-    setCommentsOverlayOpen(true);
+    setCommentsOverlayOpen(true, postId);
     if (Platform.OS === "web") lockWebModalScroll();
+    logCommentsPortalInteraction("portal-open");
 
     return () => {
+      logCommentsCloseRequest("CommentsBottomSheet.cleanup", "component-cleanup");
       setCommentsOverlayOpen(false);
       if (Platform.OS === "web") {
         unlockWebModalScroll();
         restoreWebDocumentScrollLock();
         requestSafariVisualViewportRemeasure();
       }
+      logCommentsPortalInteraction("portal-cleanup");
+    };
+  }, [postId, visible]);
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web" || typeof document === "undefined") return;
+
+    let portal: Element | null = null;
+    let detach: (() => void) | undefined;
+
+    const attach = () => {
+      portal = document.querySelector('[data-frennix-comments-sheet="true"]');
+      if (!portal) return;
+
+      const events = ["pointerdown", "pointerup", "click", "touchstart", "touchend"] as const;
+      events.forEach((eventName) => {
+        portal!.addEventListener(eventName, stopPointerEventPropagation, true);
+      });
+
+      const onFocusIn = (event: FocusEvent) => {
+        if (!portal!.contains(event.target as Node)) return;
+        logCommentsPortalInteraction("composer-focus-in");
+      };
+      portal.addEventListener("focusin", onFocusIn, true);
+
+      detach = () => {
+        events.forEach((eventName) => {
+          portal?.removeEventListener(eventName, stopPointerEventPropagation, true);
+        });
+        portal?.removeEventListener("focusin", onFocusIn, true);
+      };
+    };
+
+    attach();
+    const frame = portal ? undefined : requestAnimationFrame(attach);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      detach?.();
     };
   }, [visible]);
 
-  const finishClose = useCallback(() => {
-    if (Platform.OS === "web") blurActiveWebInput();
-    onClose();
-  }, [onClose]);
+  const requestClose = useCallback(
+    (reason: CommentsCloseReason) => {
+      logCommentsCloseRequest("CommentsBottomSheet.requestClose", reason);
+      if (Platform.OS === "web") blurActiveWebInput();
+      onClose();
+    },
+    [onClose]
+  );
+
+  const finishClose = useCallback(
+    (reason: CommentsCloseReason) => {
+      requestClose(reason);
+    },
+    [requestClose]
+  );
 
   const handleDismiss = useCallback(() => {
     if (useMobileWebFullscreen) {
-      finishClose();
+      finishClose("close-button");
       return;
     }
 
@@ -175,15 +243,24 @@ export function CommentsBottomSheet({
       Animated.spring(slide, { toValue: 0, useNativeDriver: true, ...BOTTOM_SHEET_SPRING_DISMISS }),
       Animated.spring(dragY, { toValue: 0, useNativeDriver: true, ...BOTTOM_SHEET_SPRING_DISMISS }),
     ]).start(({ finished }) => {
-      if (finished) finishClose();
+      if (finished) finishClose("close-button");
       dismissingRef.current = false;
     });
   }, [dragY, fade, finishClose, slide]);
 
   const handleBackdropPress = useCallback(() => {
     if (Date.now() - openedAtRef.current < BOTTOM_SHEET_MIN_BACKDROP_DISMISS_MS) return;
-    handleDismiss();
-  }, [handleDismiss]);
+    finishClose("backdrop-click");
+  }, [finishClose]);
+
+  const handleWebBackdropClick = useCallback(
+    (event: { target?: EventTarget | null; currentTarget?: EventTarget | null; stopPropagation?: () => void }) => {
+      event.stopPropagation?.();
+      if (event.target !== event.currentTarget) return;
+      handleBackdropPress();
+    },
+    [handleBackdropPress]
+  );
 
   const headerPanResponder = useMemo(
     () =>
@@ -195,7 +272,7 @@ export function CommentsBottomSheet({
         },
         onPanResponderRelease: (_, gesture) => {
           if (gesture.dy > BOTTOM_SHEET_DISMISS_DRAG_THRESHOLD || gesture.vy > 0.75) {
-            handleDismiss();
+            finishClose("swipe-dismiss");
             return;
           }
           Animated.spring(dragY, {
@@ -230,8 +307,22 @@ export function CommentsBottomSheet({
 
   if (!visible) return null;
 
+  const sheetSurfaceProps =
+    Platform.OS === "web"
+      ? ({
+          onClick: stopReactPropagation,
+          onPointerDown: stopReactPropagation,
+          onPointerUp: stopReactPropagation,
+          onTouchStart: stopReactPropagation,
+          onTouchEnd: stopReactPropagation,
+        } as object)
+      : null;
+
   const headerRow = (
-    <View style={[styles.headerRow, useMobileWebFullscreen && styles.mobileWebHeader]}>
+    <View
+      style={[styles.headerRow, useMobileWebFullscreen && styles.mobileWebHeader]}
+      {...sheetSurfaceProps}
+    >
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
@@ -251,20 +342,26 @@ export function CommentsBottomSheet({
     <ScrollView
       style={styles.listScroll}
       contentContainerStyle={styles.listContent}
-      keyboardShouldPersistTaps="handled"
+      keyboardShouldPersistTaps="always"
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       showsVerticalScrollIndicator={false}
       nestedScrollEnabled
+      {...sheetSurfaceProps}
     >
       {children}
     </ScrollView>
   );
 
-  const composerRegion = <View style={styles.composerHost}>{composer}</View>;
+  const composerRegion = (
+    <View style={styles.composerHost} {...sheetSurfaceProps}>
+      {composer}
+    </View>
+  );
 
   const mobileWebSurface = (
     <View
       style={[WEB_MOBILE_FULLSCREEN_ROOT, { height: viewportHeight, paddingTop: headerTopInset }]}
+      {...sheetSurfaceProps}
       {...(Platform.OS === "web"
         ? ({
             "data-frennix-comments-sheet": "true",
@@ -286,6 +383,11 @@ export function CommentsBottomSheet({
       <Pressable
         style={styles.backdropPressable}
         onPress={handleBackdropPress}
+        {...(Platform.OS === "web"
+          ? ({
+              onClick: handleWebBackdropClick,
+            } as object)
+          : null)}
         accessibilityRole="button"
         accessibilityLabel={backdropAccessibilityLabel}
       >
@@ -302,6 +404,7 @@ export function CommentsBottomSheet({
             transform: [{ translateY }],
           },
         ]}
+        {...sheetSurfaceProps}
       >
         <View style={styles.handleWrap} {...headerPanResponder.panHandlers}>
           <View style={styles.handle} />
@@ -319,6 +422,11 @@ export function CommentsBottomSheet({
       <Pressable
         style={styles.backdropPressable}
         onPress={handleBackdropPress}
+        {...(Platform.OS === "web"
+          ? ({
+              onClick: handleWebBackdropClick,
+            } as object)
+          : null)}
         accessibilityRole="button"
         accessibilityLabel={backdropAccessibilityLabel}
       >
@@ -335,6 +443,7 @@ export function CommentsBottomSheet({
             transform: [{ translateY }],
           },
         ]}
+        {...sheetSurfaceProps}
       >
         <View style={styles.handleWrap} {...headerPanResponder.panHandlers}>
           <View style={styles.handle} />

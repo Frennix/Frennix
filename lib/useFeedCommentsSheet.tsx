@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { Post } from "@frennix/types";
 import { PostCommentsSheet } from "@/components/PostCommentsSheet";
+import { logCommentsCloseRequest } from "@/lib/comments-close-diagnostics";
 import { hapticLight } from "@/lib/haptics";
 
 type OpenCommentsOptions = {
@@ -24,6 +25,7 @@ export function useFeedCommentsSheet({ userId, authorProfile }: UseFeedCommentsS
   }, []);
 
   const closeComments = useCallback(() => {
+    logCommentsCloseRequest("useFeedCommentsSheet.closeComments", "parent-onClose");
     setActivePost(null);
     setInitialDraft(undefined);
   }, []);

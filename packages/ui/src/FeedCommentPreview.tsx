@@ -8,6 +8,8 @@ interface FeedCommentPreviewProps {
   onCommentPress?: () => void;
   onViewAllPress?: () => void;
   onAuthorPress?: (username: string) => void;
+  /** When false, hide the inline "Add a comment…" affordance (modal owns composer). */
+  inlineComposerEnabled?: boolean;
 }
 
 export function FeedCommentPreview({
@@ -16,6 +18,7 @@ export function FeedCommentPreview({
   onCommentPress,
   onViewAllPress,
   onAuthorPress,
+  inlineComposerEnabled = true,
 }: FeedCommentPreviewProps) {
   const total = Math.max(commentCount, comments.length);
   const showViewAll = total > 2;
@@ -67,12 +70,13 @@ export function FeedCommentPreview({
         );
       })}
 
-      {onCommentPress ? (
+      {onCommentPress && inlineComposerEnabled ? (
         <Pressable
           onPress={onCommentPress}
           style={styles.commentInput}
           accessibilityRole="button"
           accessibilityLabel="Add a comment"
+          {...({ "data-frennix-feed-inline-comment": "true" } as object)}
         >
           <Text
             style={styles.addComment}

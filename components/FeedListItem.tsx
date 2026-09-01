@@ -27,6 +27,7 @@ type FeedListItemProps = {
   mediaActive?: boolean;
   mediaPageIndex?: number;
   onMediaPageIndexChange?: (index: number) => void;
+  inlineComposerEnabled?: boolean;
 };
 
 function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
@@ -34,6 +35,7 @@ function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
   if (prev.mediaActive !== next.mediaActive) return false;
   if (prev.mediaPageIndex !== next.mediaPageIndex) return false;
   if (prev.interactionActive !== next.interactionActive) return false;
+  if (prev.inlineComposerEnabled !== next.inlineComposerEnabled) return false;
   if (prev.onMediaPageIndexChange !== next.onMediaPageIndexChange) return false;
   if (prev.post.id !== next.post.id) return false;
 
@@ -62,6 +64,7 @@ export const FeedListItem = memo(function FeedListItem({
   mediaActive = true,
   mediaPageIndex,
   onMediaPageIndexChange,
+  inlineComposerEnabled = true,
 }: FeedListItemProps) {
   const handlers = useMemo(
     () => ({
@@ -103,6 +106,7 @@ export const FeedListItem = memo(function FeedListItem({
       mediaActive={mediaActive}
       mediaPageIndex={mediaPageIndex}
       onMediaPageIndexChange={onMediaPageIndexChange}
+      inlineComposerEnabled={inlineComposerEnabled}
     />
   );
 }, feedItemPropsEqual);
