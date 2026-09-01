@@ -22,6 +22,7 @@ import { colors } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { useLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
+import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import { useTabSceneLayoutGuard } from "@/lib/tab-scene-layout-guard";
 import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
@@ -60,6 +61,7 @@ const TabsShell = memo(function TabsShell() {
   const isolateBottomTabs = isFeedIsolateDisabled("bottom-tabs");
   const isolateNotificationBadge = isFeedIsolateDisabled("notification-badge");
   const lightboxOpen = useLightboxOverlayOpen();
+  const commentsOpen = useCommentsOverlayOpen();
   useTabSceneLayoutGuard();
   const messagesBadge =
     unreadMessages > 0 ? (unreadMessages > 99 ? "99+" : unreadMessages) : undefined;
@@ -67,7 +69,7 @@ const TabsShell = memo(function TabsShell() {
   const tabBarStyle = {
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
-    ...(isolateBottomTabs || lightboxOpen ? { display: "none" as const } : null),
+    ...(isolateBottomTabs || lightboxOpen || commentsOpen ? { display: "none" as const } : null),
   };
 
   const renderFeedHeaderTitle = useCallback(
