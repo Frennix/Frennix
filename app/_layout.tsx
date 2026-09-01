@@ -239,6 +239,13 @@ export default function RootLayout() {
             <Stack.Screen name="event/[id]" options={backScreen("Event", fadeScreen)} />
             <Stack.Screen name="event/[id]/invite" options={backScreen("Invite athletes", fadeScreen)} />
             <Stack.Screen name="post/[id]" options={backScreen("Post", fadeScreen)} />
+            <Stack.Screen
+              name="comments/[postId]"
+              options={{
+                headerShown: false,
+                ...(Platform.OS === "web" ? fadeScreen : null),
+              }}
+            />
             <Stack.Screen name="user/[username]" options={backScreen("Profile", fadeScreen)} />
             <Stack.Screen name="group/[id]" options={backScreen("Group", fadeScreen)} />
             <Stack.Screen name="challenge/[id]" options={backScreen("Challenge", fadeScreen)} />

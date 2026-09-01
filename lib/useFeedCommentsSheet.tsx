@@ -2,6 +2,10 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { Post } from "@frennix/types";
 import { PostCommentsSheet } from "@/components/PostCommentsSheet";
 import { logCommentsCloseRequest } from "@/lib/comments-close-diagnostics";
+import {
+  navigateToPostComments,
+  usesMobileWebCommentsRoute,
+} from "@/lib/mobile-web-comments-route";
 import { hapticLight } from "@/lib/haptics";
 
 type OpenCommentsOptions = {
@@ -14,15 +18,20 @@ type UseFeedCommentsSheetOptions = {
 };
 
 export function useFeedCommentsSheet({ userId, authorProfile }: UseFeedCommentsSheetOptions) {
+  const mobileWebRoute = usesMobileWebCommentsRoute();
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [initialDraft, setInitialDraft] = useState<string | undefined>();
-  const visible = activePost != null;
+  const visible = !mobileWebRoute && activePost != null;
 
-  const openComments = useCallback((post: Post, options?: OpenCommentsOptions) => {
-    hapticLight();
-    setActivePost(post);
-    setInitialDraft(options?.draft);
-  }, []);
+  const openComments = useCallback(
+    (post: Post, options?: OpenCommentsOptions) => {
+      hapticLight();
+      if (navigateToPostComments(post, options?.draft)) return;
+      setActivePost(post);
+      setInitialDraft(options?.draft);
+    },
+    []
+  );
 
   const closeComments = useCallback(() => {
     logCommentsCloseRequest("useFeedCommentsSheet.closeComments", "parent-onClose");
@@ -30,7 +39,7 @@ export function useFeedCommentsSheet({ userId, authorProfile }: UseFeedCommentsS
     setInitialDraft(undefined);
   }, []);
 
-  const commentsSheet: ReactNode = (
+  const commentsSheet: ReactNode = mobileWebRoute ? null : (
     <PostCommentsSheet
       visible={visible}
       post={activePost}

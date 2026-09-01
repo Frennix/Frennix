@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · efbb980d</title>
+    <title>Frennix · 710b6f6e</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="efbb980dcba0cfc4756e0132b999b758a82f0582" />
-    <meta name="frennix-build-bundle" content="index-1faf6c7687e6de920141f9534f018385.js" />
-    <meta name="frennix-build-at" content="2026-09-01T22:48:54.642Z" />
+    <meta name="frennix-build-sha" content="710b6f6e558d1c3acbfaf0007b6fdd70a0e7539f" />
+    <meta name="frennix-build-bundle" content="index-cb542aa394b9724f79759edd6caa62c1.js" />
+    <meta name="frennix-build-at" content="2026-09-01T22:57:25.299Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -234,6 +234,27 @@
   [data-frennix-comments-fullscreen="true"] input {
     background-color: #141416 !important;
   }
+  /* Dedicated mobile web comments route — opaque page, no feed underneath. */
+  #frennix-comments-route,
+  [data-frennix-comments-route="true"] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 100dvh !important;
+    height: 100% !important;
+    background-color: #0A0A0B !important;
+    opacity: 1 !important;
+    overflow: hidden !important;
+  }
+  [data-frennix-comments-route="true"] [data-frennix-comment-input="true"],
+  [data-frennix-comments-route="true"] textarea,
+  [data-frennix-comments-route="true"] input {
+    font-size: 16px !important;
+    line-height: 22px !important;
+    background-color: #141416 !important;
+    transform: none !important;
+    zoom: normal !important;
+  }
   /* While comments modal is open, block feed pointer/focus bleed-through. */
   body[data-frennix-comments-open="true"] #app-root-shell,
   body[data-frennix-comments-open="true"] #feed-scroll-list,
@@ -324,7 +345,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="efbb980dcba0cfc4756e0132b999b758a82f0582" data-bundle="index-1faf6c7687e6de920141f9534f018385.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="710b6f6e558d1c3acbfaf0007b6fdd70a0e7539f" data-bundle="index-cb542aa394b9724f79759edd6caa62c1.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -370,7 +391,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-1faf6c7687e6de920141f9534f018385.js?v=efbb980d" defer></script>
+  <script src="/_expo/static/js/web/index-cb542aa394b9724f79759edd6caa62c1.js?v=710b6f6e" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
