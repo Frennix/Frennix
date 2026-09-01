@@ -22,7 +22,8 @@ import {
 } from "@/components/BottomActionSheet";
 import { setCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import {
-  measureSafariVisualViewport,
+  isMobileWeb,
+  readVisualViewportHeight,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
 } from "@/lib/safari-visual-viewport";
@@ -45,12 +46,22 @@ type CommentsBottomSheetProps = {
   backdropAccessibilityLabel?: string;
 };
 
-const WEB_OVERLAY_ROOT: ViewStyle = Platform.select({
+const useMobileWebFullscreen = Platform.OS === "web" && isMobileWeb();
+
+function blurActiveWebInput(): void {
+  if (typeof document === "undefined") return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+}
+
+const WEB_DESKTOP_OVERLAY_ROOT: ViewStyle = Platform.select({
   web: {
     position: "fixed",
     left: 0,
     right: 0,
+    top: 0,
     width: "100%",
+    height: "100%",
     zIndex: COMMENTS_SHEET_Z_INDEX,
     display: "flex",
     flexDirection: "column",
@@ -62,6 +73,23 @@ const WEB_OVERLAY_ROOT: ViewStyle = Platform.select({
     flex: 1,
     justifyContent: "flex-end",
   },
+}) as ViewStyle;
+
+const WEB_MOBILE_FULLSCREEN_ROOT: ViewStyle = Platform.select({
+  web: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    width: "100%",
+    zIndex: COMMENTS_SHEET_Z_INDEX,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    backgroundColor: colors.background,
+    touchAction: "none",
+  },
+  default: {},
 }) as ViewStyle;
 
 export function CommentsBottomSheet({
@@ -78,24 +106,28 @@ export function CommentsBottomSheet({
   const dragY = useRef(new Animated.Value(0)).current;
   const dismissingRef = useRef(false);
   const openedAtRef = useRef(0);
-  const [viewport, setViewport] = useState(() =>
-    Platform.OS === "web" ? measureSafariVisualViewport() : null
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    Platform.OS === "web" ? readVisualViewportHeight() : 0
   );
 
   useEffect(() => {
-    if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!visible || Platform.OS !== "web" || !useMobileWebFullscreen || typeof window === "undefined") {
+      return;
+    }
 
-    const update = () => setViewport(measureSafariVisualViewport());
-    update();
-    return subscribeSafariVisualViewport(update);
+    const syncHeight = () => setViewportHeight(readVisualViewportHeight());
+    syncHeight();
+    return subscribeSafariVisualViewport(syncHeight);
   }, [visible]);
 
   useEffect(() => {
-    if (!visible) {
-      slide.setValue(0);
-      fade.setValue(0);
-      dragY.setValue(0);
-      dismissingRef.current = false;
+    if (!visible || useMobileWebFullscreen) {
+      if (!visible) {
+        slide.setValue(0);
+        fade.setValue(0);
+        dragY.setValue(0);
+        dismissingRef.current = false;
+      }
       return;
     }
 
@@ -125,7 +157,17 @@ export function CommentsBottomSheet({
     };
   }, [visible]);
 
+  const finishClose = useCallback(() => {
+    if (Platform.OS === "web") blurActiveWebInput();
+    onClose();
+  }, [onClose]);
+
   const handleDismiss = useCallback(() => {
+    if (useMobileWebFullscreen) {
+      finishClose();
+      return;
+    }
+
     if (dismissingRef.current) return;
     dismissingRef.current = true;
     Animated.parallel([
@@ -133,10 +175,10 @@ export function CommentsBottomSheet({
       Animated.spring(slide, { toValue: 0, useNativeDriver: true, ...BOTTOM_SHEET_SPRING_DISMISS }),
       Animated.spring(dragY, { toValue: 0, useNativeDriver: true, ...BOTTOM_SHEET_SPRING_DISMISS }),
     ]).start(({ finished }) => {
-      if (finished) onClose();
+      if (finished) finishClose();
       dismissingRef.current = false;
     });
-  }, [dragY, fade, onClose, slide]);
+  }, [dragY, fade, finishClose, slide]);
 
   const handleBackdropPress = useCallback(() => {
     if (Date.now() - openedAtRef.current < BOTTOM_SHEET_MIN_BACKDROP_DISMISS_MS) return;
@@ -166,22 +208,15 @@ export function CommentsBottomSheet({
     [dragY, handleDismiss]
   );
 
-  const overlayTop = Platform.OS === "web" ? (viewport?.offsetTop ?? 0) : 0;
-  const overlayHeight =
-    Platform.OS === "web"
-      ? (viewport?.overlayHeight ?? (typeof window !== "undefined" ? window.innerHeight : 640))
-      : undefined;
+  const desktopSheetHeight = useMemo(() => {
+    if (Platform.OS !== "web" || useMobileWebFullscreen) return undefined;
+    const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
+    const target = Math.round(layoutHeight * SHEET_OPEN_RATIO);
+    const max = Math.round(layoutHeight * SHEET_MAX_RATIO);
+    return Math.min(Math.max(target, 280), max);
+  }, [visible]);
 
-  const sheetHeight = useMemo(() => {
-    if (Platform.OS === "web" && overlayHeight) {
-      const target = Math.round(overlayHeight * SHEET_OPEN_RATIO);
-      const max = Math.round(overlayHeight * SHEET_MAX_RATIO);
-      return Math.min(Math.max(target, 280), max);
-    }
-    return undefined;
-  }, [overlayHeight]);
-
-  const openOffset = sheetHeight ?? 420;
+  const openOffset = desktopSheetHeight ?? 420;
   const translateY = Animated.add(
     slide.interpolate({
       inputRange: [0, 1],
@@ -191,20 +226,61 @@ export function CommentsBottomSheet({
   );
 
   const composerBottomInset = Math.max(insets.bottom, spacing.sm);
+  const headerTopInset = Math.max(insets.top, spacing.sm);
 
   if (!visible) return null;
 
-  const surface = (
+  const headerRow = (
+    <View style={[styles.headerRow, useMobileWebFullscreen && styles.mobileWebHeader]}>
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
+      <Pressable
+        onPress={handleDismiss}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Close comments"
+        style={styles.closeButton}
+      >
+        <Text style={styles.closeIcon}>✕</Text>
+      </Pressable>
+    </View>
+  );
+
+  const listRegion = (
+    <ScrollView
+      style={styles.listScroll}
+      contentContainerStyle={styles.listContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
+    >
+      {children}
+    </ScrollView>
+  );
+
+  const composerRegion = <View style={styles.composerHost}>{composer}</View>;
+
+  const mobileWebSurface = (
     <View
-      style={[
-        WEB_OVERLAY_ROOT,
-        Platform.OS === "web"
-          ? ({
-              top: overlayTop,
-              height: overlayHeight,
-            } as ViewStyle)
-          : null,
-      ]}
+      style={[WEB_MOBILE_FULLSCREEN_ROOT, { height: viewportHeight, paddingTop: headerTopInset }]}
+      {...(Platform.OS === "web"
+        ? ({
+            "data-frennix-comments-sheet": "true",
+            "data-frennix-comments-fullscreen": "true",
+          } as object)
+        : null)}
+    >
+      {headerRow}
+      {listRegion}
+      {composerRegion}
+    </View>
+  );
+
+  const desktopWebSurface = (
+    <View
+      style={WEB_DESKTOP_OVERLAY_ROOT}
       {...(Platform.OS === "web" ? ({ "data-frennix-comments-sheet": "true" } as object) : null)}
     >
       <Pressable
@@ -220,11 +296,8 @@ export function CommentsBottomSheet({
         style={[
           styles.sheet,
           {
-            height: sheetHeight ?? ("70%" as const),
-            maxHeight:
-              Platform.OS === "web" && overlayHeight
-                ? overlayHeight - 8
-                : ("75%" as const),
+            height: desktopSheetHeight ?? ("70%" as const),
+            maxHeight: "75%" as const,
             paddingBottom: composerBottomInset,
             transform: [{ translateY }],
           },
@@ -234,36 +307,51 @@ export function CommentsBottomSheet({
           <View style={styles.handle} />
         </View>
 
-        <View style={styles.headerRow} {...headerPanResponder.panHandlers}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <Pressable
-            onPress={handleDismiss}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Close comments"
-            style={styles.closeButton}
-          >
-            <Text style={styles.closeIcon}>✕</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          style={styles.listScroll}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled
-        >
-          {children}
-        </ScrollView>
-
-        <View style={styles.composerHost}>{composer}</View>
+        <View {...headerPanResponder.panHandlers}>{headerRow}</View>
+        {listRegion}
+        {composerRegion}
       </Animated.View>
     </View>
   );
+
+  const nativeSurface = (
+    <View style={styles.nativeRoot}>
+      <Pressable
+        style={styles.backdropPressable}
+        onPress={handleBackdropPress}
+        accessibilityRole="button"
+        accessibilityLabel={backdropAccessibilityLabel}
+      >
+        <Animated.View style={[styles.backdrop, { opacity: fade }]} pointerEvents="none" />
+      </Pressable>
+
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            height: "70%" as const,
+            maxHeight: "75%" as const,
+            paddingBottom: composerBottomInset,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <View style={styles.handleWrap} {...headerPanResponder.panHandlers}>
+          <View style={styles.handle} />
+        </View>
+
+        <View {...headerPanResponder.panHandlers}>{headerRow}</View>
+        {listRegion}
+        {composerRegion}
+      </Animated.View>
+    </View>
+  );
+
+  const surface = useMobileWebFullscreen
+    ? mobileWebSurface
+    : Platform.OS === "web"
+      ? desktopWebSurface
+      : nativeSurface;
 
   if (Platform.OS === "web" && typeof document !== "undefined") {
     return createPortal(surface, document.body);
@@ -286,6 +374,10 @@ export function CommentsBottomSheet({
 const SHEET_TOP_RADIUS = radius.lg + 8;
 
 const styles = StyleSheet.create({
+  nativeRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
   backdropPressable: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -309,6 +401,11 @@ const styles = StyleSheet.create({
         } as object)
       : null),
   },
+  mobileWebHeader: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    paddingTop: 0,
+  },
   handleWrap: {
     alignItems: "center",
     paddingTop: spacing.sm,
@@ -328,8 +425,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
     flexShrink: 0,
   },
   title: {
@@ -357,6 +452,7 @@ const styles = StyleSheet.create({
   listScroll: {
     flex: 1,
     minHeight: 0,
+    backgroundColor: colors.background,
     ...(Platform.OS === "web"
       ? ({
           overflowY: "auto",
@@ -375,8 +471,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
 });

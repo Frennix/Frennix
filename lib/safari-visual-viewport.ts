@@ -64,6 +64,13 @@ export function isMobileWebSafari(): boolean {
   return isIOS && isSafari;
 }
 
+/** Height of the visual viewport — used for full-screen mobile web overlays (no offsetTop). */
+export function readVisualViewportHeight(): number {
+  if (typeof window === "undefined") return 640;
+  const vv = window.visualViewport;
+  return vv ? Math.max(Math.round(vv.height), 180) : window.innerHeight;
+}
+
 /** Read visual viewport + safe area — no hard-coded toolbar floors. */
 export function measureSafariVisualViewport(): SafariVisualViewportSnapshot {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 0;

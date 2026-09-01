@@ -74,6 +74,11 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
+      "Mobile web full-screen comments does not use offsetTop",
+      !sheet.includes("offsetTop")
+    ) && ok;
+  ok =
+    pass(
       "Horizontal restore resets scrollX without using visualViewport.offsetLeft",
       restore.includes("Never use visualViewport.offsetLeft") &&
         restore.includes("window.scrollTo(0, preservedScrollY)") &&
