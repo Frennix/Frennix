@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { webAppShell } from "@/lib/flex-layout";
+import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { pushScreen } from "@/lib/press-utils";
 import { reportClientError } from "@/lib/report-client-error";
 
@@ -71,7 +70,7 @@ export class PostLoginShellErrorBoundary extends Component<Props, State> {
     }
 
     return (
-      <View key={resetKey} pointerEvents="box-none" style={styles.flex}>
+      <View key={resetKey} pointerEvents="box-none" style={styles.promptHost}>
         {this.props.children}
       </View>
     );
@@ -79,7 +78,22 @@ export class PostLoginShellErrorBoundary extends Component<Props, State> {
 }
 
 const styles = StyleSheet.create({
-  flex: { ...{ flex: 1, minHeight: 0, backgroundColor: "#0A0A0B" }, ...webAppShell },
+  promptHost: Platform.select({
+    web: {
+      position: "absolute",
+      width: 0,
+      height: 0,
+      overflow: "visible",
+      pointerEvents: "box-none",
+      zIndex: 0,
+    } as ViewStyle,
+    default: {
+      flex: 1,
+      minHeight: 0,
+      backgroundColor: "#0A0A0B",
+    },
+  }),
+  flex: { flex: 1, minHeight: 0, backgroundColor: "#0A0A0B" },
   banner: {
     backgroundColor: "#1a0000",
     paddingHorizontal: 16,

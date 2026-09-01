@@ -23,6 +23,8 @@ export function hideFrennixBootShell(): void {
   shell.setAttribute("data-hiding", "true");
   shell.classList.add("frennix-boot-shell--hiding");
   shell.setAttribute("aria-busy", "false");
+  shell.style.pointerEvents = "none";
+  shell.style.visibility = "hidden";
 
   const finalize = () => {
     shell.style.display = "none";

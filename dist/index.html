@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 65e0c534</title>
+    <title>Frennix · a2447645</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="65e0c534cf43e9902f80c666a87253e696391cca" />
-    <meta name="frennix-build-bundle" content="index-c961774fbc628c2ca1d8b364ba1ce592.js" />
-    <meta name="frennix-build-at" content="2026-09-01T14:12:23.287Z" />
+    <meta name="frennix-build-sha" content="a24476455cf1374f4694903a02f17f3b4f1a4d63" />
+    <meta name="frennix-build-bundle" content="index-af38686d78d48bdeec34f9150cb751a9.js" />
+    <meta name="frennix-build-at" content="2026-09-01T16:24:38.987Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -208,6 +208,11 @@
     display: none !important;
     pointer-events: none !important;
   }
+  #frennix-boot-shell[data-hiding="true"],
+  #frennix-boot-shell[aria-hidden="true"] {
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
   #auth-login-screen,
   #startup-retry-screen,
   #login-failure-screen {
@@ -242,6 +247,12 @@
   #frennix-boot-shell.frennix-boot-shell--hiding {
     opacity: 0;
     pointer-events: none;
+    visibility: hidden;
+  }
+  #frennix-boot-shell[data-hiding="true"],
+  #frennix-boot-shell[aria-hidden="true"] {
+    pointer-events: none !important;
+    visibility: hidden !important;
   }
   #frennix-boot-shell .frennix-boot-shell-logo {
     display: block;
@@ -271,7 +282,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="65e0c534cf43e9902f80c666a87253e696391cca" data-bundle="index-c961774fbc628c2ca1d8b364ba1ce592.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="a24476455cf1374f4694903a02f17f3b4f1a4d63" data-bundle="index-af38686d78d48bdeec34f9150cb751a9.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -317,7 +328,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-c961774fbc628c2ca1d8b364ba1ce592.js?v=65e0c534" defer></script>
+  <script src="/_expo/static/js/web/index-af38686d78d48bdeec34f9150cb751a9.js?v=a2447645" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
@@ -463,6 +474,8 @@
     el.setAttribute("data-hiding", "true");
     el.classList.add("frennix-boot-shell--hiding");
     el.setAttribute("aria-busy", "false");
+    el.style.pointerEvents = "none";
+    el.style.visibility = "hidden";
     var done = function () {
       el.style.display = "none";
       el.setAttribute("aria-hidden", "true");

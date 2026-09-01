@@ -23,6 +23,7 @@ import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { useLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
 import { useTabSceneLayoutGuard } from "@/lib/tab-scene-layout-guard";
+import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 
 const HeaderBell = memo(function HeaderBell() {
@@ -217,6 +218,7 @@ export default function TabsLayout() {
 
   useEffect(() => {
     if (Platform.OS === "web") {
+      restoreWebDocumentScrollLock();
       recordWebStartupCheckpoint("tabs-layout:mounted");
     }
   }, []);
