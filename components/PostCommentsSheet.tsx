@@ -111,9 +111,10 @@ export function PostCommentsSheet({
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
 
-  const { openCommentActions, commentActionSheets } = useCommentActions({
+  const { openCommentActions, commentActionSheets, resetCommentActions } = useCommentActions({
     userId,
     postId: postId ?? "",
+    rootPortal: true,
     onDeleted: () => {
       if (!postId) return;
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
@@ -132,12 +133,13 @@ export function PostCommentsSheet({
     if (!visible) {
       setCommentText("");
       setReplyTo(null);
+      resetCommentActions();
       return;
     }
     if (initialDraft) {
       setCommentText(initialDraft);
     }
-  }, [initialDraft, visible]);
+  }, [initialDraft, resetCommentActions, visible]);
 
   const invalidatePostComments = useCallback(() => {
     if (!postId) return;

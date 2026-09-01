@@ -27,9 +27,10 @@ import {
   subscribeSafariVisualViewport,
 } from "@/lib/safari-visual-viewport";
 import { lockWebModalScroll, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
-const COMMENTS_SHEET_Z_INDEX = 99998;
+const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
 

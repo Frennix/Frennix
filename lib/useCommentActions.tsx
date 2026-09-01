@@ -22,14 +22,17 @@ import { copyCommentLink, shareCommentLink } from "@/lib/comment-link";
 import { confirmBlockUser, confirmDeleteComment, showAlert, showSuccess } from "@/lib/alerts";
 import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 
 interface UseCommentActionsOptions {
   userId: string;
   postId: string;
   onDeleted?: () => void;
+  /** Web: render action sheets above the comments bottom sheet portal. */
+  rootPortal?: boolean;
 }
 
-export function useCommentActions({ userId, postId, onDeleted }: UseCommentActionsOptions) {
+export function useCommentActions({ userId, postId, onDeleted, rootPortal = false }: UseCommentActionsOptions) {
   const queryClient = useQueryClient();
   const [activeComment, setActiveComment] = useState<Comment | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -45,6 +48,13 @@ export function useCommentActions({ userId, postId, onDeleted }: UseCommentActio
 
   const closeMenu = useCallback(() => {
     setMenuVisible(false);
+    setActiveComment(null);
+  }, []);
+
+  const resetCommentActions = useCallback(() => {
+    setMenuVisible(false);
+    setEditVisible(false);
+    setReportVisible(false);
     setActiveComment(null);
   }, []);
 
@@ -163,6 +173,9 @@ export function useCommentActions({ userId, postId, onDeleted }: UseCommentActio
         actions={menuActions}
         onSelect={handleAction}
         onClose={closeMenu}
+        rootPortal={rootPortal}
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-comment-options"
       />
       <CommentEditSheet
         visible={editVisible}
@@ -176,6 +189,9 @@ export function useCommentActions({ userId, postId, onDeleted }: UseCommentActio
           if (!activeComment) return;
           editMutation.mutate({ commentId: activeComment.id, content });
         }}
+        rootPortal={rootPortal}
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-comment-edit"
       />
       <ReportReasonSheet
         visible={reportVisible}
@@ -185,6 +201,9 @@ export function useCommentActions({ userId, postId, onDeleted }: UseCommentActio
           setActiveComment(null);
         }}
         onSelect={(reason) => reportMutation.mutate(reason)}
+        rootPortal={rootPortal}
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-comment-report"
       />
     </>
   );
@@ -192,5 +211,6 @@ export function useCommentActions({ userId, postId, onDeleted }: UseCommentActio
   return {
     openCommentActions,
     commentActionSheets,
+    resetCommentActions,
   };
 }

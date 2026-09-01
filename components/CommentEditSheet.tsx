@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { RootPortalOverlay } from "@/components/RootPortalOverlay";
 import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 interface CommentEditSheetProps {
@@ -9,6 +11,9 @@ interface CommentEditSheetProps {
   loading?: boolean;
   onClose: () => void;
   onSave: (content: string) => void;
+  rootPortal?: boolean;
+  webZIndex?: number;
+  portalDataAttribute?: string;
 }
 
 export function CommentEditSheet({
@@ -17,37 +22,67 @@ export function CommentEditSheet({
   loading = false,
   onClose,
   onSave,
+  rootPortal = false,
+  webZIndex = OVERLAY_Z_INDEX.commentOptions,
+  portalDataAttribute,
 }: CommentEditSheetProps) {
   const [content, setContent] = useState(initialContent);
   const { backdropStyle } = useCenterOverlaySafeArea(visible);
+  const useRootPortal = rootPortal && Platform.OS === "web";
 
   useEffect(() => {
     if (visible) setContent(initialContent);
   }, [visible, initialContent]);
 
+  const overlayContent = (
+    <Pressable
+      style={[
+        styles.backdrop,
+        useRootPortal ? styles.rootPortalBackdrop : null,
+        ...(useRootPortal ? [] : backdropStyle),
+      ]}
+      onPress={onClose}
+    >
+      <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Text style={styles.title}>Edit comment</Text>
+        <Input
+          value={content}
+          onChangeText={setContent}
+          multiline
+          placeholder="Write a comment…"
+          editable={!loading}
+        />
+        <View style={styles.actions}>
+          <Button title="Cancel" variant="secondary" onPress={onClose} disabled={loading} />
+          <Button
+            title="Save"
+            onPress={() => onSave(content)}
+            loading={loading}
+            disabled={!content.trim() || loading}
+          />
+        </View>
+      </Pressable>
+    </Pressable>
+  );
+
+  if (Platform.OS === "web" && !visible) return null;
+
+  if (useRootPortal) {
+    return (
+      <RootPortalOverlay
+        visible={visible}
+        zIndex={webZIndex}
+        dataAttribute={portalDataAttribute}
+        justifyContent="center"
+      >
+        {overlayContent}
+      </RootPortalOverlay>
+    );
+  }
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, ...backdropStyle]} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Edit comment</Text>
-          <Input
-            value={content}
-            onChangeText={setContent}
-            multiline
-            placeholder="Write a comment…"
-            editable={!loading}
-          />
-          <View style={styles.actions}>
-            <Button title="Cancel" variant="secondary" onPress={onClose} disabled={loading} />
-            <Button
-              title="Save"
-              onPress={() => onSave(content)}
-              loading={loading}
-              disabled={!content.trim() || loading}
-            />
-          </View>
-        </Pressable>
-      </Pressable>
+      {overlayContent}
     </Modal>
   );
 }
@@ -58,6 +93,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(10, 10, 11, 0.72)",
     justifyContent: "center",
     padding: spacing.md,
+  },
+  rootPortalBackdrop: {
+    width: "100%",
+    minHeight: "100%",
   },
   sheet: {
     backgroundColor: colors.surface,

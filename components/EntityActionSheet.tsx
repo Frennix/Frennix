@@ -9,6 +9,9 @@ interface EntityActionSheetProps {
   actions: EntityActionDefinition[];
   onSelect: (actionId: EntityActionId) => void;
   onClose: () => void;
+  rootPortal?: boolean;
+  webZIndex?: number;
+  portalDataAttribute?: string;
 }
 
 function labelStyle(tone: EntityActionDefinition["tone"]) {
@@ -23,9 +26,18 @@ export function EntityActionSheet({
   actions,
   onSelect,
   onClose,
+  rootPortal,
+  webZIndex,
+  portalDataAttribute,
 }: EntityActionSheetProps) {
   return (
-    <BottomOverlayShell visible={visible} onClose={onClose}>
+    <BottomOverlayShell
+      visible={visible}
+      onClose={onClose}
+      rootPortal={rootPortal}
+      webZIndex={webZIndex}
+      portalDataAttribute={portalDataAttribute}
+    >
       <ScrollView
         bounces={false}
         showsVerticalScrollIndicator={actions.length > 6}

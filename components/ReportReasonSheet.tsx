@@ -8,6 +8,9 @@ interface ReportReasonSheetProps {
   title?: string;
   onClose: () => void;
   onSelect: (reason: string) => void;
+  rootPortal?: boolean;
+  webZIndex?: number;
+  portalDataAttribute?: string;
 }
 
 export function ReportReasonSheet({
@@ -15,9 +18,19 @@ export function ReportReasonSheet({
   title = "Report",
   onClose,
   onSelect,
+  rootPortal,
+  webZIndex,
+  portalDataAttribute,
 }: ReportReasonSheetProps) {
   return (
-    <BottomOverlayShell visible={visible} onClose={onClose} sheetMaxHeight="80%">
+    <BottomOverlayShell
+      visible={visible}
+      onClose={onClose}
+      sheetMaxHeight="80%"
+      rootPortal={rootPortal}
+      webZIndex={webZIndex}
+      portalDataAttribute={portalDataAttribute}
+    >
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>Why are you reporting this?</Text>
       <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
