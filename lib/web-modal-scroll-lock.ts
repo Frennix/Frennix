@@ -60,8 +60,8 @@ export function restoreWebDocumentScrollLock(): void {
 }
 
 /**
- * Track an active root-level modal. Locks document scroll on body/html only — never mutates
- * #feed-scroll-list (inline feed touchAction/overflow breaks Safari pan-y, BUG-004).
+ * Track an active root-level modal. Does NOT mutate #feed-scroll-list — portal overlays
+ * block background touches; inline feed touchAction/overflow breaks Safari pan-y (BUG-004).
  */
 export function lockWebModalScroll(): void {
   if (typeof document === "undefined") return;
@@ -78,11 +78,6 @@ export function lockWebModalScroll(): void {
       htmlTouchAction: readInlineStyle(document.documentElement, "touchAction"),
       htmlOverscrollBehavior: readInlineStyle(document.documentElement, "overscrollBehavior"),
     };
-
-    document.body.style.overflow = "hidden";
-    document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.overflow = "hidden";
-    document.documentElement.style.overscrollBehavior = "none";
   }
 
   lockDepth += 1;
