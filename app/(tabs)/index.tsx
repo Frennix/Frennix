@@ -43,6 +43,13 @@ import {
   type StoryChallengeKey,
   type StoryQuickReactionEmoji,
 } from "@frennix/types";
+import { findFeedPostById } from "@/lib/find-feed-post";
+import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
+import {
+  navigateToPostCommentsFromVideoViewer,
+  usesMobileWebCommentsRoute,
+} from "@/lib/mobile-web-comments-route";
+import { consumeVideoViewerReturnState } from "@/lib/web-video-viewer-return";
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedBackground } from "@/components/FeedBackground";
@@ -147,7 +154,7 @@ export default function HomeScreen() {
   markFeedHook("post-reaction");
   const { toggleLikePost } = useFeedLike(userId);
   markFeedHook("feed-like");
-  const { openGallery, lightbox, lightboxVisible } = useImageLightbox();
+  const { openGallery, lightbox, lightboxVisible, closeGallery } = useImageLightbox();
   markFeedHook("image-lightbox");
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
@@ -224,10 +231,108 @@ export default function HomeScreen() {
   });
   markFeedHook("stories-query");
 
-  const { followingIds, toggleFollow, followMutation } = useSuggestedFollow(userId, {
+  const { followingIds, toggleFollow, followMutation, isFollowing } = useSuggestedFollow(userId, {
     enabled: deferFeedSecondary,
   });
   markFeedHook("suggested-follow");
+
+  const STRONG_WORK_EMOJI = "💪";
+
+  const buildImmersiveVideoContext = useCallback(
+    (post: Post): ImmersiveVideoGalleryContext | undefined => {
+      if (!usesMobileWebCommentsRoute()) return undefined;
+      const displayPost = post.shared_post ?? post;
+      const authorId = post.author?.id;
+      const showFollow = Boolean(authorId && authorId !== userId && !isFollowing(authorId));
+      return {
+        postActions: {
+          post,
+          onLike: () => toggleLikePost(post.id),
+          onRespect: () =>
+            postReaction.mutate({
+              postId: post.id,
+              emoji: STRONG_WORK_EMOJI,
+              currentEmoji: post.my_reaction,
+            }),
+          onComment: (playback, draft) => {
+            closeGallery(playback.mediaIndex);
+            navigateToPostCommentsFromVideoViewer(
+              post,
+              playback,
+              displayPost.media_urls ?? [],
+              {
+                draft,
+                thumbnailUrl: displayPost.thumbnail_url,
+                postType: displayPost.post_type,
+              }
+            );
+          },
+          onShare: () => openShare(post.shared_post ?? post),
+          onMore: () => openPostActions(post),
+          onAuthorPress: () => {
+            if (post.author?.username) pushScreen(`/user/${post.author.username}`);
+          },
+          onFollow: authorId ? () => toggleFollow(authorId) : undefined,
+          showFollow,
+        },
+      };
+    },
+    [
+      closeGallery,
+      isFollowing,
+      openPostActions,
+      openShare,
+      postReaction,
+      toggleFollow,
+      toggleLikePost,
+      userId,
+    ]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "web" || !userId || lightboxVisible) return;
+      const pending = consumeVideoViewerReturnState();
+      if (!pending) return;
+
+      const post = findFeedPostById(queryClient, userId, pending.postId);
+      if (!post) return;
+
+      const displayPost = post.shared_post ?? post;
+      const immersive = buildImmersiveVideoContext(post);
+      if (!immersive) return;
+
+      const frame = requestAnimationFrame(() => {
+        openGallery(pending.mediaUrls, pending.mediaIndex, (finalIndex) => {
+          setCarouselIndex(post.id, finalIndex);
+        }, {
+          postType: pending.postType ?? displayPost.post_type,
+          thumbnailUrl: pending.thumbnailUrl ?? displayPost.thumbnail_url,
+          immersiveVideo: {
+            ...immersive,
+            resumeHandoff: {
+              playbackId:
+                pending.playbackId ??
+                buildFeedVideoPlaybackId(pending.postId, pending.mediaIndex),
+              mediaIndex: pending.mediaIndex,
+              currentTime: pending.currentTime,
+              muted: pending.muted,
+              wasPlaying: pending.wasPlaying,
+            },
+          },
+        });
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }, [
+      buildImmersiveVideoContext,
+      lightboxVisible,
+      openGallery,
+      queryClient,
+      setCarouselIndex,
+      userId,
+    ])
+  );
 
   useQuery({
     queryKey: ["dismissed-suggestion-ids", userId],
@@ -744,12 +849,19 @@ export default function HomeScreen() {
       const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
       const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
       setCarouselIndex(post.id, index);
+      const mediaItems = normalizePostMediaItems(displayPost.media_urls ?? [], {
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
+      });
+      const immersiveVideo =
+        mediaItems[index]?.kind === "video" ? buildImmersiveVideoContext(post) : undefined;
       openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
         setCarouselIndex(post.id, finalIndex);
       }, {
         postType: displayPost.post_type,
         thumbnailUrl: displayPost.thumbnail_url,
         videoHandoff,
+        immersiveVideo,
       });
     },
   };

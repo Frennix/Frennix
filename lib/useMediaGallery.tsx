@@ -3,6 +3,7 @@ import type { PostMediaItem, PostType } from "@frennix/types";
 import { buildMediaGalleryState, normalizePostMediaItems } from "@frennix/types";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 import { ImageLightbox, type ImageGalleryState, type MediaGalleryState } from "@/components/ImageLightbox";
+import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 
 export type GalleryCloseHandler = (index: number) => void;
 
@@ -13,6 +14,8 @@ export type OpenGalleryOptions = {
   placeholderUris?: Array<string | null>;
   /** Feed inline video timestamp when opening fullscreen from the home feed. */
   videoHandoff?: FeedVideoFullscreenHandoff;
+  /** Mobile web immersive video — post actions and resume handoff. */
+  immersiveVideo?: ImmersiveVideoGalleryContext;
 };
 
 function isMediaGalleryState(
@@ -51,6 +54,7 @@ export function useMediaGallery() {
           index,
         }),
         videoHandoff: options?.videoHandoff,
+        immersiveVideo: options?.immersiveVideo,
       });
     },
     []
@@ -92,6 +96,7 @@ export function useImageLightbox() {
     openImage: media.openImage,
     openGallery: media.openGallery,
     closeImage: media.closeGallery,
+    closeGallery: media.closeGallery,
     lightbox: media.lightbox,
     lightboxVisible: Boolean(media.gallery),
   };

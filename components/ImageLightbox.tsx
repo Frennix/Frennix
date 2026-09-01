@@ -17,6 +17,9 @@ import { createPortal } from "react-dom";
 import { prefetchCachedImages, CachedImage } from "../packages/ui/src/CachedImage";
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
 import type { FeedVideoFullscreenHandoff } from "../packages/ui/src/feedVideoPlaybackCoordinator";
+import { ImmersiveVideoViewer } from "@/components/ImmersiveVideoViewer";
+import { isMobileWeb } from "@/lib/safari-visual-viewport";
+import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import { colors, spacing, typography } from "../packages/ui/src/theme";
 
 /** Compact Instagram-style lightbox close control (smaller than global touchTarget). */
@@ -45,6 +48,7 @@ export interface MediaGalleryState {
   items: PostMediaItem[];
   index: number;
   videoHandoff?: FeedVideoFullscreenHandoff;
+  immersiveVideo?: ImmersiveVideoGalleryContext;
 }
 
 export type GalleryState = ImageGalleryState | MediaGalleryState;
@@ -431,6 +435,12 @@ function LightboxSurface({
   const visible = items.length > 0;
   const videoHandoff =
     gallery && isMediaGalleryState(gallery) ? gallery.videoHandoff : undefined;
+  const immersiveVideo =
+    gallery && isMediaGalleryState(gallery) ? gallery.immersiveVideo : undefined;
+  const useImmersiveVideo =
+    Platform.OS === "web" &&
+    isMobileWeb() &&
+    Boolean(immersiveVideo?.postActions);
 
   const syncViewportSize = useCallback(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -659,6 +669,25 @@ function LightboxSurface({
                 ]}
               >
                 {item.kind === "video" ? (
+                  useImmersiveVideo ? (
+                    <ImmersiveVideoViewer
+                      item={item}
+                      mediaIndex={itemIndex}
+                      stageWidth={pageWidth}
+                      stageHeight={pageHeight}
+                      isActive={itemIndex === index}
+                      playbackHandoff={
+                        itemIndex === index
+                          ? immersiveVideo?.resumeHandoff ??
+                            (videoHandoff && videoHandoff.mediaIndex === itemIndex
+                              ? videoHandoff
+                              : undefined)
+                          : undefined
+                      }
+                      postActions={immersiveVideo!.postActions}
+                      onClose={dismiss}
+                    />
+                  ) : (
                   <View style={styles.imageStage}>
                     <FullscreenVideoSlide
                       uri={item.url}
@@ -675,6 +704,7 @@ function LightboxSurface({
                       }
                     />
                   </View>
+                  )
                 ) : Platform.OS === "web" ? (
                   <WebZoomableImage
                     uri={item.url}
@@ -697,6 +727,7 @@ function LightboxSurface({
       </Animated.View>
 
       <View style={styles.chromeLayer} pointerEvents="box-none">
+        {!useImmersiveVideo || items[index]?.kind !== "video" ? (
         <Pressable
           style={[styles.closeButton, { top: chromeTop }]}
           onPress={dismiss}
@@ -706,6 +737,7 @@ function LightboxSurface({
         >
           <Text style={styles.closeText}>✕</Text>
         </Pressable>
+        ) : null}
 
         {items.length > 1 ? (
           <View style={[styles.galleryCounter, { top: chromeTop }]} pointerEvents="none">

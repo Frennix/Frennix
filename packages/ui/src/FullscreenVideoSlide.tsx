@@ -1,7 +1,9 @@
 import {
   createElement,
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
@@ -46,7 +48,23 @@ interface FullscreenVideoSlideProps {
   isActive: boolean;
   /** Feed → fullscreen timestamp handoff for the active slide. */
   playbackHandoff?: FeedVideoFullscreenHandoff;
+  /** Immersive social viewer — hide transport/scrubber chrome; parent renders controls. */
+  immersiveMode?: boolean;
 }
+
+export type FullscreenVideoPlaybackSnapshot = {
+  currentTime: number;
+  muted: boolean;
+  wasPlaying: boolean;
+};
+
+export type FullscreenVideoSlideHandle = {
+  getPlaybackSnapshot: () => FullscreenVideoPlaybackSnapshot;
+  pause: () => void;
+  play: () => void;
+  toggleMute: () => void;
+  isMuted: () => boolean;
+};
 
 function formatVideoTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -67,14 +85,21 @@ function configureInlineWebVideo(video: HTMLVideoElement) {
 }
 
 /** Full-screen gallery video — Frennix-owned controls only; no native controls layer. */
-export function FullscreenVideoSlide({
-  uri,
-  thumbnailUrl,
-  stageWidth,
-  stageHeight,
-  isActive,
-  playbackHandoff,
-}: FullscreenVideoSlideProps) {
+export const FullscreenVideoSlide = forwardRef<
+  FullscreenVideoSlideHandle,
+  FullscreenVideoSlideProps
+>(function FullscreenVideoSlide(
+  {
+    uri,
+    thumbnailUrl,
+    stageWidth,
+    stageHeight,
+    isActive,
+    playbackHandoff,
+    immersiveMode = false,
+  },
+  ref
+) {
   const posterState = useVideoPoster(uri, thumbnailUrl);
   const [muted, setMuted] = useState(playbackHandoff?.muted ?? false);
   const [buffering, setBuffering] = useState(false);
@@ -193,10 +218,13 @@ export function FullscreenVideoSlide({
     video.muted = muted;
     if (isActive && !failed) {
       void video.play().catch(() => setFailed(true));
+      if (playbackHandoff && handoffAppliedRef.current && !playbackHandoff.wasPlaying) {
+        video.pause();
+      }
       return;
     }
     video.pause();
-  }, [handoffReady, isActive, muted, failed, uri, retryKey]);
+  }, [handoffReady, isActive, muted, failed, uri, retryKey, playbackHandoff]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -233,6 +261,43 @@ export function FullscreenVideoSlide({
     setMuted((current) => !current);
     revealControls();
   }, [revealControls]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getPlaybackSnapshot: (): FullscreenVideoPlaybackSnapshot => {
+        const video = webVideoRef.current;
+        if (Platform.OS === "web" && video) {
+          return {
+            currentTime: video.currentTime,
+            muted: video.muted,
+            wasPlaying: !video.paused,
+          };
+        }
+        return {
+          currentTime,
+          muted,
+          wasPlaying: !isPaused,
+        };
+      },
+      pause: () => {
+        const video = webVideoRef.current;
+        if (video) video.pause();
+        else nativeVideoRef.current?.pauseAsync().catch(() => undefined);
+      },
+      play: () => {
+        const video = webVideoRef.current;
+        if (video) void video.play().catch(() => setFailed(true));
+        else nativeVideoRef.current?.playAsync().catch(() => setFailed(true));
+      },
+      toggleMute,
+      isMuted: () => {
+        const video = webVideoRef.current;
+        return video ? video.muted : muted;
+      },
+    }),
+    [currentTime, isPaused, muted, toggleMute]
+  );
 
   const togglePlayPause = useCallback(() => {
     const video = webVideoRef.current;
@@ -303,6 +368,7 @@ export function FullscreenVideoSlide({
   const webChromeMute =
     Platform.OS === "web" &&
     isActive &&
+    !immersiveMode &&
     typeof document !== "undefined"
       ? createPortal(
           <Pressable
@@ -380,11 +446,12 @@ export function FullscreenVideoSlide({
 
           <Pressable
             style={styles.tapSurface}
-            onPress={revealControls}
+            onPress={immersiveMode ? togglePlayPause : revealControls}
             accessibilityRole="button"
-            accessibilityLabel="Show video controls"
+            accessibilityLabel={immersiveMode ? "Play or pause video" : "Show video controls"}
           />
 
+          {!immersiveMode ? (
           <View
             pointerEvents={chromeControlsVisible ? "box-none" : "none"}
             style={[
@@ -462,6 +529,7 @@ export function FullscreenVideoSlide({
               <Text style={styles.timeText}>{formatVideoTime(duration)}</Text>
             </View>
           </View>
+          ) : null}
         </>
       ) : (
         (() => {
@@ -519,7 +587,7 @@ export function FullscreenVideoSlide({
       {webChromeMute}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   stage: {
