@@ -300,14 +300,18 @@ const styles = StyleSheet.create({
     minHeight: 24,
     maxHeight: 96,
     paddingVertical: 0,
+    paddingHorizontal: 0,
     color: colors.text,
     fontSize: 15,
     lineHeight: 20,
+    backgroundColor: "transparent",
     ...(Platform.OS === "web"
       ? ({
           outlineStyle: "none",
+          borderWidth: 0,
           WebkitTextFillColor: colors.text,
           caretColor: colors.text,
+          width: "100%",
         } as object)
       : null),
   },

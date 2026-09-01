@@ -49,6 +49,12 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
+      "scroll lock sets body/html overflow hidden",
+      lockSource.includes('document.body.style.overflow = "hidden"') &&
+        lockSource.includes('document.documentElement.style.overflow = "hidden"')
+    ) && ok;
+  ok =
+    pass(
       "scroll lock exposes diagnostics",
       lockSource.includes("collectFeedTouchDiagnostics") && lockSource.includes("getWebModalScrollLockDepth")
     ) && ok;

@@ -25,6 +25,7 @@ import {
   measureSafariVisualViewport,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
+  type SafariVisualViewportSnapshot,
 } from "@/lib/safari-visual-viewport";
 import { lockWebModalScroll, restoreWebDocumentScrollLock, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
@@ -50,11 +51,8 @@ const WEB_OVERLAY_ROOT: ViewStyle = Platform.select({
     position: "fixed",
     left: 0,
     right: 0,
-    width: "100vw",
+    width: "100%",
     zIndex: COMMENTS_SHEET_Z_INDEX,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "flex-end",
     overflow: "hidden",
     touchAction: "none",
   },
@@ -63,6 +61,17 @@ const WEB_OVERLAY_ROOT: ViewStyle = Platform.select({
     justifyContent: "flex-end",
   },
 }) as ViewStyle;
+
+function computeClosedSheetHeight(baselineVisualHeight: number): number {
+  const target = Math.round(baselineVisualHeight * SHEET_OPEN_RATIO);
+  const max = Math.round(baselineVisualHeight * SHEET_MAX_RATIO);
+  return Math.min(Math.max(target, 280), max);
+}
+
+function isKeyboardOpen(viewport: SafariVisualViewportSnapshot | null): boolean {
+  if (!viewport) return false;
+  return viewport.bottomChrome > 0;
+}
 
 export function CommentsBottomSheet({
   visible,
@@ -78,6 +87,8 @@ export function CommentsBottomSheet({
   const dragY = useRef(new Animated.Value(0)).current;
   const dismissingRef = useRef(false);
   const openedAtRef = useRef(0);
+  /** Visual viewport height captured when the sheet opens — keeps closed height stable. */
+  const baselineVisualHeightRef = useRef(0);
   const [viewport, setViewport] = useState(() =>
     Platform.OS === "web" ? measureSafariVisualViewport() : null
   );
@@ -85,7 +96,19 @@ export function CommentsBottomSheet({
   useEffect(() => {
     if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
 
-    const update = () => setViewport(measureSafariVisualViewport());
+    const update = () => {
+      const next = measureSafariVisualViewport();
+      setViewport((prev) =>
+        prev &&
+        prev.offsetTop === next.offsetTop &&
+        prev.overlayHeight === next.overlayHeight &&
+        prev.bottomChrome === next.bottomChrome &&
+        prev.visualHeight === next.visualHeight
+          ? prev
+          : next
+      );
+    };
+
     update();
     return subscribeSafariVisualViewport(update);
   }, [visible]);
@@ -96,7 +119,12 @@ export function CommentsBottomSheet({
       fade.setValue(0);
       dragY.setValue(0);
       dismissingRef.current = false;
+      baselineVisualHeightRef.current = 0;
       return;
+    }
+
+    if (Platform.OS === "web") {
+      baselineVisualHeightRef.current = measureSafariVisualViewport().visualHeight;
     }
 
     slide.setValue(0);
@@ -172,14 +200,17 @@ export function CommentsBottomSheet({
       ? (viewport?.overlayHeight ?? (typeof window !== "undefined" ? window.innerHeight : 640))
       : undefined;
 
+  const keyboardOpen = Platform.OS === "web" && isKeyboardOpen(viewport);
+  const baselineVisualHeight =
+    baselineVisualHeightRef.current ||
+    viewport?.visualHeight ||
+    (typeof window !== "undefined" ? window.innerHeight : 640);
+
   const sheetHeight = useMemo(() => {
-    if (Platform.OS === "web" && overlayHeight) {
-      const target = Math.round(overlayHeight * SHEET_OPEN_RATIO);
-      const max = Math.round(overlayHeight * SHEET_MAX_RATIO);
-      return Math.min(Math.max(target, 280), max);
-    }
-    return undefined;
-  }, [overlayHeight]);
+    if (Platform.OS !== "web") return undefined;
+    if (keyboardOpen && overlayHeight) return overlayHeight;
+    return computeClosedSheetHeight(baselineVisualHeight);
+  }, [baselineVisualHeight, keyboardOpen, overlayHeight]);
 
   const openOffset = sheetHeight ?? 420;
   const translateY = Animated.add(
@@ -190,7 +221,11 @@ export function CommentsBottomSheet({
     dragY
   );
 
-  const composerBottomInset = Math.max(insets.bottom, spacing.sm);
+  const composerSafeBottom = Math.max(
+    insets.bottom,
+    viewport?.envSafeAreaBottom ?? 0,
+    spacing.sm
+  );
 
   if (!visible) return null;
 
@@ -213,23 +248,25 @@ export function CommentsBottomSheet({
         accessibilityRole="button"
         accessibilityLabel={backdropAccessibilityLabel}
       >
-        <Animated.View style={[styles.backdrop, { opacity: fade }]} pointerEvents="none" />
+        <Animated.View style={[styles.backdrop, { opacity: fade }]} />
       </Pressable>
 
       <Animated.View
         style={[
           styles.sheet,
+          Platform.OS === "web" ? styles.sheetWeb : null,
           {
             height: sheetHeight ?? ("70%" as const),
             maxHeight:
               Platform.OS === "web" && overlayHeight
-                ? overlayHeight - 8
+                ? overlayHeight
                 : ("75%" as const),
-            paddingBottom: composerBottomInset,
             transform: [{ translateY }],
           },
         ]}
       >
+        <View style={styles.sheetSolidFill} pointerEvents="none" />
+
         <View style={styles.handleWrap} {...headerPanResponder.panHandlers}>
           <View style={styles.handle} />
         </View>
@@ -260,7 +297,7 @@ export function CommentsBottomSheet({
           {children}
         </ScrollView>
 
-        <View style={styles.composerHost}>{composer}</View>
+        <View style={[styles.composerHost, { paddingBottom: composerSafeBottom }]}>{composer}</View>
       </Animated.View>
     </View>
   );
@@ -288,10 +325,15 @@ const SHEET_TOP_RADIUS = radius.lg + 8;
 const styles = StyleSheet.create({
   backdropPressable: {
     ...StyleSheet.absoluteFillObject,
+    ...(Platform.OS === "web"
+      ? ({
+          touchAction: "none",
+        } as object)
+      : null),
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 10, 11, 0.82)",
+    backgroundColor: "rgba(10, 10, 11, 0.88)",
   },
   sheet: {
     backgroundColor: colors.surface,
@@ -309,12 +351,26 @@ const styles = StyleSheet.create({
         } as object)
       : null),
   },
+  sheetWeb: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexShrink: 0,
+    touchAction: "none",
+  },
+  sheetSolidFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.surface,
+  },
   handleWrap: {
     alignItems: "center",
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxs,
     minHeight: touchTarget / 2,
     justifyContent: "center",
+    flexShrink: 0,
+    zIndex: 1,
   },
   handle: {
     width: 36,
@@ -331,6 +387,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     flexShrink: 0,
+    zIndex: 1,
   },
   title: {
     ...typography.heading,
@@ -357,11 +414,13 @@ const styles = StyleSheet.create({
   listScroll: {
     flex: 1,
     minHeight: 0,
+    zIndex: 1,
     ...(Platform.OS === "web"
       ? ({
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
           touchAction: "pan-y",
+          overscrollBehavior: "contain",
         } as object)
       : null),
   },
@@ -378,5 +437,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.md,
+    zIndex: 1,
+    ...(Platform.OS === "web"
+      ? ({
+          touchAction: "none",
+        } as object)
+      : null),
   },
 });
