@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -13,7 +13,6 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { CommentsBottomSheet } from "@/components/CommentsBottomSheet";
 import { useCommentActions } from "@/lib/useCommentActions";
-import { assertCommentsModalGeometry } from "@/lib/comments-keyboard-diagnostics";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
@@ -48,33 +47,7 @@ type CommentComposerRowProps = {
   placeholder: string;
   onPost: () => void;
   posting: boolean;
-  inputRef?: RefObject<TextInput | null>;
-  onComposerFocus?: () => void;
-  onComposerBlur?: () => void;
 };
-
-function focusComposerInputWithoutScroll(inputRef: RefObject<TextInput | null>): void {
-  if (Platform.OS !== "web" || typeof document === "undefined") {
-    inputRef.current?.focus();
-    return;
-  }
-
-  const native = inputRef.current as unknown as { setNativeProps?: (props: object) => void };
-  native?.setNativeProps?.({});
-
-  const domInput = document.querySelector(
-    '[data-frennix-comment-input="true"]'
-  ) as HTMLElement | null;
-  if (domInput && "focus" in domInput && typeof domInput.focus === "function") {
-    try {
-      (domInput.focus as (options?: FocusOptions) => void)({ preventScroll: true });
-      return;
-    } catch {
-      domInput.focus();
-    }
-  }
-  inputRef.current?.focus();
-}
 
 function CommentComposerRow({
   avatarUri,
@@ -84,21 +57,14 @@ function CommentComposerRow({
   placeholder,
   onPost,
   posting,
-  inputRef,
-  onComposerFocus,
-  onComposerBlur,
 }: CommentComposerRowProps) {
   const canPost = Boolean(value.trim()) && !posting;
 
   return (
     <View style={styles.composerRow}>
       <Avatar uri={avatarUri} name={avatarName} size={32} deferImagePlaceholder />
-      <Pressable
-        style={styles.composerField}
-        onPress={() => inputRef && focusComposerInputWithoutScroll(inputRef)}
-      >
+      <View style={styles.composerField}>
         <TextInput
-          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -108,12 +74,9 @@ function CommentComposerRow({
           maxLength={2000}
           returnKeyType="default"
           blurOnSubmit={false}
-          onFocus={onComposerFocus}
-          onBlur={onComposerBlur}
           {...(Platform.OS === "web"
             ? ({
                 enterKeyHint: "send",
-                "data-frennix-comment-input": "true",
               } as object)
             : null)}
         />
@@ -131,7 +94,7 @@ function CommentComposerRow({
             <Text style={[styles.postLabel, !canPost && styles.postLabelDisabled]}>Post</Text>
           )}
         </Pressable>
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -148,7 +111,6 @@ export function PostCommentsSheet({
   const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
-  const composerInputRef = useRef<TextInput>(null);
 
   const { openCommentActions, commentActionSheets, resetCommentActions } = useCommentActions({
     userId,
@@ -295,17 +257,6 @@ export function PostCommentsSheet({
               placeholder={commentPlaceholder}
               onPost={handlePost}
               posting={commentMutation.isPending}
-              inputRef={composerInputRef}
-              onComposerFocus={() => {
-                if (Platform.OS === "web") {
-                  requestAnimationFrame(() => assertCommentsModalGeometry("composer-focus"));
-                }
-              }}
-              onComposerBlur={() => {
-                if (Platform.OS === "web") {
-                  requestAnimationFrame(() => assertCommentsModalGeometry("composer-blur"));
-                }
-              }}
             />
           </>
         }
