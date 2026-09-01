@@ -1,78 +1,194 @@
 const FEED_SCROLL_LIST_ID = "feed-scroll-list";
 
-type SavedScrollState = {
-  feedScrollTop: number;
-  feedOverflow: string;
-  feedTouchAction: string;
+type SavedDocumentStyles = {
   bodyOverflow: string;
   bodyPosition: string;
   bodyTop: string;
   bodyWidth: string;
+  bodyTouchAction: string;
+  bodyOverscrollBehavior: string;
   htmlOverflow: string;
+  htmlTouchAction: string;
+  htmlOverscrollBehavior: string;
 };
 
 let lockDepth = 0;
-let saved: SavedScrollState | null = null;
+let savedDocument: SavedDocumentStyles | null = null;
 
 function readFeedScrollElement(): HTMLElement | null {
   if (typeof document === "undefined") return null;
   return document.getElementById(FEED_SCROLL_LIST_ID);
 }
 
-/** Freeze feed scroll and lock the document while a root-level modal is open (Safari/PWA). */
+function readInlineStyle(el: HTMLElement, prop: keyof CSSStyleDeclaration): string {
+  const value = el.style[prop];
+  return typeof value === "string" ? value : "";
+}
+
+/** Clear stale inline scroll/touch locks on the feed scrollport (Safari BUG-004 recovery). */
+export function clearFeedScrollInlineLocks(): void {
+  const feed = readFeedScrollElement();
+  if (!feed) return;
+  feed.style.removeProperty("overflow");
+  feed.style.removeProperty("overflow-y");
+  feed.style.removeProperty("overflow-x");
+  feed.style.removeProperty("touch-action");
+}
+
+/**
+ * Restore document + feed scroll surfaces after overlays close.
+ * Safe to call repeatedly — clears orphaned locks from overlapping modals.
+ */
+export function restoreWebDocumentScrollLock(): void {
+  if (typeof document === "undefined") return;
+
+  clearFeedScrollInlineLocks();
+
+  document.body.style.removeProperty("overflow");
+  document.body.style.removeProperty("position");
+  document.body.style.removeProperty("top");
+  document.body.style.removeProperty("width");
+  document.body.style.removeProperty("touch-action");
+  document.body.style.removeProperty("overscroll-behavior");
+
+  document.documentElement.style.removeProperty("overflow");
+  document.documentElement.style.removeProperty("touch-action");
+  document.documentElement.style.removeProperty("overscroll-behavior");
+
+  lockDepth = 0;
+  savedDocument = null;
+}
+
+/**
+ * Track an active root-level modal. Does NOT mutate #feed-scroll-list — portal overlays
+ * block background touches; inline feed touchAction/overflow breaks Safari pan-y (BUG-004).
+ */
 export function lockWebModalScroll(): void {
   if (typeof document === "undefined") return;
+
   if (lockDepth === 0) {
-    const feed = readFeedScrollElement();
-    saved = {
-      feedScrollTop: feed?.scrollTop ?? 0,
-      feedOverflow: feed?.style.overflow ?? "",
-      feedTouchAction: feed?.style.touchAction ?? "",
-      bodyOverflow: document.body.style.overflow,
-      bodyPosition: document.body.style.position,
-      bodyTop: document.body.style.top,
-      bodyWidth: document.body.style.width,
-      htmlOverflow: document.documentElement.style.overflow,
+    savedDocument = {
+      bodyOverflow: readInlineStyle(document.body, "overflow"),
+      bodyPosition: readInlineStyle(document.body, "position"),
+      bodyTop: readInlineStyle(document.body, "top"),
+      bodyWidth: readInlineStyle(document.body, "width"),
+      bodyTouchAction: readInlineStyle(document.body, "touchAction"),
+      bodyOverscrollBehavior: readInlineStyle(document.body, "overscrollBehavior"),
+      htmlOverflow: readInlineStyle(document.documentElement, "overflow"),
+      htmlTouchAction: readInlineStyle(document.documentElement, "touchAction"),
+      htmlOverscrollBehavior: readInlineStyle(document.documentElement, "overscrollBehavior"),
     };
-
-    if (feed) {
-      feed.style.overflow = "hidden";
-      feed.style.touchAction = "none";
-    }
-
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
   }
+
   lockDepth += 1;
 }
 
-/** Restore feed scroll position and document overflow after modal close. */
+/** Release one modal scroll lock; restore document styles when the final modal closes. */
 export function unlockWebModalScroll(): void {
   if (typeof document === "undefined" || lockDepth === 0) return;
-  lockDepth -= 1;
-  if (lockDepth > 0 || !saved) return;
 
-  const feed = readFeedScrollElement();
-  if (feed) {
-    feed.style.overflow = saved.feedOverflow;
-    feed.style.touchAction = saved.feedTouchAction;
-    feed.scrollTop = saved.feedScrollTop;
+  lockDepth -= 1;
+  if (lockDepth > 0 || !savedDocument) return;
+
+  const saved = savedDocument;
+  savedDocument = null;
+
+  const restoreProp = (el: HTMLElement, prop: string, value: string) => {
+    if (value) el.style.setProperty(prop, value);
+    else el.style.removeProperty(prop);
+  };
+
+  restoreProp(document.body, "overflow", saved.bodyOverflow);
+  restoreProp(document.body, "position", saved.bodyPosition);
+  restoreProp(document.body, "top", saved.bodyTop);
+  restoreProp(document.body, "width", saved.bodyWidth);
+  restoreProp(document.body, "touch-action", saved.bodyTouchAction);
+  restoreProp(document.body, "overscroll-behavior", saved.bodyOverscrollBehavior);
+
+  restoreProp(document.documentElement, "overflow", saved.htmlOverflow);
+  restoreProp(document.documentElement, "touch-action", saved.htmlTouchAction);
+  restoreProp(document.documentElement, "overscroll-behavior", saved.htmlOverscrollBehavior);
+
+  clearFeedScrollInlineLocks();
+}
+
+export function getWebModalScrollLockDepth(): number {
+  return lockDepth;
+}
+
+export type FeedTouchDiagnostics = {
+  lockDepth: number;
+  feedScrollTop: number;
+  feedTouchAction: string;
+  feedOverflowY: string;
+  bodyOverflow: string;
+  bodyPosition: string;
+  bodyTouchAction: string;
+  htmlOverflow: string;
+  htmlTouchAction: string;
+  elementFromPoint: string | null;
+  mountedPortals: string[];
+  hiddenModalCount: number;
+};
+
+/** Dev/test probe for Safari feed touch regressions. */
+export function collectFeedTouchDiagnostics(): FeedTouchDiagnostics {
+  if (typeof document === "undefined") {
+    return {
+      lockDepth,
+      feedScrollTop: 0,
+      feedTouchAction: "n/a",
+      feedOverflowY: "n/a",
+      bodyOverflow: "n/a",
+      bodyPosition: "n/a",
+      bodyTouchAction: "n/a",
+      htmlOverflow: "n/a",
+      htmlTouchAction: "n/a",
+      elementFromPoint: null,
+      mountedPortals: [],
+      hiddenModalCount: 0,
+    };
   }
 
-  if (saved.bodyOverflow) document.body.style.overflow = saved.bodyOverflow;
-  else document.body.style.removeProperty("overflow");
+  const feed = readFeedScrollElement();
+  const feedStyle = feed ? getComputedStyle(feed) : null;
+  const bodyStyle = getComputedStyle(document.body);
+  const htmlStyle = getComputedStyle(document.documentElement);
 
-  if (saved.bodyPosition) document.body.style.position = saved.bodyPosition;
-  else document.body.style.removeProperty("position");
+  const cx = Math.round(window.innerWidth / 2);
+  const cy = Math.round(window.innerHeight * 0.55);
+  const hit = document.elementFromPoint(cx, cy);
+  const elementFromPoint =
+    hit instanceof Element
+      ? `${hit.tagName.toLowerCase()}${hit.id ? `#${hit.id}` : ""}`
+      : null;
 
-  if (saved.bodyTop) document.body.style.top = saved.bodyTop;
-  else document.body.style.removeProperty("top");
+  const portalSelectors = [
+    '[data-frennix-comments-sheet="true"]',
+    '[data-frennix-comment-options="true"]',
+    '[data-frennix-comment-edit="true"]',
+    '[data-frennix-comment-report="true"]',
+    '[data-frennix-image-lightbox="true"]',
+  ];
+  const mountedPortals = portalSelectors.filter((sel) => document.querySelector(sel));
 
-  if (saved.bodyWidth) document.body.style.width = saved.bodyWidth;
-  else document.body.style.removeProperty("width");
+  return {
+    lockDepth,
+    feedScrollTop: feed?.scrollTop ?? 0,
+    feedTouchAction: feedStyle?.touchAction ?? "missing",
+    feedOverflowY: feedStyle?.overflowY ?? "missing",
+    bodyOverflow: bodyStyle.overflow,
+    bodyPosition: bodyStyle.position,
+    bodyTouchAction: bodyStyle.touchAction,
+    htmlOverflow: htmlStyle.overflow,
+    htmlTouchAction: htmlStyle.touchAction,
+    elementFromPoint,
+    mountedPortals,
+    hiddenModalCount: document.querySelectorAll('[role="dialog"],[aria-modal="true"]').length,
+  };
+}
 
-  if (saved.htmlOverflow) document.documentElement.style.overflow = saved.htmlOverflow;
-  else document.documentElement.style.removeProperty("overflow");
-
-  saved = null;
+if (typeof window !== "undefined") {
+  (window as Window & { __FRENNIX_FEED_TOUCH_DIAG__?: () => FeedTouchDiagnostics }).__FRENNIX_FEED_TOUCH_DIAG__ =
+    collectFeedTouchDiagnostics;
 }

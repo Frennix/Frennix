@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Platform } from "react-native";
 import { isFeedScrollDebugEnabled } from "@/lib/feed-scroll-debug";
+import { collectFeedTouchDiagnostics, getWebModalScrollLockDepth } from "@/lib/web-modal-scroll-lock";
 
 export type FeedScrollDebugSnapshot = {
   scrollable: boolean;
@@ -23,6 +24,12 @@ export type FeedScrollDebugSnapshot = {
   storyVisible: boolean;
   shareSheetVisible: boolean;
   lightboxVisible: boolean;
+  /** Reference-count depth for root modal scroll locks (0 when healthy). */
+  scrollLockDepth: number;
+  feedTouchAction: string;
+  feedOverflowY: string;
+  elementFromPointCenter: string | null;
+  mountedPortals: string[];
 };
 
 const EMPTY_SNAPSHOT: FeedScrollDebugSnapshot = {
@@ -44,6 +51,11 @@ const EMPTY_SNAPSHOT: FeedScrollDebugSnapshot = {
   storyVisible: false,
   shareSheetVisible: false,
   lightboxVisible: false,
+  scrollLockDepth: 0,
+  feedTouchAction: "—",
+  feedOverflowY: "—",
+  elementFromPointCenter: null,
+  mountedPortals: [],
 };
 
 function describeElement(el: Element): string {
@@ -180,6 +192,7 @@ export function useFeedScrollDebug({
     const { contentHeight, listLayoutHeight } = metricsRef.current;
     const scrollable = contentHeight > listLayoutHeight + 1;
     const domScan = scanDomOverlays();
+    const touchDiag = collectFeedTouchDiagnostics();
     const now = Date.now();
     const lastScrollAt = lastScrollAtRef.current;
     const scrollEventsFiring = lastScrollAt != null && now - lastScrollAt < 3000;
@@ -203,6 +216,11 @@ export function useFeedScrollDebug({
       storyVisible,
       shareSheetVisible,
       lightboxVisible,
+      scrollLockDepth: getWebModalScrollLockDepth(),
+      feedTouchAction: touchDiag.feedTouchAction,
+      feedOverflowY: touchDiag.feedOverflowY,
+      elementFromPointCenter: touchDiag.elementFromPoint,
+      mountedPortals: touchDiag.mountedPortals,
     });
   }, [enabled, listRef, scrollEnabled, storyVisible, shareSheetVisible, lightboxVisible, viewportHeight]);
 

@@ -26,7 +26,7 @@ import {
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
 } from "@/lib/safari-visual-viewport";
-import { lockWebModalScroll, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
+import { lockWebModalScroll, restoreWebDocumentScrollLock, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
@@ -119,6 +119,7 @@ export function CommentsBottomSheet({
       setCommentsOverlayOpen(false);
       if (Platform.OS === "web") {
         unlockWebModalScroll();
+        restoreWebDocumentScrollLock();
         requestSafariVisualViewportRemeasure();
       }
     };

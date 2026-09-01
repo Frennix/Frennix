@@ -24,7 +24,7 @@ import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { useLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
 import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import { useTabSceneLayoutGuard } from "@/lib/tab-scene-layout-guard";
-import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
+import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 
 const HeaderBell = memo(function HeaderBell() {

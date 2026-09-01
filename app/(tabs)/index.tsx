@@ -105,7 +105,7 @@ import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
-import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
+import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 export default function HomeScreen() {

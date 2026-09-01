@@ -32,7 +32,7 @@ import AnimatedReanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { setLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
-import { restoreWebDocumentScrollLock } from "@/lib/web-document-scroll-lock";
+import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 
 /** @deprecated Use MediaGalleryState with typed items. */
 export interface ImageGalleryState {

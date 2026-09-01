@@ -13,6 +13,7 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { CommentsBottomSheet } from "@/components/CommentsBottomSheet";
 import { useCommentActions } from "@/lib/useCommentActions";
+import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
@@ -134,6 +135,7 @@ export function PostCommentsSheet({
       setCommentText("");
       setReplyTo(null);
       resetCommentActions();
+      if (Platform.OS === "web") restoreWebDocumentScrollLock();
       return;
     }
     if (initialDraft) {
