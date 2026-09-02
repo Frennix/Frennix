@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -8,6 +15,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeSyntheticEvent,
+  type TextInputContentSizeChangeEventData,
 } from "react-native";
 import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
@@ -15,6 +24,106 @@ import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
+
+const MIN_COMMENT_INPUT_HEIGHT = 22;
+const ESTIMATED_LINE_HEIGHT = 22;
+/** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
+const MAX_VISIBLE_LINES = 5;
+const COMMENT_FIELD_PAD_Y = Platform.OS === "web" ? 16 : 12;
+
+function computeCommentMaxInputHeight(): number {
+  return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT;
+}
+
+function syncWebTextareaHeight(
+  textarea: HTMLTextAreaElement,
+  maxHeight: number
+): number {
+  textarea.style.setProperty("height", "0px", "important");
+  textarea.style.setProperty("overflow-y", "hidden", "important");
+  const measured = Math.ceil(textarea.scrollHeight);
+  const next = Math.min(Math.max(MIN_COMMENT_INPUT_HEIGHT, measured), maxHeight);
+  textarea.style.setProperty("height", `${next}px`, "important");
+  textarea.style.setProperty(
+    "overflow-y",
+    next >= maxHeight - 1 ? "auto" : "hidden",
+    "important"
+  );
+  return next;
+}
+
+type WebCommentTextareaProps = {
+  value: string;
+  placeholder: string;
+  maxHeight: number;
+  onChangeText: (text: string) => void;
+  onHeightChange: (height: number) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+};
+
+function WebCommentTextarea({
+  value,
+  placeholder,
+  maxHeight,
+  onChangeText,
+  onHeightChange,
+  onFocus,
+  onBlur,
+}: WebCommentTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const remeasure = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const next = syncWebTextareaHeight(textarea, maxHeight);
+    onHeightChange(next);
+    if (textarea.selectionStart === textarea.value.length) {
+      textarea.scrollTop = textarea.scrollHeight;
+    }
+  }, [maxHeight, onHeightChange]);
+
+  useLayoutEffect(() => {
+    remeasure();
+  }, [value, maxHeight, remeasure]);
+
+  const webInputStyle = StyleSheet.flatten([
+    styles.composerInput,
+    styles.composerWebTextarea,
+    { maxHeight },
+  ]) as React.CSSProperties;
+
+  return React.createElement("textarea", {
+    ref: textareaRef,
+    value,
+    rows: 1,
+    wrap: "soft",
+    enterKeyHint: "enter",
+    inputMode: "text",
+    autoComplete: "off",
+    autoCorrect: "on",
+    spellCheck: true,
+    "data-frennix-comment-input": "true",
+    placeholder,
+    onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onChangeText(event.target.value);
+      requestAnimationFrame(remeasure);
+    },
+    onFocus: (event: React.FocusEvent<HTMLTextAreaElement>) => {
+      event.target.setAttribute("enterkeyhint", "enter");
+      remeasure();
+      onFocus?.();
+    },
+    onBlur: () => {
+      onBlur?.();
+    },
+    onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== "Enter") return;
+      event.stopPropagation();
+    },
+    style: webInputStyle,
+  });
+}
 
 function appendOptimisticComment(
   comments: Comment[],
@@ -53,30 +162,74 @@ export function CommentComposerRow({
   onComposerBlur,
 }: CommentComposerRowProps) {
   const canPost = Boolean(value.trim()) && !posting;
+  const maxInputHeight = computeCommentMaxInputHeight();
+  const [inputHeight, setInputHeight] = useState(MIN_COMMENT_INPUT_HEIGHT);
+  const fieldMinHeight = Math.max(40, inputHeight + COMMENT_FIELD_PAD_Y);
+
+  const handleNativeContentSizeChange = useCallback(
+    (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
+      const contentHeight = event.nativeEvent.contentSize.height;
+      const nextHeight = Math.min(
+        Math.max(MIN_COMMENT_INPUT_HEIGHT, Math.ceil(contentHeight)),
+        maxInputHeight
+      );
+      setInputHeight((current) => (current === nextHeight ? current : nextHeight));
+    },
+    [maxInputHeight]
+  );
+
+  const handleWebHeightChange = useCallback((height: number) => {
+    setInputHeight((current) => (current === height ? current : height));
+  }, []);
+
+  useEffect(() => {
+    if (!value) {
+      setInputHeight(MIN_COMMENT_INPUT_HEIGHT);
+    }
+  }, [value]);
+
+  const inputScrollEnabled = inputHeight >= maxInputHeight - 1;
 
   return (
     <View style={styles.composerRow}>
       <Avatar uri={avatarUri} name={avatarName} size={32} deferImagePlaceholder />
-      <View style={styles.composerField}>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          style={styles.composerInput}
-          multiline
-          maxLength={2000}
-          returnKeyType="default"
-          blurOnSubmit={false}
-          onFocus={onComposerFocus}
-          onBlur={onComposerBlur}
-          {...(Platform.OS === "web"
-            ? ({
-                enterKeyHint: "send",
-                "data-frennix-comment-input": "true",
-              } as object)
-            : null)}
-        />
+      <View style={[styles.composerField, { minHeight: fieldMinHeight }]}>
+        {Platform.OS === "web" ? (
+          <View style={styles.composerInputWrap}>
+            <WebCommentTextarea
+              value={value}
+              placeholder={placeholder}
+              maxHeight={maxInputHeight}
+              onChangeText={onChangeText}
+              onHeightChange={handleWebHeightChange}
+              onFocus={onComposerFocus}
+              onBlur={onComposerBlur}
+            />
+          </View>
+        ) : (
+          <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            onContentSizeChange={handleNativeContentSizeChange}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textMuted}
+            style={[
+              styles.composerInput,
+              {
+                height: Math.max(MIN_COMMENT_INPUT_HEIGHT, inputHeight),
+                maxHeight: maxInputHeight,
+              },
+            ]}
+            multiline
+            scrollEnabled={inputScrollEnabled}
+            maxLength={2000}
+            blurOnSubmit={false}
+            returnKeyType="default"
+            textAlignVertical="top"
+            onFocus={onComposerFocus}
+            onBlur={onComposerBlur}
+          />
+        )}
         <Pressable
           onPress={onPost}
           disabled={!canPost}
@@ -320,7 +473,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 40,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: spacing.xs,
     borderRadius: 999,
     borderWidth: 1,
@@ -330,10 +483,14 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm,
     paddingVertical: Platform.OS === "web" ? 8 : 6,
   },
+  composerInputWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
   composerInput: {
     flex: 1,
-    minHeight: 24,
-    maxHeight: 96,
+    flexShrink: 1,
+    minHeight: MIN_COMMENT_INPUT_HEIGHT,
     paddingVertical: 0,
     color: colors.text,
     fontSize: Platform.OS === "web" ? 16 : 15,
@@ -345,6 +502,15 @@ const styles = StyleSheet.create({
           caretColor: colors.text,
         } as object)
       : null),
+  },
+  composerWebTextarea: {
+    width: "100%",
+    margin: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    resize: "none",
+    overflowY: "hidden",
+    boxSizing: "border-box",
   },
   postButton: {
     minWidth: 44,
