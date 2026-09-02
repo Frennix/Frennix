@@ -117,7 +117,7 @@ import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
-import { applyPendingFeedScrollReturnIfNeeded } from "@/lib/web-feed-scroll-restore";
+import { applyPendingFeedScrollReturnIfNeeded, registerFeedScrollController, trackFeedScrollPosition } from "@/lib/web-feed-scroll-restore";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 export default function HomeScreen() {
@@ -449,6 +449,7 @@ export default function HomeScreen() {
   const webContainerStyle = webTabSceneContainerStyle();
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
+  const lastFeedScrollYRef = useRef(0);
   const { height: viewportHeight } = useWindowDimensions();
 
   const {
@@ -604,10 +605,30 @@ export default function HomeScreen() {
   });
   markFeedHook("feed-scroll-debug");
 
+  useEffect(() => {
+    if (!useWebScroll) {
+      registerFeedScrollController(null);
+      return;
+    }
+
+    registerFeedScrollController({
+      scrollTo: (y) => {
+        webScrollRef.current?.scrollTo({ y, animated: false });
+      },
+      readTrackedScrollY: () => lastFeedScrollYRef.current,
+    });
+
+    return () => registerFeedScrollController(null);
+  }, [useWebScroll]);
+
   const handleScroll = useCallback(
     (event: Parameters<typeof handleFeedScroll>[0]) => {
       handleFeedScroll(event);
       const { contentOffset } = event.nativeEvent;
+      lastFeedScrollYRef.current = contentOffset.y;
+      if (Platform.OS === "web") {
+        trackFeedScrollPosition(contentOffset.y);
+      }
       if (contentOffset.y > 120) {
         setDeferFeedSecondary(true);
       }
@@ -1038,6 +1059,9 @@ export default function HomeScreen() {
   const handleContentSizeChange = useCallback(
     (_width: number, height: number) => {
       contentHeightRef.current = height;
+      if (Platform.OS === "web" && height > 0) {
+        applyPendingFeedScrollReturnIfNeeded();
+      }
       if (listLayoutHeightRef.current > 0) {
         markFeedRender(
           "feed:ui:scroll-list-layout",

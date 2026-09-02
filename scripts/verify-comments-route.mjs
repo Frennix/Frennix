@@ -88,7 +88,7 @@ function main() {
     pass(
       "G: feed scroll saved before navigate and restored on back",
       nav.includes("saveFeedScrollReturnState") &&
-        restore.includes("feed-scroll-list") &&
+        restore.includes("resolveFeedScrollPort") &&
         restore.includes("applyPendingFeedScrollReturnIfNeeded") &&
         readSource(routePath).includes("requestFeedScrollReturnRestore")
     ) && ok;

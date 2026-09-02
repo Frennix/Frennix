@@ -47,7 +47,7 @@ export function navigateToPostComments(post: Post, draft?: string): boolean {
   if (!usesMobileWebCommentsRoute()) return false;
 
   markCommentsReturnTarget("feed");
-  saveFeedScrollReturnState();
+  saveFeedScrollReturnState({ postId: getSharedPostTargetId(post) });
   router.push(buildCommentsRouteHref(post, draft));
   return true;
 }
@@ -74,7 +74,6 @@ export function navigateToPostCommentsFromVideoViewer(
     playbackId: playback.playbackId,
   });
   markCommentsReturnTarget("video");
-  saveFeedScrollReturnState();
   router.push(buildCommentsRouteHref(post, options?.draft));
   return true;
 }

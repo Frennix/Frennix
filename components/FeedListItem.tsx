@@ -1,6 +1,8 @@
 import { memo, useMemo } from "react";
+import { Platform, View } from "react-native";
 import type { Post } from "@frennix/types";
-import { FeedPostCard } from "@frennix/ui";
+import { FeedPostCard, getSharedPostTargetId } from "@frennix/ui";
+import { buildFeedPostAnchorId } from "@/lib/web-feed-scroll-port";
 
 export type FeedListItemActions = {
   onPress: (post: Post) => void;
@@ -94,7 +96,14 @@ export const FeedListItem = memo(function FeedListItem({
   );
 
   return (
-    <FeedPostCard
+    <View
+      collapsable={false}
+      nativeID={buildFeedPostAnchorId(getSharedPostTargetId(post))}
+      {...(Platform.OS === "web"
+        ? ({ "data-feed-post-id": getSharedPostTargetId(post) } as object)
+        : null)}
+    >
+      <FeedPostCard
       post={post}
       isOwn={post.author_id === userId}
       interactionActive={interactionActive}
@@ -118,5 +127,6 @@ export const FeedListItem = memo(function FeedListItem({
       onMediaPageIndexChange={onMediaPageIndexChange}
       inlineComposerEnabled={inlineComposerEnabled}
     />
+    </View>
   );
 }, feedItemPropsEqual);

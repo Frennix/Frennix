@@ -31,7 +31,7 @@ export function buildVideoRouteHrefForPost(post: Post, mediaIndex = 0): `/video/
 
 /** Save feed scroll (+ inline playback when available) before opening the video route. */
 export function prepareFeedVideoRouteNavigation(postId: string, mediaIndex: number): void {
-  saveFeedScrollReturnState();
+  saveFeedScrollReturnState({ postId });
 
   const playbackId = buildFeedVideoPlaybackId(postId, mediaIndex);
   const handoff = captureFeedVideoForFullscreen(playbackId);
