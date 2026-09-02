@@ -28,13 +28,13 @@ import {
 } from "@/lib/comments-close-diagnostics";
 import {
   isMobileWeb,
-  isVisualViewportKeyboardOpen,
   measureSafariVisualViewport,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
   type SafariVisualViewportSnapshot,
 } from "@/lib/safari-visual-viewport";
 import { lockWebModalScroll, restoreWebDocumentScrollLock, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
+import { useCommentComposerHostBottomInset } from "@/lib/use-comment-composer-host-inset";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
@@ -421,12 +421,11 @@ export function CommentsBottomSheet({
     dragY
   );
 
-  const keyboardOpen =
-    Platform.OS === "web" && mobileViewport != null
-      ? isVisualViewportKeyboardOpen(mobileViewport)
-      : false;
-  /** Visual viewport already excludes the keyboard — do not stack safe-area padding on top. */
-  const composerSafeBottom = keyboardOpen ? 0 : Math.max(insets.bottom, spacing.sm);
+  const closedComposerBottomInset = Math.max(insets.bottom, spacing.sm);
+  const composerHostBottomInset = useCommentComposerHostBottomInset(
+    closedComposerBottomInset,
+    visible && Platform.OS === "web"
+  );
   const headerTopInset = Math.max(insets.top, spacing.sm);
   const mobileOverlayTop = mobileViewport?.offsetTop ?? 0;
   const mobileOverlayHeight = mobileViewport?.visualHeight ?? 640;
@@ -500,7 +499,7 @@ export function CommentsBottomSheet({
       style={[
         styles.composerHost,
         useVideoOverlay ? styles.composerHostVideoOverlay : null,
-        { paddingBottom: composerSafeBottom },
+        { paddingBottom: composerHostBottomInset },
       ]}
       {...sheetSurfaceProps}
     >
@@ -587,7 +586,7 @@ export function CommentsBottomSheet({
           style={[
             styles.composerHost,
             styles.composerHostVideoOverlay,
-            { paddingBottom: composerSafeBottom },
+            { paddingBottom: composerHostBottomInset },
           ]}
           {...sheetSurfaceProps}
         >
@@ -622,7 +621,7 @@ export function CommentsBottomSheet({
           {
             height: desktopSheetHeight ?? ("70%" as const),
             maxHeight: "75%" as const,
-            paddingBottom: composerSafeBottom,
+            paddingBottom: composerHostBottomInset,
             transform: [{ translateY }],
           },
         ]}
@@ -661,7 +660,7 @@ export function CommentsBottomSheet({
           {
             height: "70%" as const,
             maxHeight: "75%" as const,
-            paddingBottom: composerSafeBottom,
+            paddingBottom: composerHostBottomInset,
             transform: [{ translateY }],
           },
         ]}

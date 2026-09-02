@@ -4,6 +4,7 @@ import type { Post } from "@frennix/types";
 import { usePostCommentsContent } from "@/components/PostCommentsContent";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { useRootPortalViewport } from "@/lib/use-root-portal-viewport";
+import { useCommentComposerHostBottomInset } from "@/lib/use-comment-composer-host-inset";
 import { colors, spacing, touchTarget, typography } from "@frennix/ui";
 
 type PostCommentsScreenProps = {
@@ -44,8 +45,11 @@ export function PostCommentsScreen({
   };
 
   const headerTopInset = Math.max(insets.top, spacing.sm);
-  const { overlayTop, overlayHeight, keyboardOpen } = useRootPortalViewport(Platform.OS === "web");
-  const composerSafeBottom = keyboardOpen ? 0 : Math.max(insets.bottom, spacing.sm);
+  const { overlayTop, overlayHeight } = useRootPortalViewport(Platform.OS === "web");
+  const composerHostBottomInset = useCommentComposerHostBottomInset(
+    Math.max(insets.bottom, spacing.sm),
+    Platform.OS === "web"
+  );
 
   const webViewportRootStyle: ViewStyle | null =
     Platform.OS === "web" && overlayHeight != null
@@ -102,7 +106,7 @@ export function PostCommentsScreen({
           {thread}
         </ScrollView>
 
-        <View style={[styles.composerHost, { paddingBottom: composerSafeBottom }]}>
+        <View style={[styles.composerHost, { paddingBottom: composerHostBottomInset }]}>
           {composer}
         </View>
       </View>

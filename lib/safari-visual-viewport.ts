@@ -8,6 +8,9 @@
 /** Comfortable spacing above home indicator / Safari toolbar (design system). */
 export const OVERLAY_BOTTOM_SAFETY_MARGIN_PX = 28;
 
+/** Fallback reserve when Safari's focused-form accessory bar cannot be measured directly. */
+export const SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX = 44;
+
 const ENV_SAFE_AREA_PROBE_ID = "frennix-env-safe-area-probe";
 
 export type SafariVisualViewportSnapshot = {
@@ -69,6 +72,31 @@ export function isVisualViewportKeyboardOpen(
   snapshot: SafariVisualViewportSnapshot = measureSafariVisualViewport()
 ): boolean {
   return snapshot.bottomChrome > 0;
+}
+
+/**
+ * Lift required to keep the comment composer row above Safari's InputAccessoryView.
+ * Uses overlap measurement when the row extends past the visual viewport; otherwise
+ * falls back to SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX on iOS Safari.
+ */
+export function readSafariCommentComposerAccessoryLiftPx(): number {
+  if (typeof window === "undefined" || !window.visualViewport || !isMobileWebSafari()) {
+    return 0;
+  }
+
+  const vv = window.visualViewport;
+  const usableBottom = vv.offsetTop + vv.height;
+  const row = document.querySelector('[data-frennix-comment-composer-row="true"]');
+
+  if (row instanceof HTMLElement) {
+    const rowBottom = row.getBoundingClientRect().bottom;
+    const overlap = rowBottom - usableBottom;
+    if (overlap > 1) {
+      return Math.ceil(overlap);
+    }
+  }
+
+  return SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX;
 }
 
 /** Height of the visual viewport — used for full-screen mobile web overlays (no offsetTop). */
