@@ -718,6 +718,10 @@ const styles = StyleSheet.create({
       bottom: 0,
       flexDirection: "column",
       paddingTop: 6,
+      width: "100%",
+      maxWidth: "100%",
+      overflow: "hidden",
+      boxSizing: "border-box",
     },
     default: {},
   }) as ViewStyle,
@@ -836,6 +840,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web"
       ? ({
           boxSizing: "border-box",
+          overflow: "hidden",
         } as const)
       : null),
   },

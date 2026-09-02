@@ -27,6 +27,10 @@ import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typograp
 
 const MIN_COMMENT_INPUT_HEIGHT = 22;
 const ESTIMATED_LINE_HEIGHT = 22;
+/** Fixed horizontal slots in the composer row — used to keep Post on-screen. */
+const COMPOSER_AVATAR_WIDTH_PX = 32;
+const COMPOSER_POST_WIDTH_PX = 48;
+const COMPOSER_ROW_GAP_PX = spacing.xs;
 /** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
 const MAX_VISIBLE_LINES = 5;
 
@@ -196,8 +200,13 @@ export function CommentComposerRow({
   const inputScrollEnabled = inputHeight >= maxInputHeight - 1;
 
   return (
-    <View style={[styles.composerRow, compactComposer && styles.composerRowCompact]}>
-      <Avatar uri={avatarUri} name={avatarName} size={32} deferImagePlaceholder />
+    <View
+      style={[styles.composerRow, compactComposer && styles.composerRowCompact]}
+      {...(Platform.OS === "web" ? ({ "data-frennix-comment-composer-row": "true" } as object) : null)}
+    >
+      <View style={styles.composerAvatarSlot}>
+        <Avatar uri={avatarUri} name={avatarName} size={COMPOSER_AVATAR_WIDTH_PX} deferImagePlaceholder />
+      </View>
       <View style={[styles.composerField, compactComposer && styles.composerFieldCompact]}>
         {Platform.OS === "web" ? (
           <View style={styles.composerInputWrap}>
@@ -213,44 +222,46 @@ export function CommentComposerRow({
             />
           </View>
         ) : (
-          <TextInput
-            value={value}
-            onChangeText={onChangeText}
-            onContentSizeChange={handleNativeContentSizeChange}
-            placeholder={placeholder}
-            placeholderTextColor={colors.textMuted}
-            style={[
-              styles.composerInput,
-              {
-                height: Math.max(MIN_COMMENT_INPUT_HEIGHT, inputHeight),
-                maxHeight: maxInputHeight,
-              },
-            ]}
-            multiline
-            scrollEnabled={inputScrollEnabled}
-            maxLength={2000}
-            blurOnSubmit={false}
-            returnKeyType="default"
-            textAlignVertical="top"
-            onFocus={onComposerFocus}
-            onBlur={onComposerBlur}
-          />
+          <View style={styles.composerInputWrap}>
+            <TextInput
+              value={value}
+              onChangeText={onChangeText}
+              onContentSizeChange={handleNativeContentSizeChange}
+              placeholder={placeholder}
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.composerInput,
+                {
+                  height: Math.max(MIN_COMMENT_INPUT_HEIGHT, inputHeight),
+                  maxHeight: maxInputHeight,
+                },
+              ]}
+              multiline
+              scrollEnabled={inputScrollEnabled}
+              maxLength={2000}
+              blurOnSubmit={false}
+              returnKeyType="default"
+              textAlignVertical="top"
+              onFocus={onComposerFocus}
+              onBlur={onComposerBlur}
+            />
+          </View>
         )}
-        <Pressable
-          onPress={onPost}
-          disabled={!canPost}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Post comment"
-          style={[styles.postButton, compactComposer && styles.postButtonCompact]}
-        >
-          {posting ? (
-            <ActivityIndicator size="small" color={colors.accent} />
-          ) : (
-            <Text style={[styles.postLabel, !canPost && styles.postLabelDisabled]}>Post</Text>
-          )}
-        </Pressable>
       </View>
+      <Pressable
+        onPress={onPost}
+        disabled={!canPost}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Post comment"
+        style={[styles.postButton, compactComposer && styles.postButtonCompact]}
+      >
+        {posting ? (
+          <ActivityIndicator size="small" color={colors.accent} />
+        ) : (
+          <Text style={[styles.postLabel, !canPost && styles.postLabelDisabled]}>Post</Text>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -477,59 +488,67 @@ const styles = StyleSheet.create({
   composerRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: spacing.xs,
+    gap: COMPOSER_ROW_GAP_PX,
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
     flexShrink: 1,
+    ...(Platform.OS === "web"
+      ? ({
+          boxSizing: "border-box",
+        } as const)
+      : null),
   },
   composerRowCompact: {
     alignItems: "center",
-    gap: spacing.xs,
+  },
+  composerAvatarSlot: {
+    width: COMPOSER_AVATAR_WIDTH_PX,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
   composerField: {
     flex: 1,
     minWidth: 0,
     maxWidth: "100%",
     minHeight: 34,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.xxs,
     flexShrink: 1,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.xs,
+    paddingHorizontal: spacing.sm,
     paddingVertical: Platform.OS === "web" ? 4 : 3,
     ...(Platform.OS === "web"
       ? ({
           overflow: "hidden",
+          boxSizing: "border-box",
         } as const)
       : null),
   },
   composerFieldCompact: {
     minHeight: 32,
-    alignItems: "flex-end",
     paddingVertical: 3,
   },
   composerInputWrap: {
-    flex: 1,
+    width: "100%",
     minWidth: 0,
     flexShrink: 1,
     ...(Platform.OS === "web"
       ? ({
           overflow: "hidden",
+          boxSizing: "border-box",
         } as const)
       : null),
   },
   composerInput: {
-    flex: 1,
+    width: "100%",
+    minWidth: 0,
     flexShrink: 1,
     minHeight: MIN_COMMENT_INPUT_HEIGHT,
     maxWidth: "100%",
-    paddingVertical: 1,
+    paddingVertical: 3,
     paddingHorizontal: 0,
     color: colors.text,
     fontSize: Platform.OS === "web" ? 16 : 15,
@@ -545,9 +564,10 @@ const styles = StyleSheet.create({
   composerInputWeb: {
     width: "100%",
     maxWidth: "100%",
+    minWidth: 0,
     margin: 0,
-    paddingTop: 1,
-    paddingBottom: 1,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingHorizontal: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
@@ -564,12 +584,12 @@ const styles = StyleSheet.create({
     caretColor: colors.text,
   },
   postButton: {
+    width: COMPOSER_POST_WIDTH_PX,
     flexShrink: 0,
-    minWidth: 44,
     minHeight: 28,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.xxs,
+    paddingHorizontal: 0,
     marginBottom: Platform.OS === "web" ? 1 : 0,
   },
   postButtonCompact: {
