@@ -12,7 +12,7 @@ import {
  */
 export function useCommentsOverlayBottomReserve(active: boolean): number {
   const [reserve, setReserve] = useState(() =>
-    active ? readSafariCommentsOverlayBottomReserve() : 0
+    active ? readSafariCommentsOverlayBottomReserve(0) : 0
   );
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function useCommentsOverlayBottomReserve(active: boolean): number {
     }
 
     const measure = () => {
-      setReserve(readSafariCommentsOverlayBottomReserve());
+      setReserve((appliedReserve) => readSafariCommentsOverlayBottomReserve(appliedReserve));
     };
 
     const syncAfterViewportSettles = () => {

@@ -81,12 +81,88 @@ function isCommentComposerTextareaFocused(): boolean {
   return active.matches('textarea[data-frennix-comment-input="true"]');
 }
 
+/** visualViewport.height while keyboard is open and the comment textarea is not focused. */
+let keyboardOpenUnfocusedVisualHeight: number | null = null;
+/** visualViewport.height at the start of a comment textarea focus transition. */
+let focusTransitionStartVisualHeight: number | null = null;
+
+function resetSafariFloatingChromeBaseline(): void {
+  keyboardOpenUnfocusedVisualHeight = null;
+  focusTransitionStartVisualHeight = null;
+}
+
+function updateSafariFloatingChromeBaseline(snapshot: SafariVisualViewportSnapshot): void {
+  const keyboardOpen = isVisualViewportKeyboardOpen(snapshot);
+  const focused = isCommentComposerTextareaFocused();
+
+  if (!keyboardOpen) {
+    resetSafariFloatingChromeBaseline();
+    return;
+  }
+
+  if (!focused) {
+    focusTransitionStartVisualHeight = null;
+    keyboardOpenUnfocusedVisualHeight = Math.max(
+      keyboardOpenUnfocusedVisualHeight ?? snapshot.visualHeight,
+      snapshot.visualHeight
+    );
+    return;
+  }
+
+  if (focusTransitionStartVisualHeight == null) {
+    focusTransitionStartVisualHeight =
+      keyboardOpenUnfocusedVisualHeight ?? snapshot.visualHeight;
+  }
+}
+
+/**
+ * Safari floating chrome band depth (px) above the keyboard — not the full composer height.
+ * Measured from host overflow past visibleBottom and visualViewport shrink on textarea focus.
+ */
+function readSafariFloatingChromeBandPx(
+  snapshot: SafariVisualViewportSnapshot,
+  hostBottom: number,
+  visibleBottom: number
+): number {
+  updateSafariFloatingChromeBaseline(snapshot);
+
+  const explicitOverflow = Math.max(0, Math.ceil(hostBottom - visibleBottom));
+
+  let focusShrinkBand = 0;
+  if (focusTransitionStartVisualHeight != null) {
+    focusShrinkBand = Math.max(0, focusTransitionStartVisualHeight - snapshot.visualHeight);
+  } else if (keyboardOpenUnfocusedVisualHeight != null) {
+    focusShrinkBand = Math.max(0, keyboardOpenUnfocusedVisualHeight - snapshot.visualHeight);
+  }
+
+  return Math.max(explicitOverflow, focusShrinkBand);
+}
+
+/** Sum of flex siblings above composerHost inside the comments overlay column. */
+function readCommentsOverlayHeaderHeightPx(): number {
+  if (typeof document === "undefined") return 0;
+
+  const host = document.querySelector('[data-frennix-comment-composer-host="true"]');
+  if (!(host instanceof HTMLElement) || !(host.parentElement instanceof HTMLElement)) {
+    return 0;
+  }
+
+  let headerTotal = 0;
+  for (const child of host.parentElement.children) {
+    if (child === host) break;
+    if (child instanceof HTMLElement) {
+      headerTotal += child.getBoundingClientRect().height;
+    }
+  }
+
+  return Math.ceil(headerTotal);
+}
+
 /**
  * Pixels to subtract from comments overlay height so the full composer sits above
- * Safari bottom toolbar / InputAccessoryView. Uses measured composerHost height
- * (not visibleBottom comparisons or fixed accessory increments).
+ * Safari bottom toolbar / InputAccessoryView.
  */
-export function readSafariCommentsOverlayBottomReserve(): number {
+export function readSafariCommentsOverlayBottomReserve(appliedReserve = 0): number {
   if (typeof window === "undefined" || !window.visualViewport || !isMobileWebSafari()) {
     return 0;
   }
@@ -110,8 +186,17 @@ export function readSafariCommentsOverlayBottomReserve(): number {
   const hostOverflow = Math.max(0, Math.ceil(hostBottom - visibleBottom));
 
   if (keyboardOpen && focused) {
-    // Entire composer host must sit above Safari's accessory/form bar — reserve its full height.
-    return hostHeight + hostOverflow;
+    const floatingChromeBand = readSafariFloatingChromeBandPx(snapshot, hostBottom, visibleBottom);
+    const overlayBottom = visibleBottom - appliedReserve;
+    const hostPastOverlayBottom = Math.max(0, Math.ceil(hostBottom - overlayBottom));
+    let reserve = Math.max(floatingChromeBand, hostPastOverlayBottom);
+
+    const headerHeight = readCommentsOverlayHeaderHeightPx();
+    const minOverlayHeight = headerHeight + hostHeight;
+    const maxReserve = Math.max(0, snapshot.visualHeight - minOverlayHeight);
+    reserve = Math.min(reserve, maxReserve);
+
+    return reserve;
   }
 
   if (!keyboardOpen) {
