@@ -534,27 +534,31 @@ export function CommentsBottomSheet({
         accessibilityLabel={backdropAccessibilityLabel}
       />
       <View
-        style={[
-          styles.sheet,
-          styles.videoOverlaySheet,
-          {
-            top: videoOverlayLayout.top,
-            height: videoOverlayLayout.height,
-            maxHeight: videoOverlayLayout.height,
-            paddingBottom: Math.max(insets.bottom, spacing.xxs),
-          },
-        ]}
-        {...sheetSurfaceProps}
+        style={[styles.videoOverlayColumn, { top: videoOverlayLayout.peekHeight }]}
       >
         <View
-          style={[styles.handleWrap, useVideoOverlay ? styles.handleWrapVideoOverlay : null]}
-          {...headerPanResponder.panHandlers}
+          style={[styles.sheet, styles.videoOverlaySheetBody]}
+          {...sheetSurfaceProps}
         >
-          <View style={styles.handle} />
+          <View
+            style={[styles.handleWrap, useVideoOverlay ? styles.handleWrapVideoOverlay : null]}
+            {...headerPanResponder.panHandlers}
+          >
+            <View style={styles.handle} />
+          </View>
+          <View {...headerPanResponder.panHandlers}>{headerRow}</View>
+          {listRegion}
         </View>
-        <View {...headerPanResponder.panHandlers}>{headerRow}</View>
-        {listRegion}
-        {composerRegion}
+        <View
+          style={[
+            styles.composerHost,
+            styles.composerHostVideoOverlay,
+            { paddingBottom: Math.max(insets.bottom, spacing.xxs) },
+          ]}
+          {...sheetSurfaceProps}
+        >
+          {composer}
+        </View>
       </View>
     </View>
   );
@@ -706,6 +710,22 @@ const styles = StyleSheet.create({
     },
     default: {},
   }) as ViewStyle,
+  videoOverlayColumn: Platform.select({
+    web: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      flexDirection: "column",
+    },
+    default: {},
+  }) as ViewStyle,
+  videoOverlaySheetBody: {
+    flex: 1,
+    minHeight: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
   videoPeekDismiss: Platform.select({
     web: {
       position: "absolute",
@@ -807,8 +827,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   composerHostVideoOverlay: {
+    flexShrink: 0,
     paddingTop: spacing.xxs,
     paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.xxs,
   },
 });

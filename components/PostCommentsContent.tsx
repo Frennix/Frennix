@@ -471,6 +471,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: spacing.xs,
+    flexShrink: 0,
   },
   composerField: {
     flex: 1,
@@ -478,6 +479,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: spacing.xxs,
+    flexShrink: 0,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
@@ -489,6 +491,7 @@ const styles = StyleSheet.create({
   composerInputWrap: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 0,
   },
   composerInput: {
     flex: 1,
