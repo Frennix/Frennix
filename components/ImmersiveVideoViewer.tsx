@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Heart,
@@ -21,7 +21,7 @@ import {
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import { COMMENTS_VIDEO_PEEK_FRACTION } from "@/components/CommentsBottomSheet";
-import { useCommentsVideoPeekHeight } from "@/lib/comments-overlay-state";
+import { useCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 
 const STRONG_WORK_EMOJI = "💪";
@@ -100,10 +100,12 @@ export function ImmersiveVideoViewer({
   }, [muted]);
 
   const captionNeedsExpand = caption.length > 96;
-  const videoPeekHeight = useCommentsVideoPeekHeight();
+  const videoPeekLayout = useCommentsVideoPeekLayout();
+  const fallbackPeekHeight = Math.round(stageHeight * COMMENTS_VIDEO_PEEK_FRACTION);
   const videoStageHeight = commentsOverlayOpen
-    ? videoPeekHeight ?? Math.round(stageHeight * COMMENTS_VIDEO_PEEK_FRACTION)
+    ? videoPeekLayout?.height ?? fallbackPeekHeight
     : stageHeight;
+  const videoStageTop = commentsOverlayOpen ? videoPeekLayout?.offsetTop ?? 0 : undefined;
 
   return (
     <View
@@ -122,8 +124,20 @@ export function ImmersiveVideoViewer({
         style={[
           styles.videoStageHost,
           commentsOverlayOpen ? styles.videoStageHostPeek : styles.videoStageHostFull,
-          { width: stageWidth, height: videoStageHeight },
+          commentsOverlayOpen && videoStageTop != null
+            ? styles.videoStageHostPinned
+            : null,
+          {
+            width: stageWidth,
+            height: videoStageHeight,
+            ...(commentsOverlayOpen && videoStageTop != null
+              ? ({ top: videoStageTop } as const)
+              : null),
+          },
         ]}
+        {...(Platform.OS === "web"
+          ? ({ "data-frennix-video-stage-host": "true" } as object)
+          : null)}
       >
         <FullscreenVideoSlide
           ref={videoRef}
@@ -138,7 +152,16 @@ export function ImmersiveVideoViewer({
         />
       </View>
 
-      <View style={[styles.topBar, { paddingTop: topInset }]} pointerEvents="box-none">
+      <View
+        style={[
+          styles.topBar,
+          { paddingTop: topInset },
+          commentsOverlayOpen && videoStageTop != null
+            ? [styles.topBarPinned, { top: videoStageTop }]
+            : null,
+        ]}
+        pointerEvents="box-none"
+      >
         <Pressable
           onPress={onClose}
           hitSlop={10}
@@ -331,6 +354,15 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 0,
   },
+  videoStageHostPinned: Platform.select({
+    web: {
+      position: "fixed",
+      left: 0,
+      right: 0,
+      zIndex: 30,
+    },
+    default: {},
+  }) as ViewStyle,
   topBar: {
     position: "absolute",
     top: 0,
@@ -342,6 +374,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: spacing.sm,
   },
+  topBarPinned: Platform.select({
+    web: {
+      position: "fixed",
+      zIndex: 35,
+    },
+    default: {},
+  }) as ViewStyle,
   iconButton: {
     width: touchTarget,
     height: touchTarget,

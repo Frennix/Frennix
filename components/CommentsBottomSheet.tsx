@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Modal,
@@ -20,7 +20,7 @@ import {
   BOTTOM_SHEET_SPRING_OPEN,
   BOTTOM_SHEET_SPRING_REBOUND,
 } from "@/components/BottomActionSheet";
-import { setCommentsOverlayOpen, setCommentsVideoPeekHeight } from "@/lib/comments-overlay-state";
+import { setCommentsOverlayOpen, setCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
 import {
   logCommentsCloseRequest,
   logCommentsPortalInteraction,
@@ -40,27 +40,42 @@ import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
-/** Keep roughly the top 30% of the layout viewport for the playing video. */
-export const COMMENTS_VIDEO_PEEK_FRACTION = 0.3;
+/** Keep roughly the top 30% of the visible viewport for the playing video. */
+export const COMMENTS_VIDEO_PEEK_FRACTION = 0.28;
 const VIDEO_PEEK_FRACTION = COMMENTS_VIDEO_PEEK_FRACTION;
-const MIN_VIDEO_OVERLAY_SHEET_HEIGHT = 220;
+/** Never let keyboard/sheet layout shrink the preview below ~25% of layout height. */
+const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
+const VIDEO_PEEK_ABSOLUTE_MIN_PX = 120;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
 type VideoOverlaySheetLayout = {
-  top: number;
-  height: number;
+  /** Layout viewport Y where the visible region starts (Safari keyboard scroll). */
+  offsetTop: number;
+  /** Height of the visible region above the keyboard. */
+  visualHeight: number;
+  /** Fixed reserved height for the full video preview. */
   peekHeight: number;
+  /** Sheet top within the visual viewport overlay root. */
+  top: number;
+  /** Remaining height for comments list + composer above the keyboard. */
+  height: number;
 };
+
+function computeVideoPeekHeight(layoutHeight: number, visualHeight: number): number {
+  const fromVisible = Math.round(visualHeight * VIDEO_PEEK_FRACTION);
+  const layoutFloor = Math.round(layoutHeight * VIDEO_PEEK_MIN_LAYOUT_FRACTION);
+  const absoluteMin = Math.min(VIDEO_PEEK_ABSOLUTE_MIN_PX, layoutFloor);
+  return Math.max(absoluteMin, fromVisible);
+}
 
 function computeVideoOverlaySheetLayout(): VideoOverlaySheetLayout {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
-  const peekHeight = Math.round(layoutHeight * VIDEO_PEEK_FRACTION);
   const { offsetTop, visualHeight } = measureSafariVisualViewport();
-  const visibleBottom = offsetTop + visualHeight;
-  const top = Math.min(peekHeight, Math.max(0, visibleBottom - MIN_VIDEO_OVERLAY_SHEET_HEIGHT));
-  const height = Math.max(MIN_VIDEO_OVERLAY_SHEET_HEIGHT, visibleBottom - top);
-  return { top, height, peekHeight };
+  const peekHeight = computeVideoPeekHeight(layoutHeight, visualHeight);
+  const top = peekHeight;
+  const height = Math.max(0, visualHeight - peekHeight);
+  return { offsetTop, visualHeight, peekHeight, top, height };
 }
 
 type CommentsBottomSheetProps = {
@@ -187,13 +202,21 @@ export function CommentsBottomSheet({
     return subscribeSafariVisualViewport(syncHeight);
   }, [useVideoOverlay, visible]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!visible || !useVideoOverlay) {
-      setCommentsVideoPeekHeight(null);
+      setCommentsVideoPeekLayout(null);
       return;
     }
-    setCommentsVideoPeekHeight(videoOverlayLayout.top);
-  }, [useVideoOverlay, videoOverlayLayout.top, visible]);
+    setCommentsVideoPeekLayout({
+      height: videoOverlayLayout.peekHeight,
+      offsetTop: videoOverlayLayout.offsetTop,
+    });
+  }, [
+    useVideoOverlay,
+    videoOverlayLayout.offsetTop,
+    videoOverlayLayout.peekHeight,
+    visible,
+  ]);
 
   useEffect(() => {
     if (!visible || useMobileWebFullscreen) {
@@ -436,7 +459,14 @@ export function CommentsBottomSheet({
 
   const mobileVideoOverlaySurface = (
     <View
-      style={WEB_MOBILE_VIDEO_OVERLAY_ROOT}
+      style={[
+        WEB_MOBILE_VIDEO_OVERLAY_ROOT,
+        {
+          top: videoOverlayLayout.offsetTop,
+          height: videoOverlayLayout.visualHeight,
+          bottom: undefined,
+        },
+      ]}
       {...(Platform.OS === "web"
         ? ({
             "data-frennix-comments-sheet": "true",
@@ -462,6 +492,7 @@ export function CommentsBottomSheet({
           {
             top: videoOverlayLayout.top,
             height: videoOverlayLayout.height,
+            maxHeight: videoOverlayLayout.height,
             paddingBottom: composerBottomInset,
           },
         ]}
@@ -619,6 +650,8 @@ const styles = StyleSheet.create({
       position: "absolute",
       left: 0,
       right: 0,
+      flexShrink: 0,
+      maxHeight: "100%",
     },
     default: {},
   }) as ViewStyle,

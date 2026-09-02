@@ -25,6 +25,7 @@ function main() {
   console.log("verify-immersive-video-viewer\n");
   let ok = true;
   const viewer = readSource("components/ImmersiveVideoViewer.tsx");
+  const sheet = readSource("components/CommentsBottomSheet.tsx");
   const lightbox = readSource("components/ImageLightbox.tsx");
   const feed = readSource("app/(tabs)/index.tsx");
   const returnState = readSource("lib/web-video-viewer-return.ts");
@@ -108,7 +109,9 @@ function main() {
       viewer.includes("commentsOverlayOpen") &&
         viewer.includes("videoStageHeight") &&
         viewer.includes("videoStageHostPeek") &&
-        viewer.includes("useCommentsVideoPeekHeight") &&
+        viewer.includes("useCommentsVideoPeekLayout") &&
+        sheet.includes("computeVideoPeekHeight") &&
+        sheet.includes("VIDEO_PEEK_MIN_LAYOUT_FRACTION") &&
         styles.includes("data-frennix-immersive-comments-open")
     ) && ok;
   ok =

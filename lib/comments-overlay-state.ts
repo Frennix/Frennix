@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 
 type CommentsOverlayListener = (open: boolean) => void;
-type CommentsVideoPeekListener = (height: number | null) => void;
+type CommentsVideoPeekLayout = {
+  height: number;
+  offsetTop: number;
+};
+type CommentsVideoPeekListener = (layout: CommentsVideoPeekLayout | null) => void;
 
 let commentsOverlayOpen = false;
 let commentsOverlayPostId: string | null = null;
-let commentsVideoPeekHeight: number | null = null;
+let commentsVideoPeekLayout: CommentsVideoPeekLayout | null = null;
 const listeners = new Set<CommentsOverlayListener>();
 const videoPeekListeners = new Set<CommentsVideoPeekListener>();
 
@@ -30,20 +34,25 @@ export function setCommentsOverlayOpen(open: boolean, postId?: string | null) {
   commentsOverlayOpen = open;
   commentsOverlayPostId = nextPostId;
   if (!open) {
-    setCommentsVideoPeekHeight(null);
+    setCommentsVideoPeekLayout(null);
   }
   syncCommentsOverlayDocumentState();
   listeners.forEach((listener) => listener(open));
 }
 
-export function setCommentsVideoPeekHeight(height: number | null) {
-  if (commentsVideoPeekHeight === height) return;
-  commentsVideoPeekHeight = height;
-  videoPeekListeners.forEach((listener) => listener(height));
+export function setCommentsVideoPeekLayout(layout: CommentsVideoPeekLayout | null) {
+  if (
+    commentsVideoPeekLayout?.height === layout?.height &&
+    commentsVideoPeekLayout?.offsetTop === layout?.offsetTop
+  ) {
+    return;
+  }
+  commentsVideoPeekLayout = layout;
+  videoPeekListeners.forEach((listener) => listener(layout));
 }
 
-export function getCommentsVideoPeekHeight() {
-  return commentsVideoPeekHeight;
+export function getCommentsVideoPeekLayout() {
+  return commentsVideoPeekLayout;
 }
 
 export function getCommentsOverlayOpen() {
@@ -68,16 +77,16 @@ export function useCommentsOverlayOpen() {
   return open;
 }
 
-export function useCommentsVideoPeekHeight() {
-  const [height, setHeight] = useState(commentsVideoPeekHeight);
+export function useCommentsVideoPeekLayout() {
+  const [layout, setLayout] = useState(commentsVideoPeekLayout);
 
   useEffect(() => {
-    const listener = (value: number | null) => setHeight(value);
+    const listener = (value: CommentsVideoPeekLayout | null) => setLayout(value);
     videoPeekListeners.add(listener);
     return () => {
       videoPeekListeners.delete(listener);
     };
   }, []);
 
-  return height;
+  return layout;
 }
