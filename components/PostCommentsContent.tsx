@@ -45,16 +45,16 @@ function syncWebTextareaHeight(
   textarea: HTMLTextAreaElement,
   maxHeight: number
 ): number {
-  textarea.style.setProperty("height", `${MIN_COMMENT_INPUT_HEIGHT}px`, "important");
+  const measureMinHeight = ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+  textarea.style.setProperty("height", `${measureMinHeight}px`, "important");
   textarea.style.setProperty("overflow-y", "hidden", "important");
   const measured = Math.ceil(textarea.scrollHeight);
-  const next = Math.min(Math.max(MIN_COMMENT_INPUT_HEIGHT, measured), maxHeight);
+  const next = Math.min(Math.max(measureMinHeight, measured), maxHeight);
+  const atCap = next >= maxHeight - 1;
   textarea.style.setProperty("height", `${next}px`, "important");
-  textarea.style.setProperty(
-    "overflow-y",
-    next >= maxHeight - 1 ? "auto" : "hidden",
-    "important"
-  );
+  textarea.style.setProperty("overflow-y", atCap ? "auto" : "hidden", "important");
+  // Expand to show all lines while under the cap; only scroll internally once capped.
+  textarea.scrollTop = atCap ? textarea.scrollHeight : 0;
   return next;
 }
 
@@ -86,9 +86,6 @@ function WebCommentTextarea({
     if (!textarea) return;
     const next = syncWebTextareaHeight(textarea, maxHeight);
     onHeightChange(next);
-    if (textarea.selectionStart === textarea.value.length) {
-      textarea.scrollTop = textarea.scrollHeight;
-    }
   }, [maxHeight, onHeightChange]);
 
   useLayoutEffect(() => {
@@ -196,7 +193,7 @@ export function CommentComposerRow({
 
   useEffect(() => {
     if (!value) {
-      setInputHeight(MIN_COMMENT_INPUT_HEIGHT);
+      setInputHeight(ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX);
     }
   }, [value]);
 
