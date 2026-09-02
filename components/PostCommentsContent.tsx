@@ -22,6 +22,11 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
+import {
+  COMMENT_COMPOSER_DOM_DIAG,
+  inspectCommentComposerDom,
+  installCommentComposerDomInspectors,
+} from "@/lib/comment-composer-dom-diagnostics";
 import { isMobileWeb } from "@/lib/safari-visual-viewport";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
@@ -105,7 +110,18 @@ function scheduleCommentTextareaScrollReset(textarea: HTMLTextAreaElement): void
       textarea.style.setProperty("overflow-y", "hidden", "important");
     }
     logCommentTextareaScrollDiagnostics("raf-after-sync", textarea, {});
+    if (COMMENT_COMPOSER_DOM_DIAG) {
+      inspectCommentComposerDom(textarea, "raf-after-sync");
+    }
   });
+}
+
+let commentComposerDomInspectorsInstalled = false;
+
+function ensureCommentComposerDomInspectors(): void {
+  if (!COMMENT_COMPOSER_DOM_DIAG || commentComposerDomInspectorsInstalled) return;
+  commentComposerDomInspectorsInstalled = true;
+  installCommentComposerDomInspectors();
 }
 
 function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
@@ -149,6 +165,9 @@ function syncWebTextareaHeight(
     exceedsVisibleLines,
     computedHeightPx: nextOuter,
   });
+  if (COMMENT_COMPOSER_DOM_DIAG) {
+    inspectCommentComposerDom(textarea, "after-sync");
+  }
   scheduleCommentTextareaScrollReset(textarea);
 
   return nextOuter;
@@ -185,6 +204,7 @@ function WebCommentTextarea({
   }, [maxInputHeight, onHeightChange]);
 
   useLayoutEffect(() => {
+    ensureCommentComposerDomInspectors();
     remeasure();
   }, [value, maxInputHeight, remeasure]);
 
@@ -214,7 +234,11 @@ function WebCommentTextarea({
     },
     onFocus: (event: React.FocusEvent<HTMLTextAreaElement>) => {
       event.target.setAttribute("enterkeyhint", "enter");
+      ensureCommentComposerDomInspectors();
       remeasure();
+      if (COMMENT_COMPOSER_DOM_DIAG) {
+        inspectCommentComposerDom(event.target, "focus");
+      }
       onFocus?.();
     },
     onBlur: () => {
@@ -305,9 +329,17 @@ export function CommentComposerRow({
       <View style={styles.composerAvatarSlot}>
         <Avatar uri={avatarUri} name={avatarName} size={COMPOSER_AVATAR_WIDTH_PX} deferImagePlaceholder />
       </View>
-      <View style={[styles.composerField, compactComposer && styles.composerFieldCompact]}>
+      <View
+        style={[styles.composerField, compactComposer && styles.composerFieldCompact]}
+        {...(Platform.OS === "web"
+          ? ({ "data-frennix-comment-composer-field": "true" } as object)
+          : null)}
+      >
         {Platform.OS === "web" ? (
-          <View style={styles.composerInputWrap}>
+          <View
+            style={styles.composerInputWrap}
+            {...({ "data-frennix-comment-input-wrap": "true" } as object)}
+          >
             <WebCommentTextarea
               value={value}
               placeholder={placeholder}
