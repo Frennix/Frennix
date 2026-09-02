@@ -40,12 +40,17 @@ import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
-/** Keep roughly the top 30–32% of the visible viewport for the playing video. */
+/** Fraction of layout viewport used to seed the baseline preview before keyboard focus. */
 export const COMMENTS_VIDEO_PEEK_FRACTION = 0.31;
 const VIDEO_PEEK_FRACTION = COMMENTS_VIDEO_PEEK_FRACTION;
+/** Target preview band on large phones — preserved while typing when space allows. */
+export const COMMENTS_VIDEO_PEEK_TARGET_MIN_PX = 330;
+export const COMMENTS_VIDEO_PEEK_TARGET_MAX_PX = 400;
 /** Never let keyboard/sheet layout shrink the preview below ~25% of layout height. */
 const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
 const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
+/** Minimum sheet chrome (handle, header, composer) above the keyboard. */
+const VIDEO_SHEET_MIN_CHROME_PX = 88;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -62,17 +67,38 @@ type VideoOverlaySheetLayout = {
   height: number;
 };
 
-function computeVideoPeekHeight(layoutHeight: number, visualHeight: number): number {
-  const fromVisible = Math.round(visualHeight * VIDEO_PEEK_FRACTION);
-  const layoutFloor = Math.round(layoutHeight * VIDEO_PEEK_MIN_LAYOUT_FRACTION);
-  const absoluteMin = Math.min(VIDEO_PEEK_ABSOLUTE_MIN_PX, layoutFloor);
-  return Math.max(absoluteMin, fromVisible);
+/** Baseline preview height from the full layout viewport — not keyboard-reduced visual height. */
+export function computeBaselineVideoPeekHeight(layoutHeight: number): number {
+  const fromFraction = Math.round(layoutHeight * VIDEO_PEEK_FRACTION);
+  const layoutTargetMin = Math.round(layoutHeight * 0.38);
+  const targetMin = Math.min(
+    COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
+    Math.max(COMMENTS_VIDEO_PEEK_TARGET_MIN_PX, layoutTargetMin)
+  );
+  const targetMax = Math.min(
+    COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
+    Math.round(layoutHeight * 0.46)
+  );
+  return Math.min(targetMax, Math.max(fromFraction, targetMin));
 }
 
-function computeVideoOverlaySheetLayout(): VideoOverlaySheetLayout {
+function resolveVideoPeekHeight(
+  layoutHeight: number,
+  visualHeight: number,
+  baselinePeekHeight: number
+): number {
+  const layoutFloor = Math.round(layoutHeight * VIDEO_PEEK_MIN_LAYOUT_FRACTION);
+  const absoluteMin = Math.min(VIDEO_PEEK_ABSOLUTE_MIN_PX, layoutFloor);
+  const maxPeekForVisible = Math.max(absoluteMin, visualHeight - VIDEO_SHEET_MIN_CHROME_PX);
+  return Math.min(baselinePeekHeight, maxPeekForVisible);
+}
+
+function computeVideoOverlaySheetLayout(baselinePeekHeight: number | null): VideoOverlaySheetLayout {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
   const { offsetTop, visualHeight } = measureSafariVisualViewport();
-  const peekHeight = computeVideoPeekHeight(layoutHeight, visualHeight);
+  const baselinePeek =
+    baselinePeekHeight ?? computeBaselineVideoPeekHeight(layoutHeight);
+  const peekHeight = resolveVideoPeekHeight(layoutHeight, visualHeight, baselinePeek);
   const top = peekHeight;
   const height = Math.max(0, visualHeight - peekHeight);
   return { offsetTop, visualHeight, peekHeight, top, height };
@@ -179,12 +205,19 @@ export function CommentsBottomSheet({
   const dismissingRef = useRef(false);
   const openedAtRef = useRef(0);
   const useVideoOverlay = presentation === "videoOverlay";
+  const videoPeekBaselineRef = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(() =>
     Platform.OS === "web" ? readVisualViewportHeight() : 0
   );
   const [videoOverlayLayout, setVideoOverlayLayout] = useState<VideoOverlaySheetLayout>(() =>
-    computeVideoOverlaySheetLayout()
+    computeVideoOverlaySheetLayout(null)
   );
+
+  useEffect(() => {
+    if (!visible || !useVideoOverlay) {
+      videoPeekBaselineRef.current = null;
+    }
+  }, [useVideoOverlay, visible]);
 
   useEffect(() => {
     if (!visible || Platform.OS !== "web" || !useMobileWebFullscreen || typeof window === "undefined") {
@@ -193,7 +226,12 @@ export function CommentsBottomSheet({
 
     const syncHeight = () => {
       if (useVideoOverlay) {
-        setVideoOverlayLayout(computeVideoOverlaySheetLayout());
+        if (videoPeekBaselineRef.current == null) {
+          videoPeekBaselineRef.current = computeBaselineVideoPeekHeight(window.innerHeight);
+        }
+        setVideoOverlayLayout(
+          computeVideoOverlaySheetLayout(videoPeekBaselineRef.current)
+        );
         return;
       }
       setViewportHeight(readVisualViewportHeight());

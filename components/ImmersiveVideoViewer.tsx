@@ -20,7 +20,7 @@ import {
   typography,
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
-import { COMMENTS_VIDEO_PEEK_FRACTION } from "@/components/CommentsBottomSheet";
+import { computeBaselineVideoPeekHeight } from "@/components/CommentsBottomSheet";
 import { useCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 
@@ -101,7 +101,7 @@ export function ImmersiveVideoViewer({
 
   const captionNeedsExpand = caption.length > 96;
   const videoPeekLayout = useCommentsVideoPeekLayout();
-  const fallbackPeekHeight = Math.round(stageHeight * COMMENTS_VIDEO_PEEK_FRACTION);
+  const fallbackPeekHeight = computeBaselineVideoPeekHeight(stageHeight);
   const videoStageHeight = commentsOverlayOpen
     ? videoPeekLayout?.height ?? fallbackPeekHeight
     : stageHeight;

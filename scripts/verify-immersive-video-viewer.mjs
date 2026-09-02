@@ -110,8 +110,9 @@ function main() {
         viewer.includes("videoStageHeight") &&
         viewer.includes("videoStageHostPeek") &&
         viewer.includes("useCommentsVideoPeekLayout") &&
-        sheet.includes("computeVideoPeekHeight") &&
-        sheet.includes("VIDEO_PEEK_MIN_LAYOUT_FRACTION") &&
+        sheet.includes("computeBaselineVideoPeekHeight") &&
+        sheet.includes("COMMENTS_VIDEO_PEEK_TARGET_MIN_PX") &&
+        sheet.includes("videoPeekBaselineRef") &&
         styles.includes("data-frennix-immersive-comments-open")
     ) && ok;
   ok =
