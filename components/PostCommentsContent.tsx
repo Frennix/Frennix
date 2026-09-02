@@ -48,13 +48,17 @@ function syncWebTextareaHeight(
   const measureMinHeight = ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
   textarea.style.setProperty("height", `${measureMinHeight}px`, "important");
   textarea.style.setProperty("overflow-y", "hidden", "important");
+  textarea.scrollTop = 0;
   const measured = Math.ceil(textarea.scrollHeight);
   const next = Math.min(Math.max(measureMinHeight, measured), maxHeight);
-  const atCap = next >= maxHeight - 1;
+  const exceedsVisibleLines = measured > maxHeight;
   textarea.style.setProperty("height", `${next}px`, "important");
-  textarea.style.setProperty("overflow-y", atCap ? "auto" : "hidden", "important");
-  // Expand to show all lines while under the cap; only scroll internally once capped.
-  textarea.scrollTop = atCap ? textarea.scrollHeight : 0;
+  textarea.style.setProperty("overflow-y", exceedsVisibleLines ? "auto" : "hidden", "important");
+  if (!exceedsVisibleLines) {
+    textarea.scrollTop = 0;
+  } else if (textarea.selectionStart === textarea.value.length) {
+    textarea.scrollTop = textarea.scrollHeight;
+  }
   return next;
 }
 
