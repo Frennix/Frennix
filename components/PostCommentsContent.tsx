@@ -33,40 +33,82 @@ const COMPOSER_POST_WIDTH_PX = 48;
 const COMPOSER_ROW_GAP_PX = spacing.xs;
 /** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
 const MAX_VISIBLE_LINES = 5;
-/** Vertical inset inside the bubble so line 1/5 are not clipped (≈8–10px total). */
+/** Vertical inset inside the bubble (content-box padding, not included in height). */
 const COMMENT_TEXTAREA_PADDING_Y_PX = 5;
 const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
 
+function computeCommentMaxContentHeight(): number {
+  return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT;
+}
+
+/** Border-box outer height — content lines plus vertical padding (no border). */
 function computeCommentMaxInputHeight(): number {
-  return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+  return computeCommentMaxContentHeight() + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+}
+
+function readWebTextareaVerticalChrome(textarea: HTMLTextAreaElement): number {
+  if (typeof window === "undefined") return COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+  const styles = window.getComputedStyle(textarea);
+  return (
+    (Number.parseFloat(styles.paddingTop) || 0) +
+    (Number.parseFloat(styles.paddingBottom) || 0) +
+    (Number.parseFloat(styles.borderTopWidth) || 0) +
+    (Number.parseFloat(styles.borderBottomWidth) || 0)
+  );
+}
+
+function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
+  if (typeof window === "undefined") return ESTIMATED_LINE_HEIGHT;
+  const parsed = Number.parseFloat(window.getComputedStyle(textarea).lineHeight);
+  return Number.isFinite(parsed) ? parsed : ESTIMATED_LINE_HEIGHT;
 }
 
 function syncWebTextareaHeight(
   textarea: HTMLTextAreaElement,
-  maxHeight: number
+  maxContentHeight: number
 ): number {
-  const measureMinHeight = ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
-  textarea.style.setProperty("height", `${measureMinHeight}px`, "important");
+  const chrome = readWebTextareaVerticalChrome(textarea);
+  const maxOuterHeight = maxContentHeight + chrome;
+  const measureMinContent = readWebTextareaLineHeight(textarea);
+
+  textarea.style.setProperty("box-sizing", "content-box", "important");
+  textarea.style.setProperty("height", `${measureMinContent}px`, "important");
   textarea.style.setProperty("overflow-y", "hidden", "important");
   textarea.scrollTop = 0;
-  const measured = Math.ceil(textarea.scrollHeight);
-  const next = Math.min(Math.max(measureMinHeight, measured), maxHeight);
-  const exceedsVisibleLines = measured > maxHeight;
-  textarea.style.setProperty("height", `${next}px`, "important");
+
+  const measuredOuter = Math.ceil(textarea.scrollHeight);
+  const measuredContent = Math.max(measureMinContent, measuredOuter - chrome);
+  const exceedsVisibleLines = measuredContent > maxContentHeight;
+  let nextContent = exceedsVisibleLines ? maxContentHeight : measuredContent;
+  let nextOuter = nextContent + chrome;
+
+  textarea.style.setProperty("height", `${nextContent}px`, "important");
   textarea.style.setProperty("overflow-y", exceedsVisibleLines ? "auto" : "hidden", "important");
+
+  // Border-box cap can clip the last line when scrollHeight > clientHeight at exactly 5 lines.
+  if (!exceedsVisibleLines && textarea.scrollHeight > textarea.clientHeight) {
+    const fitOuter = Math.min(Math.ceil(textarea.scrollHeight), maxOuterHeight);
+    if (fitOuter > nextOuter) {
+      nextOuter = fitOuter;
+      nextContent = Math.max(measureMinContent, nextOuter - chrome);
+      textarea.style.setProperty("height", `${nextContent}px`, "important");
+    }
+  }
+
   if (!exceedsVisibleLines) {
     textarea.scrollTop = 0;
   } else if (textarea.selectionStart === textarea.value.length) {
     textarea.scrollTop = textarea.scrollHeight;
   }
-  return next;
+
+  return nextOuter;
 }
 
 type WebCommentTextareaProps = {
   value: string;
   placeholder: string;
   inputHeight: number;
-  maxHeight: number;
+  maxContentHeight: number;
   onChangeText: (text: string) => void;
   onHeightChange: (height: number) => void;
   onFocus?: () => void;
@@ -77,7 +119,7 @@ function WebCommentTextarea({
   value,
   placeholder,
   inputHeight,
-  maxHeight,
+  maxContentHeight,
   onChangeText,
   onHeightChange,
   onFocus,
@@ -88,19 +130,24 @@ function WebCommentTextarea({
   const remeasure = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const next = syncWebTextareaHeight(textarea, maxHeight);
+    const next = syncWebTextareaHeight(textarea, maxContentHeight);
     onHeightChange(next);
-  }, [maxHeight, onHeightChange]);
+  }, [maxContentHeight, onHeightChange]);
 
   useLayoutEffect(() => {
     remeasure();
-  }, [value, maxHeight, remeasure]);
+  }, [value, maxContentHeight, remeasure]);
+
+  const webContentHeight = Math.max(
+    ESTIMATED_LINE_HEIGHT,
+    inputHeight - COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX
+  );
 
   const webInputStyle = StyleSheet.flatten([
     styles.composerInputWeb,
     {
-      height: inputHeight,
-      maxHeight,
+      height: webContentHeight,
+      maxHeight: maxContentHeight,
     },
   ]) as React.CSSProperties;
 
@@ -177,7 +224,10 @@ export function CommentComposerRow({
 }: CommentComposerRowProps) {
   const canPost = Boolean(value.trim()) && !posting;
   const maxInputHeight = computeCommentMaxInputHeight();
-  const [inputHeight, setInputHeight] = useState(MIN_COMMENT_INPUT_HEIGHT);
+  const maxContentHeight = computeCommentMaxContentHeight();
+  const [inputHeight, setInputHeight] = useState(
+    ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX
+  );
 
   const handleNativeContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
@@ -218,7 +268,7 @@ export function CommentComposerRow({
               value={value}
               placeholder={placeholder}
               inputHeight={inputHeight}
-              maxHeight={maxInputHeight}
+              maxContentHeight={maxContentHeight}
               onChangeText={onChangeText}
               onHeightChange={handleWebHeightChange}
               onFocus={onComposerFocus}
@@ -526,7 +576,6 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === "web" ? 4 : 3,
     ...(Platform.OS === "web"
       ? ({
-          overflow: "hidden",
           boxSizing: "border-box",
         } as const)
       : null),
@@ -581,7 +630,7 @@ const styles = StyleSheet.create({
     resize: "none",
     overflowX: "hidden",
     overflowY: "hidden",
-    boxSizing: "border-box",
+    boxSizing: "content-box",
     display: "block",
     outlineStyle: "none",
     WebkitTextFillColor: colors.text,
