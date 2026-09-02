@@ -28,10 +28,11 @@ import {
 } from "@/lib/comments-close-diagnostics";
 import {
   isMobileWeb,
+  isVisualViewportKeyboardOpen,
   measureSafariVisualViewport,
-  readVisualViewportHeight,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
+  type SafariVisualViewportSnapshot,
 } from "@/lib/safari-visual-viewport";
 import { lockWebModalScroll, restoreWebDocumentScrollLock, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
@@ -151,14 +152,12 @@ const WEB_DESKTOP_OVERLAY_ROOT: ViewStyle = Platform.select({
 const WEB_MOBILE_FULLSCREEN_ROOT: ViewStyle = Platform.select({
   web: {
     position: "fixed",
-    top: 0,
     left: 0,
     right: 0,
     width: "100%",
     zIndex: COMMENTS_SHEET_Z_INDEX,
     display: "flex",
     flexDirection: "column",
-    overflow: "hidden",
     backgroundColor: colors.background,
     touchAction: "none",
   },
@@ -206,8 +205,8 @@ export function CommentsBottomSheet({
   const openedAtRef = useRef(0);
   const useVideoOverlay = presentation === "videoOverlay";
   const videoPeekBaselineRef = useRef<number | null>(null);
-  const [viewportHeight, setViewportHeight] = useState(() =>
-    Platform.OS === "web" ? readVisualViewportHeight() : 0
+  const [mobileViewport, setMobileViewport] = useState<SafariVisualViewportSnapshot | null>(() =>
+    Platform.OS === "web" ? measureSafariVisualViewport() : null
   );
   const [videoOverlayLayout, setVideoOverlayLayout] = useState<VideoOverlaySheetLayout>(() =>
     computeVideoOverlaySheetLayout(null)
@@ -225,6 +224,8 @@ export function CommentsBottomSheet({
     }
 
     const syncHeight = () => {
+      const snapshot = measureSafariVisualViewport();
+      setMobileViewport(snapshot);
       if (useVideoOverlay) {
         if (videoPeekBaselineRef.current == null) {
           videoPeekBaselineRef.current = computeBaselineVideoPeekHeight(window.innerHeight);
@@ -232,9 +233,7 @@ export function CommentsBottomSheet({
         setVideoOverlayLayout(
           computeVideoOverlaySheetLayout(videoPeekBaselineRef.current)
         );
-        return;
       }
-      setViewportHeight(readVisualViewportHeight());
     };
     syncHeight();
     return subscribeSafariVisualViewport(syncHeight);
@@ -422,8 +421,15 @@ export function CommentsBottomSheet({
     dragY
   );
 
-  const composerBottomInset = Math.max(insets.bottom, spacing.sm);
+  const keyboardOpen =
+    Platform.OS === "web" && mobileViewport != null
+      ? isVisualViewportKeyboardOpen(mobileViewport)
+      : false;
+  /** Visual viewport already excludes the keyboard — do not stack safe-area padding on top. */
+  const composerSafeBottom = keyboardOpen ? 0 : Math.max(insets.bottom, spacing.sm);
   const headerTopInset = Math.max(insets.top, spacing.sm);
+  const mobileOverlayTop = mobileViewport?.offsetTop ?? 0;
+  const mobileOverlayHeight = mobileViewport?.visualHeight ?? 640;
 
   if (!visible) return null;
 
@@ -491,7 +497,11 @@ export function CommentsBottomSheet({
 
   const composerRegion = (
     <View
-      style={[styles.composerHost, useVideoOverlay ? styles.composerHostVideoOverlay : null]}
+      style={[
+        styles.composerHost,
+        useVideoOverlay ? styles.composerHostVideoOverlay : null,
+        { paddingBottom: composerSafeBottom },
+      ]}
       {...sheetSurfaceProps}
     >
       {composer}
@@ -500,7 +510,15 @@ export function CommentsBottomSheet({
 
   const mobileWebSurface = (
     <View
-      style={[WEB_MOBILE_FULLSCREEN_ROOT, { height: viewportHeight, paddingTop: headerTopInset }]}
+      style={[
+        WEB_MOBILE_FULLSCREEN_ROOT,
+        {
+          top: mobileOverlayTop,
+          height: mobileOverlayHeight,
+          maxHeight: mobileOverlayHeight,
+          paddingTop: headerTopInset,
+        },
+      ]}
       {...sheetSurfaceProps}
       {...(Platform.OS === "web"
         ? ({
@@ -569,7 +587,7 @@ export function CommentsBottomSheet({
           style={[
             styles.composerHost,
             styles.composerHostVideoOverlay,
-            { paddingBottom: Math.max(insets.bottom, spacing.xxs) },
+            { paddingBottom: composerSafeBottom },
           ]}
           {...sheetSurfaceProps}
         >
@@ -604,7 +622,7 @@ export function CommentsBottomSheet({
           {
             height: desktopSheetHeight ?? ("70%" as const),
             maxHeight: "75%" as const,
-            paddingBottom: composerBottomInset,
+            paddingBottom: composerSafeBottom,
             transform: [{ translateY }],
           },
         ]}
@@ -643,7 +661,7 @@ export function CommentsBottomSheet({
           {
             height: "70%" as const,
             maxHeight: "75%" as const,
-            paddingBottom: composerBottomInset,
+            paddingBottom: composerSafeBottom,
             transform: [{ translateY }],
           },
         ]}
@@ -738,7 +756,6 @@ const styles = StyleSheet.create({
       paddingTop: 6,
       width: "100%",
       maxWidth: "100%",
-      overflow: "hidden",
       boxSizing: "border-box",
     },
     default: {},

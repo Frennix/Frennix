@@ -64,6 +64,13 @@ export function isMobileWebSafari(): boolean {
   return isIOS && isSafari;
 }
 
+/** True when Safari's visual viewport is reduced by the on-screen keyboard or bottom chrome. */
+export function isVisualViewportKeyboardOpen(
+  snapshot: SafariVisualViewportSnapshot = measureSafariVisualViewport()
+): boolean {
+  return snapshot.bottomChrome > 0;
+}
+
 /** Height of the visual viewport — used for full-screen mobile web overlays (no offsetTop). */
 export function readVisualViewportHeight(): number {
   if (typeof window === "undefined") return 640;

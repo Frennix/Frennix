@@ -37,11 +37,16 @@ const MAX_VISIBLE_LINES = 5;
 const COMMENT_TEXTAREA_PADDING_X_PX = 14;
 const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
 const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
-/** Sub-pixel slack before treating textarea content as overflow-scrollable. */
-const COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX = 1;
 
 /** Border-box inset around the textarea inside composerField (1px each side). */
 const COMPOSER_FIELD_BORDER_TOTAL_PX = 2;
+
+type WebTextareaVerticalChromePx = {
+  paddingTop: number;
+  paddingBottom: number;
+  borderTop: number;
+  borderBottom: number;
+};
 
 function computeCommentMinInputHeight(): number {
   return ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
@@ -49,6 +54,48 @@ function computeCommentMinInputHeight(): number {
 
 function computeCommentMaxInputHeight(): number {
   return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+}
+
+function readWebTextareaVerticalChromePx(textarea: HTMLTextAreaElement): WebTextareaVerticalChromePx {
+  if (typeof window === "undefined") {
+    return {
+      paddingTop: COMMENT_TEXTAREA_PADDING_Y_PX,
+      paddingBottom: COMMENT_TEXTAREA_PADDING_Y_PX,
+      borderTop: 0,
+      borderBottom: 0,
+    };
+  }
+
+  const style = window.getComputedStyle(textarea);
+  return {
+    paddingTop: Number.parseFloat(style.paddingTop) || COMMENT_TEXTAREA_PADDING_Y_PX,
+    paddingBottom: Number.parseFloat(style.paddingBottom) || COMMENT_TEXTAREA_PADDING_Y_PX,
+    borderTop: Number.parseFloat(style.borderTopWidth) || 0,
+    borderBottom: Number.parseFloat(style.borderBottomWidth) || 0,
+  };
+}
+
+function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
+  if (typeof window === "undefined") return ESTIMATED_LINE_HEIGHT;
+  const parsed = Number.parseFloat(window.getComputedStyle(textarea).lineHeight);
+  return Number.isFinite(parsed) ? parsed : ESTIMATED_LINE_HEIGHT;
+}
+
+/** Border-box height for exactly MAX_VISIBLE_LINES complete rows inside the textarea. */
+export function computeWebCommentMaxTextareaHeight(textarea: HTMLTextAreaElement): number {
+  const lineHeight = readWebTextareaLineHeight(textarea);
+  const { paddingTop, paddingBottom, borderTop, borderBottom } =
+    readWebTextareaVerticalChromePx(textarea);
+  return Math.ceil(
+    MAX_VISIBLE_LINES * lineHeight + paddingTop + paddingBottom + borderTop + borderBottom
+  );
+}
+
+function computeWebCommentMinTextareaHeight(textarea: HTMLTextAreaElement): number {
+  const lineHeight = readWebTextareaLineHeight(textarea);
+  const { paddingTop, paddingBottom, borderTop, borderBottom } =
+    readWebTextareaVerticalChromePx(textarea);
+  return Math.ceil(lineHeight + paddingTop + paddingBottom + borderTop + borderBottom);
 }
 
 function readComposerFieldVerticalPaddingPx(compactComposer: boolean): number {
@@ -69,65 +116,29 @@ export function computeCommentMaxComposerFieldHeight(compactComposer = false): n
   return computeCommentComposerFieldHeight(computeCommentMaxInputHeight(), compactComposer);
 }
 
-function commentTextareaContentFits(textarea: HTMLTextAreaElement): boolean {
-  return textarea.scrollHeight <= textarea.clientHeight + COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX;
-}
-
-function applyCommentTextareaScroll(textarea: HTMLTextAreaElement): void {
-  if (!textarea.value) {
-    textarea.scrollTop = 0;
-    textarea.style.setProperty("overflow-y", "hidden", "important");
-    return;
-  }
-
-  if (commentTextareaContentFits(textarea)) {
-    textarea.style.setProperty("overflow-y", "hidden", "important");
-    textarea.scrollTop = 0;
-    return;
-  }
-
-  textarea.style.setProperty("overflow-y", "auto", "important");
-  if (textarea.selectionStart === textarea.value.length) {
-    textarea.scrollTop = textarea.scrollHeight;
-  }
-}
-
-function scheduleCommentTextareaScrollReset(textarea: HTMLTextAreaElement): void {
-  if (typeof requestAnimationFrame === "undefined") return;
-  requestAnimationFrame(() => {
-    if (!textarea.isConnected) return;
-    if (commentTextareaContentFits(textarea)) {
-      textarea.scrollTop = 0;
-      textarea.style.setProperty("overflow-y", "hidden", "important");
-    }
-  });
-}
-
-function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
-  if (typeof window === "undefined") return ESTIMATED_LINE_HEIGHT;
-  const parsed = Number.parseFloat(window.getComputedStyle(textarea).lineHeight);
-  return Number.isFinite(parsed) ? parsed : ESTIMATED_LINE_HEIGHT;
-}
-
-function syncWebTextareaHeight(
-  textarea: HTMLTextAreaElement,
-  maxOuterHeight: number
-): number {
-  const measureMinOuter =
-    readWebTextareaLineHeight(textarea) + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+function syncWebTextareaHeight(textarea: HTMLTextAreaElement): number {
+  const maxOuterHeight = computeWebCommentMaxTextareaHeight(textarea);
+  const measureMinOuter = computeWebCommentMinTextareaHeight(textarea);
 
   textarea.style.setProperty("box-sizing", "border-box", "important");
-  // Measure full content height — collapsing to one line under-reports scrollHeight on iOS Safari.
   textarea.style.setProperty("height", "0px", "important");
   textarea.style.setProperty("overflow-y", "hidden", "important");
   textarea.scrollTop = 0;
 
   const measured = Math.ceil(textarea.scrollHeight);
-  const nextOuter = Math.min(maxOuterHeight, Math.max(measureMinOuter, measured));
+  const atMaxViewport = measured >= maxOuterHeight;
+  const nextOuter = atMaxViewport ? maxOuterHeight : Math.max(measureMinOuter, measured);
 
   textarea.style.setProperty("height", `${nextOuter}px`, "important");
-  applyCommentTextareaScroll(textarea);
-  scheduleCommentTextareaScrollReset(textarea);
+  if (atMaxViewport) {
+    textarea.style.setProperty("overflow-y", "auto", "important");
+    if (textarea.selectionStart === textarea.value.length) {
+      textarea.scrollTop = textarea.scrollHeight;
+    }
+  } else {
+    textarea.style.setProperty("overflow-y", "hidden", "important");
+    textarea.scrollTop = 0;
+  }
 
   return nextOuter;
 }
@@ -158,19 +169,18 @@ function WebCommentTextarea({
   const remeasure = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const next = syncWebTextareaHeight(textarea, maxInputHeight);
+    const next = syncWebTextareaHeight(textarea);
     onHeightChange(next);
-  }, [maxInputHeight, onHeightChange]);
+  }, [onHeightChange]);
 
   useLayoutEffect(() => {
     remeasure();
-  }, [value, maxInputHeight, remeasure]);
+  }, [value, remeasure]);
 
   const webInputStyle = StyleSheet.flatten([
     styles.composerInputWeb,
     {
       minHeight: minInputHeight,
-      maxHeight: maxInputHeight,
     },
   ]) as React.CSSProperties;
 
@@ -266,7 +276,7 @@ export function CommentComposerRow({
 
   const handleWebHeightChange = useCallback(
     (height: number) => {
-      const next = Math.min(maxInputHeight, Math.max(minInputHeight, height));
+      const next = Math.max(minInputHeight, height);
       const deleting = value.length < prevValueLengthRef.current;
       prevValueLengthRef.current = value.length;
 
@@ -275,7 +285,7 @@ export function CommentComposerRow({
         return next;
       });
     },
-    [maxInputHeight, minInputHeight, value.length]
+    [minInputHeight, value.length]
   );
 
   useEffect(() => {
@@ -300,7 +310,7 @@ export function CommentComposerRow({
           styles.composerField,
           compactComposer && styles.composerFieldCompact,
           Platform.OS === "web"
-            ? { minHeight: composerFieldHeight, flexShrink: 0 }
+            ? { minHeight: composerFieldHeight, height: composerFieldHeight, flexShrink: 0 }
             : null,
         ]}
         {...(Platform.OS === "web"
@@ -624,7 +634,6 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === "web" ? 4 : 3,
     ...(Platform.OS === "web"
       ? ({
-          overflow: "hidden",
           boxSizing: "border-box",
         } as const)
       : null),
@@ -640,7 +649,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web"
       ? ({
           overflowX: "hidden",
-          overflowY: "visible",
+          overflowY: "hidden",
           boxSizing: "border-box",
         } as const)
       : null),

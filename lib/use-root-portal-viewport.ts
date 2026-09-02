@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import {
+  isVisualViewportKeyboardOpen,
   measureSafariVisualViewport,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
@@ -25,5 +26,8 @@ export function useRootPortalViewport(active: boolean) {
       ? (viewport?.overlayHeight ?? (typeof window !== "undefined" ? window.innerHeight : 640))
       : undefined;
 
-  return { overlayTop, overlayHeight };
+  const keyboardOpen =
+    Platform.OS === "web" && viewport != null ? isVisualViewportKeyboardOpen(viewport) : false;
+
+  return { overlayTop, overlayHeight, keyboardOpen };
 }

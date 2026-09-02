@@ -44,8 +44,8 @@ export function PostCommentsScreen({
   };
 
   const headerTopInset = Math.max(insets.top, spacing.sm);
-  const composerBottomInset = Math.max(insets.bottom, spacing.sm);
-  const { overlayTop, overlayHeight } = useRootPortalViewport(Platform.OS === "web");
+  const { overlayTop, overlayHeight, keyboardOpen } = useRootPortalViewport(Platform.OS === "web");
+  const composerSafeBottom = keyboardOpen ? 0 : Math.max(insets.bottom, spacing.sm);
 
   const webViewportRootStyle: ViewStyle | null =
     Platform.OS === "web" && overlayHeight != null
@@ -64,7 +64,12 @@ export function PostCommentsScreen({
     <>
       {commentActionSheets}
       <View
-        style={[styles.root, webTabSceneShell, webViewportRootStyle]}
+        style={[
+          styles.root,
+          webTabSceneShell,
+          webViewportRootStyle,
+          Platform.OS === "web" ? styles.rootWebViewport : null,
+        ]}
         {...(Platform.OS === "web"
           ? ({
               nativeID: "frennix-comments-route",
@@ -97,7 +102,7 @@ export function PostCommentsScreen({
           {thread}
         </ScrollView>
 
-        <View style={[styles.composerHost, { paddingBottom: composerBottomInset }]}>
+        <View style={[styles.composerHost, { paddingBottom: composerSafeBottom }]}>
           {composer}
         </View>
       </View>
@@ -109,6 +114,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  rootWebViewport: {
+    overflow: "visible",
   },
   header: {
     flexShrink: 0,
