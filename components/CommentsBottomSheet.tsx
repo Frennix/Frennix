@@ -28,6 +28,7 @@ import {
 } from "@/lib/comments-close-diagnostics";
 import {
   isMobileWeb,
+  measureSafariVisualViewport,
   readVisualViewportHeight,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
@@ -39,6 +40,27 @@ import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
+/** Keep roughly the top 30% of the layout viewport for the playing video. */
+const VIDEO_PEEK_FRACTION = 0.3;
+const MIN_VIDEO_OVERLAY_SHEET_HEIGHT = 220;
+
+export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
+
+type VideoOverlaySheetLayout = {
+  top: number;
+  height: number;
+  peekHeight: number;
+};
+
+function computeVideoOverlaySheetLayout(): VideoOverlaySheetLayout {
+  const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
+  const peekHeight = Math.round(layoutHeight * VIDEO_PEEK_FRACTION);
+  const { offsetTop, visualHeight } = measureSafariVisualViewport();
+  const visibleBottom = offsetTop + visualHeight;
+  const top = Math.min(peekHeight, Math.max(0, visibleBottom - MIN_VIDEO_OVERLAY_SHEET_HEIGHT));
+  const height = Math.max(MIN_VIDEO_OVERLAY_SHEET_HEIGHT, visibleBottom - top);
+  return { top, height, peekHeight };
+}
 
 type CommentsBottomSheetProps = {
   visible: boolean;
@@ -51,6 +73,8 @@ type CommentsBottomSheetProps = {
   /** Fixed composer row rendered above the safe-area inset. */
   composer: ReactNode;
   backdropAccessibilityLabel?: string;
+  /** Mobile web fullscreen vs video-route overlay that preserves a video peek region. */
+  presentation?: CommentsSheetPresentation;
 };
 
 const useMobileWebFullscreen = Platform.OS === "web" && isMobileWeb();
@@ -99,6 +123,21 @@ const WEB_MOBILE_FULLSCREEN_ROOT: ViewStyle = Platform.select({
   default: {},
 }) as ViewStyle;
 
+const WEB_MOBILE_VIDEO_OVERLAY_ROOT: ViewStyle = Platform.select({
+  web: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    zIndex: COMMENTS_SHEET_Z_INDEX,
+    pointerEvents: "box-none",
+    touchAction: "none",
+  },
+  default: {},
+}) as ViewStyle;
+
 function stopPointerEventPropagation(event: Event): void {
   event.stopPropagation();
 }
@@ -115,6 +154,7 @@ export function CommentsBottomSheet({
   children,
   composer,
   backdropAccessibilityLabel = "Close comments",
+  presentation = "fullscreen",
 }: CommentsBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(0)).current;
@@ -122,8 +162,12 @@ export function CommentsBottomSheet({
   const dragY = useRef(new Animated.Value(0)).current;
   const dismissingRef = useRef(false);
   const openedAtRef = useRef(0);
+  const useVideoOverlay = presentation === "videoOverlay";
   const [viewportHeight, setViewportHeight] = useState(() =>
     Platform.OS === "web" ? readVisualViewportHeight() : 0
+  );
+  const [videoOverlayLayout, setVideoOverlayLayout] = useState<VideoOverlaySheetLayout>(() =>
+    computeVideoOverlaySheetLayout()
   );
 
   useEffect(() => {
@@ -131,10 +175,16 @@ export function CommentsBottomSheet({
       return;
     }
 
-    const syncHeight = () => setViewportHeight(readVisualViewportHeight());
+    const syncHeight = () => {
+      if (useVideoOverlay) {
+        setVideoOverlayLayout(computeVideoOverlaySheetLayout());
+        return;
+      }
+      setViewportHeight(readVisualViewportHeight());
+    };
     syncHeight();
     return subscribeSafariVisualViewport(syncHeight);
-  }, [visible]);
+  }, [useVideoOverlay, visible]);
 
   useEffect(() => {
     if (!visible || useMobileWebFullscreen) {
@@ -375,6 +425,49 @@ export function CommentsBottomSheet({
     </View>
   );
 
+  const mobileVideoOverlaySurface = (
+    <View
+      style={WEB_MOBILE_VIDEO_OVERLAY_ROOT}
+      {...(Platform.OS === "web"
+        ? ({
+            "data-frennix-comments-sheet": "true",
+            "data-frennix-comments-video-overlay": "true",
+          } as object)
+        : null)}
+    >
+      <Pressable
+        style={[styles.videoPeekDismiss, { height: videoOverlayLayout.peekHeight }]}
+        onPress={handleBackdropPress}
+        {...(Platform.OS === "web"
+          ? ({
+              onClick: handleWebBackdropClick,
+            } as object)
+          : null)}
+        accessibilityRole="button"
+        accessibilityLabel={backdropAccessibilityLabel}
+      />
+      <View
+        style={[
+          styles.sheet,
+          styles.videoOverlaySheet,
+          {
+            top: videoOverlayLayout.top,
+            height: videoOverlayLayout.height,
+            paddingBottom: composerBottomInset,
+          },
+        ]}
+        {...sheetSurfaceProps}
+      >
+        <View style={styles.handleWrap} {...headerPanResponder.panHandlers}>
+          <View style={styles.handle} />
+        </View>
+        <View {...headerPanResponder.panHandlers}>{headerRow}</View>
+        {listRegion}
+        {composerRegion}
+      </View>
+    </View>
+  );
+
   const desktopWebSurface = (
     <View
       style={WEB_DESKTOP_OVERLAY_ROOT}
@@ -457,7 +550,9 @@ export function CommentsBottomSheet({
   );
 
   const surface = useMobileWebFullscreen
-    ? mobileWebSurface
+    ? useVideoOverlay
+      ? mobileVideoOverlaySurface
+      : mobileWebSurface
     : Platform.OS === "web"
       ? desktopWebSurface
       : nativeSurface;
@@ -510,6 +605,25 @@ const styles = StyleSheet.create({
         } as object)
       : null),
   },
+  videoOverlaySheet: Platform.select({
+    web: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+    },
+    default: {},
+  }) as ViewStyle,
+  videoPeekDismiss: Platform.select({
+    web: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      pointerEvents: "auto",
+      backgroundColor: "transparent",
+    },
+    default: {},
+  }) as ViewStyle,
   mobileWebHeader: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,

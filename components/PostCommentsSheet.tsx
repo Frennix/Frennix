@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
-import { CommentsBottomSheet } from "@/components/CommentsBottomSheet";
+import { CommentsBottomSheet, type CommentsSheetPresentation } from "@/components/CommentsBottomSheet";
 import { usePostCommentsContent } from "@/components/PostCommentsContent";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { restoreWebHorizontalScrollPosition } from "@/lib/web-horizontal-scroll-restore";
@@ -13,6 +13,7 @@ type PostCommentsSheetProps = {
   authorProfile?: Post["author"];
   initialDraft?: string;
   onClose: () => void;
+  presentation?: CommentsSheetPresentation;
 };
 
 export function PostCommentsSheet({
@@ -22,6 +23,7 @@ export function PostCommentsSheet({
   authorProfile,
   initialDraft,
   onClose,
+  presentation = "fullscreen",
 }: PostCommentsSheetProps) {
   useEffect(() => {
     if (Platform.OS !== "web" || visible) return;
@@ -41,6 +43,7 @@ export function PostCommentsSheet({
       authorProfile={authorProfile}
       initialDraft={initialDraft}
       onClose={onClose}
+      presentation={presentation}
     />
   );
 }
@@ -52,6 +55,7 @@ function PostCommentsSheetBody({
   authorProfile,
   initialDraft,
   onClose,
+  presentation,
 }: PostCommentsSheetProps & { post: Post; visible: boolean }) {
   const { postId, title, commentActionSheets, composer, thread } = usePostCommentsContent({
     post,
@@ -77,6 +81,7 @@ function PostCommentsSheetBody({
         postId={postId}
         title={title}
         composer={composer}
+        presentation={presentation}
       >
         {thread}
       </CommentsBottomSheet>

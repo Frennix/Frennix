@@ -75,7 +75,6 @@ export function ImmersiveVideoViewer({
   const openComments = useCallback(
     (draft?: string) => {
       const snapshot = videoRef.current?.getPlaybackSnapshot();
-      videoRef.current?.pause();
       postActions.onComment(
         {
           mediaIndex,

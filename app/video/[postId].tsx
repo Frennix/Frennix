@@ -66,7 +66,7 @@ export default function PostVideoRoute() {
   const params = useLocalSearchParams<{ postId: string; mediaIndex?: string }>();
   const postId = Array.isArray(params.postId) ? params.postId[0] : params.postId;
   const mediaIndex = parseMediaIndex(params.mediaIndex);
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const userId = session?.user.id ?? "";
   const [resumeHandoff, setResumeHandoff] = useState<FeedVideoFullscreenHandoff | undefined>(() =>
     consumeInitialResumeHandoff(postId)
@@ -144,6 +144,8 @@ export default function PostVideoRoute() {
         mediaIndex={mediaIndex}
         resumeHandoff={resumeHandoff}
         postActions={postActions}
+        userId={userId}
+        authorProfile={profile ?? undefined}
         onBack={handleBack}
       />
     );
