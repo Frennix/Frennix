@@ -829,7 +829,14 @@ const styles = StyleSheet.create({
   },
   composerHostVideoOverlay: {
     flexShrink: 0,
+    width: "100%",
+    maxWidth: "100%",
     paddingTop: spacing.xs,
     paddingHorizontal: spacing.sm,
+    ...(Platform.OS === "web"
+      ? ({
+          boxSizing: "border-box",
+        } as const)
+      : null),
   },
 });
