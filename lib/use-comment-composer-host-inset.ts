@@ -21,19 +21,25 @@ export function useCommentsOverlayBottomReserve(active: boolean): number {
       return;
     }
 
-    const sync = () => {
+    const measure = () => {
       setReserve(readSafariCommentsOverlayBottomReserve());
     };
 
-    sync();
-    requestAnimationFrame(sync);
-
-    const onFocusChange = () => {
-      sync();
-      requestAnimationFrame(sync);
+    const syncAfterViewportSettles = () => {
+      measure();
+      requestAnimationFrame(() => {
+        measure();
+        requestAnimationFrame(measure);
+      });
     };
 
-    const unsubViewport = subscribeSafariVisualViewport(sync);
+    syncAfterViewportSettles();
+
+    const onFocusChange = () => {
+      syncAfterViewportSettles();
+    };
+
+    const unsubViewport = subscribeSafariVisualViewport(syncAfterViewportSettles);
     document.addEventListener("focusin", onFocusChange);
     document.addEventListener("focusout", onFocusChange);
 

@@ -8,7 +8,7 @@
 /** Comfortable spacing above home indicator / Safari toolbar (design system). */
 export const OVERLAY_BOTTOM_SAFETY_MARGIN_PX = 28;
 
-/** Fallback reserve when Safari's focused-form accessory bar cannot be measured directly. */
+/** @deprecated No longer used for overlay reserve — accessory lift uses measured composerHost height. */
 export const SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX = 44;
 
 const ENV_SAFE_AREA_PROBE_ID = "frennix-env-safe-area-probe";
@@ -83,8 +83,8 @@ function isCommentComposerTextareaFocused(): boolean {
 
 /**
  * Pixels to subtract from comments overlay height so the full composer sits above
- * Safari bottom toolbar / InputAccessoryView. Measured from visualViewport bottom
- * and composerHost rect — not composerHost padding.
+ * Safari bottom toolbar / InputAccessoryView. Uses measured composerHost height
+ * (not visibleBottom comparisons or fixed accessory increments).
  */
 export function readSafariCommentsOverlayBottomReserve(): number {
   if (typeof window === "undefined" || !window.visualViewport || !isMobileWebSafari()) {
@@ -93,31 +93,32 @@ export function readSafariCommentsOverlayBottomReserve(): number {
 
   const snapshot = measureSafariVisualViewport();
   const visibleBottom = snapshot.offsetTop + snapshot.visualHeight;
-  let reserve = snapshot.bottomChrome;
+  const keyboardOpen = isVisualViewportKeyboardOpen(snapshot);
+  const focused = isCommentComposerTextareaFocused();
 
   const host = document.querySelector('[data-frennix-comment-composer-host="true"]');
-  if (host instanceof HTMLElement) {
-    const composerBottom = host.getBoundingClientRect().bottom;
-    const lift = composerBottom - (visibleBottom - reserve);
-    if (lift > 0) {
-      reserve += Math.ceil(lift);
+  if (!(host instanceof HTMLElement)) {
+    if (keyboardOpen && focused) {
+      return 0;
     }
+    return keyboardOpen ? 0 : snapshot.bottomChrome;
   }
 
-  if (isVisualViewportKeyboardOpen(snapshot) && isCommentComposerTextareaFocused()) {
-    const row = document.querySelector('[data-frennix-comment-composer-row="true"]');
-    if (row instanceof HTMLElement) {
-      const rowBottom = row.getBoundingClientRect().bottom;
-      const clearance = visibleBottom - reserve - rowBottom;
-      if (clearance < SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX) {
-        reserve += Math.ceil(
-          SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX - Math.max(0, clearance)
-        );
-      }
-    }
+  const hostRect = host.getBoundingClientRect();
+  const hostHeight = Math.ceil(hostRect.height);
+  const hostBottom = hostRect.bottom;
+  const hostOverflow = Math.max(0, Math.ceil(hostBottom - visibleBottom));
+
+  if (keyboardOpen && focused) {
+    // Entire composer host must sit above Safari's accessory/form bar — reserve its full height.
+    return hostHeight + hostOverflow;
   }
 
-  return Math.max(0, reserve);
+  if (!keyboardOpen) {
+    return snapshot.bottomChrome + hostOverflow;
+  }
+
+  return hostOverflow;
 }
 
 /** @deprecated Prefer readSafariCommentsOverlayBottomReserve — reserve at overlay root, not host padding. */
