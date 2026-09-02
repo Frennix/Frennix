@@ -40,12 +40,33 @@ const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
 /** Sub-pixel slack before treating textarea content as overflow-scrollable. */
 const COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX = 1;
 
+/** Border-box inset around the textarea inside composerField (1px each side). */
+const COMPOSER_FIELD_BORDER_TOTAL_PX = 2;
+
 function computeCommentMinInputHeight(): number {
   return ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
 }
 
 function computeCommentMaxInputHeight(): number {
   return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+}
+
+function readComposerFieldVerticalPaddingPx(compactComposer: boolean): number {
+  return compactComposer ? 6 : 8;
+}
+
+/** Border-box height for the rounded composerField wrapping a textarea of the given outer height. */
+export function computeCommentComposerFieldHeight(
+  textareaHeight: number,
+  compactComposer = false
+): number {
+  return (
+    textareaHeight + readComposerFieldVerticalPaddingPx(compactComposer) + COMPOSER_FIELD_BORDER_TOTAL_PX
+  );
+}
+
+export function computeCommentMaxComposerFieldHeight(compactComposer = false): number {
+  return computeCommentComposerFieldHeight(computeCommentMaxInputHeight(), compactComposer);
 }
 
 function commentTextareaContentFits(textarea: HTMLTextAreaElement): boolean {
@@ -227,9 +248,9 @@ export function CommentComposerRow({
   const canPost = Boolean(value.trim()) && !posting;
   const minInputHeight = computeCommentMinInputHeight();
   const maxInputHeight = computeCommentMaxInputHeight();
-  const fieldVerticalPaddingPx = compactComposer ? 6 : 8;
   const prevValueLengthRef = useRef(0);
   const [inputHeight, setInputHeight] = useState(minInputHeight);
+  const composerFieldHeight = computeCommentComposerFieldHeight(inputHeight, compactComposer);
 
   const handleNativeContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
@@ -278,7 +299,9 @@ export function CommentComposerRow({
         style={[
           styles.composerField,
           compactComposer && styles.composerFieldCompact,
-          Platform.OS === "web" ? { minHeight: fieldVerticalPaddingPx + inputHeight } : null,
+          Platform.OS === "web"
+            ? { minHeight: composerFieldHeight, flexShrink: 0 }
+            : null,
         ]}
         {...(Platform.OS === "web"
           ? ({ "data-frennix-comment-composer-field": "true" } as object)
@@ -592,7 +615,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     maxWidth: "100%",
     minHeight: 34,
-    flexShrink: 1,
+    flexShrink: Platform.OS === "web" ? 0 : 1,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,

@@ -1,8 +1,9 @@
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Post } from "@frennix/types";
 import { usePostCommentsContent } from "@/components/PostCommentsContent";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
+import { useRootPortalViewport } from "@/lib/use-root-portal-viewport";
 import { colors, spacing, touchTarget, typography } from "@frennix/ui";
 
 type PostCommentsScreenProps = {
@@ -44,12 +45,26 @@ export function PostCommentsScreen({
 
   const headerTopInset = Math.max(insets.top, spacing.sm);
   const composerBottomInset = Math.max(insets.bottom, spacing.sm);
+  const { overlayTop, overlayHeight } = useRootPortalViewport(Platform.OS === "web");
+
+  const webViewportRootStyle: ViewStyle | null =
+    Platform.OS === "web" && overlayHeight != null
+      ? {
+          position: "fixed",
+          top: overlayTop,
+          left: 0,
+          right: 0,
+          width: "100%",
+          height: overlayHeight,
+          maxHeight: overlayHeight,
+        }
+      : null;
 
   return (
     <>
       {commentActionSheets}
       <View
-        style={[styles.root, webTabSceneShell]}
+        style={[styles.root, webTabSceneShell, webViewportRootStyle]}
         {...(Platform.OS === "web"
           ? ({
               nativeID: "frennix-comments-route",
@@ -94,11 +109,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
-    ...(Platform.OS === "web"
-      ? ({
-          minHeight: "100dvh",
-        } as object)
-      : null),
   },
   header: {
     flexShrink: 0,

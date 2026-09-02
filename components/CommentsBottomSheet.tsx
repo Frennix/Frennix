@@ -51,12 +51,6 @@ const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
 const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
 /** Minimum sheet chrome (handle, header, composer) above the keyboard. */
 const VIDEO_SHEET_MIN_CHROME_PX = 88;
-/** Top inset on the video-overlay column — must be subtracted from sheet height math. */
-const VIDEO_OVERLAY_COLUMN_PADDING_TOP_PX = 6;
-/** Fallback until onLayout — drag handle + "Comments" header row. */
-const VIDEO_OVERLAY_HEADER_CHROME_ESTIMATE_PX = 68;
-/** Fallback until onLayout — single-line composer host (padding + row). */
-const VIDEO_OVERLAY_COMPOSER_ESTIMATE_PX = 56;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -218,32 +212,12 @@ export function CommentsBottomSheet({
   const [videoOverlayLayout, setVideoOverlayLayout] = useState<VideoOverlaySheetLayout>(() =>
     computeVideoOverlaySheetLayout(null)
   );
-  const [videoOverlayHeaderHeight, setVideoOverlayHeaderHeight] = useState(0);
-  const [videoOverlayComposerHeight, setVideoOverlayComposerHeight] = useState(0);
 
   useEffect(() => {
     if (!visible || !useVideoOverlay) {
       videoPeekBaselineRef.current = null;
-      setVideoOverlayHeaderHeight(0);
-      setVideoOverlayComposerHeight(0);
     }
   }, [useVideoOverlay, visible]);
-
-  const handleVideoOverlayHeaderLayout = useCallback(
-    (event: { nativeEvent: { layout: { height: number } } }) => {
-      const next = Math.ceil(event.nativeEvent.layout.height);
-      setVideoOverlayHeaderHeight((current) => (current === next ? current : next));
-    },
-    []
-  );
-
-  const handleVideoOverlayComposerLayout = useCallback(
-    (event: { nativeEvent: { layout: { height: number } } }) => {
-      const next = Math.ceil(event.nativeEvent.layout.height);
-      setVideoOverlayComposerHeight((current) => (current === next ? current : next));
-    },
-    []
-  );
 
   useEffect(() => {
     if (!visible || Platform.OS !== "web" || !useMobileWebFullscreen || typeof window === "undefined") {
@@ -451,24 +425,6 @@ export function CommentsBottomSheet({
   const composerBottomInset = Math.max(insets.bottom, spacing.sm);
   const headerTopInset = Math.max(insets.top, spacing.sm);
 
-  const videoOverlayListHeight = useMemo(() => {
-    if (!useVideoOverlay) return undefined;
-    const columnContentHeight = Math.max(
-      0,
-      videoOverlayLayout.height - VIDEO_OVERLAY_COLUMN_PADDING_TOP_PX
-    );
-    const headerHeight =
-      videoOverlayHeaderHeight || VIDEO_OVERLAY_HEADER_CHROME_ESTIMATE_PX;
-    const composerHeight =
-      videoOverlayComposerHeight || VIDEO_OVERLAY_COMPOSER_ESTIMATE_PX;
-    return Math.max(0, columnContentHeight - headerHeight - composerHeight);
-  }, [
-    useVideoOverlay,
-    videoOverlayComposerHeight,
-    videoOverlayHeaderHeight,
-    videoOverlayLayout.height,
-  ]);
-
   if (!visible) return null;
 
   const sheetSurfaceProps =
@@ -510,12 +466,12 @@ export function CommentsBottomSheet({
     <ScrollView
       style={[
         styles.listScroll,
-        useVideoOverlay && videoOverlayListHeight != null
+        useVideoOverlay
           ? ({
-              height: videoOverlayListHeight,
-              flex: 0,
-              flexGrow: 0,
-              flexShrink: 0,
+              flex: 1,
+              minHeight: 0,
+              flexGrow: 1,
+              flexShrink: 1,
             } as ViewStyle)
           : null,
       ]}
@@ -598,7 +554,6 @@ export function CommentsBottomSheet({
       >
         <View
           style={[styles.sheet, styles.videoOverlayHeaderShell]}
-          onLayout={handleVideoOverlayHeaderLayout}
           {...sheetSurfaceProps}
         >
           <View
@@ -616,7 +571,6 @@ export function CommentsBottomSheet({
             styles.composerHostVideoOverlay,
             { paddingBottom: Math.max(insets.bottom, spacing.xxs) },
           ]}
-          onLayout={handleVideoOverlayComposerLayout}
           {...sheetSurfaceProps}
         >
           {composer}
@@ -778,7 +732,9 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       bottom: 0,
+      display: "flex",
       flexDirection: "column",
+      minHeight: 0,
       paddingTop: 6,
       width: "100%",
       maxWidth: "100%",
