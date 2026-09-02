@@ -670,6 +670,11 @@ const styles = StyleSheet.create({
     paddingRight: COMMENT_TEXTAREA_PADDING_X_PX,
     borderWidth: 0,
     backgroundColor: "transparent",
+    ...(Platform.OS === "web"
+      ? ({
+          boxShadow: "none",
+        } as object)
+      : null),
     color: colors.text,
     fontSize: 16,
     lineHeight: 22,

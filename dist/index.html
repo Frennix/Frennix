@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · e880521a</title>
+    <title>Frennix · 4f6176e6</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="e880521ab36880fd6484b3bb062f80c6e01ff855" />
-    <meta name="frennix-build-bundle" content="index-8a80453613be6461ad97725775a9ed48.js" />
-    <meta name="frennix-build-at" content="2026-09-02T16:03:55.028Z" />
+    <meta name="frennix-build-sha" content="4f6176e658695ddf89d43af927bbed7c00c16f20" />
+    <meta name="frennix-build-bundle" content="index-daa820d2b8e75e04f34f701851e6b599.js" />
+    <meta name="frennix-build-at" content="2026-09-02T16:27:36.091Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -267,9 +267,16 @@
     padding-left: 14px !important;
     padding-right: 14px !important;
     text-indent: 0 !important;
+    border: none !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
     -webkit-appearance: none !important;
     appearance: none !important;
     -webkit-overflow-scrolling: touch !important;
+  }
+  [data-frennix-comments-sheet="true"] textarea[data-frennix-comment-input="true"] {
+    background-color: transparent !important;
+    box-shadow: none !important;
   }
   [data-frennix-comment-composer-row="true"] {
     width: 100% !important;
@@ -281,6 +288,14 @@
   textarea[data-frennix-comment-input="true"]::placeholder {
     color: #71717a !important;
     opacity: 1 !important;
+  }
+  textarea[data-frennix-comment-input="true"]:-webkit-autofill,
+  textarea[data-frennix-comment-input="true"]:-webkit-autofill:hover,
+  textarea[data-frennix-comment-input="true"]:-webkit-autofill:focus {
+    -webkit-text-fill-color: #fafafa !important;
+    -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
   }
   textarea[data-frennix-chat-input="true"] {
     font-size: 16px !important;
@@ -298,7 +313,7 @@
     opacity: 1 !important;
   }
   [data-frennix-comments-fullscreen="true"] [data-frennix-comment-input="true"],
-  [data-frennix-comments-fullscreen="true"] textarea,
+  [data-frennix-comments-fullscreen="true"] textarea:not([data-frennix-comment-input="true"]),
   [data-frennix-comments-fullscreen="true"] input {
     background-color: #141416 !important;
   }
@@ -315,7 +330,7 @@
     overflow: hidden !important;
   }
   [data-frennix-comments-route="true"] [data-frennix-comment-input="true"],
-  [data-frennix-comments-route="true"] textarea,
+  [data-frennix-comments-route="true"] textarea:not([data-frennix-comment-input="true"]),
   [data-frennix-comments-route="true"] input {
     font-size: 16px !important;
     line-height: 22px !important;
@@ -461,7 +476,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="e880521ab36880fd6484b3bb062f80c6e01ff855" data-bundle="index-8a80453613be6461ad97725775a9ed48.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="4f6176e658695ddf89d43af927bbed7c00c16f20" data-bundle="index-daa820d2b8e75e04f34f701851e6b599.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -507,7 +522,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-8a80453613be6461ad97725775a9ed48.js?v=e880521a" defer></script>
+  <script src="/_expo/static/js/web/index-daa820d2b8e75e04f34f701851e6b599.js?v=4f6176e6" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
