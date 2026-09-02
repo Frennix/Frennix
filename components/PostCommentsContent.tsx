@@ -33,8 +33,9 @@ const COMPOSER_POST_WIDTH_PX = 48;
 const COMPOSER_ROW_GAP_PX = spacing.xs;
 /** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
 const MAX_VISIBLE_LINES = 5;
-/** Vertical inset inside the bubble (included in border-box height). */
-const COMMENT_TEXTAREA_PADDING_Y_PX = 5;
+/** Internal textarea inset — included in border-box height/width. */
+const COMMENT_TEXTAREA_PADDING_X_PX = 14;
+const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
 const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
 
 function computeCommentMaxInputHeight(): number {
@@ -578,7 +579,7 @@ const styles = StyleSheet.create({
     minHeight: MIN_COMMENT_INPUT_HEIGHT,
     maxWidth: "100%",
     paddingVertical: COMMENT_TEXTAREA_PADDING_Y_PX,
-    paddingHorizontal: 0,
+    paddingHorizontal: COMMENT_TEXTAREA_PADDING_X_PX,
     color: colors.text,
     fontSize: Platform.OS === "web" ? 16 : 15,
     lineHeight: Platform.OS === "web" ? 22 : 20,
@@ -597,7 +598,8 @@ const styles = StyleSheet.create({
     margin: 0,
     paddingTop: COMMENT_TEXTAREA_PADDING_Y_PX,
     paddingBottom: COMMENT_TEXTAREA_PADDING_Y_PX,
-    paddingHorizontal: 0,
+    paddingLeft: COMMENT_TEXTAREA_PADDING_X_PX,
+    paddingRight: COMMENT_TEXTAREA_PADDING_X_PX,
     borderWidth: 0,
     backgroundColor: "transparent",
     color: colors.text,
@@ -608,9 +610,16 @@ const styles = StyleSheet.create({
     overflowY: "hidden",
     boxSizing: "border-box",
     display: "block",
+    textIndent: 0,
     outlineStyle: "none",
     WebkitTextFillColor: colors.text,
     caretColor: colors.text,
+    ...(Platform.OS === "web"
+      ? ({
+          WebkitAppearance: "none",
+          appearance: "none",
+        } as object)
+      : null),
   },
   postButton: {
     width: COMPOSER_POST_WIDTH_PX,
