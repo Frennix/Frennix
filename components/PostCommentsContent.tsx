@@ -29,7 +29,6 @@ const MIN_COMMENT_INPUT_HEIGHT = 22;
 const ESTIMATED_LINE_HEIGHT = 22;
 /** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
 const MAX_VISIBLE_LINES = 5;
-const COMMENT_FIELD_PAD_Y = Platform.OS === "web" ? 16 : 12;
 
 function computeCommentMaxInputHeight(): number {
   return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT;
@@ -39,7 +38,7 @@ function syncWebTextareaHeight(
   textarea: HTMLTextAreaElement,
   maxHeight: number
 ): number {
-  textarea.style.setProperty("height", "0px", "important");
+  textarea.style.setProperty("height", `${MIN_COMMENT_INPUT_HEIGHT}px`, "important");
   textarea.style.setProperty("overflow-y", "hidden", "important");
   const measured = Math.ceil(textarea.scrollHeight);
   const next = Math.min(Math.max(MIN_COMMENT_INPUT_HEIGHT, measured), maxHeight);
@@ -55,6 +54,7 @@ function syncWebTextareaHeight(
 type WebCommentTextareaProps = {
   value: string;
   placeholder: string;
+  inputHeight: number;
   maxHeight: number;
   onChangeText: (text: string) => void;
   onHeightChange: (height: number) => void;
@@ -65,6 +65,7 @@ type WebCommentTextareaProps = {
 function WebCommentTextarea({
   value,
   placeholder,
+  inputHeight,
   maxHeight,
   onChangeText,
   onHeightChange,
@@ -88,9 +89,11 @@ function WebCommentTextarea({
   }, [value, maxHeight, remeasure]);
 
   const webInputStyle = StyleSheet.flatten([
-    styles.composerInput,
-    styles.composerWebTextarea,
-    { maxHeight },
+    styles.composerInputWeb,
+    {
+      height: inputHeight,
+      maxHeight,
+    },
   ]) as React.CSSProperties;
 
   return React.createElement("textarea", {
@@ -164,7 +167,6 @@ export function CommentComposerRow({
   const canPost = Boolean(value.trim()) && !posting;
   const maxInputHeight = computeCommentMaxInputHeight();
   const [inputHeight, setInputHeight] = useState(MIN_COMMENT_INPUT_HEIGHT);
-  const fieldMinHeight = Math.max(40, inputHeight + COMMENT_FIELD_PAD_Y);
 
   const handleNativeContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
@@ -193,12 +195,13 @@ export function CommentComposerRow({
   return (
     <View style={styles.composerRow}>
       <Avatar uri={avatarUri} name={avatarName} size={32} deferImagePlaceholder />
-      <View style={[styles.composerField, { minHeight: fieldMinHeight }]}>
+      <View style={styles.composerField}>
         {Platform.OS === "web" ? (
           <View style={styles.composerInputWrap}>
             <WebCommentTextarea
               value={value}
               placeholder={placeholder}
+              inputHeight={inputHeight}
               maxHeight={maxInputHeight}
               onChangeText={onChangeText}
               onHeightChange={handleWebHeightChange}
@@ -503,14 +506,21 @@ const styles = StyleSheet.create({
         } as object)
       : null),
   },
-  composerWebTextarea: {
+  composerInputWeb: {
     width: "100%",
     margin: 0,
+    paddingVertical: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
+    color: colors.text,
+    fontSize: 16,
+    lineHeight: 22,
     resize: "none",
     overflowY: "hidden",
     boxSizing: "border-box",
+    outlineStyle: "none",
+    WebkitTextFillColor: colors.text,
+    caretColor: colors.text,
   },
   postButton: {
     minWidth: 44,
