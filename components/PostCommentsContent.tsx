@@ -23,8 +23,8 @@ import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import {
-  COMMENT_COMPOSER_DOM_DIAG,
   autoInspectCommentComposerDom,
+  commentComposerDomDiagEnabled,
   installCommentComposerDomInspectors,
 } from "@/lib/comment-composer-dom-diagnostics";
 import { isMobileWeb } from "@/lib/safari-visual-viewport";
@@ -129,7 +129,7 @@ function scheduleCommentTextareaScrollReset(
 let commentComposerDomInspectorsInstalled = false;
 
 function ensureCommentComposerDomInspectors(): void {
-  if (!COMMENT_COMPOSER_DOM_DIAG || commentComposerDomInspectorsInstalled) return;
+  if (!commentComposerDomDiagEnabled() || commentComposerDomInspectorsInstalled) return;
   commentComposerDomInspectorsInstalled = true;
   installCommentComposerDomInspectors();
 }

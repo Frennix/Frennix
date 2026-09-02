@@ -5,7 +5,9 @@
 import { Platform } from "react-native";
 import { isMobileWeb } from "@/lib/safari-visual-viewport";
 
-export const COMMENT_COMPOSER_DOM_DIAG = Platform.OS === "web" && isMobileWeb();
+export function commentComposerDomDiagEnabled(): boolean {
+  return Platform.OS === "web" && isMobileWeb();
+}
 
 export type CommentComposerDomNodeSnapshot = {
   tagName: string;
@@ -201,13 +203,28 @@ function buildCommentComposerDomReport(
   };
 }
 
+function emitCommentComposerDomPing(
+  reason: string,
+  textarea: HTMLTextAreaElement,
+  context?: CommentComposerDomInspectContext
+): void {
+  if (typeof console === "undefined") return;
+  console.info("[comment-composer-dom-ping]", {
+    reason,
+    valueLength: textarea.value.length,
+    clientHeight: textarea.clientHeight,
+    scrollHeight: textarea.scrollHeight,
+    atMaxHeight: isCommentComposerAtMaxHeight(textarea, context),
+  });
+}
+
 function emitCommentComposerDomReport(
   textarea: HTMLTextAreaElement,
   reason: string,
   context?: CommentComposerDomInspectContext
 ): void {
   const report = buildCommentComposerDomReport(textarea, reason, context);
-  console.log("[comment-composer-dom]", report);
+  console.info("[comment-composer-dom]", report);
 }
 
 export function autoInspectCommentComposerDom(
@@ -215,8 +232,11 @@ export function autoInspectCommentComposerDom(
   reason: string,
   context?: CommentComposerDomInspectContext
 ): void {
-  if (!COMMENT_COMPOSER_DOM_DIAG || !textarea || typeof document === "undefined") return;
+  if (!commentComposerDomDiagEnabled() || !textarea || typeof document === "undefined") return;
   if (!textarea.isConnected) return;
+
+  emitCommentComposerDomPing(reason, textarea, context);
+
   if (!shouldAutoLogCommentComposerDom(reason, textarea, context)) return;
 
   const run = () => {
@@ -224,7 +244,7 @@ export function autoInspectCommentComposerDom(
     try {
       emitCommentComposerDomReport(textarea, reason, context);
     } catch (error) {
-      console.error("[comment-composer-dom-error]", { reason, error });
+      console.warn("[comment-composer-dom-error]", { reason, error });
     }
   };
 
@@ -243,13 +263,13 @@ export function inspectCommentComposerDom(
   reason: string,
   context?: CommentComposerDomInspectContext
 ): Record<string, unknown> | null {
-  if (!COMMENT_COMPOSER_DOM_DIAG || !textarea || typeof document === "undefined") return null;
+  if (!commentComposerDomDiagEnabled() || !textarea || typeof document === "undefined") return null;
   try {
     const report = buildCommentComposerDomReport(textarea, reason, context);
-    console.log("[comment-composer-dom]", report);
+    console.info("[comment-composer-dom]", report);
     return report;
   } catch (error) {
-    console.error("[comment-composer-dom-error]", { reason, error });
+    console.warn("[comment-composer-dom-error]", { reason, error });
     return null;
   }
 }
@@ -272,12 +292,12 @@ export function inspectCommentComposerAtPoint(x: number, y: number): Record<stri
     current = current.parentElement;
   }
 
-  console.log("[comment-composer-dom-at-point]", report);
+  console.info("[comment-composer-dom-at-point]", report);
   return report;
 }
 
 export function installCommentComposerDomInspectors(): void {
-  if (!COMMENT_COMPOSER_DOM_DIAG || typeof window === "undefined") return;
+  if (!commentComposerDomDiagEnabled() || typeof window === "undefined") return;
 
   const globalWindow = window as Window & {
     __frennixInspectCommentComposer?: () => unknown;
