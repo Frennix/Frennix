@@ -40,12 +40,12 @@ import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
-/** Keep roughly the top 30% of the visible viewport for the playing video. */
-export const COMMENTS_VIDEO_PEEK_FRACTION = 0.28;
+/** Keep roughly the top 30–32% of the visible viewport for the playing video. */
+export const COMMENTS_VIDEO_PEEK_FRACTION = 0.31;
 const VIDEO_PEEK_FRACTION = COMMENTS_VIDEO_PEEK_FRACTION;
 /** Never let keyboard/sheet layout shrink the preview below ~25% of layout height. */
 const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
-const VIDEO_PEEK_ABSOLUTE_MIN_PX = 120;
+const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -402,7 +402,11 @@ export function CommentsBottomSheet({
 
   const headerRow = (
     <View
-      style={[styles.headerRow, useMobileWebFullscreen && styles.mobileWebHeader]}
+      style={[
+        styles.headerRow,
+        useMobileWebFullscreen && styles.mobileWebHeader,
+        useVideoOverlay && styles.headerRowVideoOverlay,
+      ]}
       {...sheetSurfaceProps}
     >
       <Text style={styles.title} numberOfLines={1}>
@@ -423,7 +427,10 @@ export function CommentsBottomSheet({
   const listRegion = (
     <ScrollView
       style={styles.listScroll}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[
+        styles.listContent,
+        useVideoOverlay ? styles.listContentVideoOverlay : null,
+      ]}
       keyboardShouldPersistTaps="always"
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       showsVerticalScrollIndicator={false}
@@ -435,7 +442,10 @@ export function CommentsBottomSheet({
   );
 
   const composerRegion = (
-    <View style={styles.composerHost} {...sheetSurfaceProps}>
+    <View
+      style={[styles.composerHost, useVideoOverlay ? styles.composerHostVideoOverlay : null]}
+      {...sheetSurfaceProps}
+    >
       {composer}
     </View>
   );
@@ -493,12 +503,15 @@ export function CommentsBottomSheet({
             top: videoOverlayLayout.top,
             height: videoOverlayLayout.height,
             maxHeight: videoOverlayLayout.height,
-            paddingBottom: composerBottomInset,
+            paddingBottom: Math.max(insets.bottom, spacing.xxs),
           },
         ]}
         {...sheetSurfaceProps}
       >
-        <View style={styles.handleWrap} {...headerPanResponder.panHandlers}>
+        <View
+          style={[styles.handleWrap, useVideoOverlay ? styles.handleWrapVideoOverlay : null]}
+          {...headerPanResponder.panHandlers}
+        >
           <View style={styles.handle} />
         </View>
         <View {...headerPanResponder.panHandlers}>{headerRow}</View>
@@ -678,6 +691,11 @@ const styles = StyleSheet.create({
     minHeight: touchTarget / 2,
     justifyContent: "center",
   },
+  handleWrapVideoOverlay: {
+    paddingTop: spacing.xs,
+    paddingBottom: 2,
+    minHeight: 24,
+  },
   handle: {
     width: 36,
     height: 4,
@@ -691,6 +709,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
     flexShrink: 0,
+  },
+  headerRowVideoOverlay: {
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   title: {
     ...typography.heading,
@@ -732,6 +754,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     flexGrow: 1,
   },
+  listContentVideoOverlay: {
+    flexGrow: 0,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
   composerHost: {
     flexShrink: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -740,5 +767,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
+  },
+  composerHostVideoOverlay: {
+    paddingTop: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.xxs,
   },
 });
