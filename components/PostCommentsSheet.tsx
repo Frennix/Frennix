@@ -65,6 +65,7 @@ function PostCommentsSheetBody({
     enabled: visible,
     rootPortal: true,
     trackInputZoom: Platform.OS === "web",
+    compactComposer: presentation === "videoOverlay",
   });
 
   useEffect(() => {

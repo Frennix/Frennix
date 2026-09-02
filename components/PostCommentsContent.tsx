@@ -151,6 +151,8 @@ type CommentComposerRowProps = {
   posting: boolean;
   onComposerFocus?: () => void;
   onComposerBlur?: () => void;
+  /** Tighter pill spacing for the immersive video overlay composer. */
+  compactComposer?: boolean;
 };
 
 export function CommentComposerRow({
@@ -163,6 +165,7 @@ export function CommentComposerRow({
   posting,
   onComposerFocus,
   onComposerBlur,
+  compactComposer = false,
 }: CommentComposerRowProps) {
   const canPost = Boolean(value.trim()) && !posting;
   const maxInputHeight = computeCommentMaxInputHeight();
@@ -193,9 +196,9 @@ export function CommentComposerRow({
   const inputScrollEnabled = inputHeight >= maxInputHeight - 1;
 
   return (
-    <View style={styles.composerRow}>
+    <View style={[styles.composerRow, compactComposer && styles.composerRowCompact]}>
       <Avatar uri={avatarUri} name={avatarName} size={32} deferImagePlaceholder />
-      <View style={styles.composerField}>
+      <View style={[styles.composerField, compactComposer && styles.composerFieldCompact]}>
         {Platform.OS === "web" ? (
           <View style={styles.composerInputWrap}>
             <WebCommentTextarea
@@ -239,7 +242,7 @@ export function CommentComposerRow({
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Post comment"
-          style={styles.postButton}
+          style={[styles.postButton, compactComposer && styles.postButtonCompact]}
         >
           {posting ? (
             <ActivityIndicator size="small" color={colors.accent} />
@@ -261,6 +264,8 @@ type UsePostCommentsContentOptions = {
   /** Comment options render in a root portal (required on the dedicated comments route). */
   rootPortal?: boolean;
   trackInputZoom?: boolean;
+  /** Tighter pill spacing for the immersive video overlay composer. */
+  compactComposer?: boolean;
 };
 
 export type PostCommentsContentResult = {
@@ -279,6 +284,7 @@ export function usePostCommentsContent({
   enabled = true,
   rootPortal = false,
   trackInputZoom = false,
+  compactComposer = false,
 }: UsePostCommentsContentOptions): PostCommentsContentResult {
   const postId = getSharedPostTargetId(post);
   const queryClient = useQueryClient();
@@ -441,6 +447,7 @@ export function usePostCommentsContent({
         posting={commentMutation.isPending}
         onComposerFocus={handleComposerFocus}
         onComposerBlur={handleComposerBlur}
+        compactComposer={compactComposer}
       />
     </>
   );
@@ -473,6 +480,10 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     flexShrink: 0,
   },
+  composerRowCompact: {
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   composerField: {
     flex: 1,
     minHeight: 34,
@@ -487,6 +498,11 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.sm,
     paddingRight: spacing.xs,
     paddingVertical: Platform.OS === "web" ? 4 : 3,
+  },
+  composerFieldCompact: {
+    minHeight: 32,
+    alignItems: "center",
+    paddingVertical: 2,
   },
   composerInputWrap: {
     flex: 1,
@@ -532,6 +548,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 2,
     marginBottom: Platform.OS === "web" ? 1 : 0,
+  },
+  postButtonCompact: {
+    minHeight: 26,
+    marginBottom: 0,
   },
   postLabel: {
     ...typography.bodySmall,

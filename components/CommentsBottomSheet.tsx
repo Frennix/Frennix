@@ -717,6 +717,7 @@ const styles = StyleSheet.create({
       right: 0,
       bottom: 0,
       flexDirection: "column",
+      paddingTop: 6,
     },
     default: {},
   }) as ViewStyle,
@@ -815,7 +816,7 @@ const styles = StyleSheet.create({
   listContentVideoOverlay: {
     flexGrow: 0,
     paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   composerHost: {
     flexShrink: 0,
@@ -828,7 +829,7 @@ const styles = StyleSheet.create({
   },
   composerHostVideoOverlay: {
     flexShrink: 0,
-    paddingTop: spacing.xxs,
+    paddingTop: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
 });
