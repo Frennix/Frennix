@@ -22,6 +22,7 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
+import { isMobileWeb } from "@/lib/safari-visual-viewport";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
@@ -37,9 +38,74 @@ const MAX_VISIBLE_LINES = 5;
 const COMMENT_TEXTAREA_PADDING_X_PX = 14;
 const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
 const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
+/** Sub-pixel slack before treating textarea content as overflow-scrollable. */
+const COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX = 1;
+/** Temporary — remove after iPhone scrollTop verification. */
+const COMMENT_TEXTAREA_SCROLL_DIAG = Platform.OS === "web" && isMobileWeb();
 
 function computeCommentMaxInputHeight(): number {
   return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+}
+
+function commentTextareaContentFits(textarea: HTMLTextAreaElement): boolean {
+  return textarea.scrollHeight <= textarea.clientHeight + COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX;
+}
+
+function readCommentTextareaComputedHeight(textarea: HTMLTextAreaElement): number {
+  if (typeof window === "undefined") return 0;
+  const parsed = Number.parseFloat(window.getComputedStyle(textarea).height);
+  return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+}
+
+function logCommentTextareaScrollDiagnostics(
+  phase: "before-sync" | "after-sync" | "raf-after-sync",
+  textarea: HTMLTextAreaElement,
+  extras: { exceedsVisibleLines?: boolean; computedHeightPx?: number }
+): void {
+  if (!COMMENT_TEXTAREA_SCROLL_DIAG || typeof console === "undefined") return;
+  console.info("[comment-textarea-scroll]", {
+    phase,
+    valueLength: textarea.value.length,
+    clientHeight: textarea.clientHeight,
+    scrollHeight: textarea.scrollHeight,
+    scrollTop: textarea.scrollTop,
+    computedHeightPx: extras.computedHeightPx ?? readCommentTextareaComputedHeight(textarea),
+    selectionStart: textarea.selectionStart,
+    selectionEnd: textarea.selectionEnd,
+    exceedsVisibleLines: extras.exceedsVisibleLines ?? null,
+    contentFits: commentTextareaContentFits(textarea),
+  });
+}
+
+function applyCommentTextareaScroll(textarea: HTMLTextAreaElement): void {
+  if (!textarea.value) {
+    textarea.scrollTop = 0;
+    textarea.style.setProperty("overflow-y", "hidden", "important");
+    return;
+  }
+
+  if (commentTextareaContentFits(textarea)) {
+    textarea.style.setProperty("overflow-y", "hidden", "important");
+    textarea.scrollTop = 0;
+    return;
+  }
+
+  textarea.style.setProperty("overflow-y", "auto", "important");
+  if (textarea.selectionStart === textarea.value.length) {
+    textarea.scrollTop = textarea.scrollHeight;
+  }
+}
+
+function scheduleCommentTextareaScrollReset(textarea: HTMLTextAreaElement): void {
+  if (typeof requestAnimationFrame === "undefined") return;
+  requestAnimationFrame(() => {
+    if (!textarea.isConnected) return;
+    if (commentTextareaContentFits(textarea)) {
+      textarea.scrollTop = 0;
+      textarea.style.setProperty("overflow-y", "hidden", "important");
+    }
+    logCommentTextareaScrollDiagnostics("raf-after-sync", textarea, {});
+  });
 }
 
 function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
@@ -52,6 +118,8 @@ function syncWebTextareaHeight(
   textarea: HTMLTextAreaElement,
   maxOuterHeight: number
 ): number {
+  logCommentTextareaScrollDiagnostics("before-sync", textarea, {});
+
   const measureMinOuter =
     readWebTextareaLineHeight(textarea) + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
 
@@ -67,7 +135,6 @@ function syncWebTextareaHeight(
     : Math.max(measureMinOuter, measured);
 
   textarea.style.setProperty("height", `${nextOuter}px`, "important");
-  textarea.style.setProperty("overflow-y", exceedsVisibleLines ? "auto" : "hidden", "important");
 
   if (!exceedsVisibleLines && textarea.scrollHeight > textarea.clientHeight) {
     const fitOuter = Math.min(Math.ceil(textarea.scrollHeight), maxOuterHeight);
@@ -77,11 +144,12 @@ function syncWebTextareaHeight(
     }
   }
 
-  if (!exceedsVisibleLines) {
-    textarea.scrollTop = 0;
-  } else if (textarea.selectionStart === textarea.value.length) {
-    textarea.scrollTop = textarea.scrollHeight;
-  }
+  applyCommentTextareaScroll(textarea);
+  logCommentTextareaScrollDiagnostics("after-sync", textarea, {
+    exceedsVisibleLines,
+    computedHeightPx: nextOuter,
+  });
+  scheduleCommentTextareaScrollReset(textarea);
 
   return nextOuter;
 }
