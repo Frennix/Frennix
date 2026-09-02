@@ -51,7 +51,12 @@ interface FeedVideoPlayerProps {
   /** Active carousel slide — inactive slides cannot keep playing. */
   slideActive?: boolean;
   style?: ViewStyle;
+  /** Native / desktop overlay open — omitted when videoRouteHref is set on web. */
   onOpenFullscreen?: () => void;
+  /** Mobile web dedicated /video/[postId] href — real anchor navigation. */
+  videoRouteHref?: string;
+  /** Side effect before following videoRouteHref (feed scroll save, playback handoff). */
+  onVideoRouteNavigate?: () => void;
   onVisualReady?: () => void;
 }
 
@@ -67,6 +72,8 @@ export function FeedVideoPlayer({
   slideActive = true,
   style,
   onOpenFullscreen,
+  videoRouteHref,
+  onVideoRouteNavigate,
   onVisualReady,
 }: FeedVideoPlayerProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
@@ -287,6 +294,26 @@ export function FeedVideoPlayer({
     onOpenFullscreen();
   }, [onOpenFullscreen]);
 
+  const useRouteLink = Platform.OS === "web" && Boolean(videoRouteHref);
+  const canOpenViewer = Boolean(useRouteLink || onOpenFullscreen);
+
+  const handleRouteLinkClick = useCallback(
+    (event: { clientX: number; clientY: number; preventDefault?: () => void; stopPropagation?: () => void }) => {
+      const start = openTapStartRef.current;
+      openTapStartRef.current = null;
+      if (start) {
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (Math.hypot(dx, dy) > OPEN_VIEWER_TAP_MOVE_PX) {
+          event.preventDefault?.();
+          return;
+        }
+      }
+      onVideoRouteNavigate?.();
+    },
+    [onVideoRouteNavigate]
+  );
+
   const handleWebOpenPointerDown = useCallback(
     (event: { clientX: number; clientY: number; stopPropagation?: () => void }) => {
       event.stopPropagation?.();
@@ -349,7 +376,26 @@ export function FeedVideoPlayer({
   );
 
   const expandControl =
-    onOpenFullscreen ? (
+    canOpenViewer && useRouteLink && videoRouteHref ? (
+      createElement(
+        "a",
+        {
+          href: videoRouteHref,
+          className: "feed-video-expand-button",
+          "aria-label": "Open video full screen",
+          onPointerDown: handleWebOpenPointerDown,
+          onClick: (event: { clientX: number; clientY: number; preventDefault?: () => void; stopPropagation?: () => void }) => {
+            event.stopPropagation?.();
+            handleRouteLinkClick(event);
+          },
+        },
+        createElement(Maximize2, {
+          color: "#FFFFFF",
+          size: 16,
+          strokeWidth: 2,
+        })
+      )
+    ) : canOpenViewer && onOpenFullscreen ? (
       <Pressable
         {...(Platform.OS === "web" ? { className: "feed-video-expand-button" } : null)}
         style={styles.expandButton}
@@ -368,14 +414,46 @@ export function FeedVideoPlayer({
 
   if (failed) {
     return (
-      <MediaAspectFrame
-        dimensionsUri={dimensionsUri}
-        layout="feed"
-        style={style}
-        fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
-      >
-        {() => <MediaLoadError label="Video unavailable" onRetry={handleRetry} />}
-      </MediaAspectFrame>
+      <View style={styles.shell} collapsable={false}>
+        <MediaAspectFrame
+          dimensionsUri={dimensionsUri}
+          layout="feed"
+          style={style}
+          fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
+        >
+          {() => <MediaLoadError label="Video unavailable" onRetry={handleRetry} />}
+        </MediaAspectFrame>
+        {canOpenViewer ? (
+          <>
+            {useRouteLink && videoRouteHref
+              ? createElement("a", {
+                  href: videoRouteHref,
+                  className: "feed-video-route-link",
+                  "aria-label": "Open video full screen",
+                  onPointerDown: handleWebOpenPointerDown,
+                  onPointerCancel: handleWebOpenPointerCancel,
+                  onClick: handleRouteLinkClick,
+                  style: {
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 2,
+                  },
+                })
+              : null}
+            {!useRouteLink && onOpenFullscreen ? (
+              <Pressable
+                style={styles.openHitLayer}
+                onPress={openViewer}
+                accessibilityRole="button"
+                accessibilityLabel="Open video full screen"
+              />
+            ) : null}
+            <View style={styles.muteLayer} pointerEvents="box-none">
+              {expandControl}
+            </View>
+          </>
+        ) : null}
+      </View>
     );
   }
 
@@ -478,7 +556,18 @@ export function FeedVideoPlayer({
                 ) : null}
               </View>
 
-              {onOpenFullscreen ? (
+              {canOpenViewer && useRouteLink && videoRouteHref
+                ? createElement("a", {
+                    href: videoRouteHref,
+                    className: "feed-video-route-link",
+                    "aria-label": "Open video full screen",
+                    onPointerDown: handleWebOpenPointerDown,
+                    onPointerCancel: handleWebOpenPointerCancel,
+                    onClick: handleRouteLinkClick,
+                  })
+                : null}
+
+              {canOpenViewer && !useRouteLink && onOpenFullscreen ? (
                 Platform.OS === "web" ? (
                   <View
                     style={styles.openHitLayer}
@@ -505,7 +594,7 @@ export function FeedVideoPlayer({
         )}
       </MediaAspectFrame>
 
-      {(onOpenFullscreen || playbackAllowed) ? (
+      {canOpenViewer || playbackAllowed ? (
         <View
           {...(Platform.OS === "web" ? { className: "feed-video-mute-layer" } : null)}
           style={styles.muteLayer}

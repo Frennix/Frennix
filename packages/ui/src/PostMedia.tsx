@@ -29,6 +29,9 @@ interface PostMediaProps {
   layout?: MediaLayout;
   onImagePress?: () => void;
   onVideoPress?: () => void;
+  /** Mobile web /video/[postId] href for feed inline video. */
+  videoRouteHref?: string;
+  onVideoRouteNavigate?: () => void;
   pressDelayMs?: number;
   maxHeight?: number;
   /** Active carousel slide — inactive slides stop feed video playback. */
@@ -117,6 +120,8 @@ export function PostMedia({
   layout = "inline",
   onImagePress,
   onVideoPress,
+  videoRouteHref,
+  onVideoRouteNavigate,
   pressDelayMs,
   maxHeight,
   slideActive = true,
@@ -146,7 +151,9 @@ export function PostMedia({
         playbackId={playbackId}
         slideActive={slideActive && mediaVisible}
         style={style}
-        onOpenFullscreen={onVideoPress}
+        onOpenFullscreen={videoRouteHref ? undefined : onVideoPress}
+        videoRouteHref={videoRouteHref}
+        onVideoRouteNavigate={onVideoRouteNavigate}
         onVisualReady={onVisualReady}
       />
     );

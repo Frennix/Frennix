@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 42813b2b</title>
+    <title>Frennix · e6785796</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="42813b2b17cf9007da2aeef10a28b6d85f4190d2" />
-    <meta name="frennix-build-bundle" content="index-721bbcea1ab76c161121373203fa4efe.js" />
-    <meta name="frennix-build-at" content="2026-09-01T23:47:41.172Z" />
+    <meta name="frennix-build-sha" content="e67857965885e4ed74d0f2690e9fd50850bcdc91" />
+    <meta name="frennix-build-bundle" content="index-e3b5ce8f9922c964d0741e99bbbbcd5a.js" />
+    <meta name="frennix-build-at" content="2026-09-02T00:07:45.386Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -152,24 +152,34 @@
     z-index: 51 !important;
     pointer-events: auto !important;
   }
-  /* Inline feed video must not capture taps — dedicated hit layer opens the viewer. */
+  /* Inline feed video must not capture taps — route link opens the dedicated viewer. */
   video.feed-inline-video {
     pointer-events: none !important;
   }
-  .feed-video-open-hit-layer {
+  a.feed-video-route-link {
     position: absolute !important;
     inset: 0 !important;
     z-index: 2 !important;
     touch-action: pan-y !important;
     pointer-events: auto !important;
     cursor: pointer;
+    text-decoration: none;
+    color: transparent;
   }
-  .feed-video-expand-button {
+  a.feed-video-expand-button {
     position: absolute !important;
     top: 14px !important;
     left: 14px !important;
     z-index: 52 !important;
     pointer-events: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 18px !important;
+    background-color: rgba(0, 0, 0, 0.55) !important;
+    text-decoration: none !important;
   }
   /* Fullscreen lightbox — native controls must never appear; Frennix renders its own UI. */
   video.fullscreen-video-slide::-webkit-media-controls {
@@ -283,6 +293,18 @@
     object-fit: contain !important;
     background-color: #0A0A0B !important;
   }
+  /* Dedicated mobile web video route — opaque page, no feed underneath. */
+  #frennix-video-route,
+  [data-frennix-video-route="true"] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 100dvh !important;
+    height: 100% !important;
+    background-color: #0A0A0B !important;
+    opacity: 1 !important;
+    overflow: hidden !important;
+  }
   /* While comments modal is open, block feed pointer/focus bleed-through. */
   body[data-frennix-comments-open="true"] #app-root-shell,
   body[data-frennix-comments-open="true"] #feed-scroll-list,
@@ -373,7 +395,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="42813b2b17cf9007da2aeef10a28b6d85f4190d2" data-bundle="index-721bbcea1ab76c161121373203fa4efe.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="e67857965885e4ed74d0f2690e9fd50850bcdc91" data-bundle="index-e3b5ce8f9922c964d0741e99bbbbcd5a.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -419,7 +441,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-721bbcea1ab76c161121373203fa4efe.js?v=42813b2b" defer></script>
+  <script src="/_expo/static/js/web/index-e3b5ce8f9922c964d0741e99bbbbcd5a.js?v=e6785796" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

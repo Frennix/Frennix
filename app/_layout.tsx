@@ -246,6 +246,13 @@ export default function RootLayout() {
                 ...(Platform.OS === "web" ? fadeScreen : null),
               }}
             />
+            <Stack.Screen
+              name="video/[postId]"
+              options={{
+                headerShown: false,
+                ...(Platform.OS === "web" ? fadeScreen : null),
+              }}
+            />
             <Stack.Screen name="user/[username]" options={backScreen("Profile", fadeScreen)} />
             <Stack.Screen name="group/[id]" options={backScreen("Group", fadeScreen)} />
             <Stack.Screen name="challenge/[id]" options={backScreen("Challenge", fadeScreen)} />

@@ -44,6 +44,8 @@ interface FeedPostCardProps {
   isOwn?: boolean;
   onOwnerActionsPress?: () => void;
   onMediaPress?: (uri: string, index: number) => void;
+  videoRouteHrefForIndex?: (index: number) => string | undefined;
+  onVideoRouteNavigate?: (index: number) => void;
   /** Double-tap media to like (Instagram-style). */
   onDoubleTapLike?: () => void;
   /** Defer heavy media until the row is near the viewport. */
@@ -83,6 +85,8 @@ export const FeedPostCard = memo(function FeedPostCard({
   isOwn,
   onOwnerActionsPress,
   onMediaPress,
+  videoRouteHrefForIndex,
+  onVideoRouteNavigate,
   onDoubleTapLike,
   mediaActive = true,
   mediaPageIndex,
@@ -236,6 +240,8 @@ export const FeedPostCard = memo(function FeedPostCard({
               postType={displayPost.post_type}
               thumbnailUrl={displayPost.thumbnail_url}
               onMediaPress={onMediaPress}
+              videoRouteHrefForIndex={videoRouteHrefForIndex}
+              onVideoRouteNavigate={onVideoRouteNavigate}
               pageIndex={mediaPageIndex}
               onPageIndexChange={onMediaPageIndexChange}
               visible={mediaActive}

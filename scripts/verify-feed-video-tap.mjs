@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression: feed inline video tap opens immersive viewer on iPhone web/PWA.
+ * Regression: feed inline video uses dedicated /video/[postId] route links on mobile web.
  *
  * Usage:
  *   node scripts/verify-feed-video-tap.mjs
@@ -27,7 +27,15 @@ function main() {
   const player = readSource("packages/ui/src/FeedVideoPlayer.tsx");
   const styles = readSource("lib/web-document-styles.js");
   const carousel = readSource("packages/ui/src/PostMediaCarousel.tsx");
+  const videoRoute = readSource("lib/mobile-web-video-route.ts");
 
+  ok =
+    pass(
+      "Dedicated video route module exists",
+      fs.existsSync(path.join(ROOT, "app/video/[postId].tsx")) &&
+        videoRoute.includes("buildVideoRouteHref") &&
+        videoRoute.includes("usesMobileWebVideoRoute")
+    ) && ok;
   ok =
     pass(
       "A: inline web video has pointer-events disabled",
@@ -37,10 +45,10 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "A/D: dedicated transparent hit layer opens viewer",
-      player.includes("feed-video-open-hit-layer") &&
-        player.includes("openViewer") &&
-        player.includes("onPointerUp")
+      "A/D: real anchor route link opens viewer",
+      player.includes("feed-video-route-link") &&
+        player.includes('createElement("a"') &&
+        player.includes("videoRouteHref")
     ) && ok;
   ok =
     pass(
@@ -49,30 +57,31 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "C: tap vs scroll movement threshold",
+      "C: tap vs scroll movement threshold on route link",
       player.includes("OPEN_VIEWER_TAP_MOVE_PX") &&
-        player.includes("Math.hypot") &&
-        player.includes('touchAction: "pan-y"')
+        player.includes("handleRouteLinkClick") &&
+        styles.includes("touch-action: pan-y")
     ) && ok;
   ok =
     pass(
-      "D: expand icon entry point",
-      player.includes("feed-video-expand-button") && player.includes("Maximize2")
+      "D: expand icon is anchor with route href",
+      player.includes("feed-video-expand-button") &&
+        player.includes('className: "feed-video-expand-button"')
     ) && ok;
   ok =
     pass(
-      "Carousel wires onVideoPress to onMediaPress",
-      carousel.includes("onVideoPress") && carousel.includes("onMediaPress")
+      "Carousel passes videoRouteHrefForIndex",
+      carousel.includes("videoRouteHrefForIndex") && carousel.includes("onVideoRouteNavigate")
     ) && ok;
   ok =
     pass(
-      "Hit layer sits above video, below control buttons",
-      player.includes("zIndex: 2") && player.includes("zIndex: 101")
+      "Mobile web bypasses overlay onVideoPress when route href set",
+      carousel.includes("!videoRouteHrefForIndex")
     ) && ok;
   ok =
     pass(
-      "No preventDefault on open tap handlers",
-      !player.includes("preventDefault") || !player.match(/handleWebOpen[\s\S]*preventDefault/)
+      "Opaque video route CSS guard",
+      styles.includes("frennix-video-route") && styles.includes("min-height: 100dvh")
     ) && ok;
 
   console.log("");

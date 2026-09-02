@@ -9,6 +9,8 @@ export type FeedMediaProps = {
   postType?: PostType;
   thumbnailUrl?: string | null;
   onMediaPress?: (uri: string, index: number) => void;
+  videoRouteHrefForIndex?: (index: number) => string | undefined;
+  onVideoRouteNavigate?: (index: number) => void;
   pageIndex?: number;
   onPageIndexChange?: (index: number) => void;
   /** Defer heavy media until the row is near the viewport. */
@@ -31,6 +33,8 @@ export const FeedMedia = memo(function FeedMedia({
   postType,
   thumbnailUrl,
   onMediaPress,
+  videoRouteHrefForIndex,
+  onVideoRouteNavigate,
   pageIndex,
   onPageIndexChange,
   visible = true,
@@ -49,6 +53,8 @@ export const FeedMedia = memo(function FeedMedia({
           postType={postType}
           thumbnailUrl={thumbnailUrl}
           onMediaPress={onMediaPress}
+          videoRouteHrefForIndex={videoRouteHrefForIndex}
+          onVideoRouteNavigate={onVideoRouteNavigate}
           pageIndex={pageIndex}
           onPageIndexChange={onPageIndexChange}
           visible={visible}

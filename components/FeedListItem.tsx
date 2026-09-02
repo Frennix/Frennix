@@ -16,6 +16,8 @@ export type FeedListItemActions = {
   onModerationPress: (post: Post) => void;
   onOwnerActionsPress: (post: Post) => void;
   onMediaPress: (post: Post, uri: string, index: number) => void;
+  videoRouteHrefForMedia?: (post: Post, mediaIndex: number) => string | undefined;
+  onVideoRouteNavigate?: (post: Post, mediaIndex: number) => void;
 };
 
 type FeedListItemProps = {
@@ -81,6 +83,12 @@ export const FeedListItem = memo(function FeedListItem({
       onModerationPress: () => actions.onModerationPress(post),
       onOwnerActionsPress: () => actions.onOwnerActionsPress(post),
       onMediaPress: (uri: string, index: number) => actions.onMediaPress(post, uri, index),
+      videoRouteHrefForIndex: actions.videoRouteHrefForMedia
+        ? (index: number) => actions.videoRouteHrefForMedia!(post, index)
+        : undefined,
+      onVideoRouteNavigate: actions.onVideoRouteNavigate
+        ? (index: number) => actions.onVideoRouteNavigate!(post, index)
+        : undefined,
     }),
     [actions, post]
   );
@@ -103,6 +111,8 @@ export const FeedListItem = memo(function FeedListItem({
       onModerationPress={handlers.onModerationPress}
       onOwnerActionsPress={handlers.onOwnerActionsPress}
       onMediaPress={handlers.onMediaPress}
+      videoRouteHrefForIndex={handlers.videoRouteHrefForIndex}
+      onVideoRouteNavigate={handlers.onVideoRouteNavigate}
       mediaActive={mediaActive}
       mediaPageIndex={mediaPageIndex}
       onMediaPageIndexChange={onMediaPageIndexChange}

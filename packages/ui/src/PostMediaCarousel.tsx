@@ -28,6 +28,9 @@ interface PostMediaCarouselProps {
   thumbnailUrl?: string | null;
   style?: ViewStyle;
   onMediaPress?: (uri: string, index: number) => void;
+  /** Mobile web /video/[postId] href builder for inline feed videos. */
+  videoRouteHrefForIndex?: (index: number) => string | undefined;
+  onVideoRouteNavigate?: (index: number) => void;
   pageIndex?: number;
   onPageIndexChange?: (index: number) => void;
   /** Post row is near viewport — gates lazy load. */
@@ -43,6 +46,8 @@ export function PostMediaCarousel({
   thumbnailUrl,
   style,
   onMediaPress,
+  videoRouteHrefForIndex,
+  onVideoRouteNavigate,
   pageIndex,
   onPageIndexChange,
   mediaVisible = true,
@@ -128,9 +133,15 @@ export function PostMediaCarousel({
               : undefined
           }
           onVideoPress={
-            item.kind === "video" && onMediaPress
+            item.kind === "video" && onMediaPress && !videoRouteHrefForIndex
               ? () => onMediaPress(item.url, 0)
               : undefined
+          }
+          videoRouteHref={
+            item.kind === "video" ? videoRouteHrefForIndex?.(0) : undefined
+          }
+          onVideoRouteNavigate={
+            item.kind === "video" ? () => onVideoRouteNavigate?.(0) : undefined
           }
           onVisualReady={
             onPrimaryMediaReady
@@ -195,8 +206,16 @@ export function PostMediaCarousel({
                     : undefined
                 }
                 onVideoPress={
-                  item.kind === "video" && onMediaPress
+                  item.kind === "video" && onMediaPress && !videoRouteHrefForIndex
                     ? () => onMediaPress(item.url, itemIndex)
+                    : undefined
+                }
+                videoRouteHref={
+                  item.kind === "video" ? videoRouteHrefForIndex?.(itemIndex) : undefined
+                }
+                onVideoRouteNavigate={
+                  item.kind === "video"
+                    ? () => onVideoRouteNavigate?.(itemIndex)
                     : undefined
                 }
                 onVisualReady={
@@ -226,9 +245,15 @@ export function PostMediaCarousel({
               : undefined
           }
           onVideoPress={
-            mediaItems[0].kind === "video" && onMediaPress
+            mediaItems[0].kind === "video" && onMediaPress && !videoRouteHrefForIndex
               ? () => onMediaPress(mediaItems[0].url, 0)
               : undefined
+          }
+          videoRouteHref={
+            mediaItems[0].kind === "video" ? videoRouteHrefForIndex?.(0) : undefined
+          }
+          onVideoRouteNavigate={
+            mediaItems[0].kind === "video" ? () => onVideoRouteNavigate?.(0) : undefined
           }
           onVisualReady={
             onPrimaryMediaReady

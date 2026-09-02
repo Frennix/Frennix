@@ -45,11 +45,11 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("feed-inline-video")) {
         throw new Error("FeedVideoPlayer must disable pointer events on inline web video");
       }
-      if (!src.includes("feed-video-open-hit-layer")) {
-        throw new Error("FeedVideoPlayer must use a dedicated open-viewer hit layer");
+      if (!src.includes("videoRouteHref") || !src.includes("feed-video-route-link")) {
+        throw new Error("FeedVideoPlayer must use dedicated /video route anchor links on mobile web");
       }
       if (!src.includes("feed-video-expand-button")) {
-        throw new Error("FeedVideoPlayer must expose an expand button");
+        throw new Error("FeedVideoPlayer must expose an expand route link");
       }
       if (!src.includes("OPEN_VIEWER_TAP_MOVE_PX")) {
         throw new Error("FeedVideoPlayer must distinguish tap from scroll");

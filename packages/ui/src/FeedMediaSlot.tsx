@@ -14,6 +14,8 @@ interface FeedMediaSlotProps {
   thumbnailUrl?: string | null;
   style?: ViewStyle;
   onMediaPress?: (uri: string, index: number) => void;
+  videoRouteHrefForIndex?: (index: number) => string | undefined;
+  onVideoRouteNavigate?: (index: number) => void;
   pageIndex?: number;
   onPageIndexChange?: (index: number) => void;
   /** When false, show a skeleton until the row is near the viewport. Once active, stays mounted. */
@@ -38,6 +40,8 @@ export function FeedMediaSlot({
   thumbnailUrl,
   style,
   onMediaPress,
+  videoRouteHrefForIndex,
+  onVideoRouteNavigate,
   pageIndex,
   onPageIndexChange,
   visible = true,
@@ -89,6 +93,8 @@ export function FeedMediaSlot({
       thumbnailUrl={thumbnailUrl}
       style={style}
       onMediaPress={onMediaPress}
+      videoRouteHrefForIndex={videoRouteHrefForIndex}
+      onVideoRouteNavigate={onVideoRouteNavigate}
       pageIndex={pageIndex}
       onPageIndexChange={onPageIndexChange}
       /** Once mounted (near viewport), allow feed video autoplay — do not also require mediaActive, which is not updated on web scroll. */
