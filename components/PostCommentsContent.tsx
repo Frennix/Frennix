@@ -22,12 +22,6 @@ import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
-import {
-  autoInspectCommentComposerDom,
-  commentComposerDomDiagEnabled,
-  installCommentComposerDomInspectors,
-} from "@/lib/comment-composer-dom-diagnostics";
-import { isMobileWeb } from "@/lib/safari-visual-viewport";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
@@ -45,8 +39,10 @@ const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
 const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
 /** Sub-pixel slack before treating textarea content as overflow-scrollable. */
 const COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX = 1;
-/** Temporary — remove after iPhone scrollTop verification. */
-const COMMENT_TEXTAREA_SCROLL_DIAG = Platform.OS === "web" && isMobileWeb();
+
+function computeCommentMinInputHeight(): number {
+  return ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+}
 
 function computeCommentMaxInputHeight(): number {
   return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
@@ -54,32 +50,6 @@ function computeCommentMaxInputHeight(): number {
 
 function commentTextareaContentFits(textarea: HTMLTextAreaElement): boolean {
   return textarea.scrollHeight <= textarea.clientHeight + COMMENT_TEXTAREA_SCROLL_FIT_SLACK_PX;
-}
-
-function readCommentTextareaComputedHeight(textarea: HTMLTextAreaElement): number {
-  if (typeof window === "undefined") return 0;
-  const parsed = Number.parseFloat(window.getComputedStyle(textarea).height);
-  return Number.isFinite(parsed) ? Math.round(parsed) : 0;
-}
-
-function logCommentTextareaScrollDiagnostics(
-  phase: "before-sync" | "after-sync" | "raf-after-sync",
-  textarea: HTMLTextAreaElement,
-  extras: { exceedsVisibleLines?: boolean; computedHeightPx?: number }
-): void {
-  if (!COMMENT_TEXTAREA_SCROLL_DIAG || typeof console === "undefined") return;
-  console.info("[comment-textarea-scroll]", {
-    phase,
-    valueLength: textarea.value.length,
-    clientHeight: textarea.clientHeight,
-    scrollHeight: textarea.scrollHeight,
-    scrollTop: textarea.scrollTop,
-    computedHeightPx: extras.computedHeightPx ?? readCommentTextareaComputedHeight(textarea),
-    selectionStart: textarea.selectionStart,
-    selectionEnd: textarea.selectionEnd,
-    exceedsVisibleLines: extras.exceedsVisibleLines ?? null,
-    contentFits: commentTextareaContentFits(textarea),
-  });
 }
 
 function applyCommentTextareaScroll(textarea: HTMLTextAreaElement): void {
@@ -101,12 +71,7 @@ function applyCommentTextareaScroll(textarea: HTMLTextAreaElement): void {
   }
 }
 
-function scheduleCommentTextareaScrollReset(
-  textarea: HTMLTextAreaElement,
-  maxOuterHeight: number,
-  nextOuterHeight: number,
-  exceedsVisibleLines: boolean
-): void {
+function scheduleCommentTextareaScrollReset(textarea: HTMLTextAreaElement): void {
   if (typeof requestAnimationFrame === "undefined") return;
   requestAnimationFrame(() => {
     if (!textarea.isConnected) return;
@@ -114,24 +79,7 @@ function scheduleCommentTextareaScrollReset(
       textarea.scrollTop = 0;
       textarea.style.setProperty("overflow-y", "hidden", "important");
     }
-    logCommentTextareaScrollDiagnostics("raf-after-sync", textarea, {
-      computedHeightPx: nextOuterHeight,
-      exceedsVisibleLines,
-    });
-    autoInspectCommentComposerDom(textarea, "raf-after-sync", {
-      maxOuterHeight,
-      nextOuterHeight,
-      exceedsVisibleLines,
-    });
   });
-}
-
-let commentComposerDomInspectorsInstalled = false;
-
-function ensureCommentComposerDomInspectors(): void {
-  if (!commentComposerDomDiagEnabled() || commentComposerDomInspectorsInstalled) return;
-  commentComposerDomInspectorsInstalled = true;
-  installCommentComposerDomInspectors();
 }
 
 function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
@@ -144,43 +92,21 @@ function syncWebTextareaHeight(
   textarea: HTMLTextAreaElement,
   maxOuterHeight: number
 ): number {
-  logCommentTextareaScrollDiagnostics("before-sync", textarea, {});
-
   const measureMinOuter =
     readWebTextareaLineHeight(textarea) + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
 
   textarea.style.setProperty("box-sizing", "border-box", "important");
-  textarea.style.setProperty("height", `${measureMinOuter}px`, "important");
+  // Measure full content height — collapsing to one line under-reports scrollHeight on iOS Safari.
+  textarea.style.setProperty("height", "0px", "important");
   textarea.style.setProperty("overflow-y", "hidden", "important");
   textarea.scrollTop = 0;
 
   const measured = Math.ceil(textarea.scrollHeight);
-  const exceedsVisibleLines = measured > maxOuterHeight;
-  let nextOuter = exceedsVisibleLines
-    ? maxOuterHeight
-    : Math.max(measureMinOuter, measured);
+  const nextOuter = Math.min(maxOuterHeight, Math.max(measureMinOuter, measured));
 
   textarea.style.setProperty("height", `${nextOuter}px`, "important");
-
-  if (!exceedsVisibleLines && textarea.scrollHeight > textarea.clientHeight) {
-    const fitOuter = Math.min(Math.ceil(textarea.scrollHeight), maxOuterHeight);
-    if (fitOuter > nextOuter) {
-      nextOuter = fitOuter;
-      textarea.style.setProperty("height", `${nextOuter}px`, "important");
-    }
-  }
-
   applyCommentTextareaScroll(textarea);
-  logCommentTextareaScrollDiagnostics("after-sync", textarea, {
-    exceedsVisibleLines,
-    computedHeightPx: nextOuter,
-  });
-  autoInspectCommentComposerDom(textarea, "after-sync", {
-    maxOuterHeight,
-    nextOuterHeight: nextOuter,
-    exceedsVisibleLines,
-  });
-  scheduleCommentTextareaScrollReset(textarea, maxOuterHeight, nextOuter, exceedsVisibleLines);
+  scheduleCommentTextareaScrollReset(textarea);
 
   return nextOuter;
 }
@@ -188,7 +114,7 @@ function syncWebTextareaHeight(
 type WebCommentTextareaProps = {
   value: string;
   placeholder: string;
-  inputHeight: number;
+  minInputHeight: number;
   maxInputHeight: number;
   onChangeText: (text: string) => void;
   onHeightChange: (height: number) => void;
@@ -199,7 +125,7 @@ type WebCommentTextareaProps = {
 function WebCommentTextarea({
   value,
   placeholder,
-  inputHeight,
+  minInputHeight,
   maxInputHeight,
   onChangeText,
   onHeightChange,
@@ -216,23 +142,13 @@ function WebCommentTextarea({
   }, [maxInputHeight, onHeightChange]);
 
   useLayoutEffect(() => {
-    ensureCommentComposerDomInspectors();
     remeasure();
   }, [value, maxInputHeight, remeasure]);
-
-  useLayoutEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    autoInspectCommentComposerDom(textarea, "composer-visible", {
-      maxOuterHeight: maxInputHeight,
-      nextOuterHeight: textarea.clientHeight,
-    });
-  }, [maxInputHeight]);
 
   const webInputStyle = StyleSheet.flatten([
     styles.composerInputWeb,
     {
-      height: inputHeight,
+      minHeight: minInputHeight,
       maxHeight: maxInputHeight,
     },
   ]) as React.CSSProperties;
@@ -255,12 +171,7 @@ function WebCommentTextarea({
     },
     onFocus: (event: React.FocusEvent<HTMLTextAreaElement>) => {
       event.target.setAttribute("enterkeyhint", "enter");
-      ensureCommentComposerDomInspectors();
       remeasure();
-      autoInspectCommentComposerDom(event.target, "focus", {
-        maxOuterHeight: maxInputHeight,
-        nextOuterHeight: event.target.clientHeight,
-      });
       onFocus?.();
     },
     onBlur: () => {
@@ -314,10 +225,11 @@ export function CommentComposerRow({
   compactComposer = false,
 }: CommentComposerRowProps) {
   const canPost = Boolean(value.trim()) && !posting;
+  const minInputHeight = computeCommentMinInputHeight();
   const maxInputHeight = computeCommentMaxInputHeight();
-  const [inputHeight, setInputHeight] = useState(
-    ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX
-  );
+  const fieldVerticalPaddingPx = compactComposer ? 6 : 8;
+  const prevValueLengthRef = useRef(0);
+  const [inputHeight, setInputHeight] = useState(minInputHeight);
 
   const handleNativeContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
@@ -331,15 +243,26 @@ export function CommentComposerRow({
     [maxInputHeight]
   );
 
-  const handleWebHeightChange = useCallback((height: number) => {
-    setInputHeight((current) => (current === height ? current : height));
-  }, []);
+  const handleWebHeightChange = useCallback(
+    (height: number) => {
+      const next = Math.min(maxInputHeight, Math.max(minInputHeight, height));
+      const deleting = value.length < prevValueLengthRef.current;
+      prevValueLengthRef.current = value.length;
+
+      setInputHeight((current) => {
+        if (value.length > 0 && !deleting && next < current) return current;
+        return next;
+      });
+    },
+    [maxInputHeight, minInputHeight, value.length]
+  );
 
   useEffect(() => {
     if (!value) {
-      setInputHeight(ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX);
+      prevValueLengthRef.current = 0;
+      setInputHeight(minInputHeight);
     }
-  }, [value]);
+  }, [minInputHeight, value]);
 
   const inputScrollEnabled = inputHeight >= maxInputHeight - 1;
 
@@ -352,7 +275,11 @@ export function CommentComposerRow({
         <Avatar uri={avatarUri} name={avatarName} size={COMPOSER_AVATAR_WIDTH_PX} deferImagePlaceholder />
       </View>
       <View
-        style={[styles.composerField, compactComposer && styles.composerFieldCompact]}
+        style={[
+          styles.composerField,
+          compactComposer && styles.composerFieldCompact,
+          Platform.OS === "web" ? { minHeight: fieldVerticalPaddingPx + inputHeight } : null,
+        ]}
         {...(Platform.OS === "web"
           ? ({ "data-frennix-comment-composer-field": "true" } as object)
           : null)}
@@ -365,7 +292,7 @@ export function CommentComposerRow({
             <WebCommentTextarea
               value={value}
               placeholder={placeholder}
-              inputHeight={inputHeight}
+              minInputHeight={minInputHeight}
               maxInputHeight={maxInputHeight}
               onChangeText={onChangeText}
               onHeightChange={handleWebHeightChange}
@@ -689,7 +616,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     ...(Platform.OS === "web"
       ? ({
-          overflow: "hidden",
+          overflowX: "hidden",
+          overflowY: "visible",
           boxSizing: "border-box",
         } as const)
       : null),
