@@ -33,9 +33,12 @@ const COMPOSER_POST_WIDTH_PX = 48;
 const COMPOSER_ROW_GAP_PX = spacing.xs;
 /** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
 const MAX_VISIBLE_LINES = 5;
+/** Vertical inset inside the bubble so line 1/5 are not clipped (≈8–10px total). */
+const COMMENT_TEXTAREA_PADDING_Y_PX = 5;
+const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
 
 function computeCommentMaxInputHeight(): number {
-  return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT;
+  return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
 }
 
 function syncWebTextareaHeight(
@@ -537,7 +540,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     ...(Platform.OS === "web"
       ? ({
-          overflow: "hidden",
+          overflowX: "hidden",
           boxSizing: "border-box",
         } as const)
       : null),
@@ -548,7 +551,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minHeight: MIN_COMMENT_INPUT_HEIGHT,
     maxWidth: "100%",
-    paddingVertical: 3,
+    paddingVertical: COMMENT_TEXTAREA_PADDING_Y_PX,
     paddingHorizontal: 0,
     color: colors.text,
     fontSize: Platform.OS === "web" ? 16 : 15,
@@ -566,8 +569,8 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     minWidth: 0,
     margin: 0,
-    paddingTop: 3,
-    paddingBottom: 3,
+    paddingTop: COMMENT_TEXTAREA_PADDING_Y_PX,
+    paddingBottom: COMMENT_TEXTAREA_PADDING_Y_PX,
     paddingHorizontal: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
