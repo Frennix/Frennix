@@ -32,28 +32,12 @@ export function PostVideoScreen({
 
   if (!item || item.kind !== "video") {
     return (
-      <View
-        style={[styles.unavailableRoot, webTabSceneShell]}
-        {...(Platform.OS === "web"
-          ? ({
-              nativeID: "frennix-video-route",
-              "data-frennix-video-route": "true",
-            } as object)
-          : null)}
-      />
+      <View style={[styles.unavailableRoot, webTabSceneShell]} />
     );
   }
 
   return (
-    <View
-      style={[styles.root, webTabSceneShell]}
-      {...(Platform.OS === "web"
-        ? ({
-            nativeID: "frennix-video-route",
-            "data-frennix-video-route": "true",
-          } as object)
-        : null)}
-    >
+    <View style={[styles.root, webTabSceneShell]}>
       <ImmersiveVideoViewer
         item={item}
         mediaIndex={mediaIndex}

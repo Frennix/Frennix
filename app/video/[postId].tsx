@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { getPost } from "@frennix/api";
 import { DetailLoading } from "@/components/DetailLoading";
 import { PostVideoScreen } from "@/components/PostVideoScreen";
+import { flexFill } from "@/lib/flex-layout";
+import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { usesMobileWebVideoRoute } from "@/lib/mobile-web-video-route";
 import { useImmersiveVideoPostActions } from "@/lib/useImmersiveVideoPostActions";
 import { restoreFeedScrollReturnState } from "@/lib/web-feed-scroll-restore";
@@ -29,6 +31,28 @@ function toResumeHandoff(state: VideoViewerReturnState): FeedVideoFullscreenHand
     muted: state.muted,
     wasPlaying: state.wasPlaying,
   };
+}
+
+/** Opaque shell marker — recognized by inline boot shell as an authenticated destination. */
+function VideoRouteShell({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    hideFrennixBootShell();
+  }, []);
+
+  return (
+    <View
+      style={styles.routeShell}
+      {...(Platform.OS === "web"
+        ? ({
+            nativeID: "frennix-video-route",
+            "data-frennix-video-route": "true",
+          } as object)
+        : null)}
+    >
+      {children}
+    </View>
+  );
 }
 
 export default function PostVideoRoute() {
@@ -77,49 +101,43 @@ export default function PostVideoRoute() {
     router.replace("/(tabs)");
   }, []);
 
-  if (!userId) {
-    return <DetailLoading />;
-  }
+  let content: ReactNode;
 
-  if (!postId) {
-    return (
+  if (!userId) {
+    content = <DetailLoading />;
+  } else if (!postId) {
+    content = (
       <UnavailableVideoScreen
         message="This video link is invalid."
         onBack={handleBack}
       />
     );
-  }
-
-  if (isLoading) {
-    return <DetailLoading />;
-  }
-
-  if (isError || !post) {
-    return (
+  } else if (isLoading) {
+    content = <DetailLoading />;
+  } else if (isError || !post) {
+    content = (
       <UnavailableVideoScreen
         message="This post is unavailable or may have been deleted."
         onBack={handleBack}
       />
     );
+  } else if (Platform.OS === "web" && !usesMobileWebVideoRoute()) {
+    content = <DetailLoading />;
+  } else if (!postActions) {
+    content = <DetailLoading />;
+  } else {
+    content = (
+      <PostVideoScreen
+        post={post}
+        mediaIndex={mediaIndex}
+        resumeHandoff={resumeHandoff}
+        postActions={postActions}
+        onBack={handleBack}
+      />
+    );
   }
 
-  if (Platform.OS === "web" && !usesMobileWebVideoRoute()) {
-    return <DetailLoading />;
-  }
-
-  if (!postActions) {
-    return <DetailLoading />;
-  }
-
-  return (
-    <PostVideoScreen
-      post={post}
-      mediaIndex={mediaIndex}
-      resumeHandoff={resumeHandoff}
-      postActions={postActions}
-      onBack={handleBack}
-    />
-  );
+  return <VideoRouteShell>{content}</VideoRouteShell>;
 }
 
 function UnavailableVideoScreen({
@@ -140,6 +158,10 @@ function UnavailableVideoScreen({
 }
 
 const styles = StyleSheet.create({
+  routeShell: {
+    ...flexFill,
+    backgroundColor: colors.background,
+  },
   unavailableRoot: {
     flex: 1,
     backgroundColor: colors.background,

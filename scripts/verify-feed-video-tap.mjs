@@ -83,6 +83,12 @@ function main() {
       "Opaque video route CSS guard",
       styles.includes("frennix-video-route") && styles.includes("min-height: 100dvh")
     ) && ok;
+  ok =
+    pass(
+      "Video route counts as authenticated startup destination",
+      readSource("lib/boot-shell-document.js").includes('["frennix-video-route", 120]') &&
+        readSource("lib/authenticated-startup-ready.ts").includes('"frennix-video-route"')
+    ) && ok;
 
   console.log("");
   console.log(ok ? "All checks passed." : "Some checks failed.");
