@@ -24,7 +24,7 @@ import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import {
   COMMENT_COMPOSER_DOM_DIAG,
-  inspectCommentComposerDom,
+  autoInspectCommentComposerDom,
   installCommentComposerDomInspectors,
 } from "@/lib/comment-composer-dom-diagnostics";
 import { isMobileWeb } from "@/lib/safari-visual-viewport";
@@ -101,7 +101,12 @@ function applyCommentTextareaScroll(textarea: HTMLTextAreaElement): void {
   }
 }
 
-function scheduleCommentTextareaScrollReset(textarea: HTMLTextAreaElement): void {
+function scheduleCommentTextareaScrollReset(
+  textarea: HTMLTextAreaElement,
+  maxOuterHeight: number,
+  nextOuterHeight: number,
+  exceedsVisibleLines: boolean
+): void {
   if (typeof requestAnimationFrame === "undefined") return;
   requestAnimationFrame(() => {
     if (!textarea.isConnected) return;
@@ -109,10 +114,15 @@ function scheduleCommentTextareaScrollReset(textarea: HTMLTextAreaElement): void
       textarea.scrollTop = 0;
       textarea.style.setProperty("overflow-y", "hidden", "important");
     }
-    logCommentTextareaScrollDiagnostics("raf-after-sync", textarea, {});
-    if (COMMENT_COMPOSER_DOM_DIAG) {
-      inspectCommentComposerDom(textarea, "raf-after-sync");
-    }
+    logCommentTextareaScrollDiagnostics("raf-after-sync", textarea, {
+      computedHeightPx: nextOuterHeight,
+      exceedsVisibleLines,
+    });
+    autoInspectCommentComposerDom(textarea, "raf-after-sync", {
+      maxOuterHeight,
+      nextOuterHeight,
+      exceedsVisibleLines,
+    });
   });
 }
 
@@ -165,10 +175,12 @@ function syncWebTextareaHeight(
     exceedsVisibleLines,
     computedHeightPx: nextOuter,
   });
-  if (COMMENT_COMPOSER_DOM_DIAG) {
-    inspectCommentComposerDom(textarea, "after-sync");
-  }
-  scheduleCommentTextareaScrollReset(textarea);
+  autoInspectCommentComposerDom(textarea, "after-sync", {
+    maxOuterHeight,
+    nextOuterHeight: nextOuter,
+    exceedsVisibleLines,
+  });
+  scheduleCommentTextareaScrollReset(textarea, maxOuterHeight, nextOuter, exceedsVisibleLines);
 
   return nextOuter;
 }
@@ -208,6 +220,15 @@ function WebCommentTextarea({
     remeasure();
   }, [value, maxInputHeight, remeasure]);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    autoInspectCommentComposerDom(textarea, "composer-visible", {
+      maxOuterHeight: maxInputHeight,
+      nextOuterHeight: textarea.clientHeight,
+    });
+  }, [maxInputHeight]);
+
   const webInputStyle = StyleSheet.flatten([
     styles.composerInputWeb,
     {
@@ -236,9 +257,10 @@ function WebCommentTextarea({
       event.target.setAttribute("enterkeyhint", "enter");
       ensureCommentComposerDomInspectors();
       remeasure();
-      if (COMMENT_COMPOSER_DOM_DIAG) {
-        inspectCommentComposerDom(event.target, "focus");
-      }
+      autoInspectCommentComposerDom(event.target, "focus", {
+        maxOuterHeight: maxInputHeight,
+        nextOuterHeight: event.target.clientHeight,
+      });
       onFocus?.();
     },
     onBlur: () => {

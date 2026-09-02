@@ -30,6 +30,12 @@ export type CommentComposerDomNodeSnapshot = {
   } | null;
 };
 
+export type CommentComposerDomInspectContext = {
+  maxOuterHeight?: number;
+  nextOuterHeight?: number;
+  exceedsVisibleLines?: boolean;
+};
+
 function readDataAttributes(element: Element): Record<string, string> {
   const attrs: Record<string, string> = {};
   for (const attr of Array.from(element.attributes)) {
@@ -139,23 +145,113 @@ function buildHitTargetSamples(textarea: HTMLTextAreaElement) {
   }));
 }
 
-export function inspectCommentComposerDom(
-  textarea: HTMLTextAreaElement | null | undefined,
-  reason: string
-): Record<string, unknown> | null {
-  if (!COMMENT_COMPOSER_DOM_DIAG || !textarea || typeof document === "undefined") return null;
+function isCommentComposerAtMaxHeight(
+  textarea: HTMLTextAreaElement,
+  context?: CommentComposerDomInspectContext
+): boolean {
+  const maxOuterHeight = context?.maxOuterHeight;
+  if (maxOuterHeight == null) {
+    return textarea.clientHeight >= 120;
+  }
+  const outerHeight = context.nextOuterHeight ?? textarea.clientHeight;
+  return context.exceedsVisibleLines === true || outerHeight >= maxOuterHeight - 1;
+}
 
+function shouldAutoLogCommentComposerDom(
+  reason: string,
+  textarea: HTMLTextAreaElement,
+  context?: CommentComposerDomInspectContext
+): boolean {
+  if (reason === "composer-visible" || reason === "focus") return true;
+  return isCommentComposerAtMaxHeight(textarea, context);
+}
+
+function buildCommentComposerDomReport(
+  textarea: HTMLTextAreaElement,
+  reason: string,
+  context?: CommentComposerDomInspectContext
+): Record<string, unknown> {
+  const wrap = textarea.closest('[data-frennix-comment-input-wrap="true"]');
+  const field = textarea.closest('[data-frennix-comment-composer-field="true"]');
   const row = textarea.closest('[data-frennix-comment-composer-row="true"]');
-  const report = {
+  const hitTargets = buildHitTargetSamples(textarea);
+
+  return {
     reason,
+    atMaxHeight: isCommentComposerAtMaxHeight(textarea, context),
+    maxOuterHeight: context?.maxOuterHeight ?? null,
+    nextOuterHeight: context?.nextOuterHeight ?? null,
+    exceedsVisibleLines: context?.exceedsVisibleLines ?? null,
     textarea: snapshotCommentComposerDomNode(textarea),
+    wrapper: snapshotCommentComposerDomNode(wrap),
+    composerField: snapshotCommentComposerDomNode(field),
     ancestorChain: buildAncestorChain(textarea),
-    hitTargets: buildHitTargetSamples(textarea),
+    hitTargets,
+    typedTextStartHit:
+      hitTargets.find((target) => target.label === "typed-text-start")?.hit ?? null,
     opaqueNodesInComposerRow: row ? collectOpaqueNodes(row) : [],
+    textareaScroll: {
+      valueLength: textarea.value.length,
+      scrollTop: textarea.scrollTop,
+      clientHeight: textarea.clientHeight,
+      scrollHeight: textarea.scrollHeight,
+      selectionStart: textarea.selectionStart,
+      selectionEnd: textarea.selectionEnd,
+    },
+  };
+}
+
+function emitCommentComposerDomReport(
+  textarea: HTMLTextAreaElement,
+  reason: string,
+  context?: CommentComposerDomInspectContext
+): void {
+  const report = buildCommentComposerDomReport(textarea, reason, context);
+  console.log("[comment-composer-dom]", report);
+}
+
+export function autoInspectCommentComposerDom(
+  textarea: HTMLTextAreaElement | null | undefined,
+  reason: string,
+  context?: CommentComposerDomInspectContext
+): void {
+  if (!COMMENT_COMPOSER_DOM_DIAG || !textarea || typeof document === "undefined") return;
+  if (!textarea.isConnected) return;
+  if (!shouldAutoLogCommentComposerDom(reason, textarea, context)) return;
+
+  const run = () => {
+    if (!textarea.isConnected) return;
+    try {
+      emitCommentComposerDomReport(textarea, reason, context);
+    } catch (error) {
+      console.error("[comment-composer-dom-error]", { reason, error });
+    }
   };
 
-  console.info("[comment-composer-dom]", report);
-  return report;
+  if (typeof requestAnimationFrame === "undefined") {
+    run();
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(run);
+  });
+}
+
+export function inspectCommentComposerDom(
+  textarea: HTMLTextAreaElement | null | undefined,
+  reason: string,
+  context?: CommentComposerDomInspectContext
+): Record<string, unknown> | null {
+  if (!COMMENT_COMPOSER_DOM_DIAG || !textarea || typeof document === "undefined") return null;
+  try {
+    const report = buildCommentComposerDomReport(textarea, reason, context);
+    console.log("[comment-composer-dom]", report);
+    return report;
+  } catch (error) {
+    console.error("[comment-composer-dom-error]", { reason, error });
+    return null;
+  }
 }
 
 export function inspectCommentComposerAtPoint(x: number, y: number): Record<string, unknown> {
@@ -176,7 +272,7 @@ export function inspectCommentComposerAtPoint(x: number, y: number): Record<stri
     current = current.parentElement;
   }
 
-  console.info("[comment-composer-dom-at-point]", report);
+  console.log("[comment-composer-dom-at-point]", report);
   return report;
 }
 
@@ -197,8 +293,4 @@ export function installCommentComposerDomInspectors(): void {
 
   globalWindow.__frennixInspectCommentComposerAtPoint = (x: number, y: number) =>
     inspectCommentComposerAtPoint(x, y);
-
-  console.info(
-    "[comment-composer-dom] inspectors ready — run __frennixInspectCommentComposer() or __frennixInspectCommentComposerAtPoint(x, y)"
-  );
 }
