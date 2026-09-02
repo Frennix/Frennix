@@ -498,22 +498,34 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.sm,
     paddingRight: spacing.xs,
     paddingVertical: Platform.OS === "web" ? 4 : 3,
+    ...(Platform.OS === "web"
+      ? ({
+          overflow: "hidden",
+        } as const)
+      : null),
   },
   composerFieldCompact: {
     minHeight: 32,
-    alignItems: "center",
-    paddingVertical: 2,
+    alignItems: "flex-end",
+    paddingVertical: 3,
   },
   composerInputWrap: {
     flex: 1,
     minWidth: 0,
-    flexShrink: 0,
+    flexShrink: 1,
+    ...(Platform.OS === "web"
+      ? ({
+          overflow: "hidden",
+        } as const)
+      : null),
   },
   composerInput: {
     flex: 1,
     flexShrink: 1,
     minHeight: MIN_COMMENT_INPUT_HEIGHT,
-    paddingVertical: 0,
+    maxWidth: "100%",
+    paddingVertical: 1,
+    paddingHorizontal: 0,
     color: colors.text,
     fontSize: Platform.OS === "web" ? 16 : 15,
     lineHeight: Platform.OS === "web" ? 22 : 20,
@@ -527,16 +539,21 @@ const styles = StyleSheet.create({
   },
   composerInputWeb: {
     width: "100%",
+    maxWidth: "100%",
     margin: 0,
-    paddingVertical: 0,
+    paddingTop: 1,
+    paddingBottom: 1,
+    paddingHorizontal: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
     color: colors.text,
     fontSize: 16,
     lineHeight: 22,
     resize: "none",
+    overflowX: "hidden",
     overflowY: "hidden",
     boxSizing: "border-box",
+    display: "block",
     outlineStyle: "none",
     WebkitTextFillColor: colors.text,
     caretColor: colors.text,
