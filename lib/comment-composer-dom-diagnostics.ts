@@ -203,13 +203,68 @@ function buildCommentComposerDomReport(
   };
 }
 
+function serializeNodeSnapshot(
+  snapshot: CommentComposerDomNodeSnapshot | null | undefined
+): Record<string, string | number | null | Record<string, string>> | null {
+  if (!snapshot) return null;
+  return {
+    tagName: snapshot.tagName,
+    id: snapshot.id,
+    className: snapshot.className,
+    dataAttributes: { ...snapshot.dataAttributes },
+    backgroundColor: snapshot.backgroundColor,
+    overflow: snapshot.overflow,
+    overflowY: snapshot.overflowY,
+    height: snapshot.height,
+    clientHeight: snapshot.clientHeight,
+    scrollHeight: snapshot.scrollHeight,
+    padding: snapshot.padding,
+    boxSizing: snapshot.boxSizing,
+  };
+}
+
+function buildCommentComposerDomJsonReport(
+  textarea: HTMLTextAreaElement,
+  reason: string,
+  context?: CommentComposerDomInspectContext
+): Record<string, unknown> {
+  const report = buildCommentComposerDomReport(textarea, reason, context);
+
+  return {
+    reason: report.reason,
+    atMaxHeight: report.atMaxHeight,
+    maxOuterHeight: report.maxOuterHeight,
+    nextOuterHeight: report.nextOuterHeight,
+    exceedsVisibleLines: report.exceedsVisibleLines,
+    textarea: serializeNodeSnapshot(report.textarea as CommentComposerDomNodeSnapshot | null),
+    wrapper: serializeNodeSnapshot(report.wrapper as CommentComposerDomNodeSnapshot | null),
+    composerField: serializeNodeSnapshot(
+      report.composerField as CommentComposerDomNodeSnapshot | null
+    ),
+    typedTextStartHit: serializeNodeSnapshot(
+      report.typedTextStartHit as CommentComposerDomNodeSnapshot | null
+    ),
+    opaqueNodesInComposerRow: (report.opaqueNodesInComposerRow as CommentComposerDomNodeSnapshot[])
+      .map((node) => serializeNodeSnapshot(node))
+      .filter((node): node is NonNullable<ReturnType<typeof serializeNodeSnapshot>> => node != null),
+    textareaScroll: report.textareaScroll,
+  };
+}
+
+function logCommentComposerDomJson(
+  prefix: string,
+  payload: Record<string, unknown> | null | undefined
+): void {
+  if (typeof console === "undefined") return;
+  console.info(prefix, JSON.stringify(payload ?? null));
+}
+
 function emitCommentComposerDomPing(
   reason: string,
   textarea: HTMLTextAreaElement,
   context?: CommentComposerDomInspectContext
 ): void {
-  if (typeof console === "undefined") return;
-  console.info("[comment-composer-dom-ping]", {
+  logCommentComposerDomJson("[comment-composer-dom-ping]", {
     reason,
     valueLength: textarea.value.length,
     clientHeight: textarea.clientHeight,
@@ -223,8 +278,10 @@ function emitCommentComposerDomReport(
   reason: string,
   context?: CommentComposerDomInspectContext
 ): void {
-  const report = buildCommentComposerDomReport(textarea, reason, context);
-  console.info("[comment-composer-dom]", report);
+  logCommentComposerDomJson(
+    "[comment-composer-dom-json]",
+    buildCommentComposerDomJsonReport(textarea, reason, context)
+  );
 }
 
 export function autoInspectCommentComposerDom(
@@ -244,7 +301,10 @@ export function autoInspectCommentComposerDom(
     try {
       emitCommentComposerDomReport(textarea, reason, context);
     } catch (error) {
-      console.warn("[comment-composer-dom-error]", { reason, error });
+      console.warn(
+        "[comment-composer-dom-error]",
+        JSON.stringify({ reason, error: error instanceof Error ? error.message : String(error) })
+      );
     }
   };
 
@@ -265,11 +325,14 @@ export function inspectCommentComposerDom(
 ): Record<string, unknown> | null {
   if (!commentComposerDomDiagEnabled() || !textarea || typeof document === "undefined") return null;
   try {
-    const report = buildCommentComposerDomReport(textarea, reason, context);
-    console.info("[comment-composer-dom]", report);
+    const report = buildCommentComposerDomJsonReport(textarea, reason, context);
+    logCommentComposerDomJson("[comment-composer-dom-json]", report);
     return report;
   } catch (error) {
-    console.warn("[comment-composer-dom-error]", { reason, error });
+    console.warn(
+      "[comment-composer-dom-error]",
+      JSON.stringify({ reason, error: error instanceof Error ? error.message : String(error) })
+    );
     return null;
   }
 }
@@ -278,22 +341,32 @@ export function inspectCommentComposerAtPoint(x: number, y: number): Record<stri
   if (typeof document === "undefined") return { error: "document-unavailable" };
 
   const hit = document.elementFromPoint(x, y);
-  const report = {
-    x,
-    y,
-    hit: snapshotCommentComposerDomNode(hit),
-    hitAncestors: [] as Array<CommentComposerDomNodeSnapshot | null>,
-  };
+  const hitSnapshot = snapshotCommentComposerDomNode(hit);
+  const hitAncestors: CommentComposerDomNodeSnapshot[] = [];
 
   let current = hit;
   while (current) {
-    report.hitAncestors.push(snapshotCommentComposerDomNode(current));
+    const snapshot = snapshotCommentComposerDomNode(current);
+    if (snapshot) hitAncestors.push(snapshot);
     if (current.matches('[data-frennix-comment-composer-row="true"]')) break;
     current = current.parentElement;
   }
 
-  console.info("[comment-composer-dom-at-point]", report);
-  return report;
+  logCommentComposerDomJson("[comment-composer-dom-at-point-json]", {
+    x,
+    y,
+    hit: serializeNodeSnapshot(hitSnapshot),
+    hitAncestors: hitAncestors
+      .map((node) => serializeNodeSnapshot(node))
+      .filter((node): node is NonNullable<ReturnType<typeof serializeNodeSnapshot>> => node != null),
+  });
+
+  return {
+    x,
+    y,
+    hit: hitSnapshot,
+    hitAncestors,
+  };
 }
 
 export function installCommentComposerDomInspectors(): void {
