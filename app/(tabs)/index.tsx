@@ -51,7 +51,7 @@ import {
 } from "@/lib/mobile-web-comments-route";
 import {
   buildVideoRouteHrefForPost,
-  prepareFeedVideoRouteNavigation,
+  navigateFromFeedVideoLink,
   usesMobileWebVideoRoute,
 } from "@/lib/mobile-web-video-route";
 import { showAlert } from "@/lib/alerts";
@@ -117,6 +117,7 @@ import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
+import { applyPendingFeedScrollReturnIfNeeded } from "@/lib/web-feed-scroll-restore";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 export default function HomeScreen() {
@@ -584,6 +585,7 @@ export default function HomeScreen() {
       hideFrennixBootShell();
       restoreWebDocumentScrollLock();
       requestSafariVisualViewportRemeasure();
+      applyPendingFeedScrollReturnIfNeeded();
     }, [])
   );
 
@@ -832,7 +834,7 @@ export default function HomeScreen() {
       : undefined,
     onVideoRouteNavigate: usesMobileWebVideoRoute()
       ? (post: Post, mediaIndex: number) =>
-          prepareFeedVideoRouteNavigation(getSharedPostTargetId(post), mediaIndex)
+          navigateFromFeedVideoLink(getSharedPostTargetId(post), mediaIndex)
       : undefined,
   };
 
@@ -1021,6 +1023,7 @@ export default function HomeScreen() {
       listLayoutHeightRef.current = height;
       if (Platform.OS === "web" && height >= 60) {
         hideFrennixBootShell();
+        applyPendingFeedScrollReturnIfNeeded();
       }
       markFeedRender(
         "feed:ui:scroll-list-layout",

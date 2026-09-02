@@ -70,9 +70,9 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Feed video links remain real href routes",
+      "Feed video links use client-side route navigation",
       readSource("packages/ui/src/FeedVideoPlayer.tsx").includes("feed-video-route-link") &&
-        readSource("lib/mobile-web-video-route.ts").includes("buildVideoRouteHref")
+        readSource("lib/mobile-web-video-route.ts").includes("navigateFromFeedVideoLink")
     ) && ok;
 
   console.log("");

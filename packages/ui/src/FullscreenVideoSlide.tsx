@@ -50,6 +50,8 @@ interface FullscreenVideoSlideProps {
   playbackHandoff?: FeedVideoFullscreenHandoff;
   /** Immersive social viewer — hide transport/scrubber chrome; parent renders controls. */
   immersiveMode?: boolean;
+  /** Dedicated /video route — playback is independent from feed autoplay coordinator. */
+  routePlayback?: boolean;
 }
 
 export type FullscreenVideoPlaybackSnapshot = {
@@ -97,6 +99,7 @@ export const FullscreenVideoSlide = forwardRef<
     isActive,
     playbackHandoff,
     immersiveMode = false,
+    routePlayback = false,
   },
   ref
 ) {
@@ -218,13 +221,18 @@ export const FullscreenVideoSlide = forwardRef<
     video.muted = muted;
     if (isActive && !failed) {
       void video.play().catch(() => setFailed(true));
-      if (playbackHandoff && handoffAppliedRef.current && !playbackHandoff.wasPlaying) {
+      if (
+        playbackHandoff &&
+        handoffAppliedRef.current &&
+        !playbackHandoff.wasPlaying &&
+        !routePlayback
+      ) {
         video.pause();
       }
       return;
     }
     video.pause();
-  }, [handoffReady, isActive, muted, failed, uri, retryKey, playbackHandoff]);
+  }, [handoffReady, isActive, muted, failed, uri, retryKey, playbackHandoff, routePlayback]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -245,12 +253,12 @@ export const FullscreenVideoSlide = forwardRef<
   useEffect(() => {
     return () => {
       clearHideControlsTimer();
-      if (!playbackHandoff?.playbackId || Platform.OS !== "web") return;
+      if (routePlayback || !playbackHandoff?.playbackId || Platform.OS !== "web") return;
       const video = webVideoRef.current;
       if (!video) return;
       restoreFeedVideoFromFullscreen(playbackHandoff.playbackId, video.currentTime, video.muted);
     };
-  }, [playbackHandoff, clearHideControlsTimer]);
+  }, [playbackHandoff, clearHideControlsTimer, routePlayback]);
 
   const handleRetry = useCallback(() => {
     setFailed(false);
@@ -430,6 +438,9 @@ export const FullscreenVideoSlide = forwardRef<
               height: stageHeight,
               objectFit: "contain",
               backgroundColor: colors.background,
+              ...(Platform.OS === "web" && immersiveMode
+                ? ({ pointerEvents: "none" } as const)
+                : null),
             },
             onLoadedMetadata: handleLoadedMetadata,
             onCanPlay: () => {

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { router } from "expo-router";
 import type { Post } from "@frennix/types";
 import type { ImmersiveVideoPostActions } from "@/lib/immersive-video-gallery";
@@ -16,20 +16,26 @@ import { pushScreen } from "@/lib/press-utils";
 
 const STRONG_WORK_EMOJI = "💪";
 
+export type ImmersiveVideoPostActionsBundle = {
+  actions: ImmersiveVideoPostActions | undefined;
+  shareSheet: ReactNode;
+  postActionSheets: ReactNode;
+};
+
 export function useImmersiveVideoPostActions(
   post: Post | undefined,
   userId: string
-): ImmersiveVideoPostActions | undefined {
+): ImmersiveVideoPostActionsBundle {
   const { toggleLikePost } = useFeedLike(userId);
   const postReaction = usePostReaction(userId);
-  const { openShare } = useSharePost(userId);
-  const { openPostActions } = usePostActions({
+  const { openShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (target) => openShare(target.shared_post ?? target),
   });
   const { toggleFollow, isFollowing } = useSuggestedFollow(userId, { enabled: !!post });
 
-  return useMemo(() => {
+  const actions = useMemo(() => {
     if (!post) return undefined;
 
     const displayPost = post.shared_post ?? post;
@@ -76,4 +82,6 @@ export function useImmersiveVideoPostActions(
     toggleLikePost,
     userId,
   ]);
+
+  return { actions, shareSheet, postActionSheets };
 }

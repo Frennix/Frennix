@@ -9,7 +9,7 @@ import { flexFill } from "@/lib/flex-layout";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { usesMobileWebVideoRoute } from "@/lib/mobile-web-video-route";
 import { useImmersiveVideoPostActions } from "@/lib/useImmersiveVideoPostActions";
-import { restoreFeedScrollReturnState } from "@/lib/web-feed-scroll-restore";
+import { requestFeedScrollReturnRestore } from "@/lib/web-feed-scroll-restore";
 import {
   consumeVideoViewerReturnState,
   type VideoViewerReturnState,
@@ -31,6 +31,13 @@ function toResumeHandoff(state: VideoViewerReturnState): FeedVideoFullscreenHand
     muted: state.muted,
     wasPlaying: state.wasPlaying,
   };
+}
+
+function consumeInitialResumeHandoff(postId: string | undefined): FeedVideoFullscreenHandoff | undefined {
+  if (Platform.OS !== "web" || !postId) return undefined;
+  const pending = consumeVideoViewerReturnState();
+  if (!pending || pending.postId !== postId) return undefined;
+  return toResumeHandoff(pending);
 }
 
 /** Opaque shell marker — recognized by inline boot shell as an authenticated destination. */
@@ -61,7 +68,9 @@ export default function PostVideoRoute() {
   const mediaIndex = parseMediaIndex(params.mediaIndex);
   const { session } = useAuth();
   const userId = session?.user.id ?? "";
-  const [resumeHandoff, setResumeHandoff] = useState<FeedVideoFullscreenHandoff | undefined>();
+  const [resumeHandoff, setResumeHandoff] = useState<FeedVideoFullscreenHandoff | undefined>(() =>
+    consumeInitialResumeHandoff(postId)
+  );
 
   const {
     data: post,
@@ -74,7 +83,10 @@ export default function PostVideoRoute() {
     retry: 1,
   });
 
-  const postActions = useImmersiveVideoPostActions(post, userId);
+  const { actions: postActions, shareSheet, postActionSheets } = useImmersiveVideoPostActions(
+    post,
+    userId
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -92,7 +104,7 @@ export default function PostVideoRoute() {
 
   const handleBack = useCallback(() => {
     if (Platform.OS === "web") {
-      restoreFeedScrollReturnState();
+      requestFeedScrollReturnRestore();
     }
     if (router.canGoBack()) {
       router.back();
@@ -137,7 +149,13 @@ export default function PostVideoRoute() {
     );
   }
 
-  return <VideoRouteShell>{content}</VideoRouteShell>;
+  return (
+    <VideoRouteShell>
+      {content}
+      {shareSheet}
+      {postActionSheets}
+    </VideoRouteShell>
+  );
 }
 
 function UnavailableVideoScreen({

@@ -29,7 +29,7 @@ export function buildVideoRouteHrefForPost(post: Post, mediaIndex = 0): `/video/
   return buildVideoRouteHref(getSharedPostTargetId(post), mediaIndex);
 }
 
-/** Save feed scroll (+ inline playback when available) before following a video route link. */
+/** Save feed scroll (+ inline playback when available) before opening the video route. */
 export function prepareFeedVideoRouteNavigation(postId: string, mediaIndex: number): void {
   saveFeedScrollReturnState();
 
@@ -48,11 +48,18 @@ export function prepareFeedVideoRouteNavigation(postId: string, mediaIndex: numb
   });
 }
 
+/** Client-side Expo Router navigation — keeps href for direct loads and accessibility. */
+export function navigateFromFeedVideoLink(postId: string, mediaIndex = 0): void {
+  if (!usesMobileWebVideoRoute()) return;
+
+  prepareFeedVideoRouteNavigation(postId, mediaIndex);
+  router.push(buildVideoRouteHref(postId, mediaIndex));
+}
+
 /** Navigate to the opaque video screen (feed is unmounted underneath). */
 export function navigateToPostVideo(post: Post, mediaIndex = 0): boolean {
   if (!usesMobileWebVideoRoute()) return false;
 
-  prepareFeedVideoRouteNavigation(getSharedPostTargetId(post), mediaIndex);
-  router.push(buildVideoRouteHrefForPost(post, mediaIndex));
+  navigateFromFeedVideoLink(getSharedPostTargetId(post), mediaIndex);
   return true;
 }

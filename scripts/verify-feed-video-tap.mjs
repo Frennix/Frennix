@@ -45,10 +45,12 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "A/D: real anchor route link opens viewer",
+      "A/D: real anchor route link opens viewer via client navigation",
       player.includes("feed-video-route-link") &&
         player.includes('createElement("a"') &&
-        player.includes("videoRouteHref")
+        player.includes("videoRouteHref") &&
+        player.includes("event.preventDefault?.()") &&
+        videoRoute.includes("navigateFromFeedVideoLink")
     ) && ok;
   ok =
     pass(

@@ -298,7 +298,17 @@ export function FeedVideoPlayer({
   const canOpenViewer = Boolean(useRouteLink || onOpenFullscreen);
 
   const handleRouteLinkClick = useCallback(
-    (event: { clientX: number; clientY: number; preventDefault?: () => void; stopPropagation?: () => void }) => {
+    (event: {
+      button?: number;
+      metaKey?: boolean;
+      ctrlKey?: boolean;
+      shiftKey?: boolean;
+      altKey?: boolean;
+      clientX: number;
+      clientY: number;
+      preventDefault?: () => void;
+      stopPropagation?: () => void;
+    }) => {
       const start = openTapStartRef.current;
       openTapStartRef.current = null;
       if (start) {
@@ -309,6 +319,17 @@ export function FeedVideoPlayer({
           return;
         }
       }
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        (typeof event.button === "number" && event.button !== 0)
+      ) {
+        return;
+      }
+      event.preventDefault?.();
+      event.stopPropagation?.();
       onVideoRouteNavigate?.();
     },
     [onVideoRouteNavigate]

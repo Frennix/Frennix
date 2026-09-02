@@ -40,6 +40,8 @@ type ImmersiveVideoViewerProps = {
   stageHeight: number;
   isActive: boolean;
   playbackHandoff?: FeedVideoFullscreenHandoff;
+  /** Dedicated /video route — decouple from feed autoplay coordinator. */
+  routePlayback?: boolean;
   postActions: ImmersiveVideoGalleryContext["postActions"];
   onClose: () => void;
 };
@@ -51,6 +53,7 @@ export function ImmersiveVideoViewer({
   stageHeight,
   isActive,
   playbackHandoff,
+  routePlayback = false,
   postActions,
   onClose,
 }: ImmersiveVideoViewerProps) {
@@ -110,6 +113,7 @@ export function ImmersiveVideoViewer({
         isActive={isActive}
         playbackHandoff={playbackHandoff}
         immersiveMode
+        routePlayback={routePlayback}
       />
 
       <View style={[styles.topBar, { paddingTop: topInset }]} pointerEvents="box-none">
@@ -141,6 +145,9 @@ export function ImmersiveVideoViewer({
       <View
         style={[styles.actionRail, { bottom: bottomInset + 120 }]}
         pointerEvents="box-none"
+        {...(Platform.OS === "web"
+          ? ({ "data-frennix-immersive-rail": "true" } as object)
+          : null)}
       >
         <RailAction
           label={liked ? "Unlike" : "Like"}
@@ -314,15 +321,27 @@ const styles = StyleSheet.create({
   actionRail: {
     position: "absolute",
     right: spacing.sm,
-    zIndex: 40,
+    zIndex: 100,
     alignItems: "center",
     gap: spacing.md,
+    ...(Platform.OS === "web"
+      ? ({
+          pointerEvents: "box-none",
+        } as const)
+      : null),
   },
   railButton: {
     alignItems: "center",
     justifyContent: "center",
     minWidth: touchTarget,
     gap: 4,
+    ...(Platform.OS === "web"
+      ? ({
+          pointerEvents: "auto",
+          cursor: "pointer",
+          zIndex: 101,
+        } as const)
+      : null),
   },
   railCount: {
     ...typography.caption,

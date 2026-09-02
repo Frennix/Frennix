@@ -45,6 +45,7 @@ export function PostVideoScreen({
         stageHeight={height}
         isActive
         playbackHandoff={resumeHandoff}
+        routePlayback
         postActions={postActions}
         onClose={onBack}
       />

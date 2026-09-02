@@ -5,8 +5,11 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { getPost } from "@frennix/api";
 import { DetailLoading } from "@/components/DetailLoading";
 import { PostCommentsScreen } from "@/components/PostCommentsScreen";
-import { usesMobileWebCommentsRoute } from "@/lib/mobile-web-comments-route";
-import { restoreFeedScrollReturnState } from "@/lib/web-feed-scroll-restore";
+import {
+  shouldRestoreFeedScrollOnCommentsBack,
+  usesMobileWebCommentsRoute,
+} from "@/lib/mobile-web-comments-route";
+import { requestFeedScrollReturnRestore } from "@/lib/web-feed-scroll-restore";
 import { useAuth } from "@/providers/AuthProvider";
 import { colors, EmptyState, spacing, typography } from "@frennix/ui";
 
@@ -29,8 +32,8 @@ export default function PostCommentsRoute() {
   });
 
   const handleBack = useCallback(() => {
-    if (Platform.OS === "web") {
-      restoreFeedScrollReturnState();
+    if (Platform.OS === "web" && shouldRestoreFeedScrollOnCommentsBack()) {
+      requestFeedScrollReturnRestore();
     }
     if (router.canGoBack()) {
       router.back();
