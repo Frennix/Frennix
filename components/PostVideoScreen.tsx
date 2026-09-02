@@ -82,6 +82,7 @@ export function PostVideoScreen({
         routePlayback
         postActions={videoPostActions}
         onClose={onBack}
+        commentsOverlayOpen={commentsVisible}
       />
       {Platform.OS === "web" && usesMobileWebCommentsRoute() ? (
         <PostCommentsSheet

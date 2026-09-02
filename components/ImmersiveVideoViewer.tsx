@@ -20,6 +20,8 @@ import {
   typography,
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
+import { COMMENTS_VIDEO_PEEK_FRACTION } from "@/components/CommentsBottomSheet";
+import { useCommentsVideoPeekHeight } from "@/lib/comments-overlay-state";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 
 const STRONG_WORK_EMOJI = "💪";
@@ -44,6 +46,8 @@ type ImmersiveVideoViewerProps = {
   routePlayback?: boolean;
   postActions: ImmersiveVideoGalleryContext["postActions"];
   onClose: () => void;
+  /** Comments sheet is open over the lower portion — shrink video into the peek region. */
+  commentsOverlayOpen?: boolean;
 };
 
 export function ImmersiveVideoViewer({
@@ -56,6 +60,7 @@ export function ImmersiveVideoViewer({
   routePlayback = false,
   postActions,
   onClose,
+  commentsOverlayOpen = false,
 }: ImmersiveVideoViewerProps) {
   const insets = useSafeAreaInsets();
   const videoRef = useRef<FullscreenVideoSlideHandle>(null);
@@ -95,25 +100,43 @@ export function ImmersiveVideoViewer({
   }, [muted]);
 
   const captionNeedsExpand = caption.length > 96;
+  const videoPeekHeight = useCommentsVideoPeekHeight();
+  const videoStageHeight = commentsOverlayOpen
+    ? videoPeekHeight ?? Math.round(stageHeight * COMMENTS_VIDEO_PEEK_FRACTION)
+    : stageHeight;
 
   return (
     <View
       style={styles.root}
       {...(Platform.OS === "web"
-        ? ({ nativeID: "frennix-immersive-video-viewer", "data-frennix-immersive-video-viewer": "true" } as object)
+        ? ({
+            nativeID: "frennix-immersive-video-viewer",
+            "data-frennix-immersive-video-viewer": "true",
+            ...(commentsOverlayOpen
+              ? ({ "data-frennix-immersive-comments-open": "true" } as object)
+              : null),
+          } as object)
         : null)}
     >
-      <FullscreenVideoSlide
-        ref={videoRef}
-        uri={item.url}
-        thumbnailUrl={item.thumbnailUrl}
-        stageWidth={stageWidth}
-        stageHeight={stageHeight}
-        isActive={isActive}
-        playbackHandoff={playbackHandoff}
-        immersiveMode
-        routePlayback={routePlayback}
-      />
+      <View
+        style={[
+          styles.videoStageHost,
+          commentsOverlayOpen ? styles.videoStageHostPeek : styles.videoStageHostFull,
+          { width: stageWidth, height: videoStageHeight },
+        ]}
+      >
+        <FullscreenVideoSlide
+          ref={videoRef}
+          uri={item.url}
+          thumbnailUrl={item.thumbnailUrl}
+          stageWidth={stageWidth}
+          stageHeight={videoStageHeight}
+          isActive={isActive}
+          playbackHandoff={playbackHandoff}
+          immersiveMode
+          routePlayback={routePlayback}
+        />
+      </View>
 
       <View style={[styles.topBar, { paddingTop: topInset }]} pointerEvents="box-none">
         <Pressable
@@ -141,13 +164,15 @@ export function ImmersiveVideoViewer({
         </Pressable>
       </View>
 
-      <View
-        style={[styles.actionRail, { bottom: bottomInset + 120 }]}
-        pointerEvents="box-none"
-        {...(Platform.OS === "web"
-          ? ({ "data-frennix-immersive-rail": "true" } as object)
-          : null)}
-      >
+      {commentsOverlayOpen ? null : (
+        <>
+          <View
+            style={[styles.actionRail, { bottom: bottomInset + 120 }]}
+            pointerEvents="box-none"
+            {...(Platform.OS === "web"
+              ? ({ "data-frennix-immersive-rail": "true" } as object)
+              : null)}
+          >
         <RailAction
           label={liked ? "Unlike" : "Like"}
           onPress={postActions.onLike}
@@ -189,9 +214,9 @@ export function ImmersiveVideoViewer({
         <RailAction label="Post options" onPress={postActions.onMore}>
           <MoreVertical color="#FFFFFF" size={24} strokeWidth={2} />
         </RailAction>
-      </View>
+          </View>
 
-      <View style={[styles.bottomMeta, { paddingBottom: bottomInset + 58 }]} pointerEvents="box-none">
+          <View style={[styles.bottomMeta, { paddingBottom: bottomInset + 58 }]} pointerEvents="box-none">
         <Pressable
           style={styles.authorRow}
           onPress={postActions.onAuthorPress}
@@ -244,18 +269,20 @@ export function ImmersiveVideoViewer({
             ) : null}
           </View>
         ) : null}
-      </View>
+          </View>
 
-      <View style={[styles.commentComposerHost, { paddingBottom: bottomInset + spacing.sm }]}>
-        <Pressable
-          style={styles.commentComposerTrigger}
-          onPress={() => openComments()}
-          accessibilityRole="button"
-          accessibilityLabel="Add a comment"
-        >
-          <Text style={styles.commentComposerPlaceholder}>Add a comment…</Text>
-        </Pressable>
-      </View>
+          <View style={[styles.commentComposerHost, { paddingBottom: bottomInset + spacing.sm }]}>
+            <Pressable
+              style={styles.commentComposerTrigger}
+              onPress={() => openComments()}
+              accessibilityRole="button"
+              accessibilityLabel="Add a comment"
+            >
+              <Text style={styles.commentComposerPlaceholder}>Add a comment…</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -289,6 +316,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
     overflow: "hidden",
+  },
+  videoStageHost: {
+    alignSelf: "center",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.black,
+    overflow: "hidden",
+  },
+  videoStageHostFull: {
+    flex: 1,
+  },
+  videoStageHostPeek: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   topBar: {
     position: "absolute",

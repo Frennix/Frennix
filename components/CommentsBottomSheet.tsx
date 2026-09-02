@@ -20,7 +20,7 @@ import {
   BOTTOM_SHEET_SPRING_OPEN,
   BOTTOM_SHEET_SPRING_REBOUND,
 } from "@/components/BottomActionSheet";
-import { setCommentsOverlayOpen } from "@/lib/comments-overlay-state";
+import { setCommentsOverlayOpen, setCommentsVideoPeekHeight } from "@/lib/comments-overlay-state";
 import {
   logCommentsCloseRequest,
   logCommentsPortalInteraction,
@@ -41,7 +41,8 @@ const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
 /** Keep roughly the top 30% of the layout viewport for the playing video. */
-const VIDEO_PEEK_FRACTION = 0.3;
+export const COMMENTS_VIDEO_PEEK_FRACTION = 0.3;
+const VIDEO_PEEK_FRACTION = COMMENTS_VIDEO_PEEK_FRACTION;
 const MIN_VIDEO_OVERLAY_SHEET_HEIGHT = 220;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
@@ -185,6 +186,14 @@ export function CommentsBottomSheet({
     syncHeight();
     return subscribeSafariVisualViewport(syncHeight);
   }, [useVideoOverlay, visible]);
+
+  useEffect(() => {
+    if (!visible || !useVideoOverlay) {
+      setCommentsVideoPeekHeight(null);
+      return;
+    }
+    setCommentsVideoPeekHeight(videoOverlayLayout.top);
+  }, [useVideoOverlay, videoOverlayLayout.top, visible]);
 
   useEffect(() => {
     if (!visible || useMobileWebFullscreen) {

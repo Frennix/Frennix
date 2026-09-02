@@ -104,6 +104,15 @@ function main() {
     ) && ok;
   ok =
     pass(
+      "Comments overlay shrinks video stage with contain scaling",
+      viewer.includes("commentsOverlayOpen") &&
+        viewer.includes("videoStageHeight") &&
+        viewer.includes("videoStageHostPeek") &&
+        viewer.includes("useCommentsVideoPeekHeight") &&
+        styles.includes("data-frennix-immersive-comments-open")
+    ) && ok;
+  ok =
+    pass(
       "Photo/lightbox path unchanged for non-immersive video",
       lightbox.includes("FullscreenVideoSlide") && lightbox.includes("WebZoomableImage")
     ) && ok;
