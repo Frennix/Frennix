@@ -74,29 +74,55 @@ export function isVisualViewportKeyboardOpen(
   return snapshot.bottomChrome > 0;
 }
 
+function isCommentComposerTextareaFocused(): boolean {
+  if (typeof document === "undefined") return false;
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return false;
+  return active.matches('textarea[data-frennix-comment-input="true"]');
+}
+
 /**
- * Lift required to keep the comment composer row above Safari's InputAccessoryView.
- * Uses overlap measurement when the row extends past the visual viewport; otherwise
- * falls back to SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX on iOS Safari.
+ * Pixels to subtract from comments overlay height so the full composer sits above
+ * Safari bottom toolbar / InputAccessoryView. Measured from visualViewport bottom
+ * and composerHost rect — not composerHost padding.
  */
-export function readSafariCommentComposerAccessoryLiftPx(): number {
+export function readSafariCommentsOverlayBottomReserve(): number {
   if (typeof window === "undefined" || !window.visualViewport || !isMobileWebSafari()) {
     return 0;
   }
 
-  const vv = window.visualViewport;
-  const usableBottom = vv.offsetTop + vv.height;
-  const row = document.querySelector('[data-frennix-comment-composer-row="true"]');
+  const snapshot = measureSafariVisualViewport();
+  const visibleBottom = snapshot.offsetTop + snapshot.visualHeight;
+  let reserve = snapshot.bottomChrome;
 
-  if (row instanceof HTMLElement) {
-    const rowBottom = row.getBoundingClientRect().bottom;
-    const overlap = rowBottom - usableBottom;
-    if (overlap > 1) {
-      return Math.ceil(overlap);
+  const host = document.querySelector('[data-frennix-comment-composer-host="true"]');
+  if (host instanceof HTMLElement) {
+    const composerBottom = host.getBoundingClientRect().bottom;
+    const lift = composerBottom - (visibleBottom - reserve);
+    if (lift > 0) {
+      reserve += Math.ceil(lift);
     }
   }
 
-  return SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX;
+  if (isVisualViewportKeyboardOpen(snapshot) && isCommentComposerTextareaFocused()) {
+    const row = document.querySelector('[data-frennix-comment-composer-row="true"]');
+    if (row instanceof HTMLElement) {
+      const rowBottom = row.getBoundingClientRect().bottom;
+      const clearance = visibleBottom - reserve - rowBottom;
+      if (clearance < SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX) {
+        reserve += Math.ceil(
+          SAFARI_COMMENT_COMPOSER_ACCESSORY_FALLBACK_PX - Math.max(0, clearance)
+        );
+      }
+    }
+  }
+
+  return Math.max(0, reserve);
+}
+
+/** @deprecated Prefer readSafariCommentsOverlayBottomReserve — reserve at overlay root, not host padding. */
+export function readSafariCommentComposerAccessoryLiftPx(): number {
+  return readSafariCommentsOverlayBottomReserve();
 }
 
 /** Height of the visual viewport — used for full-screen mobile web overlays (no offsetTop). */

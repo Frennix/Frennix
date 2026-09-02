@@ -4,7 +4,7 @@ import type { Post } from "@frennix/types";
 import { usePostCommentsContent } from "@/components/PostCommentsContent";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { useRootPortalViewport } from "@/lib/use-root-portal-viewport";
-import { useCommentComposerHostBottomInset } from "@/lib/use-comment-composer-host-inset";
+import { useCommentsOverlayBottomReserve } from "@/lib/use-comment-composer-host-inset";
 import { colors, spacing, touchTarget, typography } from "@frennix/ui";
 
 type PostCommentsScreenProps = {
@@ -46,21 +46,25 @@ export function PostCommentsScreen({
 
   const headerTopInset = Math.max(insets.top, spacing.sm);
   const { overlayTop, overlayHeight } = useRootPortalViewport(Platform.OS === "web");
-  const composerHostBottomInset = useCommentComposerHostBottomInset(
-    Math.max(insets.bottom, spacing.sm),
-    Platform.OS === "web"
-  );
+  const overlayBottomReserve = useCommentsOverlayBottomReserve(Platform.OS === "web");
+  const composerHostBottomInset =
+    Platform.OS === "web" ? spacing.sm : Math.max(insets.bottom, spacing.sm);
+
+  const effectiveOverlayHeight =
+    Platform.OS === "web" && overlayHeight != null
+      ? Math.max(180, overlayHeight - overlayBottomReserve)
+      : overlayHeight;
 
   const webViewportRootStyle: ViewStyle | null =
-    Platform.OS === "web" && overlayHeight != null
+    Platform.OS === "web" && effectiveOverlayHeight != null
       ? {
           position: "fixed",
           top: overlayTop,
           left: 0,
           right: 0,
           width: "100%",
-          height: overlayHeight,
-          maxHeight: overlayHeight,
+          height: effectiveOverlayHeight,
+          maxHeight: effectiveOverlayHeight,
         }
       : null;
 
@@ -106,7 +110,12 @@ export function PostCommentsScreen({
           {thread}
         </ScrollView>
 
-        <View style={[styles.composerHost, { paddingBottom: composerHostBottomInset }]}>
+        <View
+          style={[styles.composerHost, { paddingBottom: composerHostBottomInset }]}
+          {...(Platform.OS === "web"
+            ? ({ "data-frennix-comment-composer-host": "true" } as object)
+            : null)}
+        >
           {composer}
         </View>
       </View>

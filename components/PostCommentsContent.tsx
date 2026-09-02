@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
-    flexShrink: 1,
+    flexShrink: 0,
     ...(Platform.OS === "web"
       ? ({
           boxSizing: "border-box",
@@ -645,11 +645,11 @@ const styles = StyleSheet.create({
   composerInputWrap: {
     width: "100%",
     minWidth: 0,
-    flexShrink: 1,
+    flexShrink: 0,
     ...(Platform.OS === "web"
       ? ({
           overflowX: "hidden",
-          overflowY: "hidden",
+          overflowY: "visible",
           boxSizing: "border-box",
         } as const)
       : null),

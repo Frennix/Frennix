@@ -2,54 +2,27 @@ import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import {
   isMobileWebSafari,
-  isVisualViewportKeyboardOpen,
-  measureSafariVisualViewport,
-  readSafariCommentComposerAccessoryLiftPx,
+  readSafariCommentsOverlayBottomReserve,
   subscribeSafariVisualViewport,
 } from "@/lib/safari-visual-viewport";
 
-function isCommentComposerTextareaFocused(): boolean {
-  if (typeof document === "undefined") return false;
-  const active = document.activeElement;
-  if (!(active instanceof HTMLElement)) return false;
-  return active.matches('textarea[data-frennix-comment-input="true"]');
-}
-
-function readCommentComposerHostBottomInset(closedBottomInset: number): number {
-  if (Platform.OS !== "web") return closedBottomInset;
-
-  const snapshot = measureSafariVisualViewport();
-  const keyboardOpen = isVisualViewportKeyboardOpen(snapshot);
-
-  if (!keyboardOpen) {
-    return closedBottomInset;
-  }
-
-  if (!isMobileWebSafari() || !isCommentComposerTextareaFocused()) {
-    return 0;
-  }
-
-  return readSafariCommentComposerAccessoryLiftPx();
-}
-
 /**
- * Bottom padding for the comments composer host.
- * Keyboard closed: home-indicator safe area. Keyboard open on iOS Safari with focused
- * comment textarea: lift above the InputAccessoryView / form navigation bar.
+ * Safari chrome reserve subtracted from comments overlay height (not composerHost padding).
+ * Shrinks the fixed root so the list flexes while the composer keeps its measured height.
  */
-export function useCommentComposerHostBottomInset(closedBottomInset: number, active: boolean): number {
-  const [bottomInset, setBottomInset] = useState(() =>
-    active ? readCommentComposerHostBottomInset(closedBottomInset) : closedBottomInset
+export function useCommentsOverlayBottomReserve(active: boolean): number {
+  const [reserve, setReserve] = useState(() =>
+    active ? readSafariCommentsOverlayBottomReserve() : 0
   );
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !active) {
-      setBottomInset(closedBottomInset);
+    if (Platform.OS !== "web" || !active || !isMobileWebSafari()) {
+      setReserve(0);
       return;
     }
 
     const sync = () => {
-      setBottomInset(readCommentComposerHostBottomInset(closedBottomInset));
+      setReserve(readSafariCommentsOverlayBottomReserve());
     };
 
     sync();
@@ -69,7 +42,17 @@ export function useCommentComposerHostBottomInset(closedBottomInset: number, act
       document.removeEventListener("focusin", onFocusChange);
       document.removeEventListener("focusout", onFocusChange);
     };
-  }, [active, closedBottomInset]);
+  }, [active]);
 
-  return bottomInset;
+  return reserve;
+}
+
+/**
+ * Safe-area padding for desktop/native sheet surfaces — not Safari overlay height reserve.
+ */
+export function useCommentComposerHostBottomInset(closedBottomInset: number, active: boolean): number {
+  if (!active) {
+    return closedBottomInset;
+  }
+  return closedBottomInset;
 }
