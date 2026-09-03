@@ -6,14 +6,8 @@ import { buildMediaGalleryState, normalizePostMediaItems } from "@frennix/types"
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 import { ImageLightbox, type ImageGalleryState, type MediaGalleryState } from "@/components/ImageLightbox";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
-import type { ImmersiveVideoPlaylistState } from "@/lib/immersive-video-playlist-state";
 
-export type GalleryCloseContext = {
-  postId?: string;
-  mediaIndex?: number;
-};
-
-export type GalleryCloseHandler = (index: number, context?: GalleryCloseContext) => void;
+export type GalleryCloseHandler = (index: number) => void;
 
 export type OpenGalleryOptions = {
   postType?: PostType;
@@ -24,8 +18,6 @@ export type OpenGalleryOptions = {
   videoHandoff?: FeedVideoFullscreenHandoff;
   /** Mobile web immersive video — post actions and resume handoff. */
   immersiveVideo?: ImmersiveVideoGalleryContext;
-  /** Vertical swipe playlist for feed immersive videos. */
-  immersiveVideoPlaylist?: ImmersiveVideoPlaylistState;
 };
 
 function isMediaGalleryState(
@@ -65,7 +57,6 @@ export function useMediaGallery() {
         }),
         videoHandoff: options?.videoHandoff,
         immersiveVideo: options?.immersiveVideo,
-        immersiveVideoPlaylist: options?.immersiveVideoPlaylist,
       };
       if (Platform.OS === "web" && options?.videoHandoff) {
         flushSync(() => setGallery(nextGallery));
@@ -87,8 +78,8 @@ export function useMediaGallery() {
     [openMediaGallery]
   );
 
-  const handleClose = useCallback((finalIndex: number, context?: GalleryCloseContext) => {
-    closeHandlerRef.current?.(finalIndex, context);
+  const handleClose = useCallback((finalIndex: number) => {
+    closeHandlerRef.current?.(finalIndex);
     closeHandlerRef.current = null;
     setGallery(null);
   }, []);

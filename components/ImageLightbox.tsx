@@ -18,11 +18,8 @@ import { prefetchCachedImages, CachedImage } from "../packages/ui/src/CachedImag
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
 import type { FeedVideoFullscreenHandoff } from "../packages/ui/src/feedVideoPlaybackCoordinator";
 import { ImmersiveVideoViewer } from "@/components/ImmersiveVideoViewer";
-import { ImmersiveVideoPlaylistViewer } from "@/components/ImmersiveVideoPlaylistViewer";
 import { isMobileWeb } from "@/lib/safari-visual-viewport";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
-import type { ImmersiveVideoPlaylistState } from "@/lib/immersive-video-playlist-state";
-import type { GalleryCloseContext } from "@/lib/useMediaGallery";
 import { colors, spacing, typography } from "../packages/ui/src/theme";
 
 /** Compact Instagram-style lightbox close control (smaller than global touchTarget). */
@@ -52,7 +49,6 @@ export interface MediaGalleryState {
   index: number;
   videoHandoff?: FeedVideoFullscreenHandoff;
   immersiveVideo?: ImmersiveVideoGalleryContext;
-  immersiveVideoPlaylist?: ImmersiveVideoPlaylistState;
 }
 
 export type GalleryState = ImageGalleryState | MediaGalleryState;
@@ -72,7 +68,7 @@ function resolveGalleryItems(state: GalleryState): PostMediaItem[] {
 
 interface ImageLightboxProps {
   gallery: GalleryState | null;
-  onClose: (index: number, context?: GalleryCloseContext) => void;
+  onClose: (index: number) => void;
 }
 
 const LIGHTBOX_WEB_ROOT: ViewStyle = Platform.select({
@@ -441,15 +437,10 @@ function LightboxSurface({
     gallery && isMediaGalleryState(gallery) ? gallery.videoHandoff : undefined;
   const immersiveVideo =
     gallery && isMediaGalleryState(gallery) ? gallery.immersiveVideo : undefined;
-  const immersiveVideoPlaylist =
-    gallery && isMediaGalleryState(gallery) ? gallery.immersiveVideoPlaylist : undefined;
   const useImmersiveVideo =
     Platform.OS === "web" &&
     isMobileWeb() &&
     Boolean(immersiveVideo?.postActions);
-  const useImmersiveVideoPlaylist =
-    useImmersiveVideo && Boolean(immersiveVideoPlaylist?.entries.length);
-  const playlistCloseContextRef = useRef<GalleryCloseContext>({});
 
   const syncViewportSize = useCallback(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -462,19 +453,8 @@ function LightboxSurface({
 
   const dismiss = useCallback(() => {
     dismissY.setValue(0);
-    onClose(index, useImmersiveVideoPlaylist ? playlistCloseContextRef.current : undefined);
-  }, [dismissY, index, onClose, useImmersiveVideoPlaylist]);
-
-  useEffect(() => {
-    if (!useImmersiveVideoPlaylist || !immersiveVideoPlaylist) return;
-    const entry = immersiveVideoPlaylist.entries[immersiveVideoPlaylist.initialIndex];
-    if (entry) {
-      playlistCloseContextRef.current = {
-        postId: entry.postId,
-        mediaIndex: entry.mediaIndex,
-      };
-    }
-  }, [immersiveVideoPlaylist, useImmersiveVideoPlaylist]);
+    onClose(index);
+  }, [dismissY, index, onClose]);
 
   useEffect(() => {
     if (!gallery || !pageWidth) return;
@@ -568,10 +548,7 @@ function LightboxSurface({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
-          !useImmersiveVideoPlaylist &&
-          !zoomed &&
-          gesture.dy > 8 &&
-          Math.abs(gesture.dy) > Math.abs(gesture.dx),
+          !zoomed && gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
         onPanResponderMove: (_, gesture) => {
           if (gesture.dy > 0) dismissY.setValue(gesture.dy);
         },
@@ -590,42 +567,37 @@ function LightboxSurface({
           Animated.spring(dismissY, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
         },
       }),
-    [dismiss, dismissY, useImmersiveVideoPlaylist, zoomed]
+    [dismiss, dismissY, zoomed]
   );
 
   const handleWebTouchStart = useCallback(
     (event: { nativeEvent: { touches: Array<{ pageY: number }> } }) => {
-      if (useImmersiveVideoPlaylist || zoomed || event.nativeEvent.touches.length !== 1) {
+      if (zoomed || event.nativeEvent.touches.length !== 1) {
         webSwipeStartY.current = null;
         return;
       }
       webSwipeStartY.current = event.nativeEvent.touches[0].pageY;
     },
-    [useImmersiveVideoPlaylist, zoomed]
+    [zoomed]
   );
 
   const handleWebTouchMove = useCallback(
     (event: {
       nativeEvent: { touches: Array<{ pageY: number; pageX: number }> };
     }) => {
-      if (
-        useImmersiveVideoPlaylist ||
-        zoomed ||
-        webSwipeStartY.current === null ||
-        event.nativeEvent.touches.length !== 1
-      ) {
+      if (zoomed || webSwipeStartY.current === null || event.nativeEvent.touches.length !== 1) {
         return;
       }
       const touch = event.nativeEvent.touches[0];
       const dy = touch.pageY - webSwipeStartY.current;
       if (dy > 8) dismissY.setValue(dy);
     },
-    [dismissY, useImmersiveVideoPlaylist, zoomed]
+    [dismissY, zoomed]
   );
 
   const handleWebTouchEnd = useCallback(
     (event: { nativeEvent: { changedTouches: Array<{ pageY: number }> } }) => {
-      if (useImmersiveVideoPlaylist || zoomed || webSwipeStartY.current === null) {
+      if (zoomed || webSwipeStartY.current === null) {
         webSwipeStartY.current = null;
         return;
       }
@@ -638,14 +610,7 @@ function LightboxSurface({
       }
       Animated.spring(dismissY, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
     },
-    [dismiss, dismissY, useImmersiveVideoPlaylist, zoomed]
-  );
-
-  const handlePlaylistActiveEntryChange = useCallback(
-    (entry: { postId: string; mediaIndex: number }) => {
-      playlistCloseContextRef.current = entry;
-    },
-    []
+    [dismiss, dismissY, zoomed]
   );
 
   if (!visible) return null;
@@ -673,22 +638,6 @@ function LightboxSurface({
         pointerEvents="box-none"
       >
         {pageWidth > 0 && pageHeight > 0 ? (
-          useImmersiveVideoPlaylist && immersiveVideoPlaylist ? (
-            <ImmersiveVideoPlaylistViewer
-              entries={immersiveVideoPlaylist.entries}
-              initialIndex={immersiveVideoPlaylist.initialIndex}
-              initialHandoff={immersiveVideoPlaylist.initialHandoff}
-              initialHandoffPlaybackId={immersiveVideoPlaylist.initialHandoffPlaybackId}
-              stageWidth={pageWidth}
-              stageHeight={pageHeight}
-              getPost={immersiveVideoPlaylist.getPost}
-              buildImmersiveContext={immersiveVideoPlaylist.buildImmersiveContext}
-              hasMore={immersiveVideoPlaylist.hasMore}
-              fetchMore={immersiveVideoPlaylist.fetchMore}
-              onClose={dismiss}
-              onActiveEntryChange={handlePlaylistActiveEntryChange}
-            />
-          ) : (
           <FlatList
             ref={listRef}
             data={items}
@@ -774,7 +723,6 @@ function LightboxSurface({
               </View>
             )}
           />
-          )
         ) : null}
       </Animated.View>
 
