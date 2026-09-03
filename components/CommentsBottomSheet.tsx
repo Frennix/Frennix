@@ -28,6 +28,7 @@ import {
 } from "@/lib/comments-close-diagnostics";
 import {
   isMobileWeb,
+  isVisualViewportKeyboardOpen,
   measureSafariVisualViewport,
   requestSafariVisualViewportRemeasure,
   subscribeSafariVisualViewport,
@@ -55,6 +56,10 @@ const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
 const VIDEO_SHEET_MIN_CHROME_PX = 88;
 /** Minimum column height so the handle + "Comments" header stay visible above the list. */
 const VIDEO_OVERLAY_HEADER_CHROME_PX = 80;
+/** Minimum scrollable list band while the keyboard is open. */
+const VIDEO_OVERLAY_MIN_LIST_PX = 100;
+/** Video peek height while typing — keeps the comments sheet high in the visible viewport. */
+const VIDEO_PEEK_KEYBOARD_OPEN_PX = 80;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -102,20 +107,42 @@ function computeVideoOverlaySheetLayout(
   composerBottomReserve = 0
 ): VideoOverlaySheetLayout {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
-  const { offsetTop, visualHeight } = measureSafariVisualViewport();
+  const snapshot = measureSafariVisualViewport();
+  const { offsetTop, visualHeight } = snapshot;
+  const keyboardOpen = isVisualViewportKeyboardOpen(snapshot);
   const baselinePeek =
     baselinePeekHeight ?? computeBaselineVideoPeekHeight(layoutHeight);
+
+  const minCommentsSheetHeight =
+    VIDEO_OVERLAY_HEADER_CHROME_PX + VIDEO_OVERLAY_MIN_LIST_PX;
 
   let peekHeight: number;
   let height: number;
 
-  if (composerBottomReserve > 0) {
+  if (composerBottomReserve > 0 && keyboardOpen) {
+    // Keyboard open: collapse the video peek and size the sheet from the full visual viewport.
+    peekHeight = VIDEO_PEEK_KEYBOARD_OPEN_PX;
+    height = visualHeight - peekHeight - composerBottomReserve;
+    if (height < minCommentsSheetHeight) {
+      peekHeight = Math.max(
+        VIDEO_PEEK_ABSOLUTE_MIN_PX,
+        visualHeight - composerBottomReserve - minCommentsSheetHeight
+      );
+      height = Math.max(
+        VIDEO_OVERLAY_HEADER_CHROME_PX,
+        visualHeight - peekHeight - composerBottomReserve
+      );
+    }
+  } else if (composerBottomReserve > 0) {
     const maxPeekHeight = Math.max(
       VIDEO_PEEK_ABSOLUTE_MIN_PX,
       visualHeight - composerBottomReserve - VIDEO_OVERLAY_HEADER_CHROME_PX
     );
     peekHeight = Math.min(baselinePeek, maxPeekHeight);
-    height = Math.max(0, visualHeight - peekHeight - composerBottomReserve);
+    height = Math.max(
+      VIDEO_OVERLAY_HEADER_CHROME_PX,
+      visualHeight - peekHeight - composerBottomReserve
+    );
   } else {
     peekHeight = resolveVideoPeekHeight(layoutHeight, visualHeight, baselinePeek);
     height = Math.max(0, visualHeight - peekHeight);
@@ -467,14 +494,22 @@ export function CommentsBottomSheet({
   const mobileOverlayTop = mobileViewport?.offsetTop ?? 0;
   const mobileVisualHeight = mobileViewport?.visualHeight ?? 640;
   const mobileOverlayHeight = Math.max(180, mobileVisualHeight - overlayBottomReserve);
-  const effectiveVideoVisualHeight = Math.max(
-    180,
-    videoOverlayLayout.visualHeight - videoOverlayBottomReserve
-  );
-  const effectiveVideoColumnHeight = Math.max(
-    0,
-    effectiveVideoVisualHeight - videoOverlayLayout.peekHeight
-  );
+  const videoOverlaySheetTop =
+    videoOverlayLayout.offsetTop + videoOverlayLayout.peekHeight;
+  const videoOverlaySheetHeight = suppressWebVideoInlineComposer
+    ? videoOverlayLayout.height
+    : Math.max(
+        0,
+        videoOverlayLayout.visualHeight -
+          videoOverlayLayout.peekHeight -
+          videoOverlayBottomReserve
+      );
+  const effectiveVideoVisualHeight = suppressWebVideoInlineComposer
+    ? videoOverlayLayout.visualHeight
+    : Math.max(180, videoOverlayLayout.visualHeight - videoOverlayBottomReserve);
+  const effectiveVideoColumnHeight = suppressWebVideoInlineComposer
+    ? videoOverlayLayout.height
+    : Math.max(0, effectiveVideoVisualHeight - videoOverlayLayout.peekHeight);
 
   if (!visible) return null;
 
@@ -582,14 +617,7 @@ export function CommentsBottomSheet({
 
   const mobileVideoOverlaySurface = (
     <View
-      style={[
-        WEB_MOBILE_VIDEO_OVERLAY_ROOT,
-        {
-          top: videoOverlayLayout.offsetTop,
-          height: effectiveVideoVisualHeight,
-          bottom: undefined,
-        },
-      ]}
+      style={WEB_MOBILE_VIDEO_OVERLAY_ROOT}
       {...(Platform.OS === "web"
         ? ({
             "data-frennix-comments-sheet": "true",
@@ -598,7 +626,21 @@ export function CommentsBottomSheet({
         : null)}
     >
       <Pressable
-        style={[styles.videoPeekDismiss, { height: videoOverlayLayout.peekHeight }]}
+        style={[
+          styles.videoPeekDismiss,
+          suppressWebVideoInlineComposer
+            ? ({
+                position: "fixed",
+                top: videoOverlayLayout.offsetTop,
+                left: 0,
+                right: 0,
+                height: videoOverlayLayout.peekHeight,
+              } as ViewStyle)
+            : {
+                top: 0,
+                height: videoOverlayLayout.peekHeight,
+              },
+        ]}
         onPress={handleBackdropPress}
         {...(Platform.OS === "web"
           ? ({
@@ -611,10 +653,19 @@ export function CommentsBottomSheet({
       <View
         style={[
           styles.videoOverlayColumn,
-          {
-            top: videoOverlayLayout.peekHeight,
-            height: effectiveVideoColumnHeight,
-          },
+          suppressWebVideoInlineComposer
+            ? ({
+                position: "fixed",
+                top: videoOverlaySheetTop,
+                left: 0,
+                right: 0,
+                height: videoOverlaySheetHeight,
+                bottom: undefined,
+              } as ViewStyle)
+            : {
+                top: videoOverlayLayout.peekHeight,
+                height: effectiveVideoColumnHeight,
+              },
         ]}
       >
         <View

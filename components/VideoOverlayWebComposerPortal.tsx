@@ -7,10 +7,13 @@ export type VideoOverlayWebComposerPortalProps = WebCommentComposerRowProps;
 
 function applyComposerPosition(composerRow: HTMLElement): void {
   const viewport = window.visualViewport;
-  const visibleBottom = viewport
-    ? viewport.pageTop + viewport.height
-    : window.scrollY + window.innerHeight;
-  const composerTop = visibleBottom - composerRow.offsetHeight - VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX;
+  if (!viewport) return;
+
+  const composerTop =
+    viewport.offsetTop +
+    viewport.height -
+    composerRow.offsetHeight -
+    VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX;
 
   composerRow.style.top = `${composerTop}px`;
   composerRow.style.bottom = "auto";
