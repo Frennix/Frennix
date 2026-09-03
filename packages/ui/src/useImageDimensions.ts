@@ -6,6 +6,13 @@ export type ImageDimensions = {
   height: number;
 };
 
+const dimensionCache = new Map<string, ImageDimensions>();
+
+export function peekImageDimensions(uri: string | undefined): ImageDimensions | null {
+  if (!uri) return null;
+  return dimensionCache.get(uri) ?? null;
+}
+
 export function computeImageDisplayHeight(
   containerWidth: number,
   imageWidth: number,
@@ -25,12 +32,21 @@ export function computeImageDisplayHeight(
 }
 
 export function useImageDimensions(uri: string | undefined) {
-  const [dimensions, setDimensions] = useState<ImageDimensions | null>(null);
+  const [dimensions, setDimensions] = useState<ImageDimensions | null>(() =>
+    peekImageDimensions(uri)
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uri) {
       setDimensions(null);
+      setFailed(false);
+      return;
+    }
+
+    const cached = dimensionCache.get(uri);
+    if (cached) {
+      setDimensions(cached);
       setFailed(false);
       return;
     }
@@ -43,7 +59,9 @@ export function useImageDimensions(uri: string | undefined) {
       const img = new window.Image();
       img.onload = () => {
         if (!cancelled && img.naturalWidth > 0 && img.naturalHeight > 0) {
-          setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+          const next = { width: img.naturalWidth, height: img.naturalHeight };
+          dimensionCache.set(uri, next);
+          setDimensions(next);
         }
       };
       img.onerror = () => {
@@ -58,7 +76,11 @@ export function useImageDimensions(uri: string | undefined) {
     Image.getSize(
       uri,
       (width, height) => {
-        if (!cancelled) setDimensions({ width, height });
+        if (!cancelled) {
+          const next = { width, height };
+          dimensionCache.set(uri, next);
+          setDimensions(next);
+        }
       },
       () => {
         if (!cancelled) setFailed(true);

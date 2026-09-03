@@ -49,11 +49,6 @@ import {
   navigateToPostCommentsFromVideoViewer,
   usesMobileWebCommentsRoute,
 } from "@/lib/mobile-web-comments-route";
-import {
-  buildVideoRouteHrefForPost,
-  navigateFromFeedVideoLink,
-  usesMobileWebVideoRoute,
-} from "@/lib/mobile-web-video-route";
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedBackground } from "@/components/FeedBackground";
@@ -246,7 +241,6 @@ export default function HomeScreen() {
 
   const buildImmersiveVideoContext = useCallback(
     (post: Post): ImmersiveVideoGalleryContext | undefined => {
-      if (usesMobileWebVideoRoute()) return undefined;
       if (!usesMobileWebCommentsRoute()) return undefined;
       const displayPost = post.shared_post ?? post;
       const authorId = post.author?.id;
@@ -839,9 +833,6 @@ export default function HomeScreen() {
         postType: displayPost.post_type,
         thumbnailUrl: displayPost.thumbnail_url,
       });
-      if (usesMobileWebVideoRoute() && mediaItems[index]?.kind === "video") {
-        return;
-      }
       const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
       const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
       setCarouselIndex(post.id, index);
@@ -856,13 +847,6 @@ export default function HomeScreen() {
         immersiveVideo,
       });
     },
-    videoRouteHrefForMedia: usesMobileWebVideoRoute()
-      ? (post: Post, mediaIndex: number) => buildVideoRouteHrefForPost(post, mediaIndex)
-      : undefined,
-    onVideoRouteNavigate: usesMobileWebVideoRoute()
-      ? (post: Post, mediaIndex: number) =>
-          navigateFromFeedVideoLink(getSharedPostTargetId(post), mediaIndex)
-      : undefined,
   };
 
   const feedActions = useMemo<FeedListItemActions>(
@@ -881,10 +865,6 @@ export default function HomeScreen() {
       onModerationPress: (post) => feedActionsRef.current.onModerationPress(post),
       onOwnerActionsPress: (post) => feedActionsRef.current.onOwnerActionsPress(post),
       onMediaPress: (post, uri, index) => feedActionsRef.current.onMediaPress(post, uri, index),
-      videoRouteHrefForMedia: (post, mediaIndex) =>
-        feedActionsRef.current.videoRouteHrefForMedia?.(post, mediaIndex),
-      onVideoRouteNavigate: (post, mediaIndex) =>
-        feedActionsRef.current.onVideoRouteNavigate?.(post, mediaIndex),
     }),
     []
   );

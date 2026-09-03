@@ -3,8 +3,8 @@ import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
 import type { PostType } from "@frennix/types";
 import { PostMediaCarousel } from "./PostMediaCarousel";
 import { Skeleton } from "./Skeleton";
+import { FEED_PORTRAIT_FRAME_RATIO } from "./mediaLayout";
 import { colors } from "./theme";
-import { FEED_MIN_MEDIA_HEIGHT } from "./mediaLayout";
 
 const VIEWPORT_ROOT_MARGIN = "320px 0px";
 
@@ -108,7 +108,7 @@ export function FeedMediaSlot({
 const styles = StyleSheet.create({
   skeletonWrap: {
     width: "100%",
-    minHeight: FEED_MIN_MEDIA_HEIGHT,
+    aspectRatio: 1 / FEED_PORTRAIT_FRAME_RATIO,
     backgroundColor: colors.background,
   },
 });

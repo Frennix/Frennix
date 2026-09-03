@@ -10,7 +10,7 @@ import { isMobileWeb } from "@/lib/safari-visual-viewport";
 import { saveFeedScrollReturnState } from "@/lib/web-feed-scroll-restore";
 import { saveVideoViewerReturnState } from "@/lib/web-video-viewer-return";
 
-/** Mobile web/PWA uses a dedicated /video/[postId] route instead of a feed portal. */
+/** Mobile web/PWA uses /video/[postId] for direct links; the home feed opens an overlay instead. */
 export function usesMobileWebVideoRoute(): boolean {
   return Platform.OS === "web" && isMobileWeb();
 }

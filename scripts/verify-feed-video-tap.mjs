@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression: feed inline video uses dedicated /video/[postId] route links on mobile web.
+ * Regression: feed inline video opens immersive overlay directly on mobile web.
  *
  * Usage:
  *   node scripts/verify-feed-video-tap.mjs
@@ -27,30 +27,38 @@ function main() {
   const player = readSource("packages/ui/src/FeedVideoPlayer.tsx");
   const styles = readSource("lib/web-document-styles.js");
   const carousel = readSource("packages/ui/src/PostMediaCarousel.tsx");
+  const feedIndex = readSource("app/(tabs)/index.tsx");
+  const lightbox = readSource("components/ImageLightbox.tsx");
   const videoRoute = readSource("lib/mobile-web-video-route.ts");
 
   ok =
     pass(
-      "Dedicated video route module exists",
+      "Dedicated video route module exists for direct links",
       fs.existsSync(path.join(ROOT, "app/video/[postId].tsx")) &&
-        videoRoute.includes("buildVideoRouteHref") &&
-        videoRoute.includes("usesMobileWebVideoRoute")
+        videoRoute.includes("buildVideoRouteHref")
+    ) && ok;
+  ok =
+    pass(
+      "Home feed opens immersive overlay instead of video route navigation",
+      feedIndex.includes("buildImmersiveVideoContext") &&
+        feedIndex.includes("openGallery(") &&
+        !feedIndex.includes("videoRouteHrefForMedia:") &&
+        !feedIndex.includes("onVideoRouteNavigate:")
     ) && ok;
   ok =
     pass(
       "A: inline web video has pointer-events disabled",
-      player.includes('className: "feed-inline-video"') &&
+      player.includes("feed-inline-video") &&
         player.includes('pointerEvents: "none"') &&
         styles.includes("video.feed-inline-video")
     ) && ok;
   ok =
     pass(
-      "A/D: real anchor route link opens viewer via client navigation",
-      player.includes("feed-video-route-link") &&
-        player.includes('createElement("a"') &&
-        player.includes("videoRouteHref") &&
-        player.includes("event.preventDefault?.()") &&
-        videoRoute.includes("navigateFromFeedVideoLink")
+      "Feed video tap uses overlay hit layer when route href is absent",
+      player.includes("feed-video-open-hit-layer") &&
+        player.includes("onOpenFullscreen") &&
+        carousel.includes("onVideoPress") &&
+        carousel.includes("!videoRouteHrefForIndex")
     ) && ok;
   ok =
     pass(
@@ -59,26 +67,15 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "C: tap vs scroll movement threshold on route link",
-      player.includes("OPEN_VIEWER_TAP_MOVE_PX") &&
-        player.includes("handleRouteLinkClick") &&
-        styles.includes("touch-action: pan-y")
+      "Mobile web lightbox mounts immersive viewer with post actions",
+      lightbox.includes("useImmersiveVideo") &&
+        lightbox.includes("ImmersiveVideoViewer") &&
+        lightbox.includes("createPortal")
     ) && ok;
   ok =
     pass(
-      "D: expand icon is anchor with route href",
-      player.includes("feed-video-expand-button") &&
-        player.includes('className: "feed-video-expand-button"')
-    ) && ok;
-  ok =
-    pass(
-      "Carousel passes videoRouteHrefForIndex",
-      carousel.includes("videoRouteHrefForIndex") && carousel.includes("onVideoRouteNavigate")
-    ) && ok;
-  ok =
-    pass(
-      "Mobile web bypasses overlay onVideoPress when route href set",
-      carousel.includes("!videoRouteHrefForIndex")
+      "Fullscreen slide shows poster overlay while buffering",
+      readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes("showPosterOverlay")
     ) && ok;
   ok =
     pass(

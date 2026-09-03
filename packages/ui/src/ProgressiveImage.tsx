@@ -110,6 +110,8 @@ export function ProgressiveImage({
 const styles = StyleSheet.create({
   wrap: {
     overflow: "hidden",
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.background,
+    width: "100%",
+    height: "100%",
   },
 });

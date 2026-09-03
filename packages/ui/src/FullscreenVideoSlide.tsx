@@ -114,6 +114,7 @@ export const FullscreenVideoSlide = forwardRef<
   const [duration, setDuration] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsPinned, setControlsPinned] = useState(false);
+  const [hasRenderedFrame, setHasRenderedFrame] = useState(false);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsPinnedRef = useRef(false);
@@ -151,6 +152,7 @@ export const FullscreenVideoSlide = forwardRef<
     setFailed(false);
     handoffAppliedRef.current = false;
     setHandoffReady(!playbackHandoff);
+    setHasRenderedFrame(false);
     setControlsVisible(true);
     setControlsPinned(false);
     setIsPaused(true);
@@ -354,6 +356,7 @@ export const FullscreenVideoSlide = forwardRef<
 
   const handleWebPlay = useCallback(() => {
     setIsPaused(false);
+    setHasRenderedFrame(true);
     setControlsPinned(false);
     setControlsVisible(true);
     scheduleControlsHide();
@@ -362,6 +365,10 @@ export const FullscreenVideoSlide = forwardRef<
 
   const handleTimeUpdate = useCallback(() => {
     syncVideoState();
+    const video = webVideoRef.current;
+    if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setHasRenderedFrame(true);
+    }
   }, [syncVideoState]);
 
   const handleLoadedMetadata = useCallback(() => {
@@ -372,6 +379,12 @@ export const FullscreenVideoSlide = forwardRef<
   const SpeakerIcon = muted ? VolumeX : Volume2;
   const chromeControlsVisible = controlsVisible || controlsPinned;
   const progressMax = duration > 0 ? duration : 1;
+  const posterUri = posterState.posterUri ?? thumbnailUrl ?? null;
+  const showPosterOverlay =
+    Platform.OS === "web" &&
+    isActive &&
+    Boolean(posterUri) &&
+    (!hasRenderedFrame || buffering);
 
   const webChromeMute =
     Platform.OS === "web" &&
@@ -448,7 +461,10 @@ export const FullscreenVideoSlide = forwardRef<
               applyPlaybackHandoff();
             },
             onWaiting: () => setBuffering(true),
-            onPlaying: () => setBuffering(false),
+            onPlaying: () => {
+              setBuffering(false);
+              setHasRenderedFrame(true);
+            },
             onPlay: handleWebPlay,
             onPause: handleWebPause,
             onTimeUpdate: handleTimeUpdate,
@@ -577,6 +593,23 @@ export const FullscreenVideoSlide = forwardRef<
         })()
       )}
 
+      {showPosterOverlay ? (
+        <View style={styles.posterOverlay} pointerEvents="none">
+          <ProgressiveImage
+            uri={posterUri!}
+            placeholderUri={thumbnailUrl}
+            style={{ width: stageWidth, height: stageHeight }}
+            contentFit="contain"
+            accessibilityLabel="Video poster"
+          />
+          {buffering ? (
+            <View style={styles.posterSpinner} pointerEvents="none">
+              <ActivityIndicator color={colors.accent} size="small" />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {!isActive && posterState.posterUri ? (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <ProgressiveImage
@@ -589,7 +622,7 @@ export const FullscreenVideoSlide = forwardRef<
         </View>
       ) : null}
 
-      {buffering ? (
+      {buffering && !showPosterOverlay ? (
         <View style={styles.bufferingOverlay} pointerEvents="none">
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
@@ -706,5 +739,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(10, 10, 11, 0.35)",
     zIndex: 4,
+  },
+  posterOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+    zIndex: 3,
+  },
+  posterSpinner: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10, 10, 11, 0.2)",
   },
 });

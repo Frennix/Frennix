@@ -43,6 +43,33 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("isFeed && layoutWidth > 0")) {
         throw new Error("MediaAspectFrame must treat laid-out feed frames as ready");
       }
+      if (src.includes("FEED_MIN_MEDIA_HEIGHT")) {
+        throw new Error("MediaAspectFrame must not use FEED_MIN_MEDIA_HEIGHT loading floor");
+      }
+      if (!src.includes("stableBucket")) {
+        throw new Error("MediaAspectFrame must lock feed bucket after dimension probe");
+      }
+    },
+  },
+  {
+    name: "Feed photos probe thumbnail dimensions before full image",
+    run: () => {
+      const src = read("packages/ui/src/PostMedia.tsx");
+      if (!src.includes("dimensionsUri={thumbnailUrl ?? uri}")) {
+        throw new Error("Feed photos must probe thumbnailUrl before full-resolution uri");
+      }
+    },
+  },
+  {
+    name: "Carousel uses one shared MediaAspectFrame for all slides",
+    run: () => {
+      const src = read("packages/ui/src/PostMediaCarousel.tsx");
+      if (!src.includes("fillParent: true")) {
+        throw new Error("Carousel slides must fill a shared feed frame");
+      }
+      if (!src.includes("<MediaAspectFrame")) {
+        throw new Error("Multi-image carousel must wrap slides in one MediaAspectFrame");
+      }
     },
   },
   {

@@ -1,12 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Skeleton } from "./Skeleton";
 import {
-  FEED_MIN_MEDIA_HEIGHT,
-  FEED_PHOTO_FALLBACK_RATIO,
   INLINE_DEFAULT_HEIGHT,
   classifyFeedMediaBucket,
   computeFeedMediaFrameHeight,
+  feedBucketAspectRatio,
   type FeedMediaBucket,
   type MediaLayout,
 } from "./mediaLayout";
@@ -19,7 +18,7 @@ export type MediaAspectFrameState = {
 };
 
 type MediaAspectFrameProps = {
-  /** URI used to resolve intrinsic width/height (photo, poster, or thumbnail). */
+  /** URI used to resolve intrinsic width/height (thumbnail, photo, or poster). */
   dimensionsUri?: string;
   layout?: MediaLayout;
   style?: StyleProp<ViewStyle>;
@@ -28,6 +27,10 @@ type MediaAspectFrameProps = {
   fallbackRatio?: number;
   /** When feed dimensions are unknown, assume this Instagram bucket (videos → portrait 4:5). */
   feedFallbackBucket?: FeedMediaBucket;
+  /** Parent-locked bucket (carousel) — prevents per-slide frame changes. */
+  feedFrameBucket?: FeedMediaBucket;
+  /** Skip outer sizing — fill a parent MediaAspectFrame (carousel slides). */
+  fillParent?: boolean;
   children: (frame: MediaAspectFrameState) => ReactNode;
 };
 
@@ -36,31 +39,49 @@ export function MediaAspectFrame({
   layout = "inline",
   style,
   maxHeight,
-  fallbackRatio = FEED_PHOTO_FALLBACK_RATIO,
+  fallbackRatio: _fallbackRatio,
   feedFallbackBucket = "portrait",
+  feedFrameBucket,
+  fillParent = false,
   children,
 }: MediaAspectFrameProps) {
   const [layoutWidth, setLayoutWidth] = useState(0);
   const { dimensions, failed } = useImageDimensions(dimensionsUri);
+  const [stableBucket, setStableBucket] = useState<FeedMediaBucket | null>(null);
 
   const isFeed = layout === "feed";
 
+  useEffect(() => {
+    setStableBucket(null);
+  }, [dimensionsUri]);
+
+  useEffect(() => {
+    if (feedFrameBucket || stableBucket) return;
+    if (dimensions) {
+      setStableBucket(classifyFeedMediaBucket(dimensions.width, dimensions.height));
+      return;
+    }
+    if (failed) {
+      setStableBucket(feedFallbackBucket);
+    }
+  }, [dimensions, failed, feedFallbackBucket, feedFrameBucket, stableBucket]);
+
+  const effectiveBucket = feedFrameBucket ?? stableBucket ?? feedFallbackBucket;
+
   const bucket = useMemo<FeedMediaBucket | null>(() => {
     if (!isFeed) return null;
-    if (dimensions) return classifyFeedMediaBucket(dimensions.width, dimensions.height);
-    return feedFallbackBucket;
-  }, [dimensions, feedFallbackBucket, isFeed]);
+    return effectiveBucket;
+  }, [effectiveBucket, isFeed]);
 
   const displayHeight = useMemo(() => {
-    if (!layoutWidth) {
-      return isFeed ? FEED_MIN_MEDIA_HEIGHT : INLINE_DEFAULT_HEIGHT;
-    }
+    if (fillParent) return 0;
+    if (!layoutWidth) return 0;
     if (isFeed) {
       return computeFeedMediaFrameHeight(
         layoutWidth,
         dimensions?.width ?? 0,
         dimensions?.height ?? 0,
-        feedFallbackBucket
+        effectiveBucket
       );
     }
     if (dimensions) {
@@ -72,26 +93,45 @@ export function MediaAspectFrame({
       );
     }
     return INLINE_DEFAULT_HEIGHT;
-  }, [dimensions, feedFallbackBucket, isFeed, layoutWidth, maxHeight]);
+  }, [dimensions, effectiveBucket, fillParent, isFeed, layoutWidth, maxHeight]);
 
   const frameStyle = useMemo(
     () => [
       styles.frame,
       isFeed ? styles.frameFeed : styles.frameInline,
+      fillParent ? styles.frameFillParent : null,
       style,
-      layoutWidth > 0 ? { height: displayHeight } : isFeed ? styles.frameFeedLoading : { height: displayHeight },
+      fillParent
+        ? null
+        : layoutWidth > 0
+          ? { height: displayHeight }
+          : isFeed
+            ? ({
+                aspectRatio: feedBucketAspectRatio(effectiveBucket),
+                width: "100%",
+              } as ViewStyle)
+            : { height: displayHeight || INLINE_DEFAULT_HEIGHT },
     ],
-    [displayHeight, isFeed, layoutWidth, style]
+    [displayHeight, effectiveBucket, fillParent, isFeed, layoutWidth, style]
   );
 
-  const ready = Boolean(dimensions) || failed || (isFeed && layoutWidth > 0);
+  const frameReady =
+    fillParent || Boolean(feedFrameBucket) || Boolean(dimensions) || failed || (isFeed && layoutWidth > 0);
 
   const webFrameProps =
-    Platform.OS === "web" && isFeed && bucket
+    Platform.OS === "web" && isFeed && bucket && !fillParent
       ? ({
           "data-frennix-feed-media-frame": bucket,
         } as object)
       : null;
+
+  if (fillParent) {
+    return (
+      <View style={[styles.frameFillParent, style]}>
+        {children({ ready: true, bucket: feedFrameBucket ?? bucket })}
+      </View>
+    );
+  }
 
   return (
     <View
@@ -102,8 +142,8 @@ export function MediaAspectFrame({
         if (width > 0 && width !== layoutWidth) setLayoutWidth(width);
       }}
     >
-      {!ready ? <Skeleton width="100%" height="100%" style={styles.skeleton} /> : null}
-      {children({ ready: ready || layoutWidth > 0, bucket })}
+      {!frameReady ? <Skeleton width="100%" height="100%" style={styles.skeleton} /> : null}
+      {children({ ready: frameReady, bucket })}
     </View>
   );
 }
@@ -120,8 +160,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     alignSelf: "stretch",
   },
-  frameFeedLoading: {
-    minHeight: FEED_MIN_MEDIA_HEIGHT,
+  frameFillParent: {
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+    alignSelf: "stretch",
   },
   frameInline: {
     borderRadius: radius.md,

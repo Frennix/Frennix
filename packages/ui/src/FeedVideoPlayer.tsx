@@ -57,6 +57,8 @@ interface FeedVideoPlayerProps {
   /** Side effect before following videoRouteHref (feed scroll save, playback handoff). */
   onVideoRouteNavigate?: () => void;
   onVisualReady?: () => void;
+  fillParent?: boolean;
+  feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
 }
 
 /**
@@ -74,6 +76,8 @@ export function FeedVideoPlayer({
   videoRouteHref,
   onVideoRouteNavigate,
   onVisualReady,
+  fillParent = false,
+  feedFrameBucket,
 }: FeedVideoPlayerProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
@@ -440,6 +444,8 @@ export function FeedVideoPlayer({
           layout="feed"
           style={style}
           feedFallbackBucket="portrait"
+          fillParent={fillParent}
+          feedFrameBucket={feedFrameBucket}
         >
           {() => <MediaLoadError label="Video unavailable" onRetry={handleRetry} />}
         </MediaAspectFrame>
@@ -554,6 +560,8 @@ export function FeedVideoPlayer({
         layout="feed"
         style={style}
         feedFallbackBucket="portrait"
+        fillParent={fillParent}
+        feedFrameBucket={feedFrameBucket}
       >
         {() => (
           <View

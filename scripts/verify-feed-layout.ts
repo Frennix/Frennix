@@ -242,6 +242,9 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (/Math\.max\(height,\s*FEED_MIN_MEDIA_HEIGHT\)/.test(src)) {
         throw new Error("MediaAspectFrame must not force FEED_MIN_MEDIA_HEIGHT on loaded dimensions");
       }
+      if (src.includes("frameFeedLoading")) {
+        throw new Error("MediaAspectFrame must not apply a tall feed loading min-height");
+      }
     },
   },
   {

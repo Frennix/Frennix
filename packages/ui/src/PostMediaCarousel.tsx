@@ -12,7 +12,9 @@ import {
 import type { PostType, PostMediaItem } from "@frennix/types";
 import { normalizePostMediaItems } from "@frennix/types";
 import { prefetchCachedImages } from "./CachedImage";
+import { MediaAspectFrame } from "./MediaAspectFrame";
 import { PostMedia } from "./PostMedia";
+import { FEED_PORTRAIT_FRAME_RATIO } from "./mediaLayout";
 import { colors, spacing, typography } from "./theme";
 
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
@@ -40,6 +42,68 @@ interface PostMediaCarouselProps {
   onPrimaryMediaReady?: (source: "image" | "video") => void;
 }
 
+function renderCarouselSlide({
+  item,
+  itemIndex,
+  activeIndex,
+  onMediaPress,
+  videoRouteHrefForIndex,
+  onVideoRouteNavigate,
+  mediaVisible,
+  playbackScopeId,
+  onPrimaryMediaReady,
+  fillParent,
+  feedFrameBucket,
+}: {
+  item: PostMediaItem;
+  itemIndex: number;
+  activeIndex: number;
+  onMediaPress?: (uri: string, index: number) => void;
+  videoRouteHrefForIndex?: (index: number) => string | undefined;
+  onVideoRouteNavigate?: (index: number) => void;
+  mediaVisible?: boolean;
+  playbackScopeId?: string;
+  onPrimaryMediaReady?: (source: "image" | "video") => void;
+  fillParent?: boolean;
+  feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
+}) {
+  return (
+    <PostMedia
+      uri={item.url}
+      postType={item.kind === "video" ? "video" : "photo"}
+      thumbnailUrl={item.thumbnailUrl}
+      style={styles.media}
+      layout="feed"
+      pressDelayMs={200}
+      slideActive={itemIndex === activeIndex}
+      mediaVisible={mediaVisible}
+      playbackScopeId={playbackScopeId}
+      mediaIndex={itemIndex}
+      fillParent={fillParent}
+      feedFrameBucket={feedFrameBucket}
+      onImagePress={
+        item.kind === "image" && onMediaPress
+          ? () => onMediaPress(item.url, itemIndex)
+          : undefined
+      }
+      onVideoPress={
+        item.kind === "video" && onMediaPress && !videoRouteHrefForIndex
+          ? () => onMediaPress(item.url, itemIndex)
+          : undefined
+      }
+      videoRouteHref={item.kind === "video" ? videoRouteHrefForIndex?.(itemIndex) : undefined}
+      onVideoRouteNavigate={
+        item.kind === "video" ? () => onVideoRouteNavigate?.(itemIndex) : undefined
+      }
+      onVisualReady={
+        itemIndex === 0 && onPrimaryMediaReady
+          ? () => onPrimaryMediaReady(item.kind === "video" ? "video" : "image")
+          : undefined
+      }
+    />
+  );
+}
+
 export function PostMediaCarousel({
   mediaUrls,
   postType,
@@ -63,6 +127,8 @@ export function PostMediaCarousel({
     () => normalizePostMediaItems(mediaUrls, { postType, thumbnailUrl }),
     [mediaUrls, postType, thumbnailUrl]
   );
+
+  const frameProbeUri = mediaItems[0]?.thumbnailUrl ?? mediaItems[0]?.url;
 
   const handleLayout = useCallback((width: number) => {
     if (width > 0) setContainerWidth(width);
@@ -117,38 +183,17 @@ export function PostMediaCarousel({
         style={[styles.wrapper, style]}
         onLayout={(event) => handleLayout(event.nativeEvent.layout.width)}
       >
-        <PostMedia
-          uri={item.url}
-          postType={item.kind === "video" ? "video" : "photo"}
-          thumbnailUrl={item.thumbnailUrl}
-          style={styles.media}
-          layout="feed"
-          slideActive
-          mediaVisible={mediaVisible}
-          playbackScopeId={playbackScopeId}
-          mediaIndex={0}
-          onImagePress={
-            item.kind === "image" && onMediaPress
-              ? () => onMediaPress(item.url, 0)
-              : undefined
-          }
-          onVideoPress={
-            item.kind === "video" && onMediaPress && !videoRouteHrefForIndex
-              ? () => onMediaPress(item.url, 0)
-              : undefined
-          }
-          videoRouteHref={
-            item.kind === "video" ? videoRouteHrefForIndex?.(0) : undefined
-          }
-          onVideoRouteNavigate={
-            item.kind === "video" ? () => onVideoRouteNavigate?.(0) : undefined
-          }
-          onVisualReady={
-            onPrimaryMediaReady
-              ? () => onPrimaryMediaReady(item.kind === "video" ? "video" : "image")
-              : undefined
-          }
-        />
+        {renderCarouselSlide({
+          item,
+          itemIndex: 0,
+          activeIndex,
+          onMediaPress,
+          videoRouteHrefForIndex,
+          onVideoRouteNavigate,
+          mediaVisible,
+          playbackScopeId,
+          onPrimaryMediaReady,
+        })}
       </View>
     );
   }
@@ -164,105 +209,59 @@ export function PostMediaCarousel({
       style={[styles.wrapper, style]}
       onLayout={(event) => handleLayout(event.nativeEvent.layout.width)}
     >
-      {containerWidth > 0 ? (
-        <FlatList
-          ref={listRef}
-          data={mediaItems}
-          horizontal
-          pagingEnabled
-          nestedScrollEnabled
-          directionalLockEnabled={Platform.OS === "ios"}
-          showsHorizontalScrollIndicator={false}
-          style={WEB_HORIZONTAL_SCROLL_STYLE}
-          keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
-          getItemLayout={getItemLayout}
-          snapToInterval={containerWidth}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={handleScroll}
-          initialNumToRender={2}
-          maxToRenderPerBatch={2}
-          windowSize={3}
-          removeClippedSubviews={Platform.OS !== "web"}
-          style={styles.list}
-          renderItem={({ item, index: itemIndex }) => (
-            <View style={{ width: containerWidth }}>
-              <PostMedia
-                uri={item.url}
-                postType={item.kind === "video" ? "video" : "photo"}
-                thumbnailUrl={item.thumbnailUrl}
-                style={styles.media}
-                layout="feed"
-                pressDelayMs={200}
-                slideActive={itemIndex === activeIndex}
-                mediaVisible={mediaVisible}
-                playbackScopeId={playbackScopeId}
-                mediaIndex={itemIndex}
-                onImagePress={
-                  item.kind === "image" && onMediaPress
-                    ? () => onMediaPress(item.url, itemIndex)
-                    : undefined
-                }
-                onVideoPress={
-                  item.kind === "video" && onMediaPress && !videoRouteHrefForIndex
-                    ? () => onMediaPress(item.url, itemIndex)
-                    : undefined
-                }
-                videoRouteHref={
-                  item.kind === "video" ? videoRouteHrefForIndex?.(itemIndex) : undefined
-                }
-                onVideoRouteNavigate={
-                  item.kind === "video"
-                    ? () => onVideoRouteNavigate?.(itemIndex)
-                    : undefined
-                }
-                onVisualReady={
-                  itemIndex === 0 && onPrimaryMediaReady
-                    ? () => onPrimaryMediaReady(item.kind === "video" ? "video" : "image")
-                    : undefined
-                }
+      <MediaAspectFrame
+        dimensionsUri={frameProbeUri}
+        layout="feed"
+        style={styles.media}
+      >
+        {({ bucket }) => (
+          <View style={styles.sharedFrameInner}>
+            {containerWidth > 0 ? (
+              <FlatList
+                ref={listRef}
+                data={mediaItems}
+                horizontal
+                pagingEnabled
+                nestedScrollEnabled
+                directionalLockEnabled={Platform.OS === "ios"}
+                showsHorizontalScrollIndicator={false}
+                style={[styles.list, WEB_HORIZONTAL_SCROLL_STYLE]}
+                keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
+                getItemLayout={getItemLayout}
+                snapToInterval={containerWidth}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                onMomentumScrollEnd={handleScroll}
+                initialNumToRender={2}
+                maxToRenderPerBatch={2}
+                windowSize={3}
+                removeClippedSubviews={Platform.OS !== "web"}
+                renderItem={({ item, index: itemIndex }) => (
+                  <View style={{ width: containerWidth, height: "100%" }}>
+                    {renderCarouselSlide({
+                      item,
+                      itemIndex,
+                      activeIndex,
+                      onMediaPress,
+                      videoRouteHrefForIndex,
+                      onVideoRouteNavigate,
+                      mediaVisible,
+                      playbackScopeId,
+                      onPrimaryMediaReady,
+                      fillParent: true,
+                      feedFrameBucket: bucket ?? undefined,
+                    })}
+                  </View>
+                )}
               />
-            </View>
-          )}
-        />
-      ) : (
-        <PostMedia
-          uri={mediaItems[0].url}
-          postType={mediaItems[0].kind === "video" ? "video" : "photo"}
-          thumbnailUrl={mediaItems[0].thumbnailUrl}
-          style={styles.media}
-          layout="feed"
-          pressDelayMs={200}
-          slideActive
-          mediaVisible={mediaVisible}
-          playbackScopeId={playbackScopeId}
-          mediaIndex={0}
-          onImagePress={
-            mediaItems[0].kind === "image" && onMediaPress
-              ? () => onMediaPress(mediaItems[0].url, 0)
-              : undefined
-          }
-          onVideoPress={
-            mediaItems[0].kind === "video" && onMediaPress && !videoRouteHrefForIndex
-              ? () => onMediaPress(mediaItems[0].url, 0)
-              : undefined
-          }
-          videoRouteHref={
-            mediaItems[0].kind === "video" ? videoRouteHrefForIndex?.(0) : undefined
-          }
-          onVideoRouteNavigate={
-            mediaItems[0].kind === "video" ? () => onVideoRouteNavigate?.(0) : undefined
-          }
-          onVisualReady={
-            onPrimaryMediaReady
-              ? () =>
-                  onPrimaryMediaReady(mediaItems[0].kind === "video" ? "video" : "image")
-              : undefined
-          }
-        />
-      )}
+            ) : (
+              <View style={styles.widthProbePlaceholder} />
+            )}
+          </View>
+        )}
+      </MediaAspectFrame>
 
       <View style={styles.dots} pointerEvents="none">
         {mediaItems.map((item, dotIndex) => (
@@ -291,8 +290,17 @@ const styles = StyleSheet.create({
     position: "relative",
     width: "100%",
   },
+  sharedFrameInner: {
+    width: "100%",
+    height: "100%",
+  },
+  widthProbePlaceholder: {
+    width: "100%",
+    aspectRatio: 1 / FEED_PORTRAIT_FRAME_RATIO,
+  },
   list: {
     width: "100%",
+    height: "100%",
   },
   media: {
     width: "100%",

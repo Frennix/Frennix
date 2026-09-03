@@ -41,6 +41,10 @@ interface PostMediaProps {
   playbackScopeId?: string;
   /** Index within the post media carousel. */
   mediaIndex?: number;
+  /** Fill a parent feed frame (carousel) without resizing. */
+  fillParent?: boolean;
+  /** Locked feed bucket from a parent carousel frame. */
+  feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
   /** @deprecated Row visibility no longer autoplays feed video. */
   mediaVisible?: boolean;
   onVisualReady?: () => void;
@@ -129,6 +133,8 @@ export function PostMedia({
   playbackScopeId,
   mediaIndex = 0,
   mediaVisible = true,
+  fillParent = false,
+  feedFrameBucket,
   onVisualReady,
 }: PostMediaProps) {
   const isVideo = isVideoMedia(postType, uri);
@@ -152,6 +158,8 @@ export function PostMedia({
         playbackId={playbackId}
         slideActive={slideActive && mediaVisible}
         style={style}
+        fillParent={fillParent}
+        feedFrameBucket={feedFrameBucket}
         onOpenFullscreen={videoRouteHref ? undefined : onVideoPress}
         videoRouteHref={videoRouteHref}
         onVideoRouteNavigate={onVideoRouteNavigate}
@@ -207,6 +215,8 @@ export function PostMedia({
       pressDelayMs={pressDelayMs}
       maxHeight={maxHeight}
       onVisualReady={onVisualReady}
+      fillParent={fillParent}
+      feedFrameBucket={feedFrameBucket}
     />
   );
 }
@@ -219,6 +229,8 @@ function FeedImage({
   onImagePress,
   pressDelayMs,
   maxHeight,
+  fillParent = false,
+  feedFrameBucket,
   onVisualReady,
 }: {
   uri: string;
@@ -228,6 +240,8 @@ function FeedImage({
   onImagePress?: () => void;
   pressDelayMs?: number;
   maxHeight?: number;
+  fillParent?: boolean;
+  feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
   onVisualReady?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -235,10 +249,12 @@ function FeedImage({
 
   const content = (
     <MediaAspectFrame
-      dimensionsUri={uri}
+      dimensionsUri={thumbnailUrl ?? uri}
       layout={layout}
       style={style}
       maxHeight={maxHeight}
+      fillParent={fillParent}
+      feedFrameBucket={feedFrameBucket}
     >
       {() => (
         <>
@@ -261,6 +277,7 @@ function FeedImage({
               accessibilityLabel="Post photo"
               onError={() => setImageFailed(true)}
               onLoad={onVisualReady}
+              showPlaceholder={!thumbnailUrl}
             />
           )}
         </>
