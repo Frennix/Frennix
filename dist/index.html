@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 5a2ee862</title>
+    <title>Frennix · bec986ea</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="5a2ee862dab39e58ec2fda9b90f7e7e35a653c88" />
-    <meta name="frennix-build-bundle" content="index-0b1e4d75442ffdb8e42c75984548a835.js" />
-    <meta name="frennix-build-at" content="2026-09-03T17:42:27.849Z" />
+    <meta name="frennix-build-sha" content="bec986ea547072531b0d77ea1bc2f46774b61459" />
+    <meta name="frennix-build-bundle" content="index-d78882dcd3ff30a3c94c3902138e6f23.js" />
+    <meta name="frennix-build-at" content="2026-09-03T17:55:30.838Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -37,6 +37,10 @@
     --frennix-tab-header-h: calc(92px + var(--frennix-safe-top));
     --frennix-tab-bar-h: calc(56px + var(--frennix-safe-bottom));
     --frennix-tab-chrome-h: calc(var(--frennix-tab-header-h) + var(--frennix-tab-bar-h));
+    --frennix-safari-bottom-chrome: 0px;
+    --frennix-feed-scroll-bottom-pad: calc(
+      var(--frennix-tab-bar-h) + var(--frennix-safari-bottom-chrome) + 28px + 8px
+    );
     --frennix-tab-scene-min-h: max(240px, calc(100dvh - var(--frennix-tab-chrome-h)));
     --frennix-tab-scene-min-h-svh: max(240px, calc(100svh - var(--frennix-tab-chrome-h)));
   }
@@ -166,6 +170,10 @@
     display: block !important;
     transform: none !important;
     background-color: #0A0A0B !important;
+  }
+  /* Home feed — keep captions/workout details above fixed tab bar + Safari toolbar. */
+  #feed-scroll-list > div {
+    padding-bottom: var(--frennix-feed-scroll-bottom-pad) !important;
   }
   /* Feed inline video — keep speaker control above poster/video on WebKit. */
   .feed-video-mute-layer {
@@ -632,7 +640,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="5a2ee862dab39e58ec2fda9b90f7e7e35a653c88" data-bundle="index-0b1e4d75442ffdb8e42c75984548a835.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="bec986ea547072531b0d77ea1bc2f46774b61459" data-bundle="index-d78882dcd3ff30a3c94c3902138e6f23.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -678,7 +686,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-0b1e4d75442ffdb8e42c75984548a835.js?v=5a2ee862" defer></script>
+  <script src="/_expo/static/js/web/index-d78882dcd3ff30a3c94c3902138e6f23.js?v=bec986ea" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

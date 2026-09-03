@@ -187,6 +187,28 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
     },
   },
+  {
+    name: "Feed scroll bottom padding clears tab bar and Safari toolbar",
+    run: () => {
+      const paddingSrc = read("lib/feed-scroll-bottom-padding.ts");
+      if (!paddingSrc.includes("OVERLAY_BOTTOM_SAFETY_MARGIN_PX")) {
+        throw new Error("feed scroll padding must include overlay safety margin");
+      }
+      const tabBar = 83;
+      const envBottom = 34;
+      const safariChrome = 44;
+      const breathing = 28;
+      const gap = 8;
+      const iphoneReserve = tabBar + safariChrome + breathing + gap;
+      if (iphoneReserve < 56 + envBottom + breathing + gap) {
+        throw new Error("iPhone feed scroll padding formula must reserve tab bar + safe area");
+      }
+      const styles = read("lib/web-document-styles.js");
+      if (!styles.includes("--frennix-safari-bottom-chrome")) {
+        throw new Error("web CSS must track Safari bottom chrome for feed scroll padding");
+      }
+    },
+  },
 ];
 
 let failed = 0;

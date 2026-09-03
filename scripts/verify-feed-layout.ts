@@ -253,6 +253,29 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
     },
   },
+  {
+    name: "Home feed reserves scroll padding above fixed tab bar on web",
+    run: () => {
+      const index = read("app/(tabs)/index.tsx");
+      const styles = read("lib/web-document-styles.js");
+      const padding = read("lib/feed-scroll-bottom-padding.ts");
+      if (!index.includes("useFeedScrollBottomPadding")) {
+        throw new Error("Feed index must use useFeedScrollBottomPadding");
+      }
+      if (!index.includes("paddingBottom: feedScrollBottomPadding")) {
+        throw new Error("Feed scroll content must apply dynamic bottom padding");
+      }
+      if (!styles.includes("--frennix-feed-scroll-bottom-pad")) {
+        throw new Error("web-document-styles must define feed scroll bottom padding token");
+      }
+      if (!styles.includes("#feed-scroll-list > div")) {
+        throw new Error("web-document-styles must pad feed scroll content above tab bar");
+      }
+      if (!padding.includes("computeFeedScrollBottomPadding")) {
+        throw new Error("feed-scroll-bottom-padding must compute tab bar + Safari chrome reserve");
+      }
+    },
+  },
 ];
 
 let failed = 0;

@@ -118,6 +118,7 @@ import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
 import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { applyPendingFeedScrollReturnIfNeeded, registerFeedScrollController, trackFeedScrollPosition } from "@/lib/web-feed-scroll-restore";
+import { useFeedScrollBottomPadding } from "@/lib/use-feed-scroll-bottom-padding";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 export default function HomeScreen() {
@@ -446,6 +447,11 @@ export default function HomeScreen() {
   const listRef = useRef<FlatList<FeedListRow>>(null);
   const webScrollRef = useRef<ScrollView>(null);
   const useWebScroll = Platform.OS === "web";
+  const feedScrollBottomPadding = useFeedScrollBottomPadding();
+  const listContentStyle = useMemo(
+    () => [styles.list, { paddingBottom: feedScrollBottomPadding }],
+    [feedScrollBottomPadding]
+  );
   const webContainerStyle = webTabSceneContainerStyle();
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
@@ -1178,7 +1184,7 @@ export default function HomeScreen() {
             scrollRef={webScrollRef}
             nativeID="feed-scroll-list"
             style={styles.feedList}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={listContentStyle}
             scrollEnabled={feedScrollEnabled}
             touchLock={storyVisible}
             data={listRows}
@@ -1213,7 +1219,7 @@ export default function HomeScreen() {
             style={styles.feedList}
             data={listRows}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={listContentStyle}
             scrollEnabled={feedScrollEnabled}
             nestedScrollEnabled
             initialNumToRender={8}
@@ -1404,7 +1410,6 @@ const styles = StyleSheet.create({
   feedList: { ...flexFill, ...webScrollSurface },
   list: {
     flexGrow: 1,
-    paddingBottom: spacing.xxl + spacing.lg + spacing.sm,
     paddingTop: 0,
   },
   initialSkeletons: { gap: spacing.md },
