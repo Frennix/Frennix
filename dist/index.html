@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 73009963</title>
+    <title>Frennix · e8a6ebc8</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="7300996312f255292478b89d8b90f00b7e1994dc" />
-    <meta name="frennix-build-bundle" content="index-756ca03008400b31a2288608fbe0eadf.js" />
-    <meta name="frennix-build-at" content="2026-09-02T20:09:32.214Z" />
+    <meta name="frennix-build-sha" content="e8a6ebc873e41ac7ed5d5a3ba88c742327ff97e6" />
+    <meta name="frennix-build-bundle" content="index-b75b3997ebc2127fbe57545e0a0563d1.js" />
+    <meta name="frennix-build-at" content="2026-09-03T06:10:59.157Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -371,6 +371,124 @@
   [data-frennix-comments-video-overlay="true"] > * {
     pointer-events: auto !important;
   }
+  [data-video-overlay-composer="true"] {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    z-index: 2147483647 !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: 10px !important;
+    min-height: 68px !important;
+    padding: 8px 18px !important;
+    box-sizing: border-box !important;
+    background: #080808 !important;
+    border-top: 1px solid #29292d !important;
+    transform: none !important;
+  }
+  [data-frennix-comments-video-overlay="true"] [data-frennix-comment-composer-row="true"],
+  [data-frennix-comments-video-overlay="true"] [data-frennix-comment-composer-host="true"],
+  [data-frennix-comments-video-overlay="true"] textarea[data-frennix-comment-input="true"] {
+    display: none !important;
+  }
+  [data-web-comment-composer-row="true"] {
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    background: #0A0A0B !important;
+  }
+  [data-web-comment-composer-row="true"] img {
+    flex: 0 0 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+  }
+  [data-web-comment-composer-row="true"] button {
+    flex: 0 0 auto !important;
+    height: 48px !important;
+    margin: 0 !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: #20d760 !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+  }
+  [data-web-comment-composer-row="true"] button:disabled,
+  [data-video-overlay-composer="true"] button:disabled {
+    color: #71717a !important;
+    opacity: 1 !important;
+  }
+  [data-video-comment-field="true"] {
+    position: relative !important;
+    flex: 1 1 0% !important;
+    display: block !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    height: var(--comment-field-height, 48px) !important;
+    min-height: 48px !important;
+    max-height: 114px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    border: 1px solid #34343a !important;
+    border-radius: 24px !important;
+    background: #1b1b1e !important;
+    contain: paint !important;
+    isolation: isolate !important;
+    -webkit-mask-image: -webkit-radial-gradient(white, black) !important;
+  }
+  [data-video-comment-field="true"] textarea {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 12px 16px !important;
+    box-sizing: border-box !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    outline: 0 !important;
+    background: transparent !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    line-height: 22px !important;
+    resize: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    clip-path: none !important;
+    -webkit-clip-path: none !important;
+    contain: none !important;
+    -webkit-mask-image: none !important;
+  }
+  [data-video-comment-field="true"] textarea::placeholder {
+    color: #9a9aa1 !important;
+    opacity: 1 !important;
+  }
+  [data-video-overlay-composer="true"] img {
+    flex: 0 0 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+  }
+  [data-video-overlay-composer="true"] button {
+    flex: 0 0 auto !important;
+    height: 48px !important;
+    margin: 0 !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: #20d760 !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+  }
   [data-frennix-immersive-comments-open="true"] [data-frennix-video-stage-host="true"] {
     position: fixed !important;
     left: 0 !important;
@@ -480,7 +598,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="7300996312f255292478b89d8b90f00b7e1994dc" data-bundle="index-756ca03008400b31a2288608fbe0eadf.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="e8a6ebc873e41ac7ed5d5a3ba88c742327ff97e6" data-bundle="index-b75b3997ebc2127fbe57545e0a0563d1.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -526,7 +644,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-756ca03008400b31a2288608fbe0eadf.js?v=73009963" defer></script>
+  <script src="/_expo/static/js/web/index-b75b3997ebc2127fbe57545e0a0563d1.js?v=e8a6ebc8" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

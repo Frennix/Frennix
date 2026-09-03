@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -23,6 +22,7 @@ import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import { hapticLight } from "@/lib/haptics";
+import { WebCommentComposerRow } from "@/components/WebCommentComposerRow";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
 const MIN_COMMENT_INPUT_HEIGHT = 22;
@@ -116,106 +116,6 @@ export function computeCommentMaxComposerFieldHeight(compactComposer = false): n
   return computeCommentComposerFieldHeight(computeCommentMaxInputHeight(), compactComposer);
 }
 
-function syncWebTextareaHeight(textarea: HTMLTextAreaElement): number {
-  const maxOuterHeight = computeWebCommentMaxTextareaHeight(textarea);
-  const measureMinOuter = computeWebCommentMinTextareaHeight(textarea);
-
-  textarea.style.setProperty("box-sizing", "border-box", "important");
-  textarea.style.setProperty("height", "0px", "important");
-  textarea.style.setProperty("overflow-y", "hidden", "important");
-  textarea.scrollTop = 0;
-
-  const measured = Math.ceil(textarea.scrollHeight);
-  const atMaxViewport = measured >= maxOuterHeight;
-  const nextOuter = atMaxViewport ? maxOuterHeight : Math.max(measureMinOuter, measured);
-
-  textarea.style.setProperty("height", `${nextOuter}px`, "important");
-  if (atMaxViewport) {
-    textarea.style.setProperty("overflow-y", "auto", "important");
-    if (textarea.selectionStart === textarea.value.length) {
-      textarea.scrollTop = textarea.scrollHeight;
-    }
-  } else {
-    textarea.style.setProperty("overflow-y", "hidden", "important");
-    textarea.scrollTop = 0;
-  }
-
-  return nextOuter;
-}
-
-type WebCommentTextareaProps = {
-  value: string;
-  placeholder: string;
-  minInputHeight: number;
-  maxInputHeight: number;
-  onChangeText: (text: string) => void;
-  onHeightChange: (height: number) => void;
-  onFocus?: () => void;
-  onBlur?: () => void;
-};
-
-function WebCommentTextarea({
-  value,
-  placeholder,
-  minInputHeight,
-  maxInputHeight,
-  onChangeText,
-  onHeightChange,
-  onFocus,
-  onBlur,
-}: WebCommentTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const remeasure = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const next = syncWebTextareaHeight(textarea);
-    onHeightChange(next);
-  }, [onHeightChange]);
-
-  useLayoutEffect(() => {
-    remeasure();
-  }, [value, remeasure]);
-
-  const webInputStyle = StyleSheet.flatten([
-    styles.composerInputWeb,
-    {
-      minHeight: minInputHeight,
-    },
-  ]) as React.CSSProperties;
-
-  return React.createElement("textarea", {
-    ref: textareaRef,
-    value,
-    rows: 1,
-    wrap: "soft",
-    enterKeyHint: "enter",
-    inputMode: "text",
-    autoComplete: "off",
-    autoCorrect: "on",
-    spellCheck: true,
-    "data-frennix-comment-input": "true",
-    placeholder,
-    onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onChangeText(event.target.value);
-      requestAnimationFrame(remeasure);
-    },
-    onFocus: (event: React.FocusEvent<HTMLTextAreaElement>) => {
-      event.target.setAttribute("enterkeyhint", "enter");
-      remeasure();
-      onFocus?.();
-    },
-    onBlur: () => {
-      onBlur?.();
-    },
-    onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== "Enter") return;
-      event.stopPropagation();
-    },
-    style: webInputStyle,
-  });
-}
-
 function appendOptimisticComment(
   comments: Comment[],
   optimistic: Comment,
@@ -253,14 +153,28 @@ export function CommentComposerRow({
   posting,
   onComposerFocus,
   onComposerBlur,
-  compactComposer = false,
 }: CommentComposerRowProps) {
+  if (Platform.OS === "web") {
+    return (
+      <WebCommentComposerRow
+        avatarUri={avatarUri}
+        avatarName={avatarName}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        onPost={onPost}
+        posting={posting}
+        onFocus={onComposerFocus}
+        onBlur={onComposerBlur}
+      />
+    );
+  }
+
   const canPost = Boolean(value.trim()) && !posting;
   const minInputHeight = computeCommentMinInputHeight();
   const maxInputHeight = computeCommentMaxInputHeight();
   const prevValueLengthRef = useRef(0);
   const [inputHeight, setInputHeight] = useState(minInputHeight);
-  const composerFieldHeight = computeCommentComposerFieldHeight(inputHeight, compactComposer);
 
   const handleNativeContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
@@ -274,20 +188,6 @@ export function CommentComposerRow({
     [maxInputHeight]
   );
 
-  const handleWebHeightChange = useCallback(
-    (height: number) => {
-      const next = Math.max(minInputHeight, height);
-      const deleting = value.length < prevValueLengthRef.current;
-      prevValueLengthRef.current = value.length;
-
-      setInputHeight((current) => {
-        if (value.length > 0 && !deleting && next < current) return current;
-        return next;
-      });
-    },
-    [minInputHeight, value.length]
-  );
-
   useEffect(() => {
     if (!value) {
       prevValueLengthRef.current = 0;
@@ -298,67 +198,35 @@ export function CommentComposerRow({
   const inputScrollEnabled = inputHeight >= maxInputHeight - 1;
 
   return (
-    <View
-      style={[styles.composerRow, compactComposer && styles.composerRowCompact]}
-      {...(Platform.OS === "web" ? ({ "data-frennix-comment-composer-row": "true" } as object) : null)}
-    >
+    <View style={styles.composerRow}>
       <View style={styles.composerAvatarSlot}>
         <Avatar uri={avatarUri} name={avatarName} size={COMPOSER_AVATAR_WIDTH_PX} deferImagePlaceholder />
       </View>
-      <View
-        style={[
-          styles.composerField,
-          compactComposer && styles.composerFieldCompact,
-          Platform.OS === "web"
-            ? { minHeight: composerFieldHeight, height: composerFieldHeight, flexShrink: 0 }
-            : null,
-        ]}
-        {...(Platform.OS === "web"
-          ? ({ "data-frennix-comment-composer-field": "true" } as object)
-          : null)}
-      >
-        {Platform.OS === "web" ? (
-          <View
-            style={styles.composerInputWrap}
-            {...({ "data-frennix-comment-input-wrap": "true" } as object)}
-          >
-            <WebCommentTextarea
-              value={value}
-              placeholder={placeholder}
-              minInputHeight={minInputHeight}
-              maxInputHeight={maxInputHeight}
-              onChangeText={onChangeText}
-              onHeightChange={handleWebHeightChange}
-              onFocus={onComposerFocus}
-              onBlur={onComposerBlur}
-            />
-          </View>
-        ) : (
-          <View style={styles.composerInputWrap}>
-            <TextInput
-              value={value}
-              onChangeText={onChangeText}
-              onContentSizeChange={handleNativeContentSizeChange}
-              placeholder={placeholder}
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.composerInput,
-                {
-                  height: Math.max(MIN_COMMENT_INPUT_HEIGHT, inputHeight),
-                  maxHeight: maxInputHeight,
-                },
-              ]}
-              multiline
-              scrollEnabled={inputScrollEnabled}
-              maxLength={2000}
-              blurOnSubmit={false}
-              returnKeyType="default"
-              textAlignVertical="top"
-              onFocus={onComposerFocus}
-              onBlur={onComposerBlur}
-            />
-          </View>
-        )}
+      <View style={styles.composerField}>
+        <View style={styles.composerInputWrap}>
+          <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            onContentSizeChange={handleNativeContentSizeChange}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textMuted}
+            style={[
+              styles.composerInput,
+              {
+                height: Math.max(MIN_COMMENT_INPUT_HEIGHT, inputHeight),
+                maxHeight: maxInputHeight,
+              },
+            ]}
+            multiline
+            scrollEnabled={inputScrollEnabled}
+            maxLength={2000}
+            blurOnSubmit={false}
+            returnKeyType="default"
+            textAlignVertical="top"
+            onFocus={onComposerFocus}
+            onBlur={onComposerBlur}
+          />
+        </View>
       </View>
       <Pressable
         onPress={onPost}
@@ -366,7 +234,7 @@ export function CommentComposerRow({
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel="Post comment"
-        style={[styles.postButton, compactComposer && styles.postButtonCompact]}
+        style={styles.postButton}
       >
         {posting ? (
           <ActivityIndicator size="small" color={colors.accent} />
@@ -389,6 +257,20 @@ type UsePostCommentsContentOptions = {
   trackInputZoom?: boolean;
   /** Tighter pill spacing for the immersive video overlay composer. */
   compactComposer?: boolean;
+  /** Web video overlay uses the portaled composer instead of inline sheet chrome. */
+  useVideoOverlayWebComposer?: boolean;
+};
+
+export type VideoOverlayWebComposerModel = {
+  value: string;
+  placeholder: string;
+  avatarUri?: string | null;
+  avatarName?: string;
+  posting: boolean;
+  onChangeText: (text: string) => void;
+  onPost: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
 };
 
 export type PostCommentsContentResult = {
@@ -397,6 +279,7 @@ export type PostCommentsContentResult = {
   commentActionSheets: ReactNode;
   composer: ReactNode;
   thread: ReactNode;
+  videoOverlayWebComposer: VideoOverlayWebComposerModel | null;
 };
 
 export function usePostCommentsContent({
@@ -408,6 +291,7 @@ export function usePostCommentsContent({
   rootPortal = false,
   trackInputZoom = false,
   compactComposer = false,
+  useVideoOverlayWebComposer: useVideoOverlayWebComposerOption = false,
 }: UsePostCommentsContentOptions): PostCommentsContentResult {
   const postId = getSharedPostTargetId(post);
   const queryClient = useQueryClient();
@@ -548,18 +432,23 @@ export function usePostCommentsContent({
     });
   }, [commentMutation, commentText, replyTo]);
 
-  const composer = (
+  const useVideoOverlayWebComposer =
+    useVideoOverlayWebComposerOption || (compactComposer && Platform.OS === "web");
+
+  const replyBanner = replyTo ? (
+    <View style={styles.replyBanner}>
+      <Text style={styles.replyBannerText} numberOfLines={1}>
+        Replying to {replyTo.author?.display_name ?? "comment"}
+      </Text>
+      <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
+        <Text style={styles.replyCancel}>Cancel</Text>
+      </Pressable>
+    </View>
+  ) : null;
+
+  const composer = useVideoOverlayWebComposer ? null : (
     <>
-      {replyTo ? (
-        <View style={styles.replyBanner}>
-          <Text style={styles.replyBannerText} numberOfLines={1}>
-            Replying to {replyTo.author?.display_name ?? "comment"}
-          </Text>
-          <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
-            <Text style={styles.replyCancel}>Cancel</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {replyBanner}
       <CommentComposerRow
         avatarUri={authorProfile?.avatar_url}
         avatarName={authorProfile?.display_name}
@@ -575,16 +464,33 @@ export function usePostCommentsContent({
     </>
   );
 
-  const thread = (
-    <CommentThread
-      comments={comments}
-      currentUserId={userId}
-      onReply={setReplyTo}
-      onLike={(comment) =>
-        commentLikeMutation.mutate({ commentId: comment.id, liked: !!comment.liked_by_me })
+  const videoOverlayWebComposer: VideoOverlayWebComposerModel | null = useVideoOverlayWebComposer
+    ? {
+        value: commentText,
+        placeholder: commentPlaceholder,
+        avatarUri: authorProfile?.avatar_url,
+        avatarName: authorProfile?.display_name,
+        posting: commentMutation.isPending,
+        onChangeText: setCommentText,
+        onPost: handlePost,
+        onFocus: handleComposerFocus,
+        onBlur: handleComposerBlur,
       }
-      onMenuPress={openCommentActions}
-    />
+    : null;
+
+  const thread = (
+    <>
+      {useVideoOverlayWebComposer ? replyBanner : null}
+      <CommentThread
+        comments={comments}
+        currentUserId={userId}
+        onReply={setReplyTo}
+        onLike={(comment) =>
+          commentLikeMutation.mutate({ commentId: comment.id, liked: !!comment.liked_by_me })
+        }
+        onMenuPress={openCommentActions}
+      />
+    </>
   );
 
   return {
@@ -593,6 +499,7 @@ export function usePostCommentsContent({
     commentActionSheets,
     composer,
     thread,
+    videoOverlayWebComposer,
   };
 }
 

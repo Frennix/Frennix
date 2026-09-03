@@ -118,6 +118,8 @@ type CommentsBottomSheetProps = {
   backdropAccessibilityLabel?: string;
   /** Mobile web fullscreen vs video-route overlay that preserves a video peek region. */
   presentation?: CommentsSheetPresentation;
+  /** Web video overlay: hide inline composer while the portaled composer is active. */
+  suppressInlineComposer?: boolean;
 };
 
 const useMobileWebFullscreen = Platform.OS === "web" && isMobileWeb();
@@ -196,6 +198,7 @@ export function CommentsBottomSheet({
   composer,
   backdropAccessibilityLabel = "Close comments",
   presentation = "fullscreen",
+  suppressInlineComposer = false,
 }: CommentsBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(0)).current;
@@ -425,9 +428,14 @@ export function CommentsBottomSheet({
   const overlayBottomReserve = useCommentsOverlayBottomReserve(
     visible && Platform.OS === "web" && useMobileWebFullscreen
   );
-  const videoOverlayBottomReserve = useCommentsOverlayBottomReserve(
+  const measuredVideoOverlayBottomReserve = useCommentsOverlayBottomReserve(
     visible && Platform.OS === "web" && useVideoOverlay
   );
+  const suppressWebVideoInlineComposer =
+    suppressInlineComposer || (Platform.OS === "web" && useVideoOverlay);
+  const videoOverlayBottomReserve = suppressWebVideoInlineComposer
+    ? 0
+    : measuredVideoOverlayBottomReserve;
   const composerHostBottomInset = useCommentComposerHostBottomInset(
     closedComposerBottomInset,
     visible && Platform.OS === "web" && !useMobileWebFullscreen && !useVideoOverlay
@@ -509,7 +517,7 @@ export function CommentsBottomSheet({
     </ScrollView>
   );
 
-  const composerRegion = (
+  const composerRegion = suppressWebVideoInlineComposer ? null : (
     <View
       style={[
         styles.composerHost,
@@ -599,15 +607,15 @@ export function CommentsBottomSheet({
           <View {...headerPanResponder.panHandlers}>{headerRow}</View>
         </View>
         {listRegion}
-        <View
-          style={[styles.composerHost, styles.composerHostVideoOverlay]}
-          {...sheetSurfaceProps}
-          {...(Platform.OS === "web"
-            ? ({ "data-frennix-comment-composer-host": "true" } as object)
-            : null)}
-        >
-          {composer}
-        </View>
+        {suppressWebVideoInlineComposer ? null : (
+          <View
+            style={[styles.composerHost, styles.composerHostVideoOverlay]}
+            {...sheetSurfaceProps}
+            {...({ "data-frennix-comment-composer-host": "true" } as object)}
+          >
+            {composer}
+          </View>
+        )}
       </View>
     </View>
   );
