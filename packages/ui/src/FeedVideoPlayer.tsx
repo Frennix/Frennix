@@ -48,6 +48,14 @@ import {
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
+import {
+  VIDEO_FIRST_FRAME_TIMEOUT_MS,
+  classifyVideoMediaError,
+  logVideoMediaFailure,
+  mediaExtensionFromUri,
+  shouldAutoRetryVideoLoad,
+  type VideoMediaFailureReason,
+} from "./videoMediaDelivery";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
@@ -109,6 +117,7 @@ export function FeedVideoPlayer({
   const [hasRenderedFrame, setHasRenderedFrame] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const autoRetryAttemptRef = useRef(0);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const webVideoMountRef = useRef<HTMLDivElement | null>(null);
   const [videoDomAdopted, setVideoDomAdopted] = useState(false);
@@ -223,9 +232,9 @@ export function FeedVideoPlayer({
 
       if (isAbort || notReady) return;
 
-      setFailed(true);
+      reportVideoFailure("network", videoEl);
     });
-  }, []);
+  }, [reportVideoFailure]);
 
   const intersectionEnabled = Boolean(
     playbackId && slideActive && !failed && isFeedVideoPlaybackAllowed()
@@ -338,11 +347,40 @@ export function FeedVideoPlayer({
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
 
+  const reportVideoFailure = useCallback(
+    (reason: VideoMediaFailureReason, video?: HTMLVideoElement | null) => {
+      logVideoMediaFailure({
+        surface: "feed",
+        reason,
+        ext: mediaExtensionFromUri(uri),
+        playbackId,
+        attempt: autoRetryAttemptRef.current,
+      });
+      if (shouldAutoRetryVideoLoad(reason, autoRetryAttemptRef.current)) {
+        autoRetryAttemptRef.current += 1;
+        setHasRenderedFrame(false);
+        clearStallSpinner();
+        setRetryKey((key) => key + 1);
+        return;
+      }
+      clearStallSpinner();
+      setFailed(true);
+    },
+    [clearStallSpinner, playbackId, uri]
+  );
+
+  useEffect(() => {
+    autoRetryAttemptRef.current = 0;
+    setFailed(false);
+    setHasRenderedFrame(false);
+    clearStallSpinner();
+  }, [clearStallSpinner, uri]);
+
   useEffect(() => {
     setFailed(false);
     setHasRenderedFrame(false);
     clearStallSpinner();
-  }, [clearStallSpinner, uri, retryKey]);
+  }, [clearStallSpinner, retryKey]);
 
   const presentationPosterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? null;
 
@@ -381,7 +419,8 @@ export function FeedVideoPlayer({
     video.muted = mutedRef.current;
     video.loop = true;
     video.playsInline = true;
-    video.preload = preloadGrantedRef.current ? "auto" : "metadata";
+    video.preload =
+      shouldPlayRef.current || preloadGrantedRef.current ? "auto" : "metadata";
     const posterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
     if (posterUri) video.poster = posterUri;
     Object.assign(video.style, {
@@ -416,7 +455,7 @@ export function FeedVideoPlayer({
     const onTimeUpdate = () => {
       markFrameReady();
     };
-    const onError = () => setFailed(true);
+    const onError = () => reportVideoFailure(classifyVideoMediaError(video), video);
 
     video.addEventListener("loadedmetadata", onLoadedMetadata);
     video.addEventListener("loadeddata", onLoadedData);
@@ -483,14 +522,29 @@ export function FeedVideoPlayer({
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const video = webVideoRef.current;
-    if (!video || !preloadGranted) return;
+    if (!video || (!preloadGranted && !shouldPlay)) return;
     if (video.preload !== "auto") {
       video.preload = "auto";
     }
-    if (video.readyState === HTMLMediaElement.HAVE_NOTHING) {
+    if (
+      video.readyState === HTMLMediaElement.HAVE_NOTHING &&
+      !isFeedVideoFullscreenHandoff(playbackId)
+    ) {
       video.load();
     }
-  }, [preloadGranted, uri, retryKey]);
+  }, [playbackId, preloadGranted, shouldPlay, uri, retryKey]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !shouldPlay || hasRenderedFrame || failed) return;
+    if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
+
+    const timer = setTimeout(() => {
+      if (hasRenderedFrame || !shouldPlayRef.current) return;
+      reportVideoFailure("timeout", webVideoRef.current);
+    }, VIDEO_FIRST_FRAME_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [failed, hasRenderedFrame, playbackId, reportVideoFailure, retryKey, shouldPlay, uri]);
 
   useEffect(() => {
     if (!shouldPlay) {
@@ -625,6 +679,7 @@ export function FeedVideoPlayer({
   }, []);
 
   const handleRetry = useCallback(() => {
+    autoRetryAttemptRef.current = 0;
     setFailed(false);
     setInView(false);
     setRetryKey((key) => key + 1);
@@ -738,8 +793,14 @@ export function FeedVideoPlayer({
     !hasRenderedFrame &&
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);
+  const showLoadingPlaceholder =
+    !presentationPosterUri &&
+    !hasRenderedFrame &&
+    !videoDomAdopted &&
+    !isFeedVideoFullscreenHandoff(playbackId) &&
+    (shouldPlay || inView || preloadGranted);
   const showBufferingSpinner =
-    showStallSpinner &&
+    (showStallSpinner || showLoadingPlaceholder) &&
     shouldPlay &&
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);
@@ -845,6 +906,10 @@ export function FeedVideoPlayer({
                       accessibilityLabel="Video poster"
                     />
                   </View>
+                ) : null}
+
+                {showLoadingPlaceholder ? (
+                  <View style={styles.loadingPlaceholder} pointerEvents="none" />
                 ) : null}
 
                 {videoBody}
@@ -957,6 +1022,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 0,
     backgroundColor: colors.background,
+  },
+  loadingPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    backgroundColor: colors.surfaceElevated,
   },
   bufferingSpinnerLayer: {
     ...StyleSheet.absoluteFillObject,

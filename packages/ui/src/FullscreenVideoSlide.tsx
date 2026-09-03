@@ -33,6 +33,14 @@ import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
 import { useVideoPoster } from "./useVideoPoster";
+import {
+  VIDEO_FIRST_FRAME_TIMEOUT_MS,
+  classifyVideoMediaError,
+  logVideoMediaFailure,
+  mediaExtensionFromUri,
+  shouldAutoRetryVideoLoad,
+  type VideoMediaFailureReason,
+} from "./videoMediaDelivery";
 
 /** Match ImageLightbox close chrome — fixed mute sits just left of the ✕. */
 const LIGHTBOX_CLOSE_SIZE = 34;
@@ -109,6 +117,7 @@ export const FullscreenVideoSlide = forwardRef<
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const autoRetryAttemptRef = useRef(0);
   const [handoffReady, setHandoffReady] = useState(!playbackHandoff);
   const [isPaused, setIsPaused] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -157,6 +166,32 @@ export const FullscreenVideoSlide = forwardRef<
     setControlsVisible(true);
     scheduleControlsHide();
   }, [scheduleControlsHide]);
+
+  const reportVideoFailure = useCallback(
+    (reason: VideoMediaFailureReason, video?: HTMLVideoElement | null) => {
+      logVideoMediaFailure({
+        surface: "fullscreen",
+        reason,
+        ext: mediaExtensionFromUri(uri),
+        playbackId: playbackHandoff?.playbackId,
+        attempt: autoRetryAttemptRef.current,
+      });
+      if (shouldAutoRetryVideoLoad(reason, autoRetryAttemptRef.current)) {
+        autoRetryAttemptRef.current += 1;
+        setHasRenderedFrame(false);
+        setBuffering(false);
+        setRetryKey((key) => key + 1);
+        return;
+      }
+      setBuffering(false);
+      setFailed(true);
+    },
+    [playbackHandoff?.playbackId, uri]
+  );
+
+  useEffect(() => {
+    autoRetryAttemptRef.current = 0;
+  }, [uri]);
 
   useEffect(() => {
     setFailed(false);
@@ -258,7 +293,7 @@ export const FullscreenVideoSlide = forwardRef<
       return;
     }
 
-    void video.play().catch(() => setFailed(true));
+    void video.play().catch(() => reportVideoFailure("network", video));
     if (
       playbackHandoff &&
       handoffAppliedRef.current &&
@@ -276,6 +311,26 @@ export const FullscreenVideoSlide = forwardRef<
     retryKey,
     playbackHandoff,
     routePlayback,
+    usingAdoptedFeedVideo,
+    reportVideoFailure,
+  ]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !isActive || failed || hasRenderedFrame || usingAdoptedFeedVideo) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (hasRenderedFrame) return;
+      reportVideoFailure("timeout", webVideoRef.current);
+    }, VIDEO_FIRST_FRAME_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [
+    failed,
+    hasRenderedFrame,
+    isActive,
+    reportVideoFailure,
+    retryKey,
+    uri,
     usingAdoptedFeedVideo,
   ]);
 
@@ -307,6 +362,7 @@ export const FullscreenVideoSlide = forwardRef<
   }, [playbackHandoff, clearHideControlsTimer, routePlayback, usingAdoptedFeedVideo]);
 
   const handleRetry = useCallback(() => {
+    autoRetryAttemptRef.current = 0;
     setFailed(false);
     setRetryKey((key) => key + 1);
   }, []);
@@ -341,7 +397,7 @@ export const FullscreenVideoSlide = forwardRef<
       },
       play: () => {
         const video = webVideoRef.current;
-        if (video) void video.play().catch(() => setFailed(true));
+        if (video) void video.play().catch(() => reportVideoFailure("network", video));
         else nativeVideoRef.current?.playAsync().catch(() => setFailed(true));
       },
       toggleMute,
@@ -357,7 +413,7 @@ export const FullscreenVideoSlide = forwardRef<
     const video = webVideoRef.current;
     if (!video) return;
     if (video.paused) {
-      void video.play().catch(() => setFailed(true));
+      void video.play().catch(() => reportVideoFailure("network", video));
     } else {
       video.pause();
     }
@@ -470,7 +526,7 @@ export const FullscreenVideoSlide = forwardRef<
       setBuffering(false);
       setHasRenderedFrame(true);
     };
-    const onError = () => setFailed(true);
+    const onError = () => reportVideoFailure(classifyVideoMediaError(adopted), adopted);
 
     adopted.addEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
     adopted.addEventListener("loadedmetadata", handleLoadedMetadata);
@@ -523,6 +579,12 @@ export const FullscreenVideoSlide = forwardRef<
     isActive &&
     Boolean(posterUri) &&
     (!hasRenderedFrame || (buffering && !inlineReadyAtHandoffRef.current));
+  const showLoadingOverlay =
+    Platform.OS === "web" &&
+    isActive &&
+    !posterUri &&
+    !hasRenderedFrame &&
+    !usingAdoptedFeedVideo;
 
   const webChromeMute =
     Platform.OS === "web" &&
@@ -621,7 +683,8 @@ export const FullscreenVideoSlide = forwardRef<
                 onPlay: handleWebPlay,
                 onPause: handleWebPause,
                 onTimeUpdate: handleTimeUpdate,
-                onError: () => setFailed(true),
+                onError: () =>
+                  reportVideoFailure(classifyVideoMediaError(webVideoRef.current), webVideoRef.current),
               })
             : null}
 
@@ -764,6 +827,12 @@ export const FullscreenVideoSlide = forwardRef<
         </View>
       ) : null}
 
+      {showLoadingOverlay ? (
+        <View style={styles.loadingOverlay} pointerEvents="none">
+          <ActivityIndicator color={colors.accent} size="small" />
+        </View>
+      ) : null}
+
       {!isActive && posterState.posterUri ? (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <ProgressiveImage
@@ -776,7 +845,7 @@ export const FullscreenVideoSlide = forwardRef<
         </View>
       ) : null}
 
-      {buffering && !showPosterOverlay ? (
+      {buffering && !showPosterOverlay && !showLoadingOverlay ? (
         <View style={styles.bufferingOverlay} pointerEvents="none">
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
@@ -899,6 +968,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.background,
+    zIndex: 3,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceElevated,
     zIndex: 3,
   },
   posterSpinner: {

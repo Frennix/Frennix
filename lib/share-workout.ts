@@ -63,17 +63,18 @@ async function uploadFeedMediaAssets(userId: string, media: WorkoutShareMedia[])
   let thumbnailUrl: string | null = null;
   let postType: PostType = "text";
   const hasVideo = media.some((item) => isVideoMime(item.mimeType));
+  const primaryVideo = hasVideo ? media.find((item) => isVideoMime(item.mimeType)) ?? media[0] : null;
 
-  for (const item of media) {
-    const url = await uploadPostMedia(userId, item.uri, item.mimeType, item.file);
-    mediaUrls.push(url);
-  }
-
-  if (hasVideo && media[0]) {
+  if (hasVideo && primaryVideo) {
     postType = "video";
     try {
       thumbnailUrl = await withTimeout(
-        generateAndUploadVideoThumbnail(userId, media[0].uri, media[0].mimeType, media[0].file),
+        generateAndUploadVideoThumbnail(
+          userId,
+          primaryVideo.uri,
+          primaryVideo.mimeType,
+          primaryVideo.file
+        ),
         THUMBNAIL_CAPTURE_TIMEOUT_MS + 30_000,
         "Video thumbnail upload"
       );
@@ -84,6 +85,11 @@ async function uploadFeedMediaAssets(userId: string, media: WorkoutShareMedia[])
     postType = "photo";
   } else if (media.length === 0) {
     postType = "workout_update";
+  }
+
+  for (const item of media) {
+    const url = await uploadPostMedia(userId, item.uri, item.mimeType, item.file);
+    mediaUrls.push(url);
   }
 
   return { mediaUrls, thumbnailUrl, postType };
