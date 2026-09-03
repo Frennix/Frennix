@@ -17,13 +17,13 @@ export const feedMediaRules = {
   /** Photos and videos preserve intrinsic aspect up to the portrait cap. */
   preserveAspectRatio: true,
 
-  /** Cap tall portrait media at 4:5; cover-crop inside the frame. */
+  /** Cap tall portrait media at 4:5; cover only when capped. */
   maxPortraitRatio: FEED_MAX_PORTRAIT_RATIO,
   autoCrop: true,
 
-  /** Cover fit inside the computed frame — no letterboxing. */
-  contentFit: "cover" as const,
-  videoContentFit: "cover" as const,
+  /** Contain by default; cover only when portrait exceeds the 4:5 cap. */
+  contentFit: "contain" as const,
+  videoContentFit: "contain" as const,
 
   /** Edge-to-edge within the post card; text sections use contentPaddingX. */
   edgeToEdge: true,

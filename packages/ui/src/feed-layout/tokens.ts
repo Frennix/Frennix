@@ -1,5 +1,5 @@
 import { Platform, StyleSheet } from "react-native";
-import { applyShadow, colors, overlays, radius, spacing, touchTarget, typography } from "../theme";
+import { colors, spacing, touchTarget, typography } from "../theme";
 
 /** Matches ACTION_SHEET_FONT_SCALE_MAX — caps Dynamic Type growth to preserve layout. */
 export const FEED_FONT_SCALE_MAX = 1.35;
@@ -7,7 +7,7 @@ export const FEED_FONT_SCALE_MAX = 1.35;
 /**
  * Accessibility defaults for feed components.
  * Safe areas: feed list uses tab shell insets; text sections apply contentPaddingX;
- * media spans the full card width edge-to-edge.
+ * media spans the full feed width edge-to-edge (no card shell).
  */
 export const feedAccessibility = {
   maxFontSizeMultiplier: FEED_FONT_SCALE_MAX,
@@ -22,58 +22,58 @@ export const feedLayout = {
   /** Max post width on large web viewports; phones use full width. */
   maxContentWidth: 640,
 
-  /** Horizontal inset for text/metadata sections — media is full-bleed within the card. */
-  contentPaddingX: spacing.sm,
+  /** Horizontal inset for text/metadata sections — media is full-bleed. */
+  contentPaddingX: spacing.md,
 
-  /** @deprecated Use contentPaddingX on text sections — media shares full card width. */
+  /** @deprecated Media is full-bleed — use contentPaddingX on text sections only. */
   mediaMarginX: 0,
-  /** Tight gap between compact post header and media — media leads immediately. */
+  /** Tight gap between compact post header and media. */
   mediaMarginTop: 0,
 
   /** Vertical rhythm between major sections inside a post. */
   sectionGap: spacing.sm,
 
-  postPaddingBottom: spacing.md,
+  postPaddingBottom: spacing.sm,
   postMarginX: 0,
-  postMarginBottom: spacing.md,
-  postRadius: radius.xl,
+  postMarginBottom: spacing.sm,
+  postRadius: 0,
 
   header: {
-    avatarSize: 44,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
-    nameGap: 2,
+    avatarSize: 36,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xxs,
+    gap: spacing.xs,
+    nameGap: 1,
     usernameMarginTop: 0,
     metaMarginTop: 0,
     workoutTagGap: spacing.xs,
   },
 
   media: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
+    marginTop: 0,
+    marginBottom: 0,
   },
 
   actions: {
-    rowHeight: 48,
+    rowHeight: 44,
     iconSize: 24,
     gap: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
   },
 
   caption: {
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs,
     lineHeight: 24,
   },
 
   engagement: {
-    paddingTop: spacing.xs,
+    paddingTop: spacing.xxs,
     gap: spacing.xxs,
   },
 
   comments: {
-    paddingTop: spacing.xs,
+    paddingTop: spacing.xxs,
     rowGap: spacing.xxs,
     commentInputMarginTop: spacing.xs,
   },
@@ -99,21 +99,21 @@ export const feedLayout = {
 
 export const feedLayoutTypography = {
   displayName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800" as const,
     color: colors.text,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   username: {
     ...typography.bodySmall,
     color: colors.accent,
     fontWeight: "600" as const,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   meta: {
     ...typography.caption,
     color: colors.textMuted,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   workoutTitle: {
     fontSize: 18,
@@ -164,22 +164,16 @@ export const feedLayoutStyles = StyleSheet.create({
     width: "100%",
     maxWidth: Platform.OS === "web" ? feedLayout.maxContentWidth : undefined,
     alignSelf: Platform.OS === "web" ? "center" : undefined,
-    backgroundColor: colors.surfaceCard,
-    borderRadius: feedLayout.postRadius,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    backgroundColor: "transparent",
     marginHorizontal: feedLayout.postMarginX,
     marginBottom: feedLayout.postMarginBottom,
     paddingBottom: feedLayout.postPaddingBottom,
-    overflow: "hidden",
-    ...applyShadow("md"),
+    overflow: "visible",
   },
   rootActive: {
-    backgroundColor: colors.surfaceElevated,
-    borderColor: overlays.accentBorder,
-    ...applyShadow("accent"),
+    backgroundColor: "transparent",
   },
-  /** Shared content column — every section is full width of the padded post root. */
+  /** Shared content column — every section is full width of the post root. */
   contentColumn: {
     width: "100%",
     alignSelf: "stretch" as const,
@@ -208,7 +202,7 @@ export const feedLayoutStyles = StyleSheet.create({
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
     marginBottom: feedLayout.media.marginBottom,
-    borderRadius: radius.sm,
+    borderRadius: 0,
     overflow: "hidden",
   },
   embeddedMedia: {
@@ -216,7 +210,7 @@ export const feedLayoutStyles = StyleSheet.create({
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
     marginHorizontal: feedLayout.contentPaddingX,
-    borderRadius: radius.sm,
+    borderRadius: 0,
     overflow: "hidden",
   },
   actions: {

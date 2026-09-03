@@ -6,10 +6,16 @@ import {
   FEED_MIN_MEDIA_HEIGHT,
   FEED_PHOTO_FALLBACK_RATIO,
   INLINE_DEFAULT_HEIGHT,
+  isFeedPortraitCapped,
   type MediaLayout,
 } from "./mediaLayout";
 import { computeImageDisplayHeight, useImageDimensions } from "./useImageDimensions";
 import { colors, radius } from "./theme";
+
+export type MediaAspectFrameState = {
+  ready: boolean;
+  portraitCapped: boolean;
+};
 
 type MediaAspectFrameProps = {
   /** URI used to resolve intrinsic width/height (photo, poster, or thumbnail). */
@@ -21,7 +27,7 @@ type MediaAspectFrameProps = {
   fallbackRatio?: number;
   /** Cap portrait frame height at width × ratio (e.g. 5/4 for 4:5 max). */
   maxPortraitRatio?: number;
-  children: (frame: { ready: boolean }) => ReactNode;
+  children: (frame: MediaAspectFrameState) => ReactNode;
 };
 
 export function MediaAspectFrame({
@@ -58,6 +64,16 @@ export function MediaAspectFrame({
     return INLINE_DEFAULT_HEIGHT;
   }, [dimensions, fallbackRatio, isFeed, layoutWidth, maxHeight, portraitCap]);
 
+  const portraitCapped = useMemo(
+    () =>
+      Boolean(
+        dimensions &&
+          portraitCap != null &&
+          isFeedPortraitCapped(dimensions.width, dimensions.height, portraitCap)
+      ),
+    [dimensions, portraitCap]
+  );
+
   const frameStyle = useMemo(
     () => [
       styles.frame,
@@ -79,7 +95,7 @@ export function MediaAspectFrame({
       }}
     >
       {!ready ? <Skeleton width="100%" height="100%" style={styles.skeleton} /> : null}
-      {children({ ready: ready || layoutWidth > 0 })}
+      {children({ ready: ready || layoutWidth > 0, portraitCapped })}
     </View>
   );
 }

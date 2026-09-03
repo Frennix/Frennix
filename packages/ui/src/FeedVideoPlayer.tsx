@@ -30,7 +30,8 @@ import {
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
-import { FEED_MAX_PORTRAIT_RATIO } from "./mediaLayout";
+import { FEED_MAX_PORTRAIT_RATIO, feedMediaContentFit, type MediaLayout } from "./mediaLayout";
+import { useImageDimensions } from "./useImageDimensions";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
@@ -249,6 +250,11 @@ export function FeedVideoPlayer({
   }, []);
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
+  const { dimensions: mediaDimensions } = useImageDimensions(dimensionsUri);
+  const feedVideoFit =
+    mediaDimensions != null
+      ? feedMediaContentFit(mediaDimensions.width, mediaDimensions.height, FEED_MAX_PORTRAIT_RATIO)
+      : "contain";
 
   useEffect(() => {
     setFailed(false);
@@ -482,7 +488,7 @@ export function FeedVideoPlayer({
     Platform.OS === "web" ? (
       createElement("video", {
         key: retryKey,
-        className: "feed-inline-video",
+        className: feedVideoFit === "cover" ? "feed-inline-video feed-inline-video-cover" : "feed-inline-video",
         ref: (node: HTMLVideoElement | null) => {
           webVideoRef.current = node;
         },
@@ -495,7 +501,7 @@ export function FeedVideoPlayer({
         style: {
           width: "100%",
           height: "100%",
-          objectFit: "cover",
+          objectFit: feedVideoFit,
           objectPosition: "center",
           backgroundColor: colors.background,
           pointerEvents: "none",
@@ -524,7 +530,7 @@ export function FeedVideoPlayer({
               }}
               source={{ uri }}
               style={styles.videoFill}
-              resizeMode={ResizeMode.COVER}
+              resizeMode={feedVideoFit === "cover" ? ResizeMode.COVER : ResizeMode.CONTAIN}
               shouldPlay={shouldPlay}
               isMuted={muted}
               isLooping

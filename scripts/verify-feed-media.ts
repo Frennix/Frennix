@@ -131,17 +131,18 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed video frame uses intrinsic dimensions with portrait cap",
+    name: "Feed inline video uses contain unless portrait capped",
     run: () => {
       const player = read("packages/ui/src/FeedVideoPlayer.tsx");
-      if (player.includes("fixedAspectRatio")) {
-        throw new Error("FeedVideoPlayer must not use fixedAspectRatio — use maxPortraitRatio");
+      const styles = read("lib/web-document-styles.js");
+      if (!player.includes("feedMediaContentFit")) {
+        throw new Error("FeedVideoPlayer must derive fit from media aspect ratio");
       }
-      if (!player.includes("maxPortraitRatio")) {
-        throw new Error("FeedVideoPlayer must cap feed video frames at maxPortraitRatio");
+      if (!styles.includes("object-fit: contain !important")) {
+        throw new Error("feed-inline-video must default to contain on web");
       }
-      if (!player.includes("dimensionsUri")) {
-        throw new Error("FeedVideoPlayer must probe poster dimensions for frame height");
+      if (!styles.includes("feed-inline-video-cover")) {
+        throw new Error("feed-inline-video-cover must apply cover when portrait is capped");
       }
     },
   },

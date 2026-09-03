@@ -943,7 +943,8 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <SectionErrorBoundary label="feed-stories-header" compact>
         <FeedHeader
-          showTopRow={false}
+          showHero={false}
+          showQuickActions={false}
           showStories={storiesDeferred && !isolateStories}
           stories={stories}
           suggestions={suggestions}
@@ -1404,9 +1405,9 @@ const styles = StyleSheet.create({
   list: {
     flexGrow: 1,
     paddingBottom: spacing.xxl + spacing.lg + spacing.sm,
-    paddingTop: spacing.xs,
+    paddingTop: 0,
   },
-  initialSkeletons: { gap: spacing.md, paddingHorizontal: spacing.md },
+  initialSkeletons: { gap: spacing.md },
   isolatePlaceholder: {
     flex: 1,
     alignItems: "center",

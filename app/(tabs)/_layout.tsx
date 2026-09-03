@@ -131,7 +131,7 @@ const TabsShell = memo(function TabsShell() {
         },
         lazy: false,
         freezeOnBlur: Platform.OS !== "web",
-        headerTitleContainerStyle: { overflow: "visible" },
+        headerTitleContainerStyle: { overflow: "hidden", flex: 1, maxWidth: "100%" },
       }}
     >
       <Tabs.Screen
@@ -139,6 +139,10 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Feed",
           headerTitle: renderFeedHeaderTitle,
+          headerStyle: {
+            backgroundColor: colors.backgroundFeed,
+            ...(Platform.OS === "web" ? { minHeight: 84 } : null),
+          },
           tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <AppIcon name="feed" color={color} size={size} />,
           headerRight: renderHeaderBell,

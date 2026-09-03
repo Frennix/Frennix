@@ -18,7 +18,7 @@ import { VideoPreview } from "./VideoPreview";
 import { VideoPosterFallback } from "./VideoPosterFallback";
 import { useVideoPoster } from "./useVideoPoster";
 import { WebVideoFrame } from "./WebVideoFrame";
-import { FEED_VIDEO_FALLBACK_RATIO, FEED_MAX_PORTRAIT_RATIO, type MediaLayout } from "./mediaLayout";
+import { FEED_MAX_PORTRAIT_RATIO, FEED_VIDEO_FALLBACK_RATIO, type MediaLayout } from "./mediaLayout";
 import { feedMediaRules } from "./feed-layout/feedMediaRules";
 import { colors, radius } from "./theme";
 
@@ -241,7 +241,7 @@ function FeedImage({
       maxHeight={maxHeight}
       maxPortraitRatio={layout === "feed" ? FEED_MAX_PORTRAIT_RATIO : undefined}
     >
-      {() => (
+      {({ portraitCapped }) => (
         <>
           {imageFailed ? (
             <MediaLoadError
@@ -258,7 +258,13 @@ function FeedImage({
               uri={uri}
               placeholderUri={thumbnailUrl}
               style={styles.image}
-              contentFit={layout === "feed" ? feedMediaRules.contentFit : "contain"}
+              contentFit={
+                layout === "feed"
+                  ? portraitCapped
+                    ? "cover"
+                    : feedMediaRules.contentFit
+                  : "contain"
+              }
               accessibilityLabel="Post photo"
               onError={() => setImageFailed(true)}
               onLoad={onVisualReady}

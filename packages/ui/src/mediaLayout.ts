@@ -12,3 +12,21 @@ export const FEED_VIDEO_FALLBACK_RATIO = FEED_PHOTO_FALLBACK_RATIO;
 
 export const INLINE_DEFAULT_HEIGHT = 220;
 export const FEED_MIN_MEDIA_HEIGHT = 280;
+
+/** True when media exceeds the feed portrait cap and needs cover-crop inside the frame. */
+export function isFeedPortraitCapped(
+  mediaWidth: number,
+  mediaHeight: number,
+  maxPortraitRatio: number = FEED_MAX_PORTRAIT_RATIO
+): boolean {
+  if (!mediaWidth || !mediaHeight) return false;
+  return mediaHeight / mediaWidth > maxPortraitRatio;
+}
+
+export function feedMediaContentFit(
+  mediaWidth: number,
+  mediaHeight: number,
+  maxPortraitRatio: number = FEED_MAX_PORTRAIT_RATIO
+): "cover" | "contain" {
+  return isFeedPortraitCapped(mediaWidth, mediaHeight, maxPortraitRatio) ? "cover" : "contain";
+}

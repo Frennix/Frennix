@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · c6479a39</title>
+    <title>Frennix · 77ad755f</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,15 +26,17 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="c6479a396dd2a9357698152c153bcb0bb1894afe" />
-    <meta name="frennix-build-bundle" content="index-79d8f2bd33337185ebcec008f9c46e47.js" />
-    <meta name="frennix-build-at" content="2026-09-03T16:11:09.701Z" />
+    <meta name="frennix-build-sha" content="77ad755f33a1caf2d03e47817428a7e4de5a7cce" />
+    <meta name="frennix-build-bundle" content="index-18096fb8719d7837d36f9b1b3e77f78f.js" />
+    <meta name="frennix-build-at" content="2026-09-03T16:51:43.056Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
-    --frennix-tab-header-h: 52px;
-    --frennix-tab-bar-h: 56px;
-    --frennix-tab-chrome-h: 108px;
+    --frennix-safe-top: env(safe-area-inset-top, 0px);
+    --frennix-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --frennix-tab-header-h: calc(84px + var(--frennix-safe-top));
+    --frennix-tab-bar-h: calc(56px + var(--frennix-safe-bottom));
+    --frennix-tab-chrome-h: calc(var(--frennix-tab-header-h) + var(--frennix-tab-bar-h));
     --frennix-tab-scene-min-h: max(240px, calc(100dvh - var(--frennix-tab-chrome-h)));
     --frennix-tab-scene-min-h-svh: max(240px, calc(100svh - var(--frennix-tab-chrome-h)));
   }
@@ -109,6 +111,18 @@
     overflow: hidden !important;
     background-color: #0A0A0B !important;
   }
+  /* Feed tab sticky header — clip greeting block and respect iOS safe area. */
+  #app-root-shell [role="banner"] {
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+    z-index: 30 !important;
+    background-color: #0A0A0B !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+  #frennix-feed-header-title {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
   #feed-root-container,
   #feed-scroll-shell {
     flex: 1 1 0 !important;
@@ -157,8 +171,11 @@
     pointer-events: none !important;
     width: 100% !important;
     height: 100% !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
     object-position: center !important;
+  }
+  video.feed-inline-video.feed-inline-video-cover {
+    object-fit: cover !important;
   }
   a.feed-video-route-link {
     position: absolute !important;
@@ -602,7 +619,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="c6479a396dd2a9357698152c153bcb0bb1894afe" data-bundle="index-79d8f2bd33337185ebcec008f9c46e47.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="77ad755f33a1caf2d03e47817428a7e4de5a7cce" data-bundle="index-18096fb8719d7837d36f9b1b3e77f78f.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -648,7 +665,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-79d8f2bd33337185ebcec008f9c46e47.js?v=c6479a39" defer></script>
+  <script src="/_expo/static/js/web/index-18096fb8719d7837d36f9b1b3e77f78f.js?v=77ad755f" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
