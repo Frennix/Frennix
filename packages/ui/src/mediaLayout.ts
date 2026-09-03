@@ -1,32 +1,72 @@
 /** Feed = edge-to-edge, large, aspect-preserving. Inline = card/detail with rounded corners. */
 export type MediaLayout = "feed" | "inline";
 
-/** Placeholder while dimensions load — portrait 4:5 (height/width). */
-export const FEED_PHOTO_FALLBACK_RATIO = 5 / 4;
+/** Instagram-style feed frame buckets. */
+export type FeedMediaBucket = "portrait" | "square" | "landscape";
 
-/** Max portrait frame height/width ratio — caps taller media at 4:5. */
-export const FEED_MAX_PORTRAIT_RATIO = 5 / 4;
+/** Portrait feed frame — 4:5 (height / width). */
+export const FEED_PORTRAIT_FRAME_RATIO = 5 / 4;
+
+/** Placeholder while dimensions load — portrait 4:5. */
+export const FEED_PHOTO_FALLBACK_RATIO = FEED_PORTRAIT_FRAME_RATIO;
+
+/** @deprecated Use FEED_PORTRAIT_FRAME_RATIO */
+export const FEED_MAX_PORTRAIT_RATIO = FEED_PORTRAIT_FRAME_RATIO;
 
 /** Video placeholder before poster dimensions resolve. */
-export const FEED_VIDEO_FALLBACK_RATIO = FEED_PHOTO_FALLBACK_RATIO;
+export const FEED_VIDEO_FALLBACK_RATIO = FEED_PORTRAIT_FRAME_RATIO;
 
 export const INLINE_DEFAULT_HEIGHT = 220;
 export const FEED_MIN_MEDIA_HEIGHT = 280;
 
-/** True when media exceeds the feed portrait cap and needs cover-crop inside the frame. */
+const SQUARE_TOLERANCE = 0.05;
+
+/** Classify media into Instagram-style feed buckets from intrinsic dimensions. */
+export function classifyFeedMediaBucket(
+  mediaWidth: number,
+  mediaHeight: number
+): FeedMediaBucket {
+  if (!mediaWidth || !mediaHeight) return "portrait";
+  const widthOverHeight = mediaWidth / mediaHeight;
+  if (widthOverHeight > 1 + SQUARE_TOLERANCE) return "landscape";
+  if (widthOverHeight >= 1 - SQUARE_TOLERANCE) return "square";
+  return "portrait";
+}
+
+/** Frame height for a full-width feed media container. */
+export function computeFeedMediaFrameHeight(
+  containerWidth: number,
+  mediaWidth: number,
+  mediaHeight: number,
+  fallbackBucket: FeedMediaBucket = "portrait"
+): number {
+  if (!containerWidth) return 0;
+  const bucket =
+    mediaWidth > 0 && mediaHeight > 0
+      ? classifyFeedMediaBucket(mediaWidth, mediaHeight)
+      : fallbackBucket;
+
+  switch (bucket) {
+    case "portrait":
+      return containerWidth * FEED_PORTRAIT_FRAME_RATIO;
+    case "square":
+      return containerWidth;
+    case "landscape":
+      return containerWidth * (mediaHeight / mediaWidth);
+  }
+}
+
+/** Feed media always fills its frame — cover crops excess inside fixed buckets. */
+export function feedMediaContentFit(): "cover" {
+  return "cover";
+}
+
+/** @deprecated Use classifyFeedMediaBucket + feedMediaContentFit */
 export function isFeedPortraitCapped(
   mediaWidth: number,
   mediaHeight: number,
-  maxPortraitRatio: number = FEED_MAX_PORTRAIT_RATIO
+  maxPortraitRatio: number = FEED_PORTRAIT_FRAME_RATIO
 ): boolean {
-  if (!mediaWidth || !mediaHeight) return false;
+  if (!mediaWidth || !mediaHeight) return true;
   return mediaHeight / mediaWidth > maxPortraitRatio;
-}
-
-export function feedMediaContentFit(
-  mediaWidth: number,
-  mediaHeight: number,
-  maxPortraitRatio: number = FEED_MAX_PORTRAIT_RATIO
-): "cover" | "contain" {
-  return isFeedPortraitCapped(mediaWidth, mediaHeight, maxPortraitRatio) ? "cover" : "contain";
 }

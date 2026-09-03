@@ -1,4 +1,4 @@
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { colors, spacing, touchTarget, typography } from "../theme";
 
 /** Matches ACTION_SHEET_FONT_SCALE_MAX — caps Dynamic Type growth to preserve layout. */
@@ -162,8 +162,8 @@ export const feedLayoutTypography = {
 export const feedLayoutStyles = StyleSheet.create({
   root: {
     width: "100%",
-    maxWidth: Platform.OS === "web" ? feedLayout.maxContentWidth : undefined,
-    alignSelf: Platform.OS === "web" ? "center" : undefined,
+    maxWidth: "100%",
+    alignSelf: "stretch" as const,
     backgroundColor: "transparent",
     marginHorizontal: feedLayout.postMarginX,
     marginBottom: feedLayout.postMarginBottom,
@@ -202,6 +202,7 @@ export const feedLayoutStyles = StyleSheet.create({
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
     marginBottom: feedLayout.media.marginBottom,
+    marginHorizontal: 0,
     borderRadius: 0,
     overflow: "hidden",
   },

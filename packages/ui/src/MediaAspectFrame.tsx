@@ -1,12 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Skeleton } from "./Skeleton";
 import {
-  FEED_MAX_PORTRAIT_RATIO,
   FEED_MIN_MEDIA_HEIGHT,
   FEED_PHOTO_FALLBACK_RATIO,
   INLINE_DEFAULT_HEIGHT,
-  isFeedPortraitCapped,
+  classifyFeedMediaBucket,
+  computeFeedMediaFrameHeight,
+  type FeedMediaBucket,
   type MediaLayout,
 } from "./mediaLayout";
 import { computeImageDisplayHeight, useImageDimensions } from "./useImageDimensions";
@@ -14,7 +15,7 @@ import { colors, radius } from "./theme";
 
 export type MediaAspectFrameState = {
   ready: boolean;
-  portraitCapped: boolean;
+  bucket: FeedMediaBucket | null;
 };
 
 type MediaAspectFrameProps = {
@@ -25,8 +26,8 @@ type MediaAspectFrameProps = {
   maxHeight?: number;
   /** height / width when dimensions are unknown */
   fallbackRatio?: number;
-  /** Cap portrait frame height at width × ratio (e.g. 5/4 for 4:5 max). */
-  maxPortraitRatio?: number;
+  /** When feed dimensions are unknown, assume this Instagram bucket (videos → portrait 4:5). */
+  feedFallbackBucket?: FeedMediaBucket;
   children: (frame: MediaAspectFrameState) => ReactNode;
 };
 
@@ -36,43 +37,42 @@ export function MediaAspectFrame({
   style,
   maxHeight,
   fallbackRatio = FEED_PHOTO_FALLBACK_RATIO,
-  maxPortraitRatio,
+  feedFallbackBucket = "portrait",
   children,
 }: MediaAspectFrameProps) {
   const [layoutWidth, setLayoutWidth] = useState(0);
   const { dimensions, failed } = useImageDimensions(dimensionsUri);
 
   const isFeed = layout === "feed";
-  const portraitCap = isFeed ? (maxPortraitRatio ?? FEED_MAX_PORTRAIT_RATIO) : maxPortraitRatio;
+
+  const bucket = useMemo<FeedMediaBucket | null>(() => {
+    if (!isFeed) return null;
+    if (dimensions) return classifyFeedMediaBucket(dimensions.width, dimensions.height);
+    return feedFallbackBucket;
+  }, [dimensions, feedFallbackBucket, isFeed]);
 
   const displayHeight = useMemo(() => {
     if (!layoutWidth) {
       return isFeed ? FEED_MIN_MEDIA_HEIGHT : INLINE_DEFAULT_HEIGHT;
+    }
+    if (isFeed) {
+      return computeFeedMediaFrameHeight(
+        layoutWidth,
+        dimensions?.width ?? 0,
+        dimensions?.height ?? 0,
+        feedFallbackBucket
+      );
     }
     if (dimensions) {
       return computeImageDisplayHeight(
         layoutWidth,
         dimensions.width,
         dimensions.height,
-        maxHeight,
-        portraitCap
+        maxHeight
       );
     }
-    if (isFeed) {
-      return Math.max(layoutWidth * fallbackRatio, FEED_MIN_MEDIA_HEIGHT);
-    }
     return INLINE_DEFAULT_HEIGHT;
-  }, [dimensions, fallbackRatio, isFeed, layoutWidth, maxHeight, portraitCap]);
-
-  const portraitCapped = useMemo(
-    () =>
-      Boolean(
-        dimensions &&
-          portraitCap != null &&
-          isFeedPortraitCapped(dimensions.width, dimensions.height, portraitCap)
-      ),
-    [dimensions, portraitCap]
-  );
+  }, [dimensions, feedFallbackBucket, isFeed, layoutWidth, maxHeight]);
 
   const frameStyle = useMemo(
     () => [
@@ -86,16 +86,24 @@ export function MediaAspectFrame({
 
   const ready = Boolean(dimensions) || failed || (isFeed && layoutWidth > 0);
 
+  const webFrameProps =
+    Platform.OS === "web" && isFeed && bucket
+      ? ({
+          "data-frennix-feed-media-frame": bucket,
+        } as object)
+      : null;
+
   return (
     <View
       style={frameStyle}
+      {...webFrameProps}
       onLayout={(event) => {
         const width = event.nativeEvent.layout.width;
         if (width > 0 && width !== layoutWidth) setLayoutWidth(width);
       }}
     >
       {!ready ? <Skeleton width="100%" height="100%" style={styles.skeleton} /> : null}
-      {children({ ready: ready || layoutWidth > 0, portraitCapped })}
+      {children({ ready: ready || layoutWidth > 0, bucket })}
     </View>
   );
 }
@@ -104,12 +112,13 @@ const styles = StyleSheet.create({
   frame: {
     width: "100%",
     overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "stretch",
+    justifyContent: "flex-start",
   },
   frameFeed: {
     borderRadius: 0,
     backgroundColor: colors.background,
+    alignSelf: "stretch",
   },
   frameFeedLoading: {
     minHeight: FEED_MIN_MEDIA_HEIGHT,
@@ -117,6 +126,8 @@ const styles = StyleSheet.create({
   frameInline: {
     borderRadius: radius.md,
     backgroundColor: colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
   },
   skeleton: {
     ...StyleSheet.absoluteFillObject,

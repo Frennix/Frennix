@@ -131,45 +131,53 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed inline video uses contain unless portrait capped",
+    name: "Feed inline video uses cover in full-width Instagram buckets",
     run: () => {
       const player = read("packages/ui/src/FeedVideoPlayer.tsx");
       const styles = read("lib/web-document-styles.js");
-      if (!player.includes("feedMediaContentFit")) {
-        throw new Error("FeedVideoPlayer must derive fit from media aspect ratio");
+      const layout = read("packages/ui/src/mediaLayout.ts");
+      if (!player.includes('objectFit: "cover"')) {
+        throw new Error("FeedVideoPlayer must use cover fit for feed inline video");
       }
-      if (!styles.includes("object-fit: contain !important")) {
-        throw new Error("feed-inline-video must default to contain on web");
+      if (!player.includes("feedFallbackBucket")) {
+        throw new Error("FeedVideoPlayer must default feed video frames to portrait bucket");
       }
-      if (!styles.includes("feed-inline-video-cover")) {
-        throw new Error("feed-inline-video-cover must apply cover when portrait is capped");
+      if (!styles.includes("object-fit: cover !important")) {
+        throw new Error("feed-inline-video must use cover on web");
+      }
+      if (!layout.includes("classifyFeedMediaBucket")) {
+        throw new Error("mediaLayout must classify feed media into portrait/square/landscape buckets");
+      }
+      if (!styles.includes("aspect-ratio: 4 / 5")) {
+        throw new Error("portrait feed media frame must use 4:5 aspect ratio on web");
       }
     },
   },
   {
-    name: "Feed media height respects 4:5 portrait cap on phone width",
+    name: "Feed media height uses Instagram buckets on phone width",
     run: () => {
       const phoneWidth = 390;
-      const maxPortraitRatio = 5 / 4;
-      const computeHeight = (
-        containerWidth: number,
-        mediaWidth: number,
-        mediaHeight: number,
-        cap: number
-      ) => {
-        const aspectRatio = mediaHeight / mediaWidth;
-        const cappedRatio = aspectRatio > cap ? cap : aspectRatio;
-        return containerWidth * cappedRatio;
+      const portraitFrameRatio = 5 / 4;
+      const classify = (mediaWidth: number, mediaHeight: number) => {
+        const widthOverHeight = mediaWidth / mediaHeight;
+        if (widthOverHeight > 1.05) return "landscape";
+        if (widthOverHeight >= 0.95) return "square";
+        return "portrait";
       };
-      const portrait916 = computeHeight(phoneWidth, 1080, 1920, maxPortraitRatio);
-      const square = computeHeight(phoneWidth, 1080, 1080, maxPortraitRatio);
-      const landscape = computeHeight(phoneWidth, 1920, 1080, maxPortraitRatio);
-      const cappedExpected = phoneWidth * maxPortraitRatio;
+      const frameHeight = (bucket: string, w: number, h: number) => {
+        if (bucket === "portrait") return phoneWidth * portraitFrameRatio;
+        if (bucket === "square") return phoneWidth;
+        return phoneWidth * (h / w);
+      };
+      const portrait916 = frameHeight(classify(1080, 1920), 1080, 1920);
+      const square = frameHeight(classify(1080, 1080), 1080, 1080);
+      const landscape = frameHeight(classify(1920, 1080), 1920, 1080);
+      const portraitExpected = phoneWidth * portraitFrameRatio;
       if (portrait916 <= phoneWidth) {
-        throw new Error(`Portrait feed frame must be taller than wide; got ${portrait916}px at ${phoneWidth}px width`);
+        throw new Error(`Portrait feed frame must be taller than wide; got ${portrait916}px`);
       }
-      if (Math.abs(portrait916 - cappedExpected) > 0.5) {
-        throw new Error(`Portrait 9:16 feed frame must cap at 4:5 (${cappedExpected}px), got ${portrait916}px`);
+      if (Math.abs(portrait916 - portraitExpected) > 0.5) {
+        throw new Error(`Portrait feed frame must be 4:5 (${portraitExpected}px), got ${portrait916}px`);
       }
       if (Math.abs(square - phoneWidth) > 0.5) {
         throw new Error(`Square feed frame must be 1:1 (${phoneWidth}px), got ${square}px`);

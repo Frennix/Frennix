@@ -141,7 +141,7 @@ const TabsShell = memo(function TabsShell() {
           headerTitle: renderFeedHeaderTitle,
           headerStyle: {
             backgroundColor: colors.backgroundFeed,
-            ...(Platform.OS === "web" ? { minHeight: 84 } : null),
+            ...(Platform.OS === "web" ? { minHeight: 92 } : null),
           },
           tabBarLabel: "Feed",
           tabBarIcon: ({ color, size }) => <AppIcon name="feed" color={color} size={size} />,

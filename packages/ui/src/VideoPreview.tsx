@@ -9,8 +9,7 @@ import {
 } from "react-native";
 import { CachedImage } from "./CachedImage";
 import { MediaAspectFrame } from "./MediaAspectFrame";
-import { FEED_MAX_PORTRAIT_RATIO, feedMediaContentFit, type MediaLayout } from "./mediaLayout";
-import { useImageDimensions } from "./useImageDimensions";
+import { type MediaLayout } from "./mediaLayout";
 import { colors, radius } from "./theme";
 import type { VideoPosterState } from "./useVideoPoster";
 import { useVideoPoster } from "./useVideoPoster";
@@ -51,11 +50,7 @@ export function VideoPreview({
 
   const isFeed = layout === "feed" && !compact;
   const dimensionsUri = posterUri ?? thumbnailUrl ?? undefined;
-  const { dimensions: posterDimensions } = useImageDimensions(isFeed ? dimensionsUri : undefined);
-  const posterFit =
-    posterDimensions != null
-      ? feedMediaContentFit(posterDimensions.width, posterDimensions.height, FEED_MAX_PORTRAIT_RATIO)
-      : "contain";
+  const posterFit = "cover";
 
   useEffect(() => {
     setPosterImageFailed(false);
@@ -142,7 +137,7 @@ export function VideoPreview({
         dimensionsUri={dimensionsUri}
         layout="feed"
         style={style}
-        maxPortraitRatio={FEED_MAX_PORTRAIT_RATIO}
+        feedFallbackBucket="portrait"
       >
         {() => (
           <View style={[styles.containerFeed, styles.feedFill, styles.feedShell]}>

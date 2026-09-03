@@ -30,8 +30,6 @@ import {
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
-import { FEED_MAX_PORTRAIT_RATIO, feedMediaContentFit, type MediaLayout } from "./mediaLayout";
-import { useImageDimensions } from "./useImageDimensions";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
@@ -250,11 +248,6 @@ export function FeedVideoPlayer({
   }, []);
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
-  const { dimensions: mediaDimensions } = useImageDimensions(dimensionsUri);
-  const feedVideoFit =
-    mediaDimensions != null
-      ? feedMediaContentFit(mediaDimensions.width, mediaDimensions.height, FEED_MAX_PORTRAIT_RATIO)
-      : "contain";
 
   useEffect(() => {
     setFailed(false);
@@ -446,7 +439,7 @@ export function FeedVideoPlayer({
           dimensionsUri={dimensionsUri}
           layout="feed"
           style={style}
-          maxPortraitRatio={FEED_MAX_PORTRAIT_RATIO}
+          feedFallbackBucket="portrait"
         >
           {() => <MediaLoadError label="Video unavailable" onRetry={handleRetry} />}
         </MediaAspectFrame>
@@ -488,7 +481,7 @@ export function FeedVideoPlayer({
     Platform.OS === "web" ? (
       createElement("video", {
         key: retryKey,
-        className: feedVideoFit === "cover" ? "feed-inline-video feed-inline-video-cover" : "feed-inline-video",
+        className: "feed-inline-video feed-inline-video-cover",
         ref: (node: HTMLVideoElement | null) => {
           webVideoRef.current = node;
         },
@@ -501,7 +494,7 @@ export function FeedVideoPlayer({
         style: {
           width: "100%",
           height: "100%",
-          objectFit: feedVideoFit,
+          objectFit: "cover",
           objectPosition: "center",
           backgroundColor: colors.background,
           pointerEvents: "none",
@@ -530,7 +523,7 @@ export function FeedVideoPlayer({
               }}
               source={{ uri }}
               style={styles.videoFill}
-              resizeMode={feedVideoFit === "cover" ? ResizeMode.COVER : ResizeMode.CONTAIN}
+              resizeMode={ResizeMode.COVER}
               shouldPlay={shouldPlay}
               isMuted={muted}
               isLooping
@@ -560,7 +553,7 @@ export function FeedVideoPlayer({
         dimensionsUri={dimensionsUri}
         layout="feed"
         style={style}
-        maxPortraitRatio={FEED_MAX_PORTRAIT_RATIO}
+        feedFallbackBucket="portrait"
       >
         {() => (
           <View

@@ -89,8 +89,8 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("maxPortraitRatio:")) {
         throw new Error("feedMediaRules must cap portrait media at 4:5");
       }
-      if (!src.includes('contentFit: "contain"')) {
-        throw new Error("feedMediaRules must use contain fit by default");
+      if (!src.includes('contentFit: "cover"')) {
+        throw new Error("feedMediaRules must use cover fit for feed media");
       }
       if (!src.includes("preserveAspectRatio: true")) {
         throw new Error("feedMediaRules must preserve aspect ratio");
