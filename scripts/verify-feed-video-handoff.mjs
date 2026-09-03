@@ -135,8 +135,9 @@ function main() {
     pass(
       "Feed tap sets handoff id before opening gallery",
       (() => {
-        const start = feedIndex.indexOf("onMediaPress: (post: Post");
-        const block = feedIndex.slice(start, start + 900);
+        const marker = "onMediaPress: (post: Post, uri: string, index: number)";
+        const start = feedIndex.indexOf(marker);
+        const block = feedIndex.slice(start, start + 3200);
         return (
           block.includes("setFeedVideoFullscreenHandoff(playbackId)") &&
           block.includes("openGallery(") &&

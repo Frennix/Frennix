@@ -9,6 +9,7 @@ import { flexFill } from "@/lib/flex-layout";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { usesMobileWebVideoRoute } from "@/lib/mobile-web-video-route";
 import { useImmersiveVideoPostActions } from "@/lib/useImmersiveVideoPostActions";
+import { useBuildImmersiveVideoContext } from "@/lib/useBuildImmersiveVideoContext";
 import { requestFeedScrollReturnRestore } from "@/lib/web-feed-scroll-restore";
 import {
   consumeVideoViewerReturnState,
@@ -87,6 +88,7 @@ export default function PostVideoRoute() {
     post,
     userId
   );
+  const buildImmersiveContext = useBuildImmersiveVideoContext(userId);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,6 +146,7 @@ export default function PostVideoRoute() {
         mediaIndex={mediaIndex}
         resumeHandoff={resumeHandoff}
         postActions={postActions}
+        buildImmersiveContext={buildImmersiveContext}
         userId={userId}
         authorProfile={profile ?? undefined}
         onBack={handleBack}

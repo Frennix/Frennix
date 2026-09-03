@@ -46,6 +46,11 @@ import {
 } from "@frennix/types";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import {
+  buildFeedVideoPlaylistFromPosts,
+  buildPlaylistEntriesFromPosts,
+} from "@/lib/immersive-video-playlist";
+import type { ImmersiveVideoPlaylistState } from "@/lib/immersive-video-playlist-state";
+import {
   navigateToPostCommentsFromVideoViewer,
   usesMobileWebCommentsRoute,
 } from "@/lib/mobile-web-comments-route";
@@ -833,19 +838,57 @@ export default function HomeScreen() {
         postType: displayPost.post_type,
         thumbnailUrl: displayPost.thumbnail_url,
       });
+      const isVideo = mediaItems[index]?.kind === "video";
       const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
       setFeedVideoFullscreenHandoff(playbackId);
       const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
       setCarouselIndex(post.id, index);
-      const immersiveVideo =
-        mediaItems[index]?.kind === "video" ? buildImmersiveVideoContext(post) : undefined;
-      openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
-        setCarouselIndex(post.id, finalIndex);
+      const immersiveVideo = isVideo ? buildImmersiveVideoContext(post) : undefined;
+
+      let immersiveVideoPlaylist: ImmersiveVideoPlaylistState | undefined;
+      if (isVideo && immersiveVideo && usesMobileWebCommentsRoute()) {
+        const snapshot = buildFeedVideoPlaylistFromPosts(posts, displayPost.id, index);
+        immersiveVideoPlaylist = {
+          entries: snapshot.entries,
+          initialIndex: snapshot.initialIndex,
+          initialHandoff: videoHandoff,
+          initialHandoffPlaybackId: playbackId,
+          hasMore: Boolean(hasNextPage),
+          originMediaIndex: index,
+          getPost: (postId) =>
+            posts.find((candidate) => (candidate.shared_post ?? candidate).id === postId),
+          buildImmersiveContext: buildImmersiveVideoContext,
+          fetchMore: async () => {
+            const beforeCount =
+              queryClient
+                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+                ?.pages.flatMap((page) => page.posts).length ?? posts.length;
+            await fetchNextPage();
+            const updatedPosts =
+              queryClient
+                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+                ?.pages.flatMap((page) => page.posts) ?? [];
+            const newPosts = updatedPosts.slice(beforeCount);
+            const entries = buildPlaylistEntriesFromPosts(newPosts);
+            const feedState = queryClient.getQueryState(["feed", userId]);
+            const stillHasMore = Boolean(
+              (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
+                ?.nextCursor
+            );
+            return { entries, hasMore: stillHasMore };
+          },
+        };
+      }
+
+      openGallery(displayPost.media_urls ?? [], index, (finalIndex, context) => {
+        const restorePostId = context?.postId ?? post.id;
+        setCarouselIndex(restorePostId, context?.mediaIndex ?? finalIndex);
       }, {
         postType: displayPost.post_type,
         thumbnailUrl: displayPost.thumbnail_url,
         videoHandoff,
         immersiveVideo,
+        immersiveVideoPlaylist,
       });
     },
   };
