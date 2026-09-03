@@ -35,7 +35,6 @@ import {
 } from "@/lib/safari-visual-viewport";
 import { lockWebModalScroll, restoreWebDocumentScrollLock, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
 import { useCommentComposerHostBottomInset, useCommentsOverlayBottomReserve } from "@/lib/use-comment-composer-host-inset";
-import { useVideoCommentsComposerPosition } from "@/lib/use-video-comments-composer-position";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
@@ -424,19 +423,27 @@ export function CommentsBottomSheet({
 
   const closedComposerBottomInset = Math.max(insets.bottom, spacing.sm);
   const overlayBottomReserve = useCommentsOverlayBottomReserve(
-    visible && Platform.OS === "web" && useMobileWebFullscreen && !useVideoOverlay
+    visible && Platform.OS === "web" && useMobileWebFullscreen
+  );
+  const videoOverlayBottomReserve = useCommentsOverlayBottomReserve(
+    visible && Platform.OS === "web" && useVideoOverlay
   );
   const composerHostBottomInset = useCommentComposerHostBottomInset(
     closedComposerBottomInset,
     visible && Platform.OS === "web" && !useMobileWebFullscreen && !useVideoOverlay
   );
-  const { composerHeight: videoComposerHeight } = useVideoCommentsComposerPosition(
-    visible && Platform.OS === "web" && useVideoOverlay
-  );
   const headerTopInset = Math.max(insets.top, spacing.sm);
   const mobileOverlayTop = mobileViewport?.offsetTop ?? 0;
   const mobileVisualHeight = mobileViewport?.visualHeight ?? 640;
   const mobileOverlayHeight = Math.max(180, mobileVisualHeight - overlayBottomReserve);
+  const effectiveVideoVisualHeight = Math.max(
+    180,
+    videoOverlayLayout.visualHeight - videoOverlayBottomReserve
+  );
+  const effectiveVideoColumnHeight = Math.max(
+    0,
+    effectiveVideoVisualHeight - videoOverlayLayout.peekHeight
+  );
 
   if (!visible) return null;
 
@@ -490,9 +497,7 @@ export function CommentsBottomSheet({
       ]}
       contentContainerStyle={[
         styles.listContent,
-        useVideoOverlay
-          ? [styles.listContentVideoOverlay, { paddingBottom: videoComposerHeight + spacing.xs }]
-          : null,
+        useVideoOverlay ? styles.listContentVideoOverlay : null,
       ]}
       keyboardShouldPersistTaps="always"
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -550,7 +555,7 @@ export function CommentsBottomSheet({
         WEB_MOBILE_VIDEO_OVERLAY_ROOT,
         {
           top: videoOverlayLayout.offsetTop,
-          height: videoOverlayLayout.visualHeight,
+          height: effectiveVideoVisualHeight,
           bottom: undefined,
         },
       ]}
@@ -577,8 +582,7 @@ export function CommentsBottomSheet({
           styles.videoOverlayColumn,
           {
             top: videoOverlayLayout.peekHeight,
-            height: videoOverlayLayout.height,
-            paddingBottom: Platform.OS === "web" ? videoComposerHeight : 0,
+            height: effectiveVideoColumnHeight,
           },
         ]}
       >
@@ -595,18 +599,15 @@ export function CommentsBottomSheet({
           <View {...headerPanResponder.panHandlers}>{headerRow}</View>
         </View>
         {listRegion}
-      </View>
-      <View
-        style={[styles.composerHost, styles.composerHostVideoOverlay]}
-        {...sheetSurfaceProps}
-        {...(Platform.OS === "web"
-          ? ({
-              "data-frennix-comment-composer-host": "true",
-              "data-video-comment-composer": "true",
-            } as object)
-          : null)}
-      >
-        {composer}
+        <View
+          style={[styles.composerHost, styles.composerHostVideoOverlay]}
+          {...sheetSurfaceProps}
+          {...(Platform.OS === "web"
+            ? ({ "data-frennix-comment-composer-host": "true" } as object)
+            : null)}
+        >
+          {composer}
+        </View>
       </View>
     </View>
   );
@@ -889,10 +890,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     width: "100%",
     maxWidth: "100%",
-    paddingTop: 0,
-    paddingHorizontal: 0,
-    paddingBottom: 0,
-    borderTopWidth: 0,
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
     ...(Platform.OS === "web"
       ? ({
           boxSizing: "border-box",

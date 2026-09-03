@@ -150,19 +150,12 @@ if (!html.includes('name="theme-color"')) {
 }
 
 const viewport =
-  'content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover, interactive-widget=resizes-content"';
-if (!html.includes("interactive-widget=resizes-content")) {
-  if (html.includes("viewport-fit=cover")) {
-    html = html.replace(
-      /content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"/,
-      viewport
-    );
-  } else {
-    html = html.replace(
-      /content="width=device-width, initial-scale=1, shrink-to-fit=no"/,
-      viewport
-    );
-  }
+  'content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"';
+if (!html.includes("viewport-fit=cover")) {
+  html = html.replace(
+    /content="width=device-width, initial-scale=1, shrink-to-fit=no"/,
+    viewport
+  );
 }
 
 const patchId = "frennix-web-scroll";
