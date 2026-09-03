@@ -30,6 +30,15 @@ import {
   subscribeFeedVideoSoundPreference,
 } from "./feedVideoPlaybackCoordinator";
 import {
+  FEED_VIDEO_STALL_SPINNER_MS,
+  isFeedVideoBackgroundPreloadDisabled,
+  isFeedVideoPreloadGranted,
+  releaseFeedVideoPreloadSlot,
+  setFeedVideoPlaybackZone,
+  setFeedVideoPreloadCandidate,
+  subscribeFeedVideoPreloadSlots,
+} from "./feedVideoPreloadCoordinator";
+import {
   configureFeedWebVideoElement,
   isFeedVideoDomAdopted,
   registerFeedVideoDom,
@@ -95,7 +104,8 @@ export function FeedVideoPlayer({
   inViewRef.current = inView;
   const [muted, setMuted] = useState(() => !isFeedVideoSoundEnabled());
   const [playbackAllowed, setPlaybackAllowed] = useState(() => isFeedVideoPlaybackAllowed());
-  const [buffering, setBuffering] = useState(true);
+  const [showStallSpinner, setShowStallSpinner] = useState(false);
+  const [preloadGranted, setPreloadGranted] = useState(false);
   const [hasRenderedFrame, setHasRenderedFrame] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -103,6 +113,9 @@ export function FeedVideoPlayer({
   const webVideoMountRef = useRef<HTMLDivElement | null>(null);
   const [videoDomAdopted, setVideoDomAdopted] = useState(false);
   const shouldPlayRef = useRef(false);
+  const preloadGrantedRef = useRef(false);
+  preloadGrantedRef.current = preloadGranted;
+  const stallSpinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
   const nativeIntersectionRef = useRef<View>(null);
@@ -113,6 +126,28 @@ export function FeedVideoPlayer({
   } | null>(null);
   const visualReadyRef = useRef(false);
   const openTapStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearStallSpinnerTimer = useCallback(() => {
+    if (stallSpinnerTimerRef.current) {
+      clearTimeout(stallSpinnerTimerRef.current);
+      stallSpinnerTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleStallSpinner = useCallback(() => {
+    if (!shouldPlayRef.current) return;
+    clearStallSpinnerTimer();
+    stallSpinnerTimerRef.current = setTimeout(() => {
+      if (shouldPlayRef.current) {
+        setShowStallSpinner(true);
+      }
+    }, FEED_VIDEO_STALL_SPINNER_MS);
+  }, [clearStallSpinnerTimer]);
+
+  const clearStallSpinner = useCallback(() => {
+    clearStallSpinnerTimer();
+    setShowStallSpinner(false);
+  }, [clearStallSpinnerTimer]);
 
   const notifyVisualReady = useCallback(() => {
     if (visualReadyRef.current) return;
@@ -133,17 +168,32 @@ export function FeedVideoPlayer({
 
   const handleScrollOutOfView = useCallback(() => {
     pauseMediaElement();
+    clearStallSpinner();
     setInView(false);
     if (playbackId) {
+      setFeedVideoPlaybackZone(playbackId, false);
       releaseFeedVideoDueToVisibility(playbackId);
     }
-  }, [pauseMediaElement, playbackId]);
+  }, [clearStallSpinner, pauseMediaElement, playbackId]);
 
   const handleScrollIntoView = useCallback(() => {
     setInView(true);
-    if (playbackId && isFeedVideoPlaybackAllowed()) {
-      requestFeedVideoPlay(playbackId);
+    if (playbackId) {
+      setFeedVideoPlaybackZone(playbackId, true);
+      if (isFeedVideoPlaybackAllowed()) {
+        requestFeedVideoPlay(playbackId);
+      }
     }
+  }, [playbackId]);
+
+  const handleEnterPreloadZone = useCallback(() => {
+    if (!playbackId || isFeedVideoBackgroundPreloadDisabled()) return;
+    setFeedVideoPreloadCandidate(playbackId, true);
+  }, [playbackId]);
+
+  const handleExitPreloadZone = useCallback(() => {
+    if (!playbackId) return;
+    setFeedVideoPreloadCandidate(playbackId, false);
   }, [playbackId]);
 
   const shouldPlay = Boolean(
@@ -185,7 +235,7 @@ export function FeedVideoPlayer({
 
   const intersectionTargetRef =
     Platform.OS === "web"
-      ? (webVideoRef as RefObject<Element | null>)
+      ? (webVideoMountRef as RefObject<Element | null>)
       : (nativeIntersectionRef as unknown as RefObject<Element | null>);
 
   useFeedVideoIntersectionObserver(
@@ -193,8 +243,30 @@ export function FeedVideoPlayer({
     intersectionEnabled,
     handleScrollOutOfView,
     handleScrollIntoView,
-    shouldEnterAbove
+    shouldEnterAbove,
+    {
+      onEnterPreloadZone: handleEnterPreloadZone,
+      onExitPreloadZone: handleExitPreloadZone,
+    }
   );
+
+  useEffect(() => {
+    if (!playbackId) return;
+    const syncPreloadGranted = () => {
+      setPreloadGranted(isFeedVideoPreloadGranted(playbackId));
+    };
+    syncPreloadGranted();
+    return subscribeFeedVideoPreloadSlots(syncPreloadGranted);
+  }, [playbackId]);
+
+  useEffect(() => {
+    return () => {
+      clearStallSpinnerTimer();
+      if (playbackId) {
+        releaseFeedVideoPreloadSlot(playbackId);
+      }
+    };
+  }, [clearStallSpinnerTimer, playbackId]);
 
   useEffect(() => {
     if (!playbackId) return;
@@ -269,8 +341,8 @@ export function FeedVideoPlayer({
   useEffect(() => {
     setFailed(false);
     setHasRenderedFrame(false);
-    setBuffering(true);
-  }, [uri, retryKey]);
+    clearStallSpinner();
+  }, [clearStallSpinner, uri, retryKey]);
 
   const presentationPosterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? null;
 
@@ -278,8 +350,8 @@ export function FeedVideoPlayer({
     const video = webVideoRef.current;
     if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
     setHasRenderedFrame(true);
-    setBuffering(false);
-  }, []);
+    clearStallSpinner();
+  }, [clearStallSpinner]);
 
   useEffect(() => {
     if (!playbackId) return;
@@ -309,7 +381,7 @@ export function FeedVideoPlayer({
     video.muted = mutedRef.current;
     video.loop = true;
     video.playsInline = true;
-    video.preload = inViewRef.current ? "auto" : "metadata";
+    video.preload = preloadGrantedRef.current ? "auto" : "metadata";
     const posterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
     if (posterUri) video.poster = posterUri;
     Object.assign(video.style, {
@@ -335,9 +407,10 @@ export function FeedVideoPlayer({
     };
     const onWaiting = () => {
       if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
-      setBuffering(true);
+      scheduleStallSpinner();
     };
     const onPlaying = () => {
+      clearStallSpinner();
       markFrameReady();
     };
     const onTimeUpdate = () => {
@@ -358,7 +431,7 @@ export function FeedVideoPlayer({
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       video.style.opacity = "1";
       setHasRenderedFrame(true);
-      setBuffering(false);
+      clearStallSpinner();
     }
     setVideoDomAdopted(false);
     if (playbackId) {
@@ -392,6 +465,8 @@ export function FeedVideoPlayer({
     markFrameReady,
     notifyVisualReady,
     playbackId,
+    scheduleStallSpinner,
+    clearStallSpinner,
     resolvedPoster.posterUri,
     retryKey,
     thumbnailUrl,
@@ -404,6 +479,24 @@ export function FeedVideoPlayer({
       webVideoRef.current?.pause();
     };
   }, [playbackId]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const video = webVideoRef.current;
+    if (!video || !preloadGranted) return;
+    if (video.preload !== "auto") {
+      video.preload = "auto";
+    }
+    if (video.readyState === HTMLMediaElement.HAVE_NOTHING) {
+      video.load();
+    }
+  }, [preloadGranted, uri, retryKey]);
+
+  useEffect(() => {
+    if (!shouldPlay) {
+      clearStallSpinner();
+    }
+  }, [clearStallSpinner, shouldPlay]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -646,7 +739,10 @@ export function FeedVideoPlayer({
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);
   const showBufferingSpinner =
-    buffering && !videoDomAdopted && !isFeedVideoFullscreenHandoff(playbackId);
+    showStallSpinner &&
+    shouldPlay &&
+    !videoDomAdopted &&
+    !isFeedVideoFullscreenHandoff(playbackId);
 
   const videoBody =
     Platform.OS === "web" ? (
@@ -705,8 +801,13 @@ export function FeedVideoPlayer({
                 }
                 if (status.isPlaying && status.durationMillis != null) {
                   setHasRenderedFrame(true);
+                  clearStallSpinner();
                 }
-                setBuffering(status.isBuffering);
+                if (status.isBuffering) {
+                  scheduleStallSpinner();
+                } else {
+                  clearStallSpinner();
+                }
               }}
             />
           );

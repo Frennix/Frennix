@@ -78,7 +78,21 @@ function main() {
       "Feed buffering spinner stays transparent over poster or last frame",
       feedPlayer.includes("bufferingSpinnerLayer") &&
         feedPlayer.includes('backgroundColor: "transparent"') &&
-        feedPlayer.includes('size="small"')
+        feedPlayer.includes('size="small"') &&
+        feedPlayer.includes("FEED_VIDEO_STALL_SPINNER_MS")
+    ) && ok;
+
+  ok =
+    pass(
+      "Feed video preloads one screen ahead with capped concurrent slots",
+      readSource("packages/ui/src/useFeedVideoIntersectionObserver.ts").includes(
+        'FEED_VIDEO_PRELOAD_ROOT_MARGIN = "100% 0px 100% 0px"'
+      ) &&
+        readSource("packages/ui/src/feedVideoPreloadCoordinator.ts").includes(
+          "FEED_VIDEO_MAX_PRELOAD_SLOTS = 3"
+        ) &&
+        feedPlayer.includes("setFeedVideoPreloadCandidate") &&
+        feedPlayer.includes("preloadGranted")
     ) && ok;
 
   ok =
@@ -134,10 +148,11 @@ function main() {
 
   ok =
     pass(
-      "No video.load() in feed/fullscreen transition path",
-      !feedPlayer.includes(".load()") &&
-        !fullscreen.includes(".load()") &&
-        !dom.includes(".load()")
+      "No video.load() during fullscreen handoff path",
+      !fullscreen.includes(".load()") &&
+        !dom.includes(".load()") &&
+        feedPlayer.includes("preloadGranted") &&
+        feedPlayer.includes("HAVE_NOTHING")
     ) && ok;
 
   ok =

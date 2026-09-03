@@ -73,10 +73,17 @@ export {
 } from "./feedVideoDom";
 export { FeedVideoPlaybackGate } from "./FeedVideoPlaybackGate";
 export {
-  useFeedVideoIntersectionObserver,
+  FEED_VIDEO_PRELOAD_ROOT_MARGIN,
   FEED_VIDEO_VISIBILITY_THRESHOLD,
   FEED_SCROLL_ROOT_ID,
+  useFeedVideoIntersectionObserver,
 } from "./useFeedVideoIntersectionObserver";
+export {
+  FEED_VIDEO_MAX_PRELOAD_SLOTS,
+  FEED_VIDEO_STALL_SPINNER_MS,
+  isFeedVideoBackgroundPreloadDisabled,
+  isFeedVideoPreloadGranted,
+} from "./feedVideoPreloadCoordinator";
 export { useMediaVisibility, MEDIA_AUTOPLAY_VISIBILITY_THRESHOLD } from "./useMediaVisibility";
 export { QueryErrorState } from "./QueryErrorState";
 export { MenuIconButton } from "./MenuIconButton";

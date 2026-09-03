@@ -4,6 +4,12 @@ import { Dimensions, Platform } from "react-native";
 /** Pause feed video when less than 25% of it remains visible in the scrollport. */
 export const FEED_VIDEO_VISIBILITY_THRESHOLD = 0.25;
 
+/**
+ * Expand the feed scroll root by one viewport height above and below so videos
+ * begin preparing roughly one screen before they enter view.
+ */
+export const FEED_VIDEO_PRELOAD_ROOT_MARGIN = "100% 0px 100% 0px";
+
 /** Home feed scroll container — IntersectionObserver root on web/PWA. */
 export const FEED_SCROLL_ROOT_ID = "feed-scroll-list";
 
@@ -24,10 +30,16 @@ function resolveDomNode(ref: RefObject<unknown>): Element | null {
   return null;
 }
 
+export type FeedVideoIntersectionObserverOptions = {
+  onEnterPreloadZone?: () => void;
+  onExitPreloadZone?: () => void;
+  preloadRootMargin?: string;
+};
+
 /**
  * Observes a feed video against the feed scrollport (not the browser window).
- * Calls onAboveThreshold when visibility crosses upward past the threshold (autoplay).
- * Calls onBelowThreshold synchronously when visibility drops — callers must pause media there.
+ * Playback uses the visible scrollport with a 25% visibility threshold.
+ * Optional preload callbacks fire when the element enters an expanded root margin.
  */
 export function useFeedVideoIntersectionObserver(
   targetRef: RefObject<Element | null>,
@@ -35,7 +47,8 @@ export function useFeedVideoIntersectionObserver(
   onBelowThreshold: () => void,
   onAboveThreshold?: () => void,
   /** When true while above threshold, fires enter even if IO already marked visible (fixes inView desync). */
-  shouldEnterAbove?: () => boolean
+  shouldEnterAbove?: () => boolean,
+  options?: FeedVideoIntersectionObserverOptions
 ) {
   const onBelowThresholdRef = useRef(onBelowThreshold);
   onBelowThresholdRef.current = onBelowThreshold;
@@ -43,16 +56,27 @@ export function useFeedVideoIntersectionObserver(
   onAboveThresholdRef.current = onAboveThreshold;
   const shouldEnterAboveRef = useRef(shouldEnterAbove);
   shouldEnterAboveRef.current = shouldEnterAbove;
+  const onEnterPreloadZoneRef = useRef(options?.onEnterPreloadZone);
+  onEnterPreloadZoneRef.current = options?.onEnterPreloadZone;
+  const onExitPreloadZoneRef = useRef(options?.onExitPreloadZone);
+  onExitPreloadZoneRef.current = options?.onExitPreloadZone;
+  const preloadRootMargin = options?.preloadRootMargin ?? FEED_VIDEO_PRELOAD_ROOT_MARGIN;
   const hasMetThresholdRef = useRef(false);
+  const inPreloadZoneRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
       hasMetThresholdRef.current = false;
+      if (inPreloadZoneRef.current) {
+        inPreloadZoneRef.current = false;
+        onExitPreloadZoneRef.current?.();
+      }
       return;
     }
 
     if (Platform.OS === "web" && typeof IntersectionObserver !== "undefined") {
-      let observer: IntersectionObserver | null = null;
+      let playbackObserver: IntersectionObserver | null = null;
+      let preloadObserver: IntersectionObserver | null = null;
       let rafId = 0;
       let cancelled = false;
 
@@ -71,7 +95,7 @@ export function useFeedVideoIntersectionObserver(
           return;
         }
 
-        observer = new IntersectionObserver(
+        playbackObserver = new IntersectionObserver(
           (entries) => {
             const entry = entries[0];
             if (!entry) return;
@@ -102,7 +126,30 @@ export function useFeedVideoIntersectionObserver(
           }
         );
 
-        observer.observe(target);
+        playbackObserver.observe(target);
+
+        if (onEnterPreloadZoneRef.current || onExitPreloadZoneRef.current) {
+          preloadObserver = new IntersectionObserver(
+            (entries) => {
+              const entry = entries[0];
+              if (!entry) return;
+              const inZone = entry.isIntersecting;
+              if (inZone && !inPreloadZoneRef.current) {
+                inPreloadZoneRef.current = true;
+                onEnterPreloadZoneRef.current?.();
+              } else if (!inZone && inPreloadZoneRef.current) {
+                inPreloadZoneRef.current = false;
+                onExitPreloadZoneRef.current?.();
+              }
+            },
+            {
+              root,
+              rootMargin: preloadRootMargin,
+              threshold: [0, 0.01],
+            }
+          );
+          preloadObserver.observe(target);
+        }
       };
 
       attach();
@@ -110,7 +157,12 @@ export function useFeedVideoIntersectionObserver(
       return () => {
         cancelled = true;
         cancelAnimationFrame(rafId);
-        observer?.disconnect();
+        playbackObserver?.disconnect();
+        preloadObserver?.disconnect();
+        if (inPreloadZoneRef.current) {
+          inPreloadZoneRef.current = false;
+          onExitPreloadZoneRef.current?.();
+        }
       };
     }
 
@@ -139,6 +191,18 @@ export function useFeedVideoIntersectionObserver(
           const visibleHeight = Math.max(0, visibleBottom - visibleTop);
           const ratio = visibleHeight / height;
 
+          const preloadMargin = rootRect.height;
+          const inPreloadZone =
+            targetBottom > rootRect.top - preloadMargin &&
+            targetTop < rootRect.bottom + preloadMargin;
+          if (inPreloadZone && !inPreloadZoneRef.current) {
+            inPreloadZoneRef.current = true;
+            onEnterPreloadZoneRef.current?.();
+          } else if (!inPreloadZone && inPreloadZoneRef.current) {
+            inPreloadZoneRef.current = false;
+            onExitPreloadZoneRef.current?.();
+          }
+
           const aboveThreshold =
             entryIsVisibleInRoot(targetTop, targetBottom, rootRect) &&
             ratio >= FEED_VIDEO_VISIBILITY_THRESHOLD;
@@ -166,6 +230,16 @@ export function useFeedVideoIntersectionObserver(
         const visibleHeight = Math.max(0, visibleBottom - visibleTop);
         const ratio = visibleHeight / height;
 
+        const inPreloadZone =
+          y + height > -windowHeight && y < windowHeight * 2;
+        if (inPreloadZone && !inPreloadZoneRef.current) {
+          inPreloadZoneRef.current = true;
+          onEnterPreloadZoneRef.current?.();
+        } else if (!inPreloadZone && inPreloadZoneRef.current) {
+          inPreloadZoneRef.current = false;
+          onExitPreloadZoneRef.current?.();
+        }
+
         if (ratio >= FEED_VIDEO_VISIBILITY_THRESHOLD) {
           const wasBelow = !hasMetThresholdRef.current;
           hasMetThresholdRef.current = true;
@@ -189,8 +263,12 @@ export function useFeedVideoIntersectionObserver(
     return () => {
       mounted = false;
       if (interval) clearInterval(interval);
+      if (inPreloadZoneRef.current) {
+        inPreloadZoneRef.current = false;
+        onExitPreloadZoneRef.current?.();
+      }
     };
-  }, [enabled, targetRef]);
+  }, [enabled, preloadRootMargin, targetRef]);
 }
 
 function entryIsVisibleInRoot(

@@ -221,8 +221,8 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("showPosterBackdrop")) {
         throw new Error("FeedVideoPlayer must render poster backdrop until first frame");
       }
-      if (!src.includes("hasRenderedFrame")) {
-        throw new Error("FeedVideoPlayer must track first rendered video frame");
+      if (!src.includes("showStallSpinner")) {
+        throw new Error("FeedVideoPlayer must debounce stall spinner while expected to play");
       }
       if (!src.includes('backgroundColor: "transparent"')) {
         throw new Error("FeedVideoPlayer buffering spinner must not paint a black overlay");

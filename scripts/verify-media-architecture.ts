@@ -101,6 +101,13 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!observer.includes("onAboveThreshold")) {
         throw new Error("feed video observer must support autoplay on visibility");
       }
+      if (!observer.includes("FEED_VIDEO_PRELOAD_ROOT_MARGIN")) {
+        throw new Error("feed video observer must preload roughly one screen ahead");
+      }
+      const preload = read("packages/ui/src/feedVideoPreloadCoordinator.ts");
+      if (!preload.includes("FEED_VIDEO_MAX_PRELOAD_SLOTS = 3")) {
+        throw new Error("feed video preload must cap concurrent background buffers");
+      }
       if (!gate.includes("useIsFocused")) {
         throw new Error("FeedVideoPlaybackGate must pause when leaving the Feed tab");
       }
