@@ -20,8 +20,15 @@ import {
 import { FastForward, Pause, Play, Rewind, Volume2, VolumeX } from "lucide-react-native";
 import {
   restoreFeedVideoFromFullscreen,
+  setFeedVideoFullscreenHandoff,
   type FeedVideoFullscreenHandoff,
 } from "./feedVideoPlaybackCoordinator";
+import {
+  adoptFeedVideoDomForFullscreen,
+  configureFeedWebVideoElement,
+  getRegisteredFeedVideoElement,
+  returnFeedVideoDomFromFullscreen,
+} from "./feedVideoDom";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
@@ -77,13 +84,7 @@ function formatVideoTime(seconds: number) {
 }
 
 function configureInlineWebVideo(video: HTMLVideoElement) {
-  video.controls = false;
-  video.removeAttribute("controls");
-  video.setAttribute("playsinline", "");
-  video.setAttribute("webkit-playsinline", "true");
-  video.setAttribute("x-webkit-airplay", "deny");
-  video.disablePictureInPicture = true;
-  video.disableRemotePlayback = true;
+  configureFeedWebVideoElement(video);
 }
 
 /** Full-screen gallery video — Frennix-owned controls only; no native controls layer. */
@@ -116,6 +117,15 @@ export const FullscreenVideoSlide = forwardRef<
   const [controlsPinned, setControlsPinned] = useState(false);
   const [hasRenderedFrame, setHasRenderedFrame] = useState(false);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  const webVideoMountRef = useRef<HTMLDivElement | null>(null);
+  const [usingAdoptedFeedVideo, setUsingAdoptedFeedVideo] = useState(() =>
+    Platform.OS === "web" &&
+    Boolean(
+      playbackHandoff?.playbackId &&
+        getRegisteredFeedVideoElement(playbackHandoff.playbackId)
+    )
+  );
+  const inlineReadyAtHandoffRef = useRef(false);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsPinnedRef = useRef(false);
   const handoffAppliedRef = useRef(false);
@@ -150,14 +160,24 @@ export const FullscreenVideoSlide = forwardRef<
 
   useEffect(() => {
     setFailed(false);
-    handoffAppliedRef.current = false;
-    setHandoffReady(!playbackHandoff);
-    setHasRenderedFrame(false);
+    const registered =
+      playbackHandoff?.playbackId &&
+      getRegisteredFeedVideoElement(playbackHandoff.playbackId);
+    const inlineReady =
+      registered != null &&
+      registered.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+    inlineReadyAtHandoffRef.current = Boolean(inlineReady);
+    handoffAppliedRef.current = Boolean(registered);
+    setHandoffReady(!playbackHandoff || Boolean(inlineReady));
+    setHasRenderedFrame(Boolean(inlineReady));
+    setBuffering(false);
     setControlsVisible(true);
     setControlsPinned(false);
-    setIsPaused(true);
-    setCurrentTime(0);
-    setDuration(0);
+    setIsPaused(registered ? registered.paused : true);
+    setCurrentTime(registered?.currentTime ?? playbackHandoff?.currentTime ?? 0);
+    setDuration(
+      registered && Number.isFinite(registered.duration) ? registered.duration : 0
+    );
     clearHideControlsTimer();
   }, [uri, retryKey, playbackHandoff, clearHideControlsTimer]);
 
@@ -191,7 +211,7 @@ export const FullscreenVideoSlide = forwardRef<
   }, []);
 
   useLayoutEffect(() => {
-    if (Platform.OS !== "web" || !isActive) return;
+    if (Platform.OS !== "web" || !isActive || usingAdoptedFeedVideo) return;
     const video = webVideoRef.current;
     if (!video) return;
 
@@ -213,7 +233,7 @@ export const FullscreenVideoSlide = forwardRef<
     return () => {
       video.removeEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
     };
-  }, [isActive, retryKey, uri, scheduleControlsHide]);
+  }, [isActive, retryKey, uri, scheduleControlsHide, usingAdoptedFeedVideo]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -221,8 +241,12 @@ export const FullscreenVideoSlide = forwardRef<
     if (!video || !handoffReady) return;
 
     video.muted = muted;
-    if (isActive && !failed) {
-      void video.play().catch(() => setFailed(true));
+    if (!isActive || failed) {
+      video.pause();
+      return;
+    }
+
+    if (usingAdoptedFeedVideo) {
       if (
         playbackHandoff &&
         handoffAppliedRef.current &&
@@ -233,8 +257,27 @@ export const FullscreenVideoSlide = forwardRef<
       }
       return;
     }
-    video.pause();
-  }, [handoffReady, isActive, muted, failed, uri, retryKey, playbackHandoff, routePlayback]);
+
+    void video.play().catch(() => setFailed(true));
+    if (
+      playbackHandoff &&
+      handoffAppliedRef.current &&
+      !playbackHandoff.wasPlaying &&
+      !routePlayback
+    ) {
+      video.pause();
+    }
+  }, [
+    handoffReady,
+    isActive,
+    muted,
+    failed,
+    uri,
+    retryKey,
+    playbackHandoff,
+    routePlayback,
+    usingAdoptedFeedVideo,
+  ]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -256,11 +299,12 @@ export const FullscreenVideoSlide = forwardRef<
     return () => {
       clearHideControlsTimer();
       if (routePlayback || !playbackHandoff?.playbackId || Platform.OS !== "web") return;
+      if (usingAdoptedFeedVideo) return;
       const video = webVideoRef.current;
       if (!video) return;
       restoreFeedVideoFromFullscreen(playbackHandoff.playbackId, video.currentTime, video.muted);
     };
-  }, [playbackHandoff, clearHideControlsTimer, routePlayback]);
+  }, [playbackHandoff, clearHideControlsTimer, routePlayback, usingAdoptedFeedVideo]);
 
   const handleRetry = useCallback(() => {
     setFailed(false);
@@ -376,6 +420,100 @@ export const FullscreenVideoSlide = forwardRef<
     applyPlaybackHandoff();
   }, [applyPlaybackHandoff, syncVideoState]);
 
+  useLayoutEffect(() => {
+    if (Platform.OS !== "web" || !isActive || routePlayback || !playbackHandoff?.playbackId) {
+      return;
+    }
+
+    const mount = webVideoMountRef.current;
+    if (!mount) return;
+
+    const adopted = adoptFeedVideoDomForFullscreen(playbackHandoff.playbackId, mount, {
+      width: stageWidth,
+      height: stageHeight,
+      objectFit: immersiveMode ? "cover" : "contain",
+      immersiveMode,
+    });
+
+    if (!adopted) return;
+
+    webVideoRef.current = adopted;
+    setUsingAdoptedFeedVideo(true);
+    handoffAppliedRef.current = true;
+    inlineReadyAtHandoffRef.current =
+      adopted.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+    setHandoffReady(true);
+    setHasRenderedFrame(inlineReadyAtHandoffRef.current);
+    setBuffering(false);
+    setIsPaused(adopted.paused);
+    setCurrentTime(adopted.currentTime);
+    if (Number.isFinite(adopted.duration)) {
+      setDuration(adopted.duration);
+    }
+    setMuted(adopted.muted);
+    configureInlineWebVideo(adopted);
+
+    const blockNativeFullscreen = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      configureInlineWebVideo(adopted);
+      if (typeof adopted.webkitExitFullscreen === "function") {
+        void adopted.webkitExitFullscreen();
+      }
+    };
+    const onCanPlay = () => setBuffering(false);
+    const onWaiting = () => {
+      if (inlineReadyAtHandoffRef.current) return;
+      setBuffering(true);
+    };
+    const onPlaying = () => {
+      setBuffering(false);
+      setHasRenderedFrame(true);
+    };
+    const onError = () => setFailed(true);
+
+    adopted.addEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
+    adopted.addEventListener("loadedmetadata", handleLoadedMetadata);
+    adopted.addEventListener("canplay", onCanPlay);
+    adopted.addEventListener("waiting", onWaiting);
+    adopted.addEventListener("playing", onPlaying);
+    adopted.addEventListener("play", handleWebPlay);
+    adopted.addEventListener("pause", handleWebPause);
+    adopted.addEventListener("timeupdate", handleTimeUpdate);
+    adopted.addEventListener("error", onError);
+    scheduleControlsHide();
+
+    return () => {
+      adopted.removeEventListener("webkitbeginfullscreen", blockNativeFullscreen, true);
+      adopted.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      adopted.removeEventListener("canplay", onCanPlay);
+      adopted.removeEventListener("waiting", onWaiting);
+      adopted.removeEventListener("playing", onPlaying);
+      adopted.removeEventListener("play", handleWebPlay);
+      adopted.removeEventListener("pause", handleWebPause);
+      adopted.removeEventListener("timeupdate", handleTimeUpdate);
+      adopted.removeEventListener("error", onError);
+      returnFeedVideoDomFromFullscreen(playbackHandoff.playbackId);
+      setFeedVideoFullscreenHandoff(null);
+      setUsingAdoptedFeedVideo(false);
+      if (webVideoRef.current === adopted) {
+        webVideoRef.current = null;
+      }
+    };
+  }, [
+    handleLoadedMetadata,
+    handleTimeUpdate,
+    handleWebPause,
+    handleWebPlay,
+    immersiveMode,
+    isActive,
+    playbackHandoff,
+    routePlayback,
+    scheduleControlsHide,
+    stageHeight,
+    stageWidth,
+  ]);
+
   const SpeakerIcon = muted ? VolumeX : Volume2;
   const chromeControlsVisible = controlsVisible || controlsPinned;
   const progressMax = duration > 0 ? duration : 1;
@@ -384,7 +522,7 @@ export const FullscreenVideoSlide = forwardRef<
     Platform.OS === "web" &&
     isActive &&
     Boolean(posterUri) &&
-    (!hasRenderedFrame || buffering);
+    (!hasRenderedFrame || (buffering && !inlineReadyAtHandoffRef.current));
 
   const webChromeMute =
     Platform.OS === "web" &&
@@ -428,48 +566,64 @@ export const FullscreenVideoSlide = forwardRef<
     <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       {Platform.OS === "web" ? (
         <>
-          {createElement("video", {
-            key: retryKey,
-            className: "fullscreen-video-slide",
-            ref: (node: HTMLVideoElement | null) => {
-              webVideoRef.current = node;
-              if (node) configureInlineWebVideo(node);
+          {createElement("div", {
+            ref: (node: HTMLDivElement | null) => {
+              webVideoMountRef.current = node;
             },
-            src: uri,
-            muted,
-            playsInline: true,
-            // @ts-expect-error RN web passes through to DOM
-            "webkit-playsinline": "true",
-            // @ts-expect-error legacy AirPlay guard
-            "x-webkit-airplay": "deny",
-            disablePictureInPicture: true,
-            disableRemotePlayback: true,
-            preload: isActive ? "auto" : "metadata",
-            poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
+            className: "fullscreen-video-mount",
             style: {
               width: stageWidth,
               height: stageHeight,
-              objectFit: "contain",
+              position: "relative",
+              overflow: "hidden",
               backgroundColor: colors.background,
-              ...(Platform.OS === "web" && immersiveMode
-                ? ({ pointerEvents: "none" } as const)
-                : null),
             },
-            onLoadedMetadata: handleLoadedMetadata,
-            onCanPlay: () => {
-              setBuffering(false);
-              applyPlaybackHandoff();
-            },
-            onWaiting: () => setBuffering(true),
-            onPlaying: () => {
-              setBuffering(false);
-              setHasRenderedFrame(true);
-            },
-            onPlay: handleWebPlay,
-            onPause: handleWebPause,
-            onTimeUpdate: handleTimeUpdate,
-            onError: () => setFailed(true),
           })}
+
+          {!usingAdoptedFeedVideo
+            ? createElement("video", {
+                key: retryKey,
+                className: "fullscreen-video-slide",
+                ref: (node: HTMLVideoElement | null) => {
+                  webVideoRef.current = node;
+                  if (node) configureInlineWebVideo(node);
+                },
+                src: uri,
+                muted,
+                playsInline: true,
+                // @ts-expect-error RN web passes through to DOM
+                "webkit-playsinline": "true",
+                // @ts-expect-error legacy AirPlay guard
+                "x-webkit-airplay": "deny",
+                disablePictureInPicture: true,
+                disableRemotePlayback: true,
+                preload: isActive ? "auto" : "metadata",
+                poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
+                style: {
+                  width: stageWidth,
+                  height: stageHeight,
+                  objectFit: "contain",
+                  backgroundColor: colors.background,
+                  ...(Platform.OS === "web" && immersiveMode
+                    ? ({ pointerEvents: "none" } as const)
+                    : null),
+                },
+                onLoadedMetadata: handleLoadedMetadata,
+                onCanPlay: () => {
+                  setBuffering(false);
+                  applyPlaybackHandoff();
+                },
+                onWaiting: () => setBuffering(true),
+                onPlaying: () => {
+                  setBuffering(false);
+                  setHasRenderedFrame(true);
+                },
+                onPlay: handleWebPlay,
+                onPause: handleWebPause,
+                onTimeUpdate: handleTimeUpdate,
+                onError: () => setFailed(true),
+              })
+            : null}
 
           <Pressable
             style={styles.tapSurface}

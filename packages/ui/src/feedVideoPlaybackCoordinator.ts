@@ -18,8 +18,22 @@ type FeedVideoSyncHandlers = {
 
 let playbackAllowed = true;
 let activeVideoId: string | null = null;
+/** Feed inline video reparented into fullscreen — must not pause or reload on overlay open. */
+let fullscreenHandoffPlaybackId: string | null = null;
 const pauseHandlers = new Map<string, PauseHandler>();
 const syncHandlers = new Map<string, FeedVideoSyncHandlers>();
+
+export function setFeedVideoFullscreenHandoff(playbackId: string | null) {
+  fullscreenHandoffPlaybackId = playbackId;
+}
+
+export function getFeedVideoFullscreenHandoff(): string | null {
+  return fullscreenHandoffPlaybackId;
+}
+
+export function isFeedVideoFullscreenHandoff(playbackId: string | undefined | null): boolean {
+  return Boolean(playbackId && fullscreenHandoffPlaybackId === playbackId);
+}
 
 export function buildFeedVideoPlaybackId(scopeId: string, mediaIndex: number) {
   return `${scopeId}:${mediaIndex}`;
@@ -128,8 +142,14 @@ export function subscribeFeedVideoSoundPreference(listener: SoundPreferenceListe
 }
 
 export function pauseAllFeedVideos() {
-  pauseHandlers.forEach((pause) => pause());
-  activeVideoId = null;
+  pauseHandlers.forEach((pause, id) => {
+    if (fullscreenHandoffPlaybackId && id === fullscreenHandoffPlaybackId) return;
+    pause();
+  });
+  activeVideoId =
+    fullscreenHandoffPlaybackId && activeVideoId === fullscreenHandoffPlaybackId
+      ? fullscreenHandoffPlaybackId
+      : null;
 }
 
 /** Session flag — true after the user explicitly unmutes any feed video. */

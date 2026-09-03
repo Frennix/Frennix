@@ -96,7 +96,7 @@ import { useLocationFeedBanner } from "@/lib/useLocationFeedBanner";
 import { FeedScrollDebugOverlay } from "@/components/FeedScrollDebugOverlay";
 import { FeedScrollTestView } from "@/components/FeedScrollTestView";
 import { WebFeedScrollList } from "@/components/WebFeedScrollList";
-import { FeedPostCardSkeleton, FeedVideoPlaybackGate, QueryErrorState, getSharedPostTargetId, colors, spacing, buildFeedVideoPlaybackId, captureFeedVideoForFullscreen } from "@frennix/ui";
+import { FeedPostCardSkeleton, FeedVideoPlaybackGate, QueryErrorState, getSharedPostTargetId, colors, spacing, buildFeedVideoPlaybackId, captureFeedVideoForFullscreen, setFeedVideoFullscreenHandoff } from "@frennix/ui";
 import { flexFill, webScrollSurface, webTabSceneShell } from "@/lib/flex-layout";
 import { webTabSceneContainerStyle } from "@/lib/web-tab-scene-layout";
 import { isFeedScrollTestMode } from "@/lib/feed-scroll-debug";
@@ -834,6 +834,7 @@ export default function HomeScreen() {
         thumbnailUrl: displayPost.thumbnail_url,
       });
       const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
+      setFeedVideoFullscreenHandoff(playbackId);
       const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
       setCarouselIndex(post.id, index);
       const immersiveVideo =

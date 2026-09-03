@@ -60,8 +60,17 @@ export {
   buildFeedVideoPlaybackId,
   captureFeedVideoForFullscreen,
   restoreFeedVideoFromFullscreen,
+  setFeedVideoFullscreenHandoff,
+  getFeedVideoFullscreenHandoff,
+  isFeedVideoFullscreenHandoff,
   type FeedVideoFullscreenHandoff,
 } from "./feedVideoPlaybackCoordinator";
+export {
+  adoptFeedVideoDomForFullscreen,
+  getRegisteredFeedVideoElement,
+  isFeedVideoDomAdopted,
+  returnFeedVideoDomFromFullscreen,
+} from "./feedVideoDom";
 export { FeedVideoPlaybackGate } from "./FeedVideoPlaybackGate";
 export {
   useFeedVideoIntersectionObserver,

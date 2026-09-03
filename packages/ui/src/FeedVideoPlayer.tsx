@@ -18,6 +18,7 @@ import {
 import { Volume2, VolumeX, Maximize2 } from "lucide-react-native";
 import {
   isActiveFeedVideo,
+  isFeedVideoFullscreenHandoff,
   isFeedVideoPlaybackAllowed,
   isFeedVideoSoundEnabled,
   registerFeedVideoPauseHandler,
@@ -28,8 +29,16 @@ import {
   subscribeFeedVideoPlaybackAllowed,
   subscribeFeedVideoSoundPreference,
 } from "./feedVideoPlaybackCoordinator";
+import {
+  configureFeedWebVideoElement,
+  isFeedVideoDomAdopted,
+  registerFeedVideoDom,
+  subscribeFeedVideoDomAdopted,
+  unregisterFeedVideoDom,
+} from "./feedVideoDom";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
+import { ProgressiveImage } from "./ProgressiveImage";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
@@ -90,6 +99,8 @@ export function FeedVideoPlayer({
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  const webVideoMountRef = useRef<HTMLDivElement | null>(null);
+  const [videoDomAdopted, setVideoDomAdopted] = useState(false);
   const shouldPlayRef = useRef(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
@@ -111,12 +122,13 @@ export function FeedVideoPlayer({
   const isActiveVideo = Boolean(playbackId && isActiveFeedVideo(playbackId));
 
   const pauseMediaElement = useCallback(() => {
+    if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
     if (Platform.OS === "web") {
       webVideoRef.current?.pause();
     } else {
       void nativeVideoRef.current?.pauseAsync();
     }
-  }, []);
+  }, [playbackId]);
 
   const handleScrollOutOfView = useCallback(() => {
     pauseMediaElement();
@@ -136,8 +148,8 @@ export function FeedVideoPlayer({
   const shouldPlay = Boolean(
     inView &&
       playbackId &&
-      isFeedVideoPlaybackAllowed() &&
-      isActiveVideo &&
+      (isFeedVideoPlaybackAllowed() || isFeedVideoFullscreenHandoff(playbackId)) &&
+      (isActiveVideo || isFeedVideoFullscreenHandoff(playbackId)) &&
       slideActive &&
       !failed
   );
@@ -257,16 +269,123 @@ export function FeedVideoPlayer({
     setFailed(false);
   }, [uri, retryKey]);
 
+  useEffect(() => {
+    if (!playbackId) return;
+    return subscribeFeedVideoDomAdopted(() => {
+      setVideoDomAdopted(isFeedVideoDomAdopted(playbackId));
+    });
+  }, [playbackId]);
+
+  useLayoutEffect(() => {
+    if (Platform.OS !== "web") return;
+    const mount = webVideoMountRef.current;
+    if (!mount) return;
+
+    if (playbackId && isFeedVideoDomAdopted(playbackId)) {
+      const existing = webVideoRef.current;
+      if (existing && existing.parentElement !== mount) {
+        mount.appendChild(existing);
+      }
+      setVideoDomAdopted(true);
+      return;
+    }
+
+    const video = document.createElement("video");
+    video.className = "feed-inline-video feed-inline-video-cover";
+    configureFeedWebVideoElement(video);
+    video.src = uri;
+    video.muted = mutedRef.current;
+    video.loop = true;
+    video.playsInline = true;
+    video.preload = inViewRef.current ? "auto" : "metadata";
+    const posterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
+    if (posterUri) video.poster = posterUri;
+    Object.assign(video.style, {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      objectPosition: "center",
+      backgroundColor: colors.background,
+      pointerEvents: "none",
+    });
+
+    const onLoadedMetadata = () => {
+      notifyVisualReady();
+      if (shouldPlayRef.current) attemptWebAutoplay();
+    };
+    const onCanPlay = () => {
+      setBuffering(false);
+      if (shouldPlayRef.current) attemptWebAutoplay();
+    };
+    const onWaiting = () => {
+      if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
+      setBuffering(true);
+    };
+    const onPlaying = () => setBuffering(false);
+    const onError = () => setFailed(true);
+
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    video.addEventListener("canplay", onCanPlay);
+    video.addEventListener("waiting", onWaiting);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("error", onError);
+
+    mount.appendChild(video);
+    webVideoRef.current = video;
+    setVideoDomAdopted(false);
+    if (playbackId) {
+      registerFeedVideoDom(playbackId, video, mount);
+    }
+
+    return () => {
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("canplay", onCanPlay);
+      video.removeEventListener("waiting", onWaiting);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("error", onError);
+
+      if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) {
+        return;
+      }
+
+      video.pause();
+      video.remove();
+      if (webVideoRef.current === video) {
+        webVideoRef.current = null;
+      }
+      if (playbackId) {
+        unregisterFeedVideoDom(playbackId, video);
+      }
+    };
+  }, [
+    attemptWebAutoplay,
+    notifyVisualReady,
+    playbackId,
+    resolvedPoster.posterUri,
+    retryKey,
+    thumbnailUrl,
+    uri,
+  ]);
+
   useLayoutEffect(() => {
     return () => {
+      if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
       webVideoRef.current?.pause();
     };
-  }, []);
+  }, [playbackId]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const video = webVideoRef.current;
+    if (!video || isFeedVideoFullscreenHandoff(playbackId)) return;
+    video.muted = muted;
+  }, [muted, playbackId]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const video = webVideoRef.current;
     if (!video) return;
+    if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
 
     if (shouldPlay) {
       attemptWebAutoplay();
@@ -274,7 +393,7 @@ export function FeedVideoPlayer({
     }
 
     video.pause();
-  }, [attemptWebAutoplay, shouldPlay, muted, failed, uri, retryKey]);
+  }, [attemptWebAutoplay, playbackId, shouldPlay, muted, failed, uri, retryKey]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -483,40 +602,38 @@ export function FeedVideoPlayer({
     );
   }
 
+  const showBufferingOverlay =
+    buffering && !videoDomAdopted && !isFeedVideoFullscreenHandoff(playbackId);
+  const placeholderUri = resolvedPoster.posterUri ?? thumbnailUrl ?? null;
+
   const videoBody =
     Platform.OS === "web" ? (
-      createElement("video", {
-        key: retryKey,
-        className: "feed-inline-video feed-inline-video-cover",
-        ref: (node: HTMLVideoElement | null) => {
-          webVideoRef.current = node;
-        },
-        src: uri,
-        muted,
-        playsInline: true,
-        loop: true,
-        preload: inView ? "auto" : "metadata",
-        poster: resolvedPoster.posterUri ?? thumbnailUrl ?? undefined,
-        style: {
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: "center",
-          backgroundColor: colors.background,
-          pointerEvents: "none",
-        },
-        onLoadedMetadata: () => {
-          notifyVisualReady();
-          if (shouldPlayRef.current) attemptWebAutoplay();
-        },
-        onCanPlay: () => {
-          setBuffering(false);
-          if (shouldPlayRef.current) attemptWebAutoplay();
-        },
-        onWaiting: () => setBuffering(true),
-        onPlaying: () => setBuffering(false),
-        onError: () => setFailed(true),
-      })
+      <>
+        {createElement("div", {
+          ref: (node: HTMLDivElement | null) => {
+            webVideoMountRef.current = node;
+          },
+          className: "feed-video-mount",
+          style: {
+            width: "100%",
+            height: "100%",
+            position: "relative",
+            overflow: "hidden",
+            backgroundColor: colors.background,
+          },
+        })}
+        {videoDomAdopted && placeholderUri ? (
+          <View style={styles.adoptedPoster} pointerEvents="none">
+            <ProgressiveImage
+              uri={placeholderUri}
+              placeholderUri={thumbnailUrl}
+              style={styles.videoFill}
+              contentFit="cover"
+              accessibilityLabel="Video frame"
+            />
+          </View>
+        ) : null}
+      </>
     ) : (
       (() => {
         try {
@@ -573,7 +690,7 @@ export function FeedVideoPlayer({
               <View style={styles.videoSurface} pointerEvents="none">
                 {videoBody}
 
-                {buffering ? (
+                {showBufferingOverlay ? (
                   <View
                     style={styles.bufferingOverlay}
                     pointerEvents="none"
@@ -668,6 +785,10 @@ const styles = StyleSheet.create({
   videoFill: {
     width: "100%",
     height: "100%",
+  },
+  adoptedPoster: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
   bufferingOverlay: {
     ...StyleSheet.absoluteFillObject,

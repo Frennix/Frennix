@@ -52,7 +52,8 @@
     "verify:client-diagnostics": "node scripts/verify-client-diagnostics.mjs",
     "setup:iphone-web-push": "node scripts/setup-iphone-web-push.mjs",
     "build:web": "expo export -p web && node scripts/copy-pwa-assets.mjs && node scripts/patch-web-html.js",
-    "verify:feed-post-login-layout": "node scripts/verify-feed-post-login-layout.mjs"
+    "verify:feed-post-login-layout": "node scripts/verify-feed-post-login-layout.mjs",
+    "verify:feed-video-handoff": "node scripts/verify-feed-video-handoff.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",

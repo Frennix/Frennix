@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react";
+import { Platform } from "react-native";
+import { flushSync } from "react-dom";
 import type { PostMediaItem, PostType } from "@frennix/types";
 import { buildMediaGalleryState, normalizePostMediaItems } from "@frennix/types";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
@@ -47,7 +49,7 @@ export function useMediaGallery() {
       options?: OpenGalleryOptions
     ) => {
       closeHandlerRef.current = onClosed ?? null;
-      setGallery({
+      const nextGallery = {
         ...buildMediaGalleryState(mediaUrls, {
           postType: options?.postType,
           thumbnailUrl: options?.thumbnailUrl,
@@ -55,7 +57,12 @@ export function useMediaGallery() {
         }),
         videoHandoff: options?.videoHandoff,
         immersiveVideo: options?.immersiveVideo,
-      });
+      };
+      if (Platform.OS === "web" && options?.videoHandoff) {
+        flushSync(() => setGallery(nextGallery));
+        return;
+      }
+      setGallery(nextGallery);
     },
     []
   );
