@@ -20,26 +20,43 @@ export type SafariVisualViewportSnapshot = {
   /** Measured gap between layout viewport bottom and visual viewport bottom. */
   bottomChrome: number;
   envSafeAreaBottom: number;
+  envSafeAreaTop: number;
   /** Lift for bottom sheets: env + measured chrome + design breathing room. */
   sheetInset: number;
   overlayTop: number;
   overlayHeight: number;
 };
 
-function readEnvSafeAreaBottom(): number {
+function readEnvSafeAreaInset(edge: "top" | "bottom"): number {
   if (typeof document === "undefined") return 0;
 
-  let probe = document.getElementById(ENV_SAFE_AREA_PROBE_ID);
+  const probeId = `${ENV_SAFE_AREA_PROBE_ID}-${edge}`;
+  let probe = document.getElementById(probeId);
   if (!probe) {
     probe = document.createElement("div");
-    probe.id = ENV_SAFE_AREA_PROBE_ID;
-    probe.style.cssText =
-      "position:fixed;bottom:0;left:0;width:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none;";
+    probe.id = probeId;
+    const insetProp =
+      edge === "top" ? "padding-top:env(safe-area-inset-top,0px)" : "padding-bottom:env(safe-area-inset-bottom,0px)";
+    probe.style.cssText = `position:fixed;left:0;width:0;height:0;${insetProp};visibility:hidden;pointer-events:none;`;
+    if (edge === "top") {
+      probe.style.top = "0";
+    } else {
+      probe.style.bottom = "0";
+    }
     document.body.appendChild(probe);
   }
 
-  const parsed = Number.parseFloat(getComputedStyle(probe).paddingBottom);
+  const property = edge === "top" ? "paddingTop" : "paddingBottom";
+  const parsed = Number.parseFloat(getComputedStyle(probe)[property]);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function readEnvSafeAreaTop(): number {
+  return readEnvSafeAreaInset("top");
+}
+
+function readEnvSafeAreaBottom(): number {
+  return readEnvSafeAreaInset("bottom");
 }
 
 function measureBottomChrome(): number {
@@ -223,6 +240,7 @@ export function measureSafariVisualViewport(): SafariVisualViewportSnapshot {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 0;
   const vv = typeof window !== "undefined" ? window.visualViewport : null;
   const envBottom = readEnvSafeAreaBottom();
+  const envTop = readEnvSafeAreaTop();
   const bottomChrome = vv ? measureBottomChrome() : 0;
   const offsetTop = vv ? Math.round(vv.offsetTop) : 0;
   const visualHeight = vv ? Math.round(vv.height) : layoutHeight;
@@ -234,6 +252,7 @@ export function measureSafariVisualViewport(): SafariVisualViewportSnapshot {
     visualHeight,
     bottomChrome,
     envSafeAreaBottom: envBottom,
+    envSafeAreaTop: envTop,
     sheetInset,
     overlayTop: offsetTop,
     overlayHeight: Math.max(visualHeight, 180),

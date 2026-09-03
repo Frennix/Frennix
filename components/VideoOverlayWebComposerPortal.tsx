@@ -1,19 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { WebCommentComposerRow, type WebCommentComposerRowProps } from "@/components/WebCommentComposerRow";
-import { VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX } from "@/lib/use-video-overlay-portaled-composer-reserve";
+import { computeVideoOverlayComposerTop } from "@/lib/video-overlay-visual-viewport-layout";
 
 export type VideoOverlayWebComposerPortalProps = WebCommentComposerRowProps;
 
 function applyComposerPosition(composerRow: HTMLElement): void {
-  const viewport = window.visualViewport;
-  if (!viewport) return;
-
-  const composerTop =
-    viewport.offsetTop +
-    viewport.height -
-    composerRow.offsetHeight -
-    VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX;
+  const composerTop = computeVideoOverlayComposerTop(composerRow.offsetHeight);
 
   composerRow.style.top = `${composerTop}px`;
   composerRow.style.bottom = "auto";
