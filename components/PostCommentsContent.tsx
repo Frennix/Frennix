@@ -17,11 +17,13 @@ import {
   View,
   type NativeSyntheticEvent,
   type TextInputContentSizeChangeEventData,
+  type ViewStyle,
 } from "react-native";
 import { addComment, getComments, toggleCommentLike } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
+import { syncVideoCommentTextareaHeight } from "@/lib/sync-video-comment-textarea-height";
 import { hapticLight } from "@/lib/haptics";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
@@ -31,11 +33,16 @@ const ESTIMATED_LINE_HEIGHT = 22;
 const COMPOSER_AVATAR_WIDTH_PX = 32;
 const COMPOSER_POST_WIDTH_PX = 48;
 const COMPOSER_ROW_GAP_PX = spacing.xs;
-/** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
-const MAX_VISIBLE_LINES = 5;
+/** Instagram-like cap: grow through ~5 visible lines (4 on video overlay), then scroll internally. */
+const DEFAULT_MAX_VISIBLE_LINES = 5;
+const COMPACT_MAX_VISIBLE_LINES = 4;
+const COMPACT_COMPOSER_FIELD_MAX_HEIGHT_PX = 104;
 /** Internal textarea inset — included in border-box height/width. */
 const COMMENT_TEXTAREA_PADDING_X_PX = 14;
 const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
+const COMPACT_TEXTAREA_PADDING_X_PX = 16;
+const COMPACT_TEXTAREA_PADDING_Y_PX = 10;
+const COMPACT_AVATAR_WIDTH_PX = 36;
 const COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX = COMMENT_TEXTAREA_PADDING_Y_PX * 2;
 
 /** Border-box inset around the textarea inside composerField (1px each side). */
@@ -48,12 +55,13 @@ type WebTextareaVerticalChromePx = {
   borderBottom: number;
 };
 
-function computeCommentMinInputHeight(): number {
+function computeCommentMinInputHeight(maxVisibleLines = DEFAULT_MAX_VISIBLE_LINES): number {
+  void maxVisibleLines;
   return ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
 }
 
-function computeCommentMaxInputHeight(): number {
-  return MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
+function computeCommentMaxInputHeight(maxVisibleLines = DEFAULT_MAX_VISIBLE_LINES): number {
+  return maxVisibleLines * ESTIMATED_LINE_HEIGHT + COMMENT_TEXTAREA_PADDING_TOTAL_Y_PX;
 }
 
 function readWebTextareaVerticalChromePx(textarea: HTMLTextAreaElement): WebTextareaVerticalChromePx {
@@ -81,13 +89,16 @@ function readWebTextareaLineHeight(textarea: HTMLTextAreaElement): number {
   return Number.isFinite(parsed) ? parsed : ESTIMATED_LINE_HEIGHT;
 }
 
-/** Border-box height for exactly MAX_VISIBLE_LINES complete rows inside the textarea. */
-export function computeWebCommentMaxTextareaHeight(textarea: HTMLTextAreaElement): number {
+/** Border-box height for exactly maxVisibleLines complete rows inside the textarea. */
+export function computeWebCommentMaxTextareaHeight(
+  textarea: HTMLTextAreaElement,
+  maxVisibleLines = DEFAULT_MAX_VISIBLE_LINES
+): number {
   const lineHeight = readWebTextareaLineHeight(textarea);
   const { paddingTop, paddingBottom, borderTop, borderBottom } =
     readWebTextareaVerticalChromePx(textarea);
   return Math.ceil(
-    MAX_VISIBLE_LINES * lineHeight + paddingTop + paddingBottom + borderTop + borderBottom
+    maxVisibleLines * lineHeight + paddingTop + paddingBottom + borderTop + borderBottom
   );
 }
 
@@ -99,7 +110,7 @@ function computeWebCommentMinTextareaHeight(textarea: HTMLTextAreaElement): numb
 }
 
 function readComposerFieldVerticalPaddingPx(compactComposer: boolean): number {
-  return compactComposer ? 6 : 8;
+  return compactComposer ? 0 : 8;
 }
 
 /** Border-box height for the rounded composerField wrapping a textarea of the given outer height. */
@@ -112,12 +123,24 @@ export function computeCommentComposerFieldHeight(
   );
 }
 
-export function computeCommentMaxComposerFieldHeight(compactComposer = false): number {
-  return computeCommentComposerFieldHeight(computeCommentMaxInputHeight(), compactComposer);
+export function computeCommentMaxComposerFieldHeight(
+  compactComposer = false,
+  maxVisibleLines = compactComposer ? COMPACT_MAX_VISIBLE_LINES : DEFAULT_MAX_VISIBLE_LINES
+): number {
+  const fieldHeight = computeCommentComposerFieldHeight(
+    computeCommentMaxInputHeight(maxVisibleLines),
+    compactComposer
+  );
+  return compactComposer
+    ? Math.min(fieldHeight, COMPACT_COMPOSER_FIELD_MAX_HEIGHT_PX)
+    : fieldHeight;
 }
 
-function syncWebTextareaHeight(textarea: HTMLTextAreaElement): number {
-  const maxOuterHeight = computeWebCommentMaxTextareaHeight(textarea);
+function syncWebTextareaHeight(
+  textarea: HTMLTextAreaElement,
+  maxVisibleLines = DEFAULT_MAX_VISIBLE_LINES
+): number {
+  const maxOuterHeight = computeWebCommentMaxTextareaHeight(textarea, maxVisibleLines);
   const measureMinOuter = computeWebCommentMinTextareaHeight(textarea);
 
   textarea.style.setProperty("box-sizing", "border-box", "important");
@@ -148,6 +171,7 @@ type WebCommentTextareaProps = {
   placeholder: string;
   minInputHeight: number;
   maxInputHeight: number;
+  maxVisibleLines?: number;
   onChangeText: (text: string) => void;
   onHeightChange: (height: number) => void;
   onFocus?: () => void;
@@ -159,6 +183,7 @@ function WebCommentTextarea({
   placeholder,
   minInputHeight,
   maxInputHeight,
+  maxVisibleLines = DEFAULT_MAX_VISIBLE_LINES,
   onChangeText,
   onHeightChange,
   onFocus,
@@ -169,9 +194,9 @@ function WebCommentTextarea({
   const remeasure = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const next = syncWebTextareaHeight(textarea);
+    const next = syncWebTextareaHeight(textarea, maxVisibleLines);
     onHeightChange(next);
-  }, [onHeightChange]);
+  }, [maxVisibleLines, onHeightChange]);
 
   useLayoutEffect(() => {
     remeasure();
@@ -216,6 +241,64 @@ function WebCommentTextarea({
   });
 }
 
+type VideoWebCommentTextareaProps = {
+  value: string;
+  placeholder: string;
+  onChangeText: (text: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+};
+
+function VideoWebCommentTextarea({
+  value,
+  placeholder,
+  onChangeText,
+  onFocus,
+  onBlur,
+}: VideoWebCommentTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const remeasure = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    syncVideoCommentTextareaHeight(textarea);
+  }, []);
+
+  useLayoutEffect(() => {
+    remeasure();
+  }, [value, remeasure]);
+
+  return React.createElement("textarea", {
+    ref: textareaRef,
+    value,
+    rows: 1,
+    wrap: "soft",
+    enterKeyHint: "enter",
+    inputMode: "text",
+    autoComplete: "off",
+    autoCorrect: "on",
+    "data-frennix-comment-input": "true",
+    "data-video-comment-input": "true",
+    placeholder,
+    onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onChangeText(event.target.value);
+      requestAnimationFrame(remeasure);
+    },
+    onFocus: (event: React.FocusEvent<HTMLTextAreaElement>) => {
+      event.target.setAttribute("enterkeyhint", "enter");
+      remeasure();
+      onFocus?.();
+    },
+    onBlur: () => {
+      onBlur?.();
+    },
+    onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== "Enter") return;
+      event.stopPropagation();
+    },
+  });
+}
+
 function appendOptimisticComment(
   comments: Comment[],
   optimistic: Comment,
@@ -255,12 +338,22 @@ export function CommentComposerRow({
   onComposerBlur,
   compactComposer = false,
 }: CommentComposerRowProps) {
+  const isVideoWebComposer = compactComposer && Platform.OS === "web";
+  const maxVisibleLines = compactComposer ? COMPACT_MAX_VISIBLE_LINES : DEFAULT_MAX_VISIBLE_LINES;
   const canPost = Boolean(value.trim()) && !posting;
-  const minInputHeight = computeCommentMinInputHeight();
-  const maxInputHeight = computeCommentMaxInputHeight();
+  const minInputHeight = compactComposer
+    ? ESTIMATED_LINE_HEIGHT + COMPACT_TEXTAREA_PADDING_Y_PX * 2
+    : computeCommentMinInputHeight(maxVisibleLines);
+  const maxInputHeight = compactComposer
+    ? COMPACT_MAX_VISIBLE_LINES * ESTIMATED_LINE_HEIGHT + COMPACT_TEXTAREA_PADDING_Y_PX * 2
+    : computeCommentMaxInputHeight(maxVisibleLines);
   const prevValueLengthRef = useRef(0);
   const [inputHeight, setInputHeight] = useState(minInputHeight);
-  const composerFieldHeight = computeCommentComposerFieldHeight(inputHeight, compactComposer);
+  const composerFieldHeight = Math.min(
+    computeCommentComposerFieldHeight(inputHeight, compactComposer),
+    compactComposer ? COMPACT_COMPOSER_FIELD_MAX_HEIGHT_PX : Number.POSITIVE_INFINITY
+  );
+  const avatarSize = compactComposer ? COMPACT_AVATAR_WIDTH_PX : COMPOSER_AVATAR_WIDTH_PX;
 
   const handleNativeContentSizeChange = useCallback(
     (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
@@ -300,18 +393,24 @@ export function CommentComposerRow({
   return (
     <View
       style={[styles.composerRow, compactComposer && styles.composerRowCompact]}
-      {...(Platform.OS === "web" ? ({ "data-frennix-comment-composer-row": "true" } as object) : null)}
+      {...(Platform.OS === "web"
+        ? ({
+            "data-frennix-comment-composer-row": "true",
+          } as object)
+        : null)}
     >
-      <View style={styles.composerAvatarSlot}>
-        <Avatar uri={avatarUri} name={avatarName} size={COMPOSER_AVATAR_WIDTH_PX} deferImagePlaceholder />
+      <View style={[styles.composerAvatarSlot, compactComposer && styles.composerAvatarSlotCompact]}>
+        <Avatar uri={avatarUri} name={avatarName} size={avatarSize} deferImagePlaceholder />
       </View>
       <View
         style={[
           styles.composerField,
           compactComposer && styles.composerFieldCompact,
-          Platform.OS === "web"
+          Platform.OS === "web" && !isVideoWebComposer
             ? { minHeight: composerFieldHeight, height: composerFieldHeight, flexShrink: 0 }
-            : null,
+            : isVideoWebComposer
+              ? { flexShrink: 0 }
+              : null,
         ]}
         {...(Platform.OS === "web"
           ? ({ "data-frennix-comment-composer-field": "true" } as object)
@@ -319,19 +418,33 @@ export function CommentComposerRow({
       >
         {Platform.OS === "web" ? (
           <View
-            style={styles.composerInputWrap}
+            style={[
+              styles.composerInputWrap,
+              compactComposer && styles.composerInputWrapCompact,
+            ]}
             {...({ "data-frennix-comment-input-wrap": "true" } as object)}
           >
-            <WebCommentTextarea
-              value={value}
-              placeholder={placeholder}
-              minInputHeight={minInputHeight}
-              maxInputHeight={maxInputHeight}
-              onChangeText={onChangeText}
-              onHeightChange={handleWebHeightChange}
-              onFocus={onComposerFocus}
-              onBlur={onComposerBlur}
-            />
+            {isVideoWebComposer ? (
+              <VideoWebCommentTextarea
+                value={value}
+                placeholder={placeholder}
+                onChangeText={onChangeText}
+                onFocus={onComposerFocus}
+                onBlur={onComposerBlur}
+              />
+            ) : (
+              <WebCommentTextarea
+                value={value}
+                placeholder={placeholder}
+                minInputHeight={minInputHeight}
+                maxInputHeight={maxInputHeight}
+                maxVisibleLines={maxVisibleLines}
+                onChangeText={onChangeText}
+                onHeightChange={handleWebHeightChange}
+                onFocus={onComposerFocus}
+                onBlur={onComposerBlur}
+              />
+            )}
           </View>
         ) : (
           <View style={styles.composerInputWrap}>
@@ -612,13 +725,17 @@ const styles = StyleSheet.create({
       : null),
   },
   composerRowCompact: {
-    alignItems: "center",
+    alignItems: "flex-end",
   },
   composerAvatarSlot: {
     width: COMPOSER_AVATAR_WIDTH_PX,
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
+  },
+  composerAvatarSlotCompact: {
+    width: COMPACT_AVATAR_WIDTH_PX,
+    marginBottom: 4,
   },
   composerField: {
     flex: 1,
@@ -639,8 +756,11 @@ const styles = StyleSheet.create({
       : null),
   },
   composerFieldCompact: {
-    minHeight: 32,
-    paddingVertical: 3,
+    minHeight: 44,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderRadius: 22,
+    justifyContent: "center",
   },
   composerInputWrap: {
     width: "100%",
@@ -654,6 +774,14 @@ const styles = StyleSheet.create({
         } as const)
       : null),
   },
+  composerInputWrapCompact: Platform.select({
+    web: {
+      overflowX: "hidden",
+      overflowY: "hidden",
+      alignItems: "flex-end",
+    },
+    default: {},
+  }) as ViewStyle,
   composerInput: {
     width: "100%",
     minWidth: 0,
@@ -718,7 +846,7 @@ const styles = StyleSheet.create({
     marginBottom: Platform.OS === "web" ? 1 : 0,
   },
   postButtonCompact: {
-    minHeight: 26,
+    minHeight: 44,
     marginBottom: 0,
   },
   postLabel: {
