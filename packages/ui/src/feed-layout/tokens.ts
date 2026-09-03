@@ -6,8 +6,8 @@ export const FEED_FONT_SCALE_MAX = 1.35;
 
 /**
  * Accessibility defaults for feed components.
- * Safe areas: feed list uses tab shell insets; post cards apply contentPaddingX once on Root
- * so media and metadata share one column width.
+ * Safe areas: feed list uses tab shell insets; text sections apply contentPaddingX;
+ * media spans the full card width edge-to-edge.
  */
 export const feedAccessibility = {
   maxFontSizeMultiplier: FEED_FONT_SCALE_MAX,
@@ -22,10 +22,10 @@ export const feedLayout = {
   /** Max post width on large web viewports; phones use full width. */
   maxContentWidth: 640,
 
-  /** Single horizontal inset for the entire post column — media and metadata share this width. */
-  contentPaddingX: 0,
+  /** Horizontal inset for text/metadata sections — media is full-bleed within the card. */
+  contentPaddingX: spacing.sm,
 
-  /** @deprecated Use contentPaddingX on Root — media shares the same column as metadata. */
+  /** @deprecated Use contentPaddingX on text sections — media shares full card width. */
   mediaMarginX: 0,
   /** Tight gap between compact post header and media — media leads immediately. */
   mediaMarginTop: 0,
@@ -34,7 +34,7 @@ export const feedLayout = {
   sectionGap: spacing.sm,
 
   postPaddingBottom: spacing.md,
-  postMarginX: spacing.md,
+  postMarginX: 0,
   postMarginBottom: spacing.md,
   postRadius: radius.xl,
 
@@ -171,7 +171,6 @@ export const feedLayoutStyles = StyleSheet.create({
     marginHorizontal: feedLayout.postMarginX,
     marginBottom: feedLayout.postMarginBottom,
     paddingBottom: feedLayout.postPaddingBottom,
-    paddingHorizontal: spacing.md,
     overflow: "hidden",
     ...applyShadow("md"),
   },
@@ -188,11 +187,13 @@ export const feedLayoutStyles = StyleSheet.create({
   contentInset: {
     width: "100%",
     alignSelf: "stretch" as const,
+    paddingHorizontal: feedLayout.contentPaddingX,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.header.paddingTop,
     paddingBottom: feedLayout.header.paddingBottom,
     gap: feedLayout.header.gap,
@@ -207,37 +208,43 @@ export const feedLayoutStyles = StyleSheet.create({
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
     marginBottom: feedLayout.media.marginBottom,
-    borderRadius: radius.lg,
+    borderRadius: radius.sm,
     overflow: "hidden",
   },
   embeddedMedia: {
     width: "100%",
     alignSelf: "stretch" as const,
     marginTop: feedLayout.media.marginTop,
-    borderRadius: radius.lg,
+    marginHorizontal: feedLayout.contentPaddingX,
+    borderRadius: radius.sm,
     overflow: "hidden",
   },
   actions: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.actions.paddingTop,
     paddingBottom: feedLayout.actions.paddingBottom,
   },
   caption: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.caption.paddingTop,
   },
   engagement: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.engagement.paddingTop,
     gap: feedLayout.engagement.gap,
   },
   comments: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.comments.paddingTop,
     gap: feedLayout.comments.rowGap,
   },
   label: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.extensions.labelPaddingTop,
     paddingBottom: feedLayout.extensions.labelPaddingBottom,
   },
@@ -247,14 +254,17 @@ export const feedLayoutStyles = StyleSheet.create({
   },
   belowMedia: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.extensions.belowMediaPaddingTop,
   },
   commerce: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.extensions.commercePaddingTop,
   },
   footer: {
     width: "100%",
+    paddingHorizontal: feedLayout.contentPaddingX,
     paddingTop: feedLayout.extensions.footerPaddingTop,
   },
   mediaOverlay: {

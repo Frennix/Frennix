@@ -18,7 +18,8 @@ import { VideoPreview } from "./VideoPreview";
 import { VideoPosterFallback } from "./VideoPosterFallback";
 import { useVideoPoster } from "./useVideoPoster";
 import { WebVideoFrame } from "./WebVideoFrame";
-import { FEED_VIDEO_FALLBACK_RATIO, type MediaLayout } from "./mediaLayout";
+import { FEED_VIDEO_FALLBACK_RATIO, FEED_MAX_PORTRAIT_RATIO, type MediaLayout } from "./mediaLayout";
+import { feedMediaRules } from "./feed-layout/feedMediaRules";
 import { colors, radius } from "./theme";
 
 interface PostMediaProps {
@@ -238,6 +239,7 @@ function FeedImage({
       layout={layout}
       style={style}
       maxHeight={maxHeight}
+      maxPortraitRatio={layout === "feed" ? FEED_MAX_PORTRAIT_RATIO : undefined}
     >
       {() => (
         <>
@@ -256,7 +258,7 @@ function FeedImage({
               uri={uri}
               placeholderUri={thumbnailUrl}
               style={styles.image}
-              contentFit="contain"
+              contentFit={layout === "feed" ? feedMediaRules.contentFit : "contain"}
               accessibilityLabel="Post photo"
               onError={() => setImageFailed(true)}
               onLoad={onVisualReady}

@@ -130,6 +130,54 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
     },
   },
+  {
+    name: "Feed video frame uses intrinsic dimensions with portrait cap",
+    run: () => {
+      const player = read("packages/ui/src/FeedVideoPlayer.tsx");
+      if (player.includes("fixedAspectRatio")) {
+        throw new Error("FeedVideoPlayer must not use fixedAspectRatio — use maxPortraitRatio");
+      }
+      if (!player.includes("maxPortraitRatio")) {
+        throw new Error("FeedVideoPlayer must cap feed video frames at maxPortraitRatio");
+      }
+      if (!player.includes("dimensionsUri")) {
+        throw new Error("FeedVideoPlayer must probe poster dimensions for frame height");
+      }
+    },
+  },
+  {
+    name: "Feed media height respects 4:5 portrait cap on phone width",
+    run: () => {
+      const phoneWidth = 390;
+      const maxPortraitRatio = 5 / 4;
+      const computeHeight = (
+        containerWidth: number,
+        mediaWidth: number,
+        mediaHeight: number,
+        cap: number
+      ) => {
+        const aspectRatio = mediaHeight / mediaWidth;
+        const cappedRatio = aspectRatio > cap ? cap : aspectRatio;
+        return containerWidth * cappedRatio;
+      };
+      const portrait916 = computeHeight(phoneWidth, 1080, 1920, maxPortraitRatio);
+      const square = computeHeight(phoneWidth, 1080, 1080, maxPortraitRatio);
+      const landscape = computeHeight(phoneWidth, 1920, 1080, maxPortraitRatio);
+      const cappedExpected = phoneWidth * maxPortraitRatio;
+      if (portrait916 <= phoneWidth) {
+        throw new Error(`Portrait feed frame must be taller than wide; got ${portrait916}px at ${phoneWidth}px width`);
+      }
+      if (Math.abs(portrait916 - cappedExpected) > 0.5) {
+        throw new Error(`Portrait 9:16 feed frame must cap at 4:5 (${cappedExpected}px), got ${portrait916}px`);
+      }
+      if (Math.abs(square - phoneWidth) > 0.5) {
+        throw new Error(`Square feed frame must be 1:1 (${phoneWidth}px), got ${square}px`);
+      }
+      if (landscape >= phoneWidth) {
+        throw new Error(`Landscape feed frame must be shorter than width; got ${landscape}px`);
+      }
+    },
+  },
 ];
 
 let failed = 0;

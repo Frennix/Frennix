@@ -30,7 +30,7 @@ import {
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
-import { FEED_VIDEO_FIXED_ASPECT_RATIO } from "./mediaLayout";
+import { FEED_MAX_PORTRAIT_RATIO } from "./mediaLayout";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
@@ -248,6 +248,8 @@ export function FeedVideoPlayer({
     });
   }, []);
 
+  const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
+
   useEffect(() => {
     setFailed(false);
   }, [uri, retryKey]);
@@ -435,9 +437,10 @@ export function FeedVideoPlayer({
     return (
       <View style={styles.shell} collapsable={false}>
         <MediaAspectFrame
+          dimensionsUri={dimensionsUri}
           layout="feed"
           style={style}
-          fixedAspectRatio={FEED_VIDEO_FIXED_ASPECT_RATIO}
+          maxPortraitRatio={FEED_MAX_PORTRAIT_RATIO}
         >
           {() => <MediaLoadError label="Video unavailable" onRetry={handleRetry} />}
         </MediaAspectFrame>
@@ -548,9 +551,10 @@ export function FeedVideoPlayer({
   return (
     <View style={styles.shell} collapsable={false}>
       <MediaAspectFrame
+        dimensionsUri={dimensionsUri}
         layout="feed"
         style={style}
-        fixedAspectRatio={FEED_VIDEO_FIXED_ASPECT_RATIO}
+        maxPortraitRatio={FEED_MAX_PORTRAIT_RATIO}
       >
         {() => (
           <View

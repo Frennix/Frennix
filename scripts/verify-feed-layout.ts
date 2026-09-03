@@ -86,8 +86,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "feedMediaRules define aspect and crop policy",
     run: () => {
       const src = read("packages/ui/src/feed-layout/feedMediaRules.ts");
-      if (!src.includes("autoCrop: false")) {
-        throw new Error("feedMediaRules must disable auto-crop");
+      if (!src.includes("maxPortraitRatio:")) {
+        throw new Error("feedMediaRules must cap portrait media at 4:5");
+      }
+      if (!src.includes('contentFit: "cover"')) {
+        throw new Error("feedMediaRules must use cover fit for feed media");
       }
       if (!src.includes("preserveAspectRatio: true")) {
         throw new Error("feedMediaRules must preserve aspect ratio");
@@ -181,8 +184,15 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!tokens.includes("contentColumn")) {
         throw new Error("feedLayout must define contentColumn for unified post width");
       }
-      if (!tokens.includes("paddingHorizontal: spacing.md")) {
-        throw new Error("FeedLayout root must apply horizontal inset for card content");
+      if (!tokens.includes("contentPaddingX")) {
+        throw new Error("feedLayout must define contentPaddingX for text sections");
+      }
+      const rootBlock = tokens.match(/root:\s*\{([\s\S]*?)\n  \},/)?.[1] ?? "";
+      if (/paddingHorizontal:/.test(rootBlock)) {
+        throw new Error("FeedLayout root must not apply horizontal padding — media is full-bleed");
+      }
+      if (!tokens.includes("paddingHorizontal: feedLayout.contentPaddingX")) {
+        throw new Error("FeedLayout text sections must apply horizontal inset");
       }
       if (!tokens.includes("postRadius")) {
         throw new Error("feedLayout must define postRadius for premium cards");

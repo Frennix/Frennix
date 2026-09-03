@@ -10,10 +10,16 @@ export function computeImageDisplayHeight(
   containerWidth: number,
   imageWidth: number,
   imageHeight: number,
-  maxHeight?: number
+  maxHeight?: number,
+  maxPortraitRatio?: number
 ): number {
   if (!containerWidth || !imageWidth || !imageHeight) return 0;
-  const naturalHeight = containerWidth * (imageHeight / imageWidth);
+  const aspectRatio = imageHeight / imageWidth;
+  const cappedRatio =
+    maxPortraitRatio != null && aspectRatio > maxPortraitRatio
+      ? maxPortraitRatio
+      : aspectRatio;
+  const naturalHeight = containerWidth * cappedRatio;
   if (maxHeight && naturalHeight > maxHeight) return maxHeight;
   return naturalHeight;
 }

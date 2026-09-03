@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Skeleton } from "./Skeleton";
 import {
+  FEED_MAX_PORTRAIT_RATIO,
   FEED_MIN_MEDIA_HEIGHT,
   FEED_PHOTO_FALLBACK_RATIO,
   INLINE_DEFAULT_HEIGHT,
@@ -18,8 +19,8 @@ type MediaAspectFrameProps = {
   maxHeight?: number;
   /** height / width when dimensions are unknown */
   fallbackRatio?: number;
-  /** When set, frame height always uses width × ratio (ignores intrinsic media dimensions). */
-  fixedAspectRatio?: number;
+  /** Cap portrait frame height at width × ratio (e.g. 5/4 for 4:5 max). */
+  maxPortraitRatio?: number;
   children: (frame: { ready: boolean }) => ReactNode;
 };
 
@@ -29,36 +30,33 @@ export function MediaAspectFrame({
   style,
   maxHeight,
   fallbackRatio = FEED_PHOTO_FALLBACK_RATIO,
-  fixedAspectRatio,
+  maxPortraitRatio,
   children,
 }: MediaAspectFrameProps) {
   const [layoutWidth, setLayoutWidth] = useState(0);
-  const probeDimensionsUri = fixedAspectRatio != null ? undefined : dimensionsUri;
-  const { dimensions, failed } = useImageDimensions(probeDimensionsUri);
+  const { dimensions, failed } = useImageDimensions(dimensionsUri);
 
   const isFeed = layout === "feed";
-  const usesFixedAspect = fixedAspectRatio != null;
+  const portraitCap = isFeed ? (maxPortraitRatio ?? FEED_MAX_PORTRAIT_RATIO) : maxPortraitRatio;
 
   const displayHeight = useMemo(() => {
     if (!layoutWidth) {
       return isFeed ? FEED_MIN_MEDIA_HEIGHT : INLINE_DEFAULT_HEIGHT;
-    }
-    if (usesFixedAspect) {
-      return layoutWidth * fixedAspectRatio;
     }
     if (dimensions) {
       return computeImageDisplayHeight(
         layoutWidth,
         dimensions.width,
         dimensions.height,
-        maxHeight
+        maxHeight,
+        portraitCap
       );
     }
     if (isFeed) {
       return Math.max(layoutWidth * fallbackRatio, FEED_MIN_MEDIA_HEIGHT);
     }
     return INLINE_DEFAULT_HEIGHT;
-  }, [dimensions, fallbackRatio, fixedAspectRatio, isFeed, layoutWidth, maxHeight, usesFixedAspect]);
+  }, [dimensions, fallbackRatio, isFeed, layoutWidth, maxHeight, portraitCap]);
 
   const frameStyle = useMemo(
     () => [
@@ -70,10 +68,7 @@ export function MediaAspectFrame({
     [displayHeight, isFeed, layoutWidth, style]
   );
 
-  const ready =
-    usesFixedAspect
-      ? layoutWidth > 0
-      : Boolean(dimensions) || failed || (isFeed && layoutWidth > 0);
+  const ready = Boolean(dimensions) || failed || (isFeed && layoutWidth > 0);
 
   return (
     <View

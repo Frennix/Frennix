@@ -1,7 +1,8 @@
 import {
+  FEED_MAX_PORTRAIT_RATIO,
   FEED_MIN_MEDIA_HEIGHT,
   FEED_PHOTO_FALLBACK_RATIO,
-  FEED_VIDEO_FIXED_ASPECT_RATIO,
+  FEED_VIDEO_FALLBACK_RATIO,
   type MediaLayout,
 } from "../mediaLayout";
 
@@ -13,21 +14,18 @@ export const feedMediaRules = {
   /** Layout mode passed to PostMedia / MediaAspectFrame for all feed mounts. */
   layout: "feed" satisfies MediaLayout,
 
-  /** Photos preserve intrinsic aspect ratio; feed videos use a fixed frame. */
+  /** Photos and videos preserve intrinsic aspect up to the portrait cap. */
   preserveAspectRatio: true,
 
-  /** Feed videos fill a fixed 9:16 frame with cover fit (no letterboxing). */
-  videoFixedAspectRatio: FEED_VIDEO_FIXED_ASPECT_RATIO,
+  /** Cap tall portrait media at 4:5; cover-crop inside the frame. */
+  maxPortraitRatio: FEED_MAX_PORTRAIT_RATIO,
+  autoCrop: true,
+
+  /** Cover fit inside the computed frame — no letterboxing. */
+  contentFit: "cover" as const,
   videoContentFit: "cover" as const,
-  autoCrop: false,
 
-  /** No portrait height cap — fitness progress/transformation media shows in full. */
-  maxPortraitRatio: null as number | null,
-
-  /** Image fit inside exact-aspect photo frame. */
-  contentFit: "contain" as const,
-
-  /** Edge-to-edge within the unified post content column (same width as metadata). */
+  /** Edge-to-edge within the post card; text sections use contentPaddingX. */
   edgeToEdge: true,
 
   /** Skeleton placeholder height while dimensions load (not applied after probe). */
@@ -37,7 +35,7 @@ export const feedMediaRules = {
   photoFallbackRatio: FEED_PHOTO_FALLBACK_RATIO,
 
   /** Fallback ratio for video before poster dimensions resolve. */
-  videoFallbackRatio: FEED_VIDEO_FIXED_ASPECT_RATIO,
+  videoFallbackRatio: FEED_VIDEO_FALLBACK_RATIO,
 
   /** Web: defer carousel/video mount until near viewport (FeedMediaSlot). */
   deferUntilNearViewport: true,
