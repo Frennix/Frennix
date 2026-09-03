@@ -60,8 +60,39 @@ function main() {
     pass(
       "Feed player suppresses buffering overlay during fullscreen handoff",
       feedPlayer.includes("isFeedVideoFullscreenHandoff") &&
-        feedPlayer.includes("showBufferingOverlay") &&
+        feedPlayer.includes("showBufferingSpinner") &&
         feedPlayer.includes("videoDomAdopted")
+    ) && ok;
+
+  ok =
+    pass(
+      "Feed player keeps poster visible until first rendered frame",
+      feedPlayer.includes("showPosterBackdrop") &&
+        feedPlayer.includes("hasRenderedFrame") &&
+        feedPlayer.includes("presentationPosterUri") &&
+        feedPlayer.includes("posterLayer")
+    ) && ok;
+
+  ok =
+    pass(
+      "Feed buffering spinner stays transparent over poster or last frame",
+      feedPlayer.includes("bufferingSpinnerLayer") &&
+        feedPlayer.includes('backgroundColor: "transparent"') &&
+        feedPlayer.includes('size="small"')
+    ) && ok;
+
+  ok =
+    pass(
+      "Upload pipeline generates stored video thumbnails",
+      readSource("lib/share-workout.ts").includes("generateAndUploadVideoThumbnail") &&
+        readSource("lib/share-workout.ts").includes("thumbnail_url: thumbnailUrl")
+    ) && ok;
+
+  ok =
+    pass(
+      "Feed passes post thumbnail_url into FeedVideoPlayer",
+      readSource("packages/ui/src/PostMedia.tsx").includes("thumbnailUrl={thumbnailUrl}") &&
+        readSource("packages/ui/src/PostMedia.tsx").includes("posterState={posterState}")
     ) && ok;
 
   ok =

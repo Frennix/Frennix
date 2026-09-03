@@ -95,7 +95,8 @@ export function FeedVideoPlayer({
   inViewRef.current = inView;
   const [muted, setMuted] = useState(() => !isFeedVideoSoundEnabled());
   const [playbackAllowed, setPlaybackAllowed] = useState(() => isFeedVideoPlaybackAllowed());
-  const [buffering, setBuffering] = useState(false);
+  const [buffering, setBuffering] = useState(true);
+  const [hasRenderedFrame, setHasRenderedFrame] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -267,7 +268,18 @@ export function FeedVideoPlayer({
 
   useEffect(() => {
     setFailed(false);
+    setHasRenderedFrame(false);
+    setBuffering(true);
   }, [uri, retryKey]);
+
+  const presentationPosterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? null;
+
+  const markFrameReady = useCallback(() => {
+    const video = webVideoRef.current;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    setHasRenderedFrame(true);
+    setBuffering(false);
+  }, []);
 
   useEffect(() => {
     if (!playbackId) return;
@@ -305,7 +317,8 @@ export function FeedVideoPlayer({
       height: "100%",
       objectFit: "cover",
       objectPosition: "center",
-      backgroundColor: colors.background,
+      backgroundColor: "transparent",
+      opacity: "0",
       pointerEvents: "none",
     });
 
@@ -313,25 +326,40 @@ export function FeedVideoPlayer({
       notifyVisualReady();
       if (shouldPlayRef.current) attemptWebAutoplay();
     };
+    const onLoadedData = () => {
+      markFrameReady();
+    };
     const onCanPlay = () => {
-      setBuffering(false);
+      markFrameReady();
       if (shouldPlayRef.current) attemptWebAutoplay();
     };
     const onWaiting = () => {
       if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
       setBuffering(true);
     };
-    const onPlaying = () => setBuffering(false);
+    const onPlaying = () => {
+      markFrameReady();
+    };
+    const onTimeUpdate = () => {
+      markFrameReady();
+    };
     const onError = () => setFailed(true);
 
     video.addEventListener("loadedmetadata", onLoadedMetadata);
+    video.addEventListener("loadeddata", onLoadedData);
     video.addEventListener("canplay", onCanPlay);
     video.addEventListener("waiting", onWaiting);
     video.addEventListener("playing", onPlaying);
+    video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("error", onError);
 
     mount.appendChild(video);
     webVideoRef.current = video;
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      video.style.opacity = "1";
+      setHasRenderedFrame(true);
+      setBuffering(false);
+    }
     setVideoDomAdopted(false);
     if (playbackId) {
       registerFeedVideoDom(playbackId, video, mount);
@@ -339,9 +367,11 @@ export function FeedVideoPlayer({
 
     return () => {
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("loadeddata", onLoadedData);
       video.removeEventListener("canplay", onCanPlay);
       video.removeEventListener("waiting", onWaiting);
       video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("error", onError);
 
       if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) {
@@ -359,6 +389,7 @@ export function FeedVideoPlayer({
     };
   }, [
     attemptWebAutoplay,
+    markFrameReady,
     notifyVisualReady,
     playbackId,
     resolvedPoster.posterUri,
@@ -380,6 +411,13 @@ export function FeedVideoPlayer({
     if (!video || isFeedVideoFullscreenHandoff(playbackId)) return;
     video.muted = muted;
   }, [muted, playbackId]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const video = webVideoRef.current;
+    if (!video) return;
+    video.style.opacity = hasRenderedFrame ? "1" : "0";
+  }, [hasRenderedFrame]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -602,9 +640,13 @@ export function FeedVideoPlayer({
     );
   }
 
-  const showBufferingOverlay =
+  const showPosterBackdrop =
+    Boolean(presentationPosterUri) &&
+    !hasRenderedFrame &&
+    !videoDomAdopted &&
+    !isFeedVideoFullscreenHandoff(playbackId);
+  const showBufferingSpinner =
     buffering && !videoDomAdopted && !isFeedVideoFullscreenHandoff(playbackId);
-  const placeholderUri = resolvedPoster.posterUri ?? thumbnailUrl ?? null;
 
   const videoBody =
     Platform.OS === "web" ? (
@@ -619,13 +661,14 @@ export function FeedVideoPlayer({
             height: "100%",
             position: "relative",
             overflow: "hidden",
-            backgroundColor: colors.background,
+            backgroundColor: "transparent",
+            zIndex: 1,
           },
         })}
-        {videoDomAdopted && placeholderUri ? (
+        {videoDomAdopted && presentationPosterUri ? (
           <View style={styles.adoptedPoster} pointerEvents="none">
             <ProgressiveImage
-              uri={placeholderUri}
+              uri={presentationPosterUri}
               placeholderUri={thumbnailUrl}
               style={styles.videoFill}
               contentFit="cover"
@@ -652,13 +695,16 @@ export function FeedVideoPlayer({
               isLooping
               useNativeControls={false}
               posterSource={
-                resolvedPoster.posterUri ? { uri: resolvedPoster.posterUri } : undefined
+                presentationPosterUri ? { uri: presentationPosterUri } : undefined
               }
-              usePoster={Boolean(resolvedPoster.posterUri)}
+              usePoster={Boolean(presentationPosterUri)}
               onPlaybackStatusUpdate={(status) => {
                 if (!status.isLoaded) {
                   if ("error" in status && status.error) setFailed(true);
                   return;
+                }
+                if (status.isPlaying && status.durationMillis != null) {
+                  setHasRenderedFrame(true);
                 }
                 setBuffering(status.isBuffering);
               }}
@@ -688,16 +734,32 @@ export function FeedVideoPlayer({
           >
             <View style={styles.mediaLayer} pointerEvents="box-none">
               <View style={styles.videoSurface} pointerEvents="none">
+                {showPosterBackdrop ? (
+                  <View style={styles.posterLayer} pointerEvents="none">
+                    <ProgressiveImage
+                      uri={presentationPosterUri!}
+                      placeholderUri={thumbnailUrl}
+                      style={styles.videoFill}
+                      contentFit="cover"
+                      accessibilityLabel="Video poster"
+                    />
+                  </View>
+                ) : null}
+
                 {videoBody}
 
-                {showBufferingOverlay ? (
+                {showBufferingSpinner ? (
                   <View
-                    style={styles.bufferingOverlay}
+                    style={styles.bufferingSpinnerLayer}
                     pointerEvents="none"
                     accessibilityLabel="Video loading"
                     accessibilityRole="progressbar"
                   >
-                    <ActivityIndicator color={colors.accent} size="large" accessibilityLabel="Loading video" />
+                    <ActivityIndicator
+                      color={colors.accent}
+                      size="small"
+                      accessibilityLabel="Loading video"
+                    />
                   </View>
                 ) : null}
               </View>
@@ -790,11 +852,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 0,
   },
-  bufferingOverlay: {
+  posterLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    backgroundColor: colors.background,
+  },
+  bufferingSpinnerLayer: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(10, 10, 11, 0.35)",
+    backgroundColor: "transparent",
+    zIndex: 2,
   },
   muteLayer: {
     ...StyleSheet.absoluteFillObject,

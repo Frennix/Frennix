@@ -127,10 +127,24 @@ export function useVideoPoster(videoUri: string | undefined, thumbnailUrl?: stri
     let cancelled = false;
 
     if (Platform.OS === "web") {
+      setReady(false);
       setPosterUri(null);
-      setUseVideoFrameFallback(true);
-      setReady(true);
-      return;
+      setUseVideoFrameFallback(false);
+
+      void resolveFallbackPoster(videoUri).then((uri) => {
+        if (cancelled) return;
+        if (uri) {
+          setPosterUri(uri);
+          setUseVideoFrameFallback(false);
+        } else {
+          setUseVideoFrameFallback(true);
+        }
+        setReady(true);
+      });
+
+      return () => {
+        cancelled = true;
+      };
     }
 
     setReady(false);

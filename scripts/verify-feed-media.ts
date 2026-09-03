@@ -215,6 +215,21 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "Feed inline video keeps poster visible while buffering",
+    run: () => {
+      const src = read("packages/ui/src/FeedVideoPlayer.tsx");
+      if (!src.includes("showPosterBackdrop")) {
+        throw new Error("FeedVideoPlayer must render poster backdrop until first frame");
+      }
+      if (!src.includes("hasRenderedFrame")) {
+        throw new Error("FeedVideoPlayer must track first rendered video frame");
+      }
+      if (!src.includes('backgroundColor: "transparent"')) {
+        throw new Error("FeedVideoPlayer buffering spinner must not paint a black overlay");
+      }
+    },
+  },
+  {
     name: "Feed scroll bottom padding clears tab bar and Safari toolbar",
     run: () => {
       const paddingSrc = read("lib/feed-scroll-bottom-padding.ts");
