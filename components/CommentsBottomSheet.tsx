@@ -35,6 +35,7 @@ import {
 } from "@/lib/safari-visual-viewport";
 import { lockWebModalScroll, restoreWebDocumentScrollLock, unlockWebModalScroll } from "@/lib/web-modal-scroll-lock";
 import { useCommentComposerHostBottomInset, useCommentsOverlayBottomReserve } from "@/lib/use-comment-composer-host-inset";
+import { useVideoOverlayPortaledComposerReserve } from "@/lib/use-video-overlay-portaled-composer-reserve";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
@@ -50,8 +51,10 @@ export const COMMENTS_VIDEO_PEEK_TARGET_MAX_PX = 400;
 /** Never let keyboard/sheet layout shrink the preview below ~25% of layout height. */
 const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
 const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
-/** Minimum sheet chrome (handle, header, composer) above the keyboard. */
+/** Minimum sheet chrome (handle, header, inline composer) above the keyboard. */
 const VIDEO_SHEET_MIN_CHROME_PX = 88;
+/** Minimum column height so the handle + "Comments" header stay visible above the list. */
+const VIDEO_OVERLAY_HEADER_CHROME_PX = 80;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -94,14 +97,31 @@ function resolveVideoPeekHeight(
   return Math.min(baselinePeekHeight, maxPeekForVisible);
 }
 
-function computeVideoOverlaySheetLayout(baselinePeekHeight: number | null): VideoOverlaySheetLayout {
+function computeVideoOverlaySheetLayout(
+  baselinePeekHeight: number | null,
+  composerBottomReserve = 0
+): VideoOverlaySheetLayout {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
   const { offsetTop, visualHeight } = measureSafariVisualViewport();
   const baselinePeek =
     baselinePeekHeight ?? computeBaselineVideoPeekHeight(layoutHeight);
-  const peekHeight = resolveVideoPeekHeight(layoutHeight, visualHeight, baselinePeek);
+
+  let peekHeight: number;
+  let height: number;
+
+  if (composerBottomReserve > 0) {
+    const maxPeekHeight = Math.max(
+      VIDEO_PEEK_ABSOLUTE_MIN_PX,
+      visualHeight - composerBottomReserve - VIDEO_OVERLAY_HEADER_CHROME_PX
+    );
+    peekHeight = Math.min(baselinePeek, maxPeekHeight);
+    height = Math.max(0, visualHeight - peekHeight - composerBottomReserve);
+  } else {
+    peekHeight = resolveVideoPeekHeight(layoutHeight, visualHeight, baselinePeek);
+    height = Math.max(0, visualHeight - peekHeight);
+  }
+
   const top = peekHeight;
-  const height = Math.max(0, visualHeight - peekHeight);
   return { offsetTop, visualHeight, peekHeight, top, height };
 }
 
@@ -207,17 +227,31 @@ export function CommentsBottomSheet({
   const dismissingRef = useRef(false);
   const openedAtRef = useRef(0);
   const useVideoOverlay = presentation === "videoOverlay";
+  const suppressWebVideoInlineComposer =
+    suppressInlineComposer || (Platform.OS === "web" && useVideoOverlay);
+  const portaledComposerReserve = useVideoOverlayPortaledComposerReserve(
+    visible && Platform.OS === "web" && suppressWebVideoInlineComposer
+  );
   const videoPeekBaselineRef = useRef<number | null>(null);
   const [mobileViewport, setMobileViewport] = useState<SafariVisualViewportSnapshot | null>(() =>
     Platform.OS === "web" ? measureSafariVisualViewport() : null
   );
-  const [videoOverlayLayout, setVideoOverlayLayout] = useState<VideoOverlaySheetLayout>(() =>
-    computeVideoOverlaySheetLayout(null)
+  const videoOverlayLayout = useMemo(
+    () =>
+      computeVideoOverlaySheetLayout(
+        videoPeekBaselineRef.current,
+        suppressWebVideoInlineComposer ? portaledComposerReserve : 0
+      ),
+    [mobileViewport, portaledComposerReserve, suppressWebVideoInlineComposer]
   );
 
   useEffect(() => {
     if (!visible || !useVideoOverlay) {
       videoPeekBaselineRef.current = null;
+      return;
+    }
+    if (typeof window !== "undefined") {
+      videoPeekBaselineRef.current = computeBaselineVideoPeekHeight(window.innerHeight);
     }
   }, [useVideoOverlay, visible]);
 
@@ -227,16 +261,7 @@ export function CommentsBottomSheet({
     }
 
     const syncHeight = () => {
-      const snapshot = measureSafariVisualViewport();
-      setMobileViewport(snapshot);
-      if (useVideoOverlay) {
-        if (videoPeekBaselineRef.current == null) {
-          videoPeekBaselineRef.current = computeBaselineVideoPeekHeight(window.innerHeight);
-        }
-        setVideoOverlayLayout(
-          computeVideoOverlaySheetLayout(videoPeekBaselineRef.current)
-        );
-      }
+      setMobileViewport(measureSafariVisualViewport());
     };
     syncHeight();
     return subscribeSafariVisualViewport(syncHeight);
@@ -429,12 +454,10 @@ export function CommentsBottomSheet({
     visible && Platform.OS === "web" && useMobileWebFullscreen
   );
   const measuredVideoOverlayBottomReserve = useCommentsOverlayBottomReserve(
-    visible && Platform.OS === "web" && useVideoOverlay
+    visible && Platform.OS === "web" && useVideoOverlay && !suppressWebVideoInlineComposer
   );
-  const suppressWebVideoInlineComposer =
-    suppressInlineComposer || (Platform.OS === "web" && useVideoOverlay);
   const videoOverlayBottomReserve = suppressWebVideoInlineComposer
-    ? 0
+    ? portaledComposerReserve
     : measuredVideoOverlayBottomReserve;
   const composerHostBottomInset = useCommentComposerHostBottomInset(
     closedComposerBottomInset,
