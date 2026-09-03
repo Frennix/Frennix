@@ -30,7 +30,7 @@ import {
 } from "./feedVideoPlaybackCoordinator";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
-import { FEED_VIDEO_FALLBACK_RATIO } from "./mediaLayout";
+import { FEED_VIDEO_FIXED_ASPECT_RATIO } from "./mediaLayout";
 import { colors } from "./theme";
 import { useFeedVideoIntersectionObserver } from "./useFeedVideoIntersectionObserver";
 import { useVideoPoster, type VideoPosterState } from "./useVideoPoster";
@@ -248,8 +248,6 @@ export function FeedVideoPlayer({
     });
   }, []);
 
-  const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
-
   useEffect(() => {
     setFailed(false);
   }, [uri, retryKey]);
@@ -437,10 +435,9 @@ export function FeedVideoPlayer({
     return (
       <View style={styles.shell} collapsable={false}>
         <MediaAspectFrame
-          dimensionsUri={dimensionsUri}
           layout="feed"
           style={style}
-          fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
+          fixedAspectRatio={FEED_VIDEO_FIXED_ASPECT_RATIO}
         >
           {() => <MediaLoadError label="Video unavailable" onRetry={handleRetry} />}
         </MediaAspectFrame>
@@ -495,7 +492,8 @@ export function FeedVideoPlayer({
         style: {
           width: "100%",
           height: "100%",
-          objectFit: "contain",
+          objectFit: "cover",
+          objectPosition: "center",
           backgroundColor: colors.background,
           pointerEvents: "none",
         },
@@ -523,7 +521,7 @@ export function FeedVideoPlayer({
               }}
               source={{ uri }}
               style={styles.videoFill}
-              resizeMode={ResizeMode.CONTAIN}
+              resizeMode={ResizeMode.COVER}
               shouldPlay={shouldPlay}
               isMuted={muted}
               isLooping
@@ -550,10 +548,9 @@ export function FeedVideoPlayer({
   return (
     <View style={styles.shell} collapsable={false}>
       <MediaAspectFrame
-        dimensionsUri={dimensionsUri}
         layout="feed"
         style={style}
-        fallbackRatio={FEED_VIDEO_FALLBACK_RATIO}
+        fixedAspectRatio={FEED_VIDEO_FIXED_ASPECT_RATIO}
       >
         {() => (
           <View

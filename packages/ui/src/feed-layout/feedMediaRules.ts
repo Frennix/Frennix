@@ -1,7 +1,7 @@
 import {
   FEED_MIN_MEDIA_HEIGHT,
   FEED_PHOTO_FALLBACK_RATIO,
-  FEED_VIDEO_FALLBACK_RATIO,
+  FEED_VIDEO_FIXED_ASPECT_RATIO,
   type MediaLayout,
 } from "../mediaLayout";
 
@@ -13,14 +13,18 @@ export const feedMediaRules = {
   /** Layout mode passed to PostMedia / MediaAspectFrame for all feed mounts. */
   layout: "feed" satisfies MediaLayout,
 
-  /** Preserve original aspect ratio; never stretch or auto-crop user content. */
+  /** Photos preserve intrinsic aspect ratio; feed videos use a fixed frame. */
   preserveAspectRatio: true,
+
+  /** Feed videos fill a fixed 9:16 frame with cover fit (no letterboxing). */
+  videoFixedAspectRatio: FEED_VIDEO_FIXED_ASPECT_RATIO,
+  videoContentFit: "cover" as const,
   autoCrop: false,
 
   /** No portrait height cap — fitness progress/transformation media shows in full. */
   maxPortraitRatio: null as number | null,
 
-  /** Image fit inside exact-aspect frame (identical to cover when frame matches media). */
+  /** Image fit inside exact-aspect photo frame. */
   contentFit: "contain" as const,
 
   /** Edge-to-edge within the unified post content column (same width as metadata). */
@@ -33,7 +37,7 @@ export const feedMediaRules = {
   photoFallbackRatio: FEED_PHOTO_FALLBACK_RATIO,
 
   /** Fallback ratio for video before poster dimensions resolve. */
-  videoFallbackRatio: FEED_VIDEO_FALLBACK_RATIO,
+  videoFallbackRatio: FEED_VIDEO_FIXED_ASPECT_RATIO,
 
   /** Web: defer carousel/video mount until near viewport (FeedMediaSlot). */
   deferUntilNearViewport: true,
