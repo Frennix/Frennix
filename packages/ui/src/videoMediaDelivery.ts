@@ -1,7 +1,30 @@
 /** Shared feed/fullscreen video load policy — no signed URLs in this app (public storage). */
 
 export const VIDEO_FIRST_FRAME_TIMEOUT_MS = 25_000;
+/** Poll + force-reveal window before declaring first-frame timeout failure. */
+export const VIDEO_REVEAL_FALLBACK_MS = 8_000;
+export const VIDEO_REVEAL_POLL_MS = 250;
 export const VIDEO_MAX_AUTO_RETRIES = 1;
+
+/** HTMLMediaElement.HAVE_CURRENT_DATA — first decodable frame available. */
+export function feedVideoReadyToReveal(readyState: number): boolean {
+  return readyState >= 2;
+}
+
+export function shouldShowFeedVideoPosterLayer(
+  presentationPosterUri: string | null | undefined,
+  hasRenderedFrame: boolean
+): boolean {
+  return Boolean(presentationPosterUri) && !hasRenderedFrame;
+}
+
+export function shouldShowFeedVideoLoadingPlaceholder(
+  presentationPosterUri: string | null | undefined,
+  hasRenderedFrame: boolean,
+  waitingForFrame: boolean
+): boolean {
+  return !presentationPosterUri && !hasRenderedFrame && waitingForFrame;
+}
 
 export type VideoMediaFailureReason =
   | "aborted"

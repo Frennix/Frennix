@@ -55,6 +55,14 @@ export { ScalePressable } from "./ScalePressable";
 export { ProgressiveImage } from "./ProgressiveImage";
 export { MediaLoadError } from "./MediaLoadError";
 export { FeedVideoPlayer } from "./FeedVideoPlayer";
+export { WebNativeImage } from "./WebNativeImage";
+export {
+  feedVideoReadyToReveal,
+  shouldShowFeedVideoLoadingPlaceholder,
+  shouldShowFeedVideoPosterLayer,
+  VIDEO_REVEAL_FALLBACK_MS,
+  VIDEO_REVEAL_POLL_MS,
+} from "./videoMediaDelivery";
 export { FullscreenVideoSlide } from "./FullscreenVideoSlide";
 export {
   buildFeedVideoPlaybackId,

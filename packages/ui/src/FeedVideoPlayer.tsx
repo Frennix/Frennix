@@ -50,10 +50,15 @@ import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
 import {
   VIDEO_FIRST_FRAME_TIMEOUT_MS,
+  VIDEO_REVEAL_FALLBACK_MS,
+  VIDEO_REVEAL_POLL_MS,
   classifyVideoMediaError,
+  feedVideoReadyToReveal,
   logVideoMediaFailure,
   mediaExtensionFromUri,
   shouldAutoRetryVideoLoad,
+  shouldShowFeedVideoLoadingPlaceholder,
+  shouldShowFeedVideoPosterLayer,
   type VideoMediaFailureReason,
 } from "./videoMediaDelivery";
 import { colors } from "./theme";
@@ -384,12 +389,26 @@ export function FeedVideoPlayer({
 
   const presentationPosterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? null;
 
-  const markFrameReady = useCallback(() => {
+  const revealVideoFrame = useCallback(() => {
     const video = webVideoRef.current;
-    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    if (!video || !feedVideoReadyToReveal(video.readyState)) return false;
     setHasRenderedFrame(true);
+    video.style.opacity = "1";
     clearStallSpinner();
-  }, [clearStallSpinner]);
+    notifyVisualReady();
+    return true;
+  }, [clearStallSpinner, notifyVisualReady]);
+
+  const scheduleVideoFrameCallbackReveal = useCallback(
+    (video: HTMLVideoElement) => {
+      const rvfc = video.requestVideoFrameCallback;
+      if (typeof rvfc !== "function") return;
+      rvfc.call(video, () => {
+        revealVideoFrame();
+      });
+    },
+    [revealVideoFrame]
+  );
 
   useEffect(() => {
     if (!playbackId) return;
@@ -438,10 +457,11 @@ export function FeedVideoPlayer({
       if (shouldPlayRef.current) attemptWebAutoplay();
     };
     const onLoadedData = () => {
-      markFrameReady();
+      if (revealVideoFrame()) return;
+      scheduleVideoFrameCallbackReveal(video);
     };
     const onCanPlay = () => {
-      markFrameReady();
+      revealVideoFrame();
       if (shouldPlayRef.current) attemptWebAutoplay();
     };
     const onWaiting = () => {
@@ -450,10 +470,13 @@ export function FeedVideoPlayer({
     };
     const onPlaying = () => {
       clearStallSpinner();
-      markFrameReady();
+      revealVideoFrame();
     };
+    let sawTimeUpdate = false;
     const onTimeUpdate = () => {
-      markFrameReady();
+      if (sawTimeUpdate) return;
+      sawTimeUpdate = true;
+      revealVideoFrame();
     };
     const onError = () => reportVideoFailure(classifyVideoMediaError(video), video);
 
@@ -501,11 +524,12 @@ export function FeedVideoPlayer({
     };
   }, [
     attemptWebAutoplay,
-    markFrameReady,
     notifyVisualReady,
     playbackId,
+    revealVideoFrame,
     scheduleStallSpinner,
     clearStallSpinner,
+    scheduleVideoFrameCallbackReveal,
     resolvedPoster.posterUri,
     retryKey,
     thumbnailUrl,
@@ -535,16 +559,52 @@ export function FeedVideoPlayer({
   }, [playbackId, preloadGranted, shouldPlay, uri, retryKey]);
 
   useEffect(() => {
+    if (Platform.OS !== "web" || hasRenderedFrame || failed) return;
+
+    const startedAt = Date.now();
+    const poll = setInterval(() => {
+      const video = webVideoRef.current;
+      if (!video) return;
+      if (revealVideoFrame()) {
+        clearInterval(poll);
+        return;
+      }
+      if (Date.now() - startedAt >= VIDEO_REVEAL_FALLBACK_MS) {
+        clearInterval(poll);
+        if (feedVideoReadyToReveal(video.readyState)) {
+          revealVideoFrame();
+        }
+      }
+    }, VIDEO_REVEAL_POLL_MS);
+
+    return () => clearInterval(poll);
+  }, [failed, hasRenderedFrame, revealVideoFrame, retryKey, uri]);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || !shouldPlay || hasRenderedFrame || failed) return;
     if (playbackId && isFeedVideoFullscreenHandoff(playbackId)) return;
 
     const timer = setTimeout(() => {
       if (hasRenderedFrame || !shouldPlayRef.current) return;
-      reportVideoFailure("timeout", webVideoRef.current);
+      const video = webVideoRef.current;
+      if (video && feedVideoReadyToReveal(video.readyState)) {
+        revealVideoFrame();
+        return;
+      }
+      reportVideoFailure("timeout", video);
     }, VIDEO_FIRST_FRAME_TIMEOUT_MS);
 
     return () => clearTimeout(timer);
-  }, [failed, hasRenderedFrame, playbackId, reportVideoFailure, retryKey, shouldPlay, uri]);
+  }, [
+    failed,
+    hasRenderedFrame,
+    playbackId,
+    reportVideoFailure,
+    revealVideoFrame,
+    retryKey,
+    shouldPlay,
+    uri,
+  ]);
 
   useEffect(() => {
     if (!shouldPlay) {
@@ -789,18 +849,19 @@ export function FeedVideoPlayer({
   }
 
   const showPosterBackdrop =
-    Boolean(presentationPosterUri) &&
-    !hasRenderedFrame &&
+    shouldShowFeedVideoPosterLayer(presentationPosterUri, hasRenderedFrame) &&
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);
   const showLoadingPlaceholder =
-    !presentationPosterUri &&
-    !hasRenderedFrame &&
-    !videoDomAdopted &&
-    !isFeedVideoFullscreenHandoff(playbackId) &&
-    (shouldPlay || inView || preloadGranted);
+    shouldShowFeedVideoLoadingPlaceholder(
+      presentationPosterUri,
+      hasRenderedFrame,
+      !videoDomAdopted &&
+        !isFeedVideoFullscreenHandoff(playbackId) &&
+        (shouldPlay || inView || preloadGranted)
+    );
   const showBufferingSpinner =
-    (showStallSpinner || showLoadingPlaceholder) &&
+    (showStallSpinner || (showLoadingPlaceholder && !hasRenderedFrame)) &&
     shouldPlay &&
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);

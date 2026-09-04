@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Animated,
+  Platform,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { CachedImage } from "./CachedImage";
 import { MediaLoadError } from "./MediaLoadError";
 import { Skeleton } from "./Skeleton";
+import { WebNativeImage } from "./WebNativeImage";
 import { colors } from "./theme";
 
 type ProgressiveImageProps = {
@@ -36,6 +44,7 @@ export function ProgressiveImage({
 }: ProgressiveImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [useNativeWebFallback, setUseNativeWebFallback] = useState(Platform.OS === "web");
   const [retryKey, setRetryKey] = useState(0);
   const opacity = useRef(new Animated.Value(0)).current;
   const revealedRef = useRef(false);
@@ -43,6 +52,7 @@ export function ProgressiveImage({
   useEffect(() => {
     setLoaded(false);
     setFailed(false);
+    setUseNativeWebFallback(Platform.OS === "web");
     revealedRef.current = false;
     opacity.setValue(0);
   }, [uri, retryKey, opacity]);
@@ -61,15 +71,49 @@ export function ProgressiveImage({
 
   const handleRetry = () => {
     setFailed(false);
+    setUseNativeWebFallback(Platform.OS === "web");
     revealedRef.current = false;
     opacity.setValue(0);
     setLoaded(false);
     setRetryKey((key) => key + 1);
   };
 
+  const handleExpoImageError = () => {
+    if (Platform.OS === "web" && !useNativeWebFallback) {
+      setUseNativeWebFallback(true);
+      revealedRef.current = false;
+      opacity.setValue(0);
+      setLoaded(false);
+      return;
+    }
+    setFailed(true);
+    onError?.();
+  };
+
   if (failed) {
     return (
       <MediaLoadError label="Photo unavailable" onRetry={handleRetry} style={style} />
+    );
+  }
+
+  if (Platform.OS === "web" && useNativeWebFallback) {
+    return (
+      <View style={[styles.wrap, style]} accessibilityLabel={accessibilityLabel}>
+        {!loaded && showPlaceholder && !placeholderUri ? (
+          <Skeleton style={StyleSheet.absoluteFillObject} />
+        ) : null}
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
+          <WebNativeImage
+            key={retryKey}
+            uri={uri}
+            contentFit={contentFit}
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel={accessibilityLabel}
+            onLoad={reveal}
+            onError={handleExpoImageError}
+          />
+        </Animated.View>
+      </View>
     );
   }
 
@@ -97,10 +141,7 @@ export function ProgressiveImage({
           style={StyleSheet.absoluteFill}
           onLoad={reveal}
           onLoadEnd={reveal}
-          onError={() => {
-            setFailed(true);
-            onError?.();
-          }}
+          onError={handleExpoImageError}
         />
       </Animated.View>
     </View>

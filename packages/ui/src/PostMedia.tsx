@@ -1,4 +1,4 @@
-import { createElement, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Platform,
   StyleSheet,
@@ -245,7 +245,13 @@ function FeedImage({
   onVisualReady?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    setImageFailed(false);
+    setImageLoaded(false);
+  }, [uri, retryKey]);
 
   const content = (
     <MediaAspectFrame
@@ -264,6 +270,7 @@ function FeedImage({
               style={styles.imageFallback}
               onRetry={() => {
                 setImageFailed(false);
+                setImageLoaded(false);
                 setRetryKey((key) => key + 1);
               }}
             />
@@ -275,8 +282,14 @@ function FeedImage({
               style={styles.image}
               contentFit={layout === "feed" ? feedMediaRules.contentFit : "contain"}
               accessibilityLabel="Post photo"
-              onError={() => setImageFailed(true)}
-              onLoad={onVisualReady}
+              onError={() => {
+                setImageLoaded(false);
+                setImageFailed(true);
+              }}
+              onLoad={() => {
+                setImageLoaded(true);
+                onVisualReady?.();
+              }}
               showPlaceholder={!thumbnailUrl}
             />
           )}
@@ -290,9 +303,13 @@ function FeedImage({
       <TouchableOpacity
         activeOpacity={0.95}
         delayPressIn={pressDelayMs ?? 0}
-        onPress={onImagePress}
+        onPress={() => {
+          if (imageFailed || !imageLoaded) return;
+          onImagePress();
+        }}
         accessibilityRole="button"
         accessibilityLabel="View full image"
+        accessibilityState={{ disabled: imageFailed || !imageLoaded }}
       >
         {content}
       </TouchableOpacity>

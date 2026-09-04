@@ -29,7 +29,7 @@ let ok = true;
 ok = pass("Lightbox renders through web portal", lightbox.includes("createPortal") && lightbox.includes("document.body")) && ok;
 ok = pass("Web root uses fixed full viewport", lightbox.includes("100dvh") && lightbox.includes("100vw")) && ok;
 ok = pass("Solid black full-screen backdrop", lightbox.includes("colors.black")) && ok;
-ok = pass("Images use cover fit", lightbox.includes('contentFit="cover"') && lightbox.includes('objectFit: "cover"')) && ok;
+ok = pass("Images use contain fit in lightbox", lightbox.includes('objectFit: "contain"')) && ok;
 ok = pass("Image stage uses absolute fill", lightbox.includes("imageStage") && lightbox.includes("StyleSheet.absoluteFillObject")) && ok;
 ok = pass("Web lightbox uses plain HTML img", lightbox.includes('createElement("img"') && lightbox.includes("WEB_LIGHTBOX_PLAIN_IMG_STYLE")) && ok;
 ok = pass("Web img logs bounding rect on open", lightbox.includes("getBoundingClientRect()")) && ok;

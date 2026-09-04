@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import { prefetchCachedImages, CachedImage } from "../packages/ui/src/CachedImage";
 import { FullscreenVideoSlide } from "../packages/ui/src/FullscreenVideoSlide";
+import { MediaLoadError } from "../packages/ui/src/MediaLoadError";
 import type { FeedVideoFullscreenHandoff } from "../packages/ui/src/feedVideoPlaybackCoordinator";
 import { ImmersiveVideoViewer } from "@/components/ImmersiveVideoViewer";
 import { isMobileWeb } from "@/lib/safari-visual-viewport";
@@ -130,7 +131,7 @@ function isPointInsideContainedImage(
   const bounds = img.getBoundingClientRect();
   const { naturalWidth, naturalHeight } = img;
   if (!naturalWidth || !naturalHeight || bounds.width <= 0 || bounds.height <= 0) {
-    return true;
+    return false;
   }
   const fitScale = Math.min(bounds.width / naturalWidth, bounds.height / naturalHeight);
   const renderedWidth = naturalWidth * fitScale;
@@ -254,14 +255,18 @@ function WebZoomableImage({
   uri,
   onZoomChange,
   onLetterboxPress,
+  onMediaError,
 }: {
   uri: string;
   placeholderUri?: string | null;
   onZoomChange: (zoomed: boolean) => void;
   onLetterboxPress?: () => void;
+  onMediaError?: () => void;
 }) {
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
   const lastTap = useRef(0);
@@ -272,8 +277,9 @@ function WebZoomableImage({
   useEffect(() => {
     setScale(1);
     setPan({ x: 0, y: 0 });
+    setFailed(false);
     onZoomChange(false);
-  }, [uri, onZoomChange]);
+  }, [uri, retryKey, onZoomChange]);
 
   useEffect(() => {
     function onWheel(event: WheelEvent) {
@@ -317,12 +323,30 @@ function WebZoomableImage({
   }
 
   function maybeDismissFromLetterbox(clientX: number, clientY: number) {
-    if (scale > 1.01 || movedDuringTouch.current || !onLetterboxPress) return;
+    if (scale > 1.01 || movedDuringTouch.current || !onLetterboxPress || failed) return;
     const img = imgRef.current;
-    if (!img) return;
+    if (!img) {
+      onLetterboxPress();
+      return;
+    }
     if (!isPointInsideContainedImage(img, clientX, clientY)) {
       onLetterboxPress();
     }
+  }
+
+  if (failed) {
+    return (
+      <View style={styles.imageStage}>
+        <MediaLoadError
+          label="Photo unavailable"
+          style={StyleSheet.absoluteFillObject}
+          onRetry={() => {
+            setFailed(false);
+            setRetryKey((key) => key + 1);
+          }}
+        />
+      </View>
+    );
   }
 
   return (
@@ -395,6 +419,7 @@ function WebZoomableImage({
       onDoubleClick={handleDoubleTap}
     >
       {createElement("img", {
+        key: retryKey,
         ref: imgRef,
         src: uri,
         alt: "",
@@ -403,6 +428,11 @@ function WebZoomableImage({
           ...WEB_LIGHTBOX_PLAIN_IMG_STYLE,
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
           transformOrigin: "center center",
+        },
+        onLoad: () => setFailed(false),
+        onError: () => {
+          setFailed(true);
+          onMediaError?.();
         },
         onClick: (event: MouseEvent) => {
           maybeDismissFromLetterbox(event.clientX, event.clientY);
@@ -492,24 +522,26 @@ function LightboxSurface({
   }, [items, index]);
 
   useEffect(() => {
-    setLightboxOverlayOpen(visible);
-    if (!visible) return;
+    if (!visible) {
+      setLightboxOverlayOpen(false);
+      if (Platform.OS === "web") {
+        restoreWebDocumentScrollLock();
+      }
+      return;
+    }
+
+    setLightboxOverlayOpen(true);
 
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      const previousBodyOverflow = document.body.style.overflow;
-      const previousHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = "hidden";
       document.documentElement.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = previousBodyOverflow;
-        document.documentElement.style.overflow = previousHtmlOverflow;
-        restoreWebDocumentScrollLock();
-        setLightboxOverlayOpen(false);
-      };
     }
 
     return () => {
       setLightboxOverlayOpen(false);
+      if (Platform.OS === "web") {
+        restoreWebDocumentScrollLock();
+      }
     };
   }, [visible]);
 
@@ -711,6 +743,7 @@ function LightboxSurface({
                     placeholderUri={item.thumbnailUrl}
                     onZoomChange={handleZoomChange}
                     onLetterboxPress={!zoomed ? dismiss : undefined}
+                    onMediaError={dismiss}
                   />
                 ) : (
                   <NativeZoomableImage

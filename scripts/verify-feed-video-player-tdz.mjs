@@ -148,11 +148,12 @@ function main() {
 
   ok =
     pass(
-      "First-frame timeout effect references reportVideoFailure in deps",
+      "First-frame timeout effect references reportVideoFailure and revealVideoFrame",
       (() => {
-        const idx = feedPlayer.indexOf('reportVideoFailure("timeout", webVideoRef.current)');
-        const block = feedPlayer.slice(idx, idx + 250);
-        return block.includes("reportVideoFailure");
+        const idx = feedPlayer.indexOf('reportVideoFailure("timeout", video)');
+        if (idx < 0) return false;
+        const block = feedPlayer.slice(idx - 400, idx + 350);
+        return block.includes("revealVideoFrame") && block.includes("reportVideoFailure");
       })()
     ) && ok;
 
