@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   Animated,
   Platform,
@@ -11,6 +11,7 @@ import { CachedImage } from "./CachedImage";
 import { MediaLoadError } from "./MediaLoadError";
 import { Skeleton } from "./Skeleton";
 import { WebNativeImage } from "./WebNativeImage";
+import { isDecodedDomImage } from "./progressiveImageReveal";
 import { colors } from "./theme";
 
 type ProgressiveImageProps = {
@@ -48,14 +49,7 @@ export function ProgressiveImage({
   const [retryKey, setRetryKey] = useState(0);
   const opacity = useRef(new Animated.Value(0)).current;
   const revealedRef = useRef(false);
-
-  useEffect(() => {
-    setLoaded(false);
-    setFailed(false);
-    setUseNativeWebFallback(Platform.OS === "web");
-    revealedRef.current = false;
-    opacity.setValue(0);
-  }, [uri, retryKey, opacity]);
+  const webImgRef = useRef<HTMLImageElement | null>(null);
 
   const reveal = () => {
     if (revealedRef.current) return;
@@ -68,6 +62,18 @@ export function ProgressiveImage({
       useNativeDriver: true,
     }).start();
   };
+
+  useLayoutEffect(() => {
+    setLoaded(false);
+    setFailed(false);
+    setUseNativeWebFallback(Platform.OS === "web");
+    revealedRef.current = false;
+    opacity.setValue(0);
+
+    if (Platform.OS === "web" && useNativeWebFallback && isDecodedDomImage(webImgRef.current)) {
+      reveal();
+    }
+  }, [uri, retryKey, opacity, useNativeWebFallback]);
 
   const handleRetry = () => {
     setFailed(false);
@@ -105,6 +111,7 @@ export function ProgressiveImage({
         <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
           <WebNativeImage
             key={retryKey}
+            ref={webImgRef}
             uri={uri}
             contentFit={contentFit}
             style={StyleSheet.absoluteFill}

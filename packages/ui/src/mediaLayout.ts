@@ -88,6 +88,17 @@ export function feedMediaContentFit(): "cover" {
   return "cover";
 }
 
+/** Deterministic carousel frame size — avoids height:100% collapse through web FlatList. */
+export function resolveFeedCarouselFrameSizing(
+  containerWidth: number,
+  bucket: FeedMediaBucket = FEED_FALLBACK_BUCKET
+): { frameHeight: number; frameAspectRatio: number } {
+  const frameAspectRatio = feedBucketAspectRatio(bucket);
+  const frameHeight =
+    containerWidth > 0 ? computeFeedMediaFrameHeight(containerWidth, 0, 0, bucket) : 0;
+  return { frameHeight, frameAspectRatio };
+}
+
 /** @deprecated Use classifyFeedMediaBucket + feedMediaContentFit */
 export function isFeedPortraitCapped(
   mediaWidth: number,

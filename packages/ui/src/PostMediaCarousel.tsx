@@ -14,7 +14,13 @@ import { normalizePostMediaItems } from "@frennix/types";
 import { prefetchCachedImages } from "./CachedImage";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { PostMedia } from "./PostMedia";
-import { FEED_PORTRAIT_FRAME_RATIO } from "./mediaLayout";
+import {
+  FEED_FALLBACK_BUCKET,
+  FEED_PORTRAIT_FRAME_RATIO,
+  feedBucketAspectRatio,
+  resolveFeedCarouselFrameSizing,
+  type FeedMediaBucket,
+} from "./mediaLayout";
 import { colors, spacing, typography } from "./theme";
 
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
@@ -214,53 +220,70 @@ export function PostMediaCarousel({
         layout="feed"
         style={styles.media}
       >
-        {({ bucket }) => (
-          <View style={styles.sharedFrameInner}>
-            {containerWidth > 0 ? (
-              <FlatList
-                ref={listRef}
-                data={mediaItems}
-                horizontal
-                pagingEnabled
-                nestedScrollEnabled
-                directionalLockEnabled={Platform.OS === "ios"}
-                showsHorizontalScrollIndicator={false}
-                style={[styles.list, WEB_HORIZONTAL_SCROLL_STYLE]}
-                keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
-                getItemLayout={getItemLayout}
-                snapToInterval={containerWidth}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                onMomentumScrollEnd={handleScroll}
-                initialNumToRender={2}
-                maxToRenderPerBatch={2}
-                windowSize={3}
-                removeClippedSubviews={Platform.OS !== "web"}
-                renderItem={({ item, index: itemIndex }) => (
-                  <View style={{ width: containerWidth, height: "100%" }}>
-                    {renderCarouselSlide({
-                      item,
-                      itemIndex,
-                      activeIndex,
-                      onMediaPress,
-                      videoRouteHrefForIndex,
-                      onVideoRouteNavigate,
-                      mediaVisible,
-                      playbackScopeId,
-                      onPrimaryMediaReady,
-                      fillParent: true,
-                      feedFrameBucket: bucket ?? undefined,
-                    })}
-                  </View>
-                )}
-              />
-            ) : (
-              <View style={styles.widthProbePlaceholder} />
-            )}
-          </View>
-        )}
+        {({ bucket }) => {
+          const frameBucket = (bucket ?? FEED_FALLBACK_BUCKET) as FeedMediaBucket;
+          const { frameHeight, frameAspectRatio } = resolveFeedCarouselFrameSizing(
+            containerWidth,
+            frameBucket
+          );
+          const frameSizingStyle: ViewStyle =
+            containerWidth > 0
+              ? { height: frameHeight }
+              : ({ aspectRatio: frameAspectRatio, width: "100%" } as ViewStyle);
+
+          return (
+            <View style={[styles.sharedFrameInner, frameSizingStyle]}>
+              {containerWidth > 0 ? (
+                <FlatList
+                  ref={listRef}
+                  data={mediaItems}
+                  horizontal
+                  pagingEnabled
+                  nestedScrollEnabled
+                  directionalLockEnabled={Platform.OS === "ios"}
+                  showsHorizontalScrollIndicator={false}
+                  style={[styles.list, { height: frameHeight }, WEB_HORIZONTAL_SCROLL_STYLE]}
+                  keyExtractor={(item, itemIndex) => `${item.url}-${itemIndex}`}
+                  getItemLayout={getItemLayout}
+                  snapToInterval={containerWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  onMomentumScrollEnd={handleScroll}
+                  initialNumToRender={2}
+                  maxToRenderPerBatch={2}
+                  windowSize={3}
+                  removeClippedSubviews={Platform.OS !== "web"}
+                  renderItem={({ item, index: itemIndex }) => (
+                    <View style={{ width: containerWidth, height: frameHeight }}>
+                      {renderCarouselSlide({
+                        item,
+                        itemIndex,
+                        activeIndex,
+                        onMediaPress,
+                        videoRouteHrefForIndex,
+                        onVideoRouteNavigate,
+                        mediaVisible,
+                        playbackScopeId,
+                        onPrimaryMediaReady,
+                        fillParent: true,
+                        feedFrameBucket: frameBucket,
+                      })}
+                    </View>
+                  )}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.widthProbePlaceholder,
+                    { aspectRatio: feedBucketAspectRatio(FEED_FALLBACK_BUCKET) },
+                  ]}
+                />
+              )}
+            </View>
+          );
+        }}
       </MediaAspectFrame>
 
       <View style={styles.dots} pointerEvents="none">

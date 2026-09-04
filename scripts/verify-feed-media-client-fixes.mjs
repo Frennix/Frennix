@@ -147,6 +147,7 @@ async function main() {
   const feedPlayer = read("packages/ui/src/FeedVideoPlayer.tsx");
   const progressive = read("packages/ui/src/ProgressiveImage.tsx");
   const postMedia = read("packages/ui/src/PostMedia.tsx");
+  const postMediaCarousel = read("packages/ui/src/PostMediaCarousel.tsx");
   const lightbox = read("components/ImageLightbox.tsx");
   const policy = read("packages/ui/src/videoMediaDelivery.ts");
 
@@ -202,6 +203,22 @@ async function main() {
     pass(
       "expo-image failure can fall back to native web img",
       progressive.includes("setUseNativeWebFallback(true)")
+    ) && ok;
+
+  ok =
+    pass(
+      "Carousel frame uses deterministic pixel height before slides mount",
+      postMediaCarousel.includes("resolveFeedCarouselFrameSizing") &&
+        postMediaCarousel.includes("{ height: frameHeight }") &&
+        postMediaCarousel.includes("height: frameHeight")
+    ) && ok;
+
+  ok =
+    pass(
+      "Cached web images reveal after reset via complete/naturalWidth check",
+      progressive.includes("useLayoutEffect") &&
+        progressive.includes("isDecodedDomImage") &&
+        progressive.includes("webImgRef")
     ) && ok;
 
   ok =
