@@ -58,6 +58,16 @@ function main() {
 
   ok =
     pass(
+      "Feed player declares reportVideoFailure before attemptWebAutoplay (no TDZ)",
+      (() => {
+        const decl = feedPlayer.indexOf("const reportVideoFailure = useCallback");
+        const attempt = feedPlayer.indexOf("const attemptWebAutoplay = useCallback");
+        return decl >= 0 && attempt > decl;
+      })()
+    ) && ok;
+
+  ok =
+    pass(
       "Feed player avoids silent black when poster is missing",
       feedPlayer.includes("loadingPlaceholder") &&
         feedPlayer.includes("showLoadingPlaceholder") &&

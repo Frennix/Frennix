@@ -158,6 +158,28 @@ export function FeedVideoPlayer({
     setShowStallSpinner(false);
   }, [clearStallSpinnerTimer]);
 
+  const reportVideoFailure = useCallback(
+    (reason: VideoMediaFailureReason, video?: HTMLVideoElement | null) => {
+      logVideoMediaFailure({
+        surface: "feed",
+        reason,
+        ext: mediaExtensionFromUri(uri),
+        playbackId,
+        attempt: autoRetryAttemptRef.current,
+      });
+      if (shouldAutoRetryVideoLoad(reason, autoRetryAttemptRef.current)) {
+        autoRetryAttemptRef.current += 1;
+        setHasRenderedFrame(false);
+        clearStallSpinner();
+        setRetryKey((key) => key + 1);
+        return;
+      }
+      clearStallSpinner();
+      setFailed(true);
+    },
+    [clearStallSpinner, playbackId, uri]
+  );
+
   const notifyVisualReady = useCallback(() => {
     if (visualReadyRef.current) return;
     visualReadyRef.current = true;
@@ -346,28 +368,6 @@ export function FeedVideoPlayer({
   }, []);
 
   const dimensionsUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
-
-  const reportVideoFailure = useCallback(
-    (reason: VideoMediaFailureReason, video?: HTMLVideoElement | null) => {
-      logVideoMediaFailure({
-        surface: "feed",
-        reason,
-        ext: mediaExtensionFromUri(uri),
-        playbackId,
-        attempt: autoRetryAttemptRef.current,
-      });
-      if (shouldAutoRetryVideoLoad(reason, autoRetryAttemptRef.current)) {
-        autoRetryAttemptRef.current += 1;
-        setHasRenderedFrame(false);
-        clearStallSpinner();
-        setRetryKey((key) => key + 1);
-        return;
-      }
-      clearStallSpinner();
-      setFailed(true);
-    },
-    [clearStallSpinner, playbackId, uri]
-  );
 
   useEffect(() => {
     autoRetryAttemptRef.current = 0;
