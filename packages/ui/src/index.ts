@@ -71,6 +71,8 @@ export {
   setFeedVideoFullscreenHandoff,
   getFeedVideoFullscreenHandoff,
   isFeedVideoFullscreenHandoff,
+  isFeedVideoSoundEnabled,
+  setFeedVideoSoundEnabled,
   type FeedVideoFullscreenHandoff,
 } from "./feedVideoPlaybackCoordinator";
 export {

@@ -10,7 +10,7 @@ import {
 const STORAGE_KEY = "frennix:feed-scroll-return";
 const MAX_AGE_MS = 30 * 60 * 1000;
 const MIN_FEED_HEIGHT = 60;
-const RESTORE_TOLERANCE_PX = 32;
+const RESTORE_TOLERANCE_PX = 4;
 const RESTORE_RETRY_MS = 100;
 const RESTORE_MAX_ATTEMPTS = 24;
 
@@ -145,12 +145,12 @@ function applyFeedScrollOffset(state: FeedScrollReturnState): void {
   const scrollPort = resolveFeedScrollPort();
   if (!scrollPort || scrollPort.clientHeight < MIN_FEED_HEIGHT) return;
 
-  if (state.postId) {
-    const postTop = scrollFeedPostIntoView(state.postId, scrollPort);
-    if (postTop !== null) return;
-  }
-
   scrollPort.scrollTop = state.feedScrollTop;
+
+  // Post anchor is only a fallback when no meaningful offset was captured.
+  if (state.feedScrollTop <= 0 && state.postId) {
+    scrollFeedPostIntoView(state.postId, scrollPort);
+  }
 }
 
 function readCurrentRestoreOffset(): number {
@@ -160,18 +160,6 @@ function readCurrentRestoreOffset(): number {
 }
 
 function isRestoreVerified(state: FeedScrollReturnState): boolean {
-  if (state.postId) {
-    const postEl = findFeedPostElement(state.postId);
-    const scrollPort = resolveFeedScrollPort();
-    if (postEl && scrollPort && scrollPort.clientHeight >= MIN_FEED_HEIGHT) {
-      const portRect = scrollPort.getBoundingClientRect();
-      const postRect = postEl.getBoundingClientRect();
-      if (postRect.top >= portRect.top - RESTORE_TOLERANCE_PX && postRect.top < portRect.bottom - 48) {
-        return true;
-      }
-    }
-  }
-
   return Math.abs(readCurrentRestoreOffset() - state.feedScrollTop) <= RESTORE_TOLERANCE_PX;
 }
 
@@ -281,6 +269,22 @@ export function applyPendingFeedScrollReturnIfNeeded(): void {
 /** @deprecated Prefer requestFeedScrollReturnRestore. */
 export function restoreFeedScrollReturnState(): void {
   requestFeedScrollReturnRestore();
+}
+
+/** Scroll the feed list so a post row is visible — used after closing the video overlay. */
+export function scrollFeedToPost(postId: string): void {
+  if (typeof document === "undefined") return;
+
+  const scrollPort = resolveFeedScrollPort();
+  if (!scrollPort || scrollPort.clientHeight < MIN_FEED_HEIGHT) return;
+
+  const postEl = findFeedPostElement(postId);
+  if (!postEl) return;
+
+  const portRect = scrollPort.getBoundingClientRect();
+  const postRect = postEl.getBoundingClientRect();
+  const targetTop = postRect.top - portRect.top + scrollPort.scrollTop;
+  scrollPort.scrollTop = Math.max(0, targetTop);
 }
 
 export { buildFeedPostAnchorId };

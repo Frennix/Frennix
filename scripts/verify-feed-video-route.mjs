@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Runtime regression: mobile web feed videos use real /video/[postId] route links.
+ * Runtime regression: mobile web feed videos open fullscreen overlay (not /video route).
  *
  * Usage:
  *   node scripts/verify-feed-video-route.mjs
@@ -98,7 +98,23 @@ const MOCK_VIDEO_POST = {
 };
 
 async function main() {
-  console.log("verify-feed-video-route (runtime)\n");
+  console.log("verify-feed-video-overlay (runtime)\n");
+  let ok = true;
+
+  const feedIndex = fs.readFileSync(path.join(ROOT, "app/(tabs)/index.tsx"), "utf8");
+  ok =
+    pass(
+      "Source: feed opens gallery overlay for video taps",
+      feedIndex.includes("openGallery(") &&
+        feedIndex.includes("immersiveVideoPlaylist") &&
+        !feedIndex.includes("navigateFromFeedVideoLink")
+    ) && ok;
+  ok =
+    pass(
+      "Source: feed does not wire videoRouteHrefForMedia",
+      !feedIndex.includes("videoRouteHrefForMedia")
+    ) && ok;
+
   const env = loadEnv();
   let server = null;
   let baseUrl = productionUrl;
@@ -120,8 +136,6 @@ async function main() {
     userAgent:
       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
   });
-
-  let ok = true;
 
   await page.route("**/*", async (route) => {
     const url = route.request().url();
@@ -242,33 +256,12 @@ async function main() {
     body: document.body.innerText.slice(0, 800),
     videos: document.querySelectorAll("video").length,
     inlineVideos: document.querySelectorAll("video.feed-inline-video").length,
-    routeLinks: [...document.querySelectorAll("a.feed-video-route-link")].map((a) => a.getAttribute("href")),
-    expandLinks: [...document.querySelectorAll("a.feed-video-expand-button")].map((a) => a.getAttribute("href")),
   }));
-  if (!diagnostics.routeLinks.length) {
-    console.log("diagnostics:", JSON.stringify(diagnostics, null, 2));
-  }
 
-  const linkInfo = await page.evaluate((postId) => {
-    const expected = `/video/${postId}`;
-    const routeLink = document.querySelector(`a.feed-video-route-link[href="${expected}"]`);
-    const expandLink = document.querySelector(`a.feed-video-expand-button[href="${expected}"]`);
-    const muteButton = document.querySelector(".feed-video-mute-button");
-    return {
-      routeHref: routeLink?.getAttribute("href") ?? null,
-      expandHref: expandLink?.getAttribute("href") ?? null,
-      hasInlineVideo: Boolean(document.querySelector("video.feed-inline-video")),
-      hasMute: Boolean(muteButton),
-    };
-  }, MOCK_POST_ID);
-
-  ok = pass("A: feed video has route link href=/video/[postId]", linkInfo.routeHref === `/video/${MOCK_POST_ID}`) && ok;
-  ok =
-    pass("B: expand icon has same route href", linkInfo.expandHref === `/video/${MOCK_POST_ID}`) && ok;
   ok =
     pass(
-      "Inline video or route link present in feed",
-      linkInfo.hasInlineVideo || linkInfo.routeHref === `/video/${MOCK_POST_ID}`
+      "Inline feed video present",
+      diagnostics.inlineVideos > 0 || diagnostics.videos > 0
     ) && ok;
 
   const scrollBefore = await page.evaluate(() => {
@@ -276,24 +269,24 @@ async function main() {
     return el?.scrollTop ?? 0;
   });
 
-  await page.evaluate((postId) => {
-    const link = document.querySelector(`a.feed-video-route-link[href="/video/${postId}"]`);
-    link?.click();
-  }, MOCK_POST_ID);
+  const pathBefore = await page.evaluate(() => window.location.pathname);
 
-  await page.waitForFunction(
-    (postId) =>
-      window.location.pathname.includes(`/video/${postId}`) &&
-      (Boolean(document.querySelector("#frennix-video-route,[data-frennix-video-route='true']")) ||
-        /Add a comment/i.test(document.body.innerText)),
-    MOCK_POST_ID,
-    { timeout: 15_000 }
-  );
+  await page.evaluate(() => {
+    const mount = document.querySelector(".feed-video-mute-button")?.closest("[role='button']")?.parentElement;
+    const target =
+      document.querySelector("[data-feed-video-mount]") ??
+      document.querySelector("video.feed-inline-video")?.parentElement ??
+      mount;
+    target?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  });
 
-  const afterNav = await page.evaluate(() => ({
+  await page.waitForTimeout(1500);
+
+  const afterTap = await page.evaluate(() => ({
     pathname: window.location.pathname,
-    hasVideoRoute: Boolean(
-      document.querySelector("#frennix-video-route,[data-frennix-video-route='true']")
+    hasLightbox: Boolean(document.querySelector("[data-frennix-lightbox='true']")),
+    hasPlaylist: Boolean(
+      document.querySelector("[data-frennix-immersive-video-playlist='true']")
     ),
     hasImmersive: Boolean(
       document.querySelector("[data-frennix-immersive-video-viewer='true']")
@@ -303,71 +296,71 @@ async function main() {
 
   ok =
     pass(
-      "C: tap navigates to /video/[postId]",
-      afterNav.pathname.includes(`/video/${MOCK_POST_ID}`)
-    ) && ok;
-  ok =
-    pass(
-      "D: video route screen mounted",
-      afterNav.hasVideoRoute || afterNav.hasImmersive || afterNav.hasCommentUi
+      "C: feed video tap opens overlay without /video navigation",
+      afterTap.pathname === pathBefore &&
+        (afterTap.hasLightbox || afterTap.hasPlaylist || afterTap.hasImmersive || afterTap.hasCommentUi)
     ) && ok;
 
   await page.getByRole("button", { name: /^Comment$/i }).first().click({ timeout: 8000 }).catch(() => undefined);
   await page.waitForTimeout(2000);
 
-  const commentsPath = await page.evaluate(() => window.location.pathname);
+  const afterComment = await page.evaluate(() => ({
+    pathname: window.location.pathname,
+    hasCommentsSheet: Boolean(
+      document.querySelector("[data-frennix-comments-video-overlay='true']")
+    ),
+    hasImmersive: Boolean(
+      document.querySelector("[data-frennix-immersive-video-viewer='true']")
+    ),
+  }));
+
   ok =
-    pass("E: Comment navigates to /comments/[postId]", commentsPath.includes(`/comments/${MOCK_POST_ID}`)) &&
-    ok;
+    pass(
+      "D: Comment opens overlay sheet — video stays mounted",
+      afterComment.pathname === pathBefore &&
+        afterComment.hasCommentsSheet &&
+        afterComment.hasImmersive
+    ) && ok;
 
-  await page.goBack({ waitUntil: "networkidle" }).catch(() => undefined);
-  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    document.querySelector("[data-frennix-comments-sheet='true'] button")?.click();
+  }).catch(() => undefined);
+  await page.waitForTimeout(800);
 
-  const backOnVideo = await page.evaluate(
-    (postId) => window.location.pathname.includes(`/video/${postId}`),
-    MOCK_POST_ID
-  );
-  ok = pass("Back from comments returns to video route", backOnVideo) && ok;
-
-  await page.goBack({ waitUntil: "networkidle" }).catch(() => undefined);
-  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    document.querySelector("[data-frennix-immersive-video-viewer='true'] button")?.click();
+  }).catch(() => undefined);
+  await page.waitForTimeout(1000);
 
   const scrollAfter = await page.evaluate(() => {
     const el = document.getElementById("feed-scroll-list");
     return el?.scrollTop ?? 0;
   });
-  ok = pass("F: back to feed restores scroll position", scrollAfter === scrollBefore) && ok;
+  ok =
+    pass(
+      "E: closing overlay returns to feed with scroll preserved",
+      Math.abs(scrollAfter - scrollBefore) <= 4
+    ) && ok;
 
   await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 90_000 });
   await page.waitForSelector("#feed-scroll-list", { timeout: 30_000 });
   await page.waitForTimeout(3500);
 
-  const muteResult = await page.evaluate((postId) => {
+  const muteResult = await page.evaluate(() => {
     const mute = document.querySelector(".feed-video-mute-button");
     if (!mute) return { clicked: false, stayedOnFeed: true };
     mute.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     return {
       clicked: true,
-      stayedOnFeed: window.location.pathname === "/" || window.location.pathname.includes("(tabs)"),
+      stayedOnFeed: !window.location.pathname.includes("/video/"),
       pathname: window.location.pathname,
     };
   }, MOCK_POST_ID);
   ok =
     pass(
-      "G: mute does not navigate",
+      "F: mute does not navigate",
       !muteResult.clicked || muteResult.stayedOnFeed
     ) && ok;
-
-  const swipeResult = await page.evaluate((postId) => {
-    const link = document.querySelector(`a.feed-video-route-link[href="/video/${postId}"]`);
-    if (!link) return { ok: false };
-    const startPath = window.location.pathname;
-    link.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }));
-    link.dispatchEvent(new PointerEvent("pointerup", { clientX: 100, clientY: 240, bubbles: true }));
-    link.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 240, bubbles: true, cancelable: true }));
-    return { ok: window.location.pathname === startPath };
-  }, MOCK_POST_ID);
-  ok = pass("H: vertical swipe gesture does not navigate", swipeResult.ok) && ok;
 
   await browser.close();
   server?.close();

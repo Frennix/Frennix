@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression: mobile web immersive video viewer with social actions + comments route.
+ * Regression: mobile web immersive video viewer with overlay comments (not route replace).
  *
  * Usage:
  *   node scripts/verify-immersive-video-viewer.mjs
@@ -27,12 +27,16 @@ function main() {
   const viewer = readSource("components/ImmersiveVideoViewer.tsx");
   const sheet = readSource("components/CommentsBottomSheet.tsx");
   const lightbox = readSource("components/ImageLightbox.tsx");
+  const overlayShell = readSource("components/ImmersiveVideoOverlayShell.tsx");
+  const postVideo = readSource("components/PostVideoScreen.tsx");
   const feed = readSource("app/(tabs)/index.tsx");
-  const returnState = readSource("lib/web-video-viewer-return.ts");
-  const commentsRoute = readSource("lib/mobile-web-comments-route.ts");
   const styles = readSource("lib/web-document-styles.js");
 
-  ok = pass("ImmersiveVideoViewer component exists", fs.existsSync(path.join(ROOT, "components/ImmersiveVideoViewer.tsx"))) && ok;
+  ok =
+    pass(
+      "ImmersiveVideoViewer component exists",
+      fs.existsSync(path.join(ROOT, "components/ImmersiveVideoViewer.tsx"))
+    ) && ok;
   ok =
     pass(
       "Viewer exposes like/respect/comment/share/options",
@@ -44,22 +48,22 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Comment opens overlay sheet on mobile web video route",
-      readSource("components/PostVideoScreen.tsx").includes('presentation="videoOverlay"') &&
-        readSource("components/CommentsBottomSheet.tsx").includes('videoOverlay') &&
-        readSource("components/CommentsBottomSheet.tsx").includes("VIDEO_PEEK_FRACTION")
+      "Shared overlay shell opens videoOverlay comments sheet",
+      overlayShell.includes('presentation="videoOverlay"') &&
+        overlayShell.includes("PostCommentsSheet") &&
+        sheet.includes("videoOverlay") &&
+        sheet.includes("VIDEO_PEEK_FRACTION")
     ) && ok;
   ok =
     pass(
       "Video keeps playing when opening comments overlay",
-      viewer.includes("getPlaybackSnapshot") &&
-        !viewer.includes("videoRef.current?.pause()") &&
-        commentsRoute.includes("navigateToPostCommentsFromVideoViewer")
+      viewer.includes("getPlaybackSnapshot") && !viewer.includes("videoRef.current?.pause()")
     ) && ok;
   ok =
     pass(
-      "ImageLightbox uses ImmersiveVideoViewer on mobile web",
-      lightbox.includes("ImmersiveVideoViewer") && lightbox.includes("useImmersiveVideo")
+      "Feed overlay uses shared shell — does not navigate to comments route",
+      lightbox.includes("ImmersiveVideoOverlayShell") &&
+        !feed.includes("navigateToPostCommentsFromVideoViewer")
     ) && ok;
   ok =
     pass(
@@ -70,9 +74,8 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Dedicated video route keeps viewer mounted under comments overlay",
-      readSource("components/PostVideoScreen.tsx").includes("ImmersiveVideoViewer") &&
-        readSource("components/PostVideoScreen.tsx").includes("PostCommentsSheet")
+      "Deep-link /video route reuses shared overlay shell",
+      postVideo.includes("ImmersiveVideoOverlayShell") && postVideo.includes("routePlayback")
     ) && ok;
   ok =
     pass(
@@ -81,12 +84,6 @@ function main() {
         feed.includes("postReaction.mutate") &&
         feed.includes("openShare") &&
         feed.includes("openPostActions")
-    ) && ok;
-  ok =
-    pass(
-      "Video route uses comments overlay instead of fullscreen comments route",
-      readSource("components/PostVideoScreen.tsx").includes("openCommentsOverlay") &&
-        readSource("components/PostVideoScreen.tsx").includes("usesMobileWebCommentsRoute")
     ) && ok;
   ok =
     pass(

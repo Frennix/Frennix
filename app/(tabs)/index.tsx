@@ -46,9 +46,16 @@ import {
 } from "@frennix/types";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import {
-  navigateToPostCommentsFromVideoViewer,
-  usesMobileWebCommentsRoute,
-} from "@/lib/mobile-web-comments-route";
+  buildFeedVideoPlaylistFromPosts,
+  buildPlaylistEntriesFromPosts,
+} from "@/lib/immersive-video-playlist";
+import type { ImmersiveVideoPlaylistState } from "@/lib/immersive-video-playlist-state";
+import { usesMobileWebCommentsRoute } from "@/lib/mobile-web-comments-route";
+import {
+  requestFeedScrollReturnRestore,
+  saveFeedScrollReturnState,
+  scrollFeedToPost,
+} from "@/lib/web-feed-scroll-restore";
 import { showAlert } from "@/lib/alerts";
 import { useAuth } from "@/providers/AuthProvider";
 import { FeedBackground } from "@/components/FeedBackground";
@@ -255,18 +262,8 @@ export default function HomeScreen() {
               emoji: STRONG_WORK_EMOJI,
               currentEmoji: post.my_reaction,
             }),
-          onComment: (playback, draft) => {
-            closeGallery(playback.mediaIndex);
-            navigateToPostCommentsFromVideoViewer(
-              post,
-              playback,
-              displayPost.media_urls ?? [],
-              {
-                draft,
-                thumbnailUrl: displayPost.thumbnail_url,
-                postType: displayPost.post_type,
-              }
-            );
+          onComment: () => {
+            /* Overlay shell opens comments without unmounting the viewer. */
           },
           onShare: () => openShare(post.shared_post ?? post),
           onMore: () => openPostActions(post),
@@ -279,7 +276,6 @@ export default function HomeScreen() {
       };
     },
     [
-      closeGallery,
       isFollowing,
       openPostActions,
       openShare,
@@ -833,20 +829,84 @@ export default function HomeScreen() {
         postType: displayPost.post_type,
         thumbnailUrl: displayPost.thumbnail_url,
       });
+      const isVideo = mediaItems[index]?.kind === "video";
       const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
       setFeedVideoFullscreenHandoff(playbackId);
       const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
       setCarouselIndex(post.id, index);
-      const immersiveVideo =
-        mediaItems[index]?.kind === "video" ? buildImmersiveVideoContext(post) : undefined;
-      openGallery(displayPost.media_urls ?? [], index, (finalIndex) => {
-        setCarouselIndex(post.id, finalIndex);
-      }, {
-        postType: displayPost.post_type,
-        thumbnailUrl: displayPost.thumbnail_url,
-        videoHandoff,
-        immersiveVideo,
-      });
+      const immersiveVideo = isVideo ? buildImmersiveVideoContext(post) : undefined;
+
+      let immersiveVideoPlaylist: ImmersiveVideoPlaylistState | undefined;
+      if (isVideo && immersiveVideo && usesMobileWebCommentsRoute()) {
+        const snapshot = buildFeedVideoPlaylistFromPosts(posts, displayPost.id, index);
+        immersiveVideoPlaylist = {
+          entries: snapshot.entries,
+          initialIndex: snapshot.initialIndex,
+          initialHandoff: videoHandoff,
+          initialHandoffPlaybackId: playbackId,
+          hasMore: Boolean(hasNextPage),
+          originMediaIndex: index,
+          getPost: (postId) => {
+            const cachedPosts =
+              queryClient
+                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+                ?.pages.flatMap((page) => page.posts) ?? posts;
+            return cachedPosts.find(
+              (candidate) => (candidate.shared_post ?? candidate).id === postId
+            );
+          },
+          buildImmersiveContext: buildImmersiveVideoContext,
+          fetchMore: async () => {
+            const beforeCount =
+              queryClient
+                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+                ?.pages.flatMap((page) => page.posts).length ?? posts.length;
+            await fetchNextPage();
+            const updatedPosts =
+              queryClient
+                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+                ?.pages.flatMap((page) => page.posts) ?? [];
+            const newPosts = updatedPosts.slice(beforeCount);
+            const entries = buildPlaylistEntriesFromPosts(newPosts);
+            const feedState = queryClient.getQueryState(["feed", userId]);
+            const stillHasMore = Boolean(
+              (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
+                ?.nextCursor
+            );
+            return { entries, hasMore: stillHasMore };
+          },
+        };
+      }
+
+      if (Platform.OS === "web" && immersiveVideoPlaylist) {
+        saveFeedScrollReturnState();
+      }
+
+      openGallery(
+        displayPost.media_urls ?? [],
+        index,
+        (finalIndex, context) => {
+          const restorePostId = context?.postId ?? displayPost.id;
+          const restoreMediaIndex = context?.mediaIndex ?? finalIndex;
+          setCarouselIndex(restorePostId, restoreMediaIndex);
+          if (Platform.OS === "web") {
+            if (immersiveVideoPlaylist) {
+              requestFeedScrollReturnRestore();
+            } else if (restorePostId) {
+              scrollFeedToPost(restorePostId);
+            }
+          }
+        },
+        {
+          postType: displayPost.post_type,
+          thumbnailUrl: displayPost.thumbnail_url,
+          videoHandoff,
+          immersiveVideo,
+          immersiveVideoPlaylist,
+          immersiveVideoUserId: userId,
+          immersiveVideoAuthorProfile: viewerProfile ?? undefined,
+        }
+      );
     },
   };
 

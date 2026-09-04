@@ -21,6 +21,7 @@ import { FastForward, Pause, Play, Rewind, Volume2, VolumeX } from "lucide-react
 import {
   restoreFeedVideoFromFullscreen,
   setFeedVideoFullscreenHandoff,
+  isFeedVideoSoundEnabled,
   type FeedVideoFullscreenHandoff,
 } from "./feedVideoPlaybackCoordinator";
 import {
@@ -113,7 +114,14 @@ export const FullscreenVideoSlide = forwardRef<
   ref
 ) {
   const posterState = useVideoPoster(uri, thumbnailUrl);
-  const [muted, setMuted] = useState(playbackHandoff?.muted ?? false);
+  const [muted, setMuted] = useState(
+    () => playbackHandoff?.muted ?? (immersiveMode ? !isFeedVideoSoundEnabled() : false)
+  );
+  useEffect(() => {
+    if (!isActive || playbackHandoff || !immersiveMode) return;
+    const preferredMuted = !isFeedVideoSoundEnabled();
+    setMuted((current) => (current === preferredMuted ? current : preferredMuted));
+  }, [immersiveMode, isActive, playbackHandoff]);
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
