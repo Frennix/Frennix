@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression: iPhone PWA video route — client nav, playback, actions, scroll restore.
+ * Regression: iPhone PWA video — overlay-first feed, deep-link /video route, scroll restore.
  *
  * Usage:
  *   node scripts/verify-video-route-pwa-regressions.mjs
@@ -25,46 +25,44 @@ function main() {
   console.log("verify-video-route-pwa-regressions\n");
   let ok = true;
 
-  const player = readSource("packages/ui/src/FeedVideoPlayer.tsx");
-  const videoRoute = readSource("lib/mobile-web-video-route.ts");
   const slide = readSource("packages/ui/src/FullscreenVideoSlide.tsx");
-  const immersive = readSource("components/ImmersiveVideoViewer.tsx");
+  const overlayShell = readSource("components/ImmersiveVideoOverlayShell.tsx");
   const postVideoScreen = readSource("components/PostVideoScreen.tsx");
+  const buildContext = readSource("lib/useBuildImmersiveVideoContext.ts");
   const route = readSource("app/video/[postId].tsx");
   const scrollRestore = readSource("lib/web-feed-scroll-restore.ts");
-  const commentsRoute = readSource("lib/mobile-web-comments-route.ts");
-  const postActionsHook = readSource("lib/useImmersiveVideoPostActions.ts");
   const index = readSource("app/(tabs)/index.tsx");
   const styles = readSource("lib/web-document-styles.js");
+  const immersive = readSource("components/ImmersiveVideoViewer.tsx");
 
   ok =
     pass(
-      "A: feed video link prevents document navigation on in-app tap",
-      player.includes("event.preventDefault?.()") &&
-        player.includes("onVideoRouteNavigate?.()") &&
-        videoRoute.includes("navigateFromFeedVideoLink") &&
-        videoRoute.includes("router.push")
+      "A: feed opens overlay — not client /video navigation",
+      index.includes("openGallery(") &&
+        index.includes("immersiveVideoPlaylist") &&
+        !index.includes("navigateFromFeedVideoLink") &&
+        !index.includes("videoRouteHrefForMedia")
     ) && ok;
   ok =
     pass(
-      "A: real href preserved for direct /video/[postId] loads",
-      player.includes('href: videoRouteHref') && videoRoute.includes("buildVideoRouteHref")
+      "A: /video deep links still supported for direct loads",
+      readSource("lib/mobile-web-video-route.ts").includes("buildVideoRouteHref") &&
+        route.includes("PostVideoScreen")
     ) && ok;
   ok =
     pass(
       "B: route video decoupled from feed autoplay coordinator",
       slide.includes("routePlayback") &&
-        slide.includes("!routePlayback") &&
         postVideoScreen.includes("routePlayback") &&
-        slide.includes("routePlayback || !playbackHandoff?.playbackId")
+        overlayShell.includes("routePlayback")
     ) && ok;
   ok =
     pass(
-      "C: Share and More sheets mount on video route",
-      route.includes("shareSheet") &&
-        route.includes("postActionSheets") &&
-        postActionsHook.includes("shareSheet") &&
-        postActionsHook.includes("postActionSheets")
+      "C: Share and More sheets mount on video route via build context hook",
+      postVideoScreen.includes("shareSheet") &&
+        postVideoScreen.includes("postActionSheets") &&
+        buildContext.includes("shareSheet") &&
+        buildContext.includes("postActionSheets")
     ) && ok;
   ok =
     pass(
@@ -75,22 +73,25 @@ function main() {
   ok =
     pass(
       "D: scroll restore deferred until feed list is ready",
-      scrollRestore.includes("pendingRestoreTop") &&
+      scrollRestore.includes("pendingRestore") &&
         scrollRestore.includes("applyPendingFeedScrollReturnIfNeeded") &&
         index.includes("applyPendingFeedScrollReturnIfNeeded")
     ) && ok;
   ok =
     pass(
-      "D: video/comments back requests restore without consuming early",
-      route.includes("requestFeedScrollReturnRestore") &&
-        readSource("app/comments/[postId].tsx").includes("shouldRestoreFeedScrollOnCommentsBack")
+      "D: overlay close scrolls feed to active post",
+      scrollRestore.includes("scrollFeedToPost") && index.includes("scrollFeedToPost")
     ) && ok;
   ok =
     pass(
-      "D: Video → Comments → Video preserves feed scroll for final exit",
-      commentsRoute.includes("markCommentsReturnTarget") &&
-        commentsRoute.includes('"video"') &&
-        commentsRoute.includes("shouldRestoreFeedScrollOnCommentsBack")
+      "D: /video back requests feed scroll restore",
+      route.includes("requestFeedScrollReturnRestore")
+    ) && ok;
+  ok =
+    pass(
+      "Comments overlay on /video route — no fullscreen comments navigation",
+      overlayShell.includes('presentation="videoOverlay"') &&
+        !postVideoScreen.includes("navigateToPostCommentsFromVideoViewer")
     ) && ok;
   ok =
     pass(

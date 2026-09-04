@@ -170,7 +170,7 @@ type CommentsBottomSheetProps = {
   suppressInlineComposer?: boolean;
 };
 
-const useMobileWebFullscreen = Platform.OS === "web" && isMobileWeb();
+const isMobileWebFullscreenMode = () => Platform.OS === "web" && isMobileWeb();
 
 function blurActiveWebInput(): void {
   if (typeof document === "undefined") return;
@@ -284,7 +284,7 @@ export function CommentsBottomSheet({
   }, [useVideoOverlay, visible]);
 
   useEffect(() => {
-    if (!visible || Platform.OS !== "web" || !useMobileWebFullscreen || typeof window === "undefined") {
+    if (!visible || Platform.OS !== "web" || !isMobileWebFullscreenMode() || typeof window === "undefined") {
       return;
     }
 
@@ -312,7 +312,7 @@ export function CommentsBottomSheet({
   ]);
 
   useEffect(() => {
-    if (!visible || useMobileWebFullscreen) {
+    if (!visible || isMobileWebFullscreenMode()) {
       if (!visible) {
         slide.setValue(0);
         fade.setValue(0);
@@ -406,7 +406,7 @@ export function CommentsBottomSheet({
   );
 
   const handleDismiss = useCallback(() => {
-    if (useMobileWebFullscreen) {
+    if (isMobileWebFullscreenMode()) {
       finishClose("close-button");
       return;
     }
@@ -461,7 +461,7 @@ export function CommentsBottomSheet({
   );
 
   const desktopSheetHeight = useMemo(() => {
-    if (Platform.OS !== "web" || useMobileWebFullscreen) return undefined;
+    if (Platform.OS !== "web" || isMobileWebFullscreenMode()) return undefined;
     const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
     const target = Math.round(layoutHeight * SHEET_OPEN_RATIO);
     const max = Math.round(layoutHeight * SHEET_MAX_RATIO);
@@ -479,7 +479,7 @@ export function CommentsBottomSheet({
 
   const closedComposerBottomInset = Math.max(insets.bottom, spacing.sm);
   const overlayBottomReserve = useCommentsOverlayBottomReserve(
-    visible && Platform.OS === "web" && useMobileWebFullscreen
+    visible && Platform.OS === "web" && isMobileWebFullscreenMode()
   );
   const measuredVideoOverlayBottomReserve = useCommentsOverlayBottomReserve(
     visible && Platform.OS === "web" && useVideoOverlay && !suppressWebVideoInlineComposer
@@ -489,7 +489,7 @@ export function CommentsBottomSheet({
     : measuredVideoOverlayBottomReserve;
   const composerHostBottomInset = useCommentComposerHostBottomInset(
     closedComposerBottomInset,
-    visible && Platform.OS === "web" && !useMobileWebFullscreen && !useVideoOverlay
+    visible && Platform.OS === "web" && !isMobileWebFullscreenMode() && !useVideoOverlay
   );
   const headerTopInset = Math.max(insets.top, spacing.sm);
   const mobileOverlayTop = mobileViewport?.offsetTop ?? 0;
@@ -526,7 +526,7 @@ export function CommentsBottomSheet({
     <View
       style={[
         styles.headerRow,
-        useMobileWebFullscreen && styles.mobileWebHeader,
+        isMobileWebFullscreenMode() && styles.mobileWebHeader,
         useVideoOverlay && styles.headerRowVideoOverlay,
       ]}
       {...sheetSurfaceProps}
@@ -824,13 +824,14 @@ export function CommentsBottomSheet({
     </View>
   );
 
-  const surface = useMobileWebFullscreen
-    ? useVideoOverlay
+  const surface =
+    Platform.OS === "web" && useVideoOverlay
       ? mobileVideoOverlaySurface
-      : mobileWebSurface
-    : Platform.OS === "web"
-      ? desktopWebSurface
-      : nativeSurface;
+      : isMobileWebFullscreenMode()
+        ? mobileWebSurface
+        : Platform.OS === "web"
+          ? desktopWebSurface
+          : nativeSurface;
 
   if (Platform.OS === "web" && typeof document !== "undefined") {
     return createPortal(surface, document.body);

@@ -88,6 +88,24 @@ function main() {
     ) && ok;
   ok =
     pass(
+      "Restores exact saved feedScrollTop before post-anchor fallback",
+      restore.includes("scrollPort.scrollTop = state.feedScrollTop") &&
+        restore.includes("state.feedScrollTop <= 0 && state.postId")
+    ) && ok;
+  ok =
+    pass(
+      "Restore verification uses tight numeric offset tolerance (4px)",
+      restore.includes("RESTORE_TOLERANCE_PX = 4") &&
+        restore.includes("readCurrentRestoreOffset() - state.feedScrollTop")
+    ) && ok;
+  ok =
+    pass(
+      "Playlist overlay saves exact scroll offset without post anchoring",
+      index.includes("saveFeedScrollReturnState()") &&
+        index.includes("requestFeedScrollReturnRestore()")
+    ) && ok;
+  ok =
+    pass(
       "Back uses router history (no fresh Home replace when history exists)",
       readSource("app/video/[postId].tsx").includes("router.canGoBack()") &&
         readSource("app/video/[postId].tsx").includes("router.back()")

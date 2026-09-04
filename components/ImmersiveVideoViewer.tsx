@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -15,12 +15,15 @@ import {
   FullscreenVideoSlide,
   type FullscreenVideoSlideHandle,
   colors,
+  isFeedVideoSoundEnabled,
+  setFeedVideoSoundEnabled,
   spacing,
   touchTarget,
   typography,
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import { computeBaselineVideoPeekHeight } from "@/components/CommentsBottomSheet";
+import { useOpenImmersiveVideoComments } from "@/lib/immersive-video-comments-context";
 import { useCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 
@@ -65,7 +68,9 @@ export function ImmersiveVideoViewer({
   const insets = useSafeAreaInsets();
   const videoRef = useRef<FullscreenVideoSlideHandle>(null);
   const [captionExpanded, setCaptionExpanded] = useState(false);
-  const [muted, setMuted] = useState(playbackHandoff?.muted ?? false);
+  const [muted, setMuted] = useState(
+    () => playbackHandoff?.muted ?? !isFeedVideoSoundEnabled()
+  );
 
   const post = postActions.post;
   const displayPost = post.shared_post ?? post;
@@ -77,8 +82,14 @@ export function ImmersiveVideoViewer({
   const topInset = Math.max(insets.top, spacing.sm);
   const bottomInset = Math.max(insets.bottom, spacing.sm);
 
+  const openCommentsFromShell = useOpenImmersiveVideoComments();
+
   const openComments = useCallback(
     (draft?: string) => {
+      if (openCommentsFromShell) {
+        openCommentsFromShell(draft);
+        return;
+      }
       const snapshot = videoRef.current?.getPlaybackSnapshot();
       postActions.onComment(
         {
@@ -91,13 +102,52 @@ export function ImmersiveVideoViewer({
         draft
       );
     },
-    [mediaIndex, muted, playbackHandoff?.playbackId, postActions]
+    [
+      mediaIndex,
+      muted,
+      openCommentsFromShell,
+      playbackHandoff?.playbackId,
+      postActions,
+    ]
   );
 
   const toggleMute = useCallback(() => {
+    const nextMuted = !muted;
     videoRef.current?.toggleMute();
-    setMuted(videoRef.current?.isMuted() ?? !muted);
+    setMuted(nextMuted);
+    setFeedVideoSoundEnabled(!nextMuted);
   }, [muted]);
+
+  const [runtimeTestEnabled, setRuntimeTestEnabled] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !isActive) return;
+    if (
+      (window as Window & { __FRENNIX_PLAYLIST_RUNTIME_TEST__?: boolean })
+        .__FRENNIX_PLAYLIST_RUNTIME_TEST__
+    ) {
+      setRuntimeTestEnabled(true);
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive || playbackHandoff) return;
+    const preferredMuted = !isFeedVideoSoundEnabled();
+    setMuted((current) => (current === preferredMuted ? current : preferredMuted));
+  }, [isActive, playbackHandoff]);
+
+  useEffect(() => {
+    if (!runtimeTestEnabled || !isActive || Platform.OS !== "web" || typeof window === "undefined") {
+      return;
+    }
+    const runtimeWindow = window as Window & {
+      __FRENNIX_PLAYLIST_TOGGLE_MUTE__?: () => void;
+    };
+    runtimeWindow.__FRENNIX_PLAYLIST_TOGGLE_MUTE__ = toggleMute;
+    return () => {
+      delete runtimeWindow.__FRENNIX_PLAYLIST_TOGGLE_MUTE__;
+    };
+  }, [isActive, runtimeTestEnabled, toggleMute]);
 
   const captionNeedsExpand = caption.length > 96;
   const videoPeekLayout = useCommentsVideoPeekLayout();
@@ -306,6 +356,14 @@ export function ImmersiveVideoViewer({
           </View>
         </>
       )}
+      {runtimeTestEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Toggle mute runtime test"
+          onPress={toggleMute}
+          style={styles.runtimeTestTrigger}
+        />
+      ) : null}
     </View>
   );
 }
@@ -513,4 +571,18 @@ const styles = StyleSheet.create({
     fontSize: Platform.OS === "web" ? 16 : 15,
     lineHeight: Platform.OS === "web" ? 22 : 20,
   },
+  runtimeTestTrigger: Platform.select({
+    web: {
+      position: "absolute",
+      top: 2,
+      right: 2,
+      width: 1,
+      height: 1,
+      opacity: 0,
+      zIndex: 1,
+    },
+    default: {
+      display: "none",
+    },
+  }),
 });

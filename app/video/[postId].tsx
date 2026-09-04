@@ -8,7 +8,6 @@ import { PostVideoScreen } from "@/components/PostVideoScreen";
 import { flexFill } from "@/lib/flex-layout";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { usesMobileWebVideoRoute } from "@/lib/mobile-web-video-route";
-import { useImmersiveVideoPostActions } from "@/lib/useImmersiveVideoPostActions";
 import { requestFeedScrollReturnRestore } from "@/lib/web-feed-scroll-restore";
 import {
   consumeVideoViewerReturnState,
@@ -83,11 +82,6 @@ export default function PostVideoRoute() {
     retry: 1,
   });
 
-  const { actions: postActions, shareSheet, postActionSheets } = useImmersiveVideoPostActions(
-    post,
-    userId
-  );
-
   useFocusEffect(
     useCallback(() => {
       if (!postId) return;
@@ -135,15 +129,12 @@ export default function PostVideoRoute() {
     );
   } else if (Platform.OS === "web" && !usesMobileWebVideoRoute()) {
     content = <DetailLoading />;
-  } else if (!postActions) {
-    content = <DetailLoading />;
   } else {
     content = (
       <PostVideoScreen
         post={post}
         mediaIndex={mediaIndex}
         resumeHandoff={resumeHandoff}
-        postActions={postActions}
         userId={userId}
         authorProfile={profile ?? undefined}
         onBack={handleBack}
@@ -154,8 +145,6 @@ export default function PostVideoRoute() {
   return (
     <VideoRouteShell>
       {content}
-      {shareSheet}
-      {postActionSheets}
     </VideoRouteShell>
   );
 }
