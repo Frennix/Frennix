@@ -31,6 +31,23 @@ function main() {
   const postVideo = readSource("components/PostVideoScreen.tsx");
   const feed = readSource("app/(tabs)/index.tsx");
   const styles = readSource("lib/web-document-styles.js");
+  const slide = readSource("packages/ui/src/FullscreenVideoSlide.tsx");
+  const immersiveSlideCssStart = styles.indexOf(
+    '[data-frennix-immersive-video-viewer="true"] .fullscreen-video-slide'
+  );
+  const commentsOpenSlideCssStart = styles.indexOf(
+    '[data-frennix-immersive-comments-open="true"] .fullscreen-video-slide'
+  );
+  const immersiveSlideCss = styles.slice(
+    immersiveSlideCssStart,
+    commentsOpenSlideCssStart > immersiveSlideCssStart
+      ? commentsOpenSlideCssStart
+      : immersiveSlideCssStart + 280
+  );
+  const commentsOpenSlideCss = styles.slice(
+    commentsOpenSlideCssStart,
+    commentsOpenSlideCssStart >= 0 ? commentsOpenSlideCssStart + 220 : 0
+  );
 
   ok =
     pass(
@@ -117,6 +134,26 @@ function main() {
     pass(
       "Photo/lightbox path unchanged for non-immersive video",
       lightbox.includes("FullscreenVideoSlide") && lightbox.includes("WebZoomableImage")
+    ) && ok;
+  ok =
+    pass(
+      "Full immersive video uses cover + center",
+      immersiveSlideCssStart >= 0 &&
+        immersiveSlideCss.includes("object-fit: cover") &&
+        immersiveSlideCss.includes("object-position: center") &&
+        !immersiveSlideCss.includes("object-fit: contain") &&
+        slide.includes('objectFit: immersiveMode ? "cover" : "contain"') &&
+        slide.includes('objectPosition: "center"') &&
+        slide.includes('contentFit={immersiveMode ? "cover" : "contain"}')
+    ) && ok;
+  ok =
+    pass(
+      "Comments-open and non-immersive video remain contain",
+      commentsOpenSlideCssStart >= 0 &&
+        commentsOpenSlideCss.includes("object-fit: contain") &&
+        !commentsOpenSlideCss.includes("object-fit: cover") &&
+        slide.includes('objectFit: immersiveMode ? "cover" : "contain"') &&
+        lightbox.includes('objectFit: "contain"')
     ) && ok;
 
   console.log("");

@@ -672,7 +672,8 @@ export const FullscreenVideoSlide = forwardRef<
                 style: {
                   width: stageWidth,
                   height: stageHeight,
-                  objectFit: "contain",
+                  objectFit: immersiveMode ? "cover" : "contain",
+                  objectPosition: "center",
                   backgroundColor: colors.background,
                   ...(Platform.OS === "web" && immersiveMode
                     ? ({ pointerEvents: "none" } as const)
@@ -824,7 +825,7 @@ export const FullscreenVideoSlide = forwardRef<
             uri={posterUri!}
             placeholderUri={thumbnailUrl}
             style={{ width: stageWidth, height: stageHeight }}
-            contentFit="contain"
+            contentFit={immersiveMode ? "cover" : "contain"}
             accessibilityLabel="Video poster"
           />
           {buffering ? (
@@ -847,7 +848,7 @@ export const FullscreenVideoSlide = forwardRef<
             uri={posterState.posterUri}
             placeholderUri={thumbnailUrl}
             style={{ width: stageWidth, height: stageHeight }}
-            contentFit="contain"
+            contentFit={immersiveMode ? "cover" : "contain"}
             accessibilityLabel="Video poster"
           />
         </View>
