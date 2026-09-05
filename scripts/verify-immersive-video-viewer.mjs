@@ -32,22 +32,33 @@ function main() {
   const feed = readSource("app/(tabs)/index.tsx");
   const styles = readSource("lib/web-document-styles.js");
   const slide = readSource("packages/ui/src/FullscreenVideoSlide.tsx");
+  const mountFillCssStart = styles.indexOf(
+    '[data-frennix-immersive-video-viewer="true"] .fullscreen-video-mount'
+  );
   const immersiveSlideCssStart = styles.indexOf(
     '[data-frennix-immersive-video-viewer="true"] .fullscreen-video-slide'
   );
+  const commentsOpenCssStart = styles.indexOf('[data-frennix-immersive-comments-open="true"]');
   const commentsOpenSlideCssStart = styles.indexOf(
     '[data-frennix-immersive-comments-open="true"] .fullscreen-video-slide'
   );
-  const immersiveSlideCss = styles.slice(
-    immersiveSlideCssStart,
-    commentsOpenSlideCssStart > immersiveSlideCssStart
-      ? commentsOpenSlideCssStart
-      : immersiveSlideCssStart + 280
+  const closedImmersiveCss = styles.slice(
+    mountFillCssStart >= 0 ? mountFillCssStart : immersiveSlideCssStart,
+    commentsOpenCssStart > immersiveSlideCssStart
+      ? commentsOpenCssStart
+      : immersiveSlideCssStart + 420
   );
   const commentsOpenSlideCss = styles.slice(
     commentsOpenSlideCssStart,
     commentsOpenSlideCssStart >= 0 ? commentsOpenSlideCssStart + 220 : 0
   );
+  const hasAbsoluteFill =
+    closedImmersiveCss.includes("position: absolute") &&
+    closedImmersiveCss.includes("inset: 0") &&
+    closedImmersiveCss.includes("width: 100%") &&
+    closedImmersiveCss.includes("height: 100%") &&
+    closedImmersiveCss.includes("max-width: none") &&
+    closedImmersiveCss.includes("max-height: none");
 
   ok =
     pass(
@@ -137,11 +148,20 @@ function main() {
     ) && ok;
   ok =
     pass(
+      "Immersive mount and video use absolute fill sizing",
+      mountFillCssStart >= 0 &&
+        immersiveSlideCssStart >= 0 &&
+        closedImmersiveCss.includes(".fullscreen-video-mount") &&
+        closedImmersiveCss.includes(".fullscreen-video-slide") &&
+        hasAbsoluteFill
+    ) && ok;
+  ok =
+    pass(
       "Full immersive video uses cover + center",
       immersiveSlideCssStart >= 0 &&
-        immersiveSlideCss.includes("object-fit: cover") &&
-        immersiveSlideCss.includes("object-position: center") &&
-        !immersiveSlideCss.includes("object-fit: contain") &&
+        closedImmersiveCss.includes("object-fit: cover") &&
+        closedImmersiveCss.includes("object-position: center") &&
+        !closedImmersiveCss.includes("object-fit: contain") &&
         slide.includes('objectFit: immersiveMode ? "cover" : "contain"') &&
         slide.includes('objectPosition: "center"') &&
         slide.includes('contentFit={immersiveMode ? "cover" : "contain"}')
@@ -154,6 +174,13 @@ function main() {
         !commentsOpenSlideCss.includes("object-fit: cover") &&
         slide.includes('objectFit: immersiveMode ? "cover" : "contain"') &&
         lightbox.includes('objectFit: "contain"')
+    ) && ok;
+  ok =
+    pass(
+      "Comments-open selector does not leak into closed immersive CSS",
+      commentsOpenCssStart > immersiveSlideCssStart &&
+        !closedImmersiveCss.includes("data-frennix-immersive-comments-open") &&
+        commentsOpenSlideCssStart > commentsOpenCssStart
     ) && ok;
 
   console.log("");
