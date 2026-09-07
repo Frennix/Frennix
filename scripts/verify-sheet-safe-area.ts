@@ -129,6 +129,7 @@ const checks = [
         "components/BottomActionSheet.tsx",
         "components/PostInteractionSheet.tsx",
         "components/ImageLightbox.tsx",
+        "components/CommentsBottomSheet.tsx",
         "components/WorkoutStoryViewer.tsx",
         "components/founder/FounderSidebar.tsx",
         "components/story/StoryAnalyticsModal.tsx",
@@ -149,6 +150,31 @@ const checks = [
   {
     name: "process:RELEASE_PROCESS overlay rule",
     run: () => mustInclude("features/releases/RELEASE_PROCESS.md", "OVERLAY-SAFE-AREA", "process"),
+  },
+  {
+    name: "video-overlay:Safari clearance is measured, not a double 90px subtract",
+    run: () => {
+      mustInclude(
+        "lib/video-overlay-visual-viewport-layout.ts",
+        "export function resolveSafariControlsClearance",
+        "clearance helper"
+      );
+      mustInclude(
+        "lib/video-overlay-visual-viewport-layout.ts",
+        "alreadyAccountedInVisualViewport",
+        "visualViewport already excluded"
+      );
+      mustInclude(
+        "lib/video-overlay-visual-viewport-layout.ts",
+        "input.standalone",
+        "standalone PWA branch"
+      );
+      mustNotInclude(
+        "lib/video-overlay-visual-viewport-layout.ts",
+        "? IOS_SAFARI_FLOATING_CONTROLS_PX",
+        "hard-coded Safari 90px subtract"
+      );
+    },
   },
 ];
 

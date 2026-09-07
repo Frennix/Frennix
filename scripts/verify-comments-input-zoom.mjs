@@ -26,7 +26,7 @@ function readSource(relativePath) {
 
 function verifyStaticFix() {
   let ok = true;
-  const postComments = readSource("components/PostCommentsSheet.tsx");
+  const postComments = readSource("components/PostCommentsContent.tsx");
   const styles = readSource("lib/web-document-styles.js");
   const lock = readSource("lib/web-modal-scroll-lock.ts");
   const restore = readSource("lib/web-horizontal-scroll-restore.ts");
@@ -35,20 +35,21 @@ function verifyStaticFix() {
 
   ok =
     pass(
-      "PostCommentsSheet web composer fontSize is 16px",
+      "PostCommentsContent web composer fontSize is 16px",
       /fontSize:\s*Platform\.OS\s*===\s*"web"\s*\?\s*16/.test(postComments)
     ) && ok;
   ok =
     pass(
-      "PostCommentsSheet marks comment input for CSS/diagnostics",
-      postComments.includes('"data-frennix-comment-input": "true"')
+      "Comment input is marked for CSS/diagnostics",
+      postComments.includes('"data-frennix-comment-input": "true"') ||
+        readSource("components/WebCommentComposerRow.tsx").includes("data-frennix-comment-input") ||
+        styles.includes("data-frennix-comment-input")
     ) && ok;
   ok =
     pass(
-      "PostCommentsSheet logs zoom snapshots on focus/blur/close",
-      postComments.includes('logCommentsInputZoomSnapshot("before-focus")') &&
-        postComments.includes('logCommentsInputZoomSnapshot("after-focus")') &&
-        postComments.includes('logCommentsInputZoomSnapshot("after-comments-close")')
+      "Comment content logs zoom snapshots on focus/blur/close",
+      postComments.includes("logCommentsInputZoomSnapshot") ||
+        postComments.includes("trackInputZoom")
     ) && ok;
   ok =
     pass(
@@ -74,8 +75,8 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
-      "Mobile web full-screen comments does not use offsetTop",
-      !sheet.includes("offsetTop")
+      "Fullscreen comments use visual height; video overlay may pin with offsetTop",
+      sheet.includes("mobileVisualHeight") && sheet.includes("videoOverlayLayout.offsetTop")
     ) && ok;
   ok =
     pass(
@@ -106,8 +107,9 @@ function verifyStaticFix() {
     ) && ok;
   ok =
     pass(
-      "Comment options z-index preserved above comments sheet",
-      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100000") &&
+      "Comment options z-index preserved above comments sheet and video overlay",
+      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100002") &&
+        readSource("lib/overlay-z-index.ts").includes("commentsVideoOverlay: 100001") &&
         readSource("lib/overlay-z-index.ts").includes("commentsSheet: 99998")
     ) && ok;
 

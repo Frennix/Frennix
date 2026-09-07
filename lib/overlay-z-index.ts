@@ -2,5 +2,6 @@
 export const OVERLAY_Z_INDEX = {
   commentsSheet: 99998,
   imageLightbox: 99999,
-  commentOptions: 100000,
+  commentsVideoOverlay: 100001,
+  commentOptions: 100002,
 } as const;

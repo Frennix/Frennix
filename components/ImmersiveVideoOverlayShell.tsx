@@ -18,6 +18,8 @@ type ImmersiveVideoOverlayShellProps = {
   onActiveEntryChange?: (entry: { postId: string; mediaIndex: number }) => void;
   /** Deep-link /video route — all slides use route playback (no feed DOM adopt). */
   routePlayback?: boolean;
+  /** Feed video comment tap — open the existing overlay sheet without a second instance. */
+  commentsInitiallyOpen?: boolean;
 };
 
 export function ImmersiveVideoOverlayShell({
@@ -29,9 +31,10 @@ export function ImmersiveVideoOverlayShell({
   onClose,
   onActiveEntryChange,
   routePlayback = false,
+  commentsInitiallyOpen = false,
 }: ImmersiveVideoOverlayShellProps) {
   const initialEntry = playlist.entries[playlist.initialIndex];
-  const [commentsVisible, setCommentsVisible] = useState(false);
+  const [commentsVisible, setCommentsVisible] = useState(commentsInitiallyOpen);
   const [commentDraft, setCommentDraft] = useState<string | undefined>();
   const [activeEntry, setActiveEntry] = useState(() => ({
     postId: initialEntry?.postId ?? "",

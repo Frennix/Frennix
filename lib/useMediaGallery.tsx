@@ -29,6 +29,8 @@ export type OpenGalleryOptions = {
   immersiveVideoPlaylist?: ImmersiveVideoPlaylistState;
   immersiveVideoUserId?: string;
   immersiveVideoAuthorProfile?: Post["author"];
+  /** Open the immersive comments overlay with the viewer (video Feed comments). */
+  commentsInitiallyOpen?: boolean;
 };
 
 function isMediaGalleryState(
@@ -71,6 +73,7 @@ export function useMediaGallery() {
         immersiveVideoPlaylist: options?.immersiveVideoPlaylist,
         immersiveVideoUserId: options?.immersiveVideoUserId,
         immersiveVideoAuthorProfile: options?.immersiveVideoAuthorProfile,
+        commentsInitiallyOpen: options?.commentsInitiallyOpen,
       };
       if (Platform.OS === "web" && options?.videoHandoff) {
         flushSync(() => setGallery(nextGallery));

@@ -39,11 +39,14 @@ import { useVideoOverlayPortaledComposerReserve } from "@/lib/use-video-overlay-
 import {
   measureVideoOverlayViewportFrame,
   computeVideoOverlayFixedFrameStyle,
+  resolveVideoOverlayPeekAndSheetHeight,
+  VIDEO_OVERLAY_HEADER_CHROME_PX,
 } from "@/lib/video-overlay-visual-viewport-layout";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
 const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
+const COMMENTS_VIDEO_OVERLAY_Z_INDEX = OVERLAY_Z_INDEX.commentsVideoOverlay;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
 /** Fraction of layout viewport used to seed the baseline preview before keyboard focus. */
@@ -52,17 +55,6 @@ const VIDEO_PEEK_FRACTION = COMMENTS_VIDEO_PEEK_FRACTION;
 /** Target preview band on large phones — preserved while typing when space allows. */
 export const COMMENTS_VIDEO_PEEK_TARGET_MIN_PX = 330;
 export const COMMENTS_VIDEO_PEEK_TARGET_MAX_PX = 400;
-/** Never let keyboard/sheet layout shrink the preview below ~25% of layout height. */
-const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
-const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
-/** Minimum sheet chrome (handle, header, inline composer) above the keyboard. */
-const VIDEO_SHEET_MIN_CHROME_PX = 88;
-/** Minimum column height so the handle + "Comments" header stay visible above the list. */
-const VIDEO_OVERLAY_HEADER_CHROME_PX = 80;
-/** Minimum scrollable list band while the keyboard is open. */
-const VIDEO_OVERLAY_MIN_LIST_PX = 100;
-/** Video peek height while typing — keeps the comments sheet high in the visible viewport. */
-const VIDEO_PEEK_KEYBOARD_OPEN_PX = 80;
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -94,63 +86,23 @@ export function computeBaselineVideoPeekHeight(layoutHeight: number): number {
   return Math.min(targetMax, Math.max(fromFraction, targetMin));
 }
 
-function resolveVideoPeekHeight(
-  layoutHeight: number,
-  visualHeight: number,
-  baselinePeekHeight: number
-): number {
-  const layoutFloor = Math.round(layoutHeight * VIDEO_PEEK_MIN_LAYOUT_FRACTION);
-  const absoluteMin = Math.min(VIDEO_PEEK_ABSOLUTE_MIN_PX, layoutFloor);
-  const maxPeekForVisible = Math.max(absoluteMin, visualHeight - VIDEO_SHEET_MIN_CHROME_PX);
-  return Math.min(baselinePeekHeight, maxPeekForVisible);
-}
-
 function computeVideoOverlaySheetLayout(
   baselinePeekHeight: number | null,
   composerBottomReserve = 0
 ): VideoOverlaySheetLayout {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
   const frame = measureVideoOverlayViewportFrame();
-  const { offsetTop, visualHeight, usableHeight, keyboardOpen } = frame;
+  const { offsetTop, visualHeight, usableHeight } = frame;
   const baselinePeek =
     baselinePeekHeight ?? computeBaselineVideoPeekHeight(layoutHeight);
+  const { peekHeight, height } = resolveVideoOverlayPeekAndSheetHeight({
+    layoutHeight,
+    usableHeight,
+    baselinePeekHeight: baselinePeek,
+    composerBottomReserve,
+  });
 
-  const minCommentsSheetHeight =
-    VIDEO_OVERLAY_HEADER_CHROME_PX + VIDEO_OVERLAY_MIN_LIST_PX;
-
-  let peekHeight: number;
-  let height: number;
-
-  if (composerBottomReserve > 0 && keyboardOpen) {
-    peekHeight = VIDEO_PEEK_KEYBOARD_OPEN_PX;
-    height = usableHeight - peekHeight - composerBottomReserve;
-    if (height < minCommentsSheetHeight) {
-      peekHeight = Math.max(
-        VIDEO_PEEK_ABSOLUTE_MIN_PX,
-        usableHeight - composerBottomReserve - minCommentsSheetHeight
-      );
-      height = Math.max(
-        VIDEO_OVERLAY_HEADER_CHROME_PX,
-        usableHeight - peekHeight - composerBottomReserve
-      );
-    }
-  } else if (composerBottomReserve > 0) {
-    const maxPeekHeight = Math.max(
-      VIDEO_PEEK_ABSOLUTE_MIN_PX,
-      usableHeight - composerBottomReserve - VIDEO_OVERLAY_HEADER_CHROME_PX
-    );
-    peekHeight = Math.min(baselinePeek, maxPeekHeight);
-    height = Math.max(
-      VIDEO_OVERLAY_HEADER_CHROME_PX,
-      usableHeight - peekHeight - composerBottomReserve
-    );
-  } else {
-    peekHeight = resolveVideoPeekHeight(layoutHeight, visualHeight, baselinePeek);
-    height = Math.max(0, usableHeight - peekHeight);
-  }
-
-  const top = peekHeight;
-  return { offsetTop, visualHeight, peekHeight, top, height };
+  return { offsetTop, visualHeight, peekHeight, top: peekHeight, height };
 }
 
 type CommentsBottomSheetProps = {
@@ -222,9 +174,10 @@ const WEB_MOBILE_VIDEO_OVERLAY_ROOT: ViewStyle = Platform.select({
     right: 0,
     bottom: 0,
     width: "100%",
-    zIndex: COMMENTS_SHEET_Z_INDEX,
+    zIndex: COMMENTS_VIDEO_OVERLAY_Z_INDEX,
     pointerEvents: "auto",
     touchAction: "manipulation",
+    backgroundColor: "transparent",
   },
   default: {},
 }) as ViewStyle;
@@ -514,6 +467,7 @@ export function CommentsBottomSheet({
               minHeight: 0,
               flexGrow: 1,
               flexShrink: 1,
+              backgroundColor: colors.surface,
             } as ViewStyle)
           : null,
       ]}
@@ -609,12 +563,14 @@ export function CommentsBottomSheet({
                 right: undefined,
                 height: videoOverlayLayout.peekHeight,
                 flexShrink: 0,
+                backgroundColor: "transparent",
               },
             ]}
             onPress={handleBackdropPress}
             {...(Platform.OS === "web"
               ? ({
                   onClick: handleWebBackdropClick,
+                  "data-frennix-video-peek-dismiss": "true",
                 } as object)
               : null)}
             accessibilityRole="button"
@@ -633,11 +589,12 @@ export function CommentsBottomSheet({
                 minHeight: VIDEO_OVERLAY_HEADER_CHROME_PX,
                 height: undefined,
                 paddingBottom: portaledComposerReserve,
+                backgroundColor: "transparent",
               },
             ]}
           >
             <View
-              style={[styles.sheet, styles.videoOverlayHeaderShell]}
+              style={[styles.sheet, styles.videoOverlaySheetBody]}
               {...sheetSurfaceProps}
             >
               <View
@@ -647,18 +604,22 @@ export function CommentsBottomSheet({
                 <View style={styles.handle} />
               </View>
               <View {...headerPanResponder.panHandlers}>{headerRow}</View>
+              {listRegion}
             </View>
-            {listRegion}
           </View>
         </View>
       ) : (
         <>
           <Pressable
-            style={[styles.videoPeekDismiss, { height: videoOverlayLayout.peekHeight }]}
+            style={[
+              styles.videoPeekDismiss,
+              { height: videoOverlayLayout.peekHeight, backgroundColor: "transparent" },
+            ]}
             onPress={handleBackdropPress}
             {...(Platform.OS === "web"
               ? ({
                   onClick: handleWebBackdropClick,
+                  "data-frennix-video-peek-dismiss": "true",
                 } as object)
               : null)}
             accessibilityRole="button"
@@ -670,11 +631,12 @@ export function CommentsBottomSheet({
               {
                 top: videoOverlayLayout.peekHeight,
                 height: effectiveVideoColumnHeight,
+                backgroundColor: "transparent",
               },
             ]}
           >
             <View
-              style={[styles.sheet, styles.videoOverlayHeaderShell]}
+              style={[styles.sheet, styles.videoOverlaySheetBody]}
               {...sheetSurfaceProps}
             >
               <View
@@ -684,17 +646,17 @@ export function CommentsBottomSheet({
                 <View style={styles.handle} />
               </View>
               <View {...headerPanResponder.panHandlers}>{headerRow}</View>
+              {listRegion}
+              {suppressWebVideoInlineComposer ? null : (
+                <View
+                  style={[styles.composerHost, styles.composerHostVideoOverlay]}
+                  {...sheetSurfaceProps}
+                  {...({ "data-frennix-comment-composer-host": "true" } as object)}
+                >
+                  {composer}
+                </View>
+              )}
             </View>
-            {listRegion}
-            {suppressWebVideoInlineComposer ? null : (
-              <View
-                style={[styles.composerHost, styles.composerHostVideoOverlay]}
-                {...sheetSurfaceProps}
-                {...({ "data-frennix-comment-composer-host": "true" } as object)}
-              >
-                {composer}
-              </View>
-            )}
           </View>
         </>
       )}
@@ -963,7 +925,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   listContentVideoOverlay: {
-    flexGrow: 0,
+    flexGrow: 1,
     paddingTop: spacing.xs,
     paddingBottom: spacing.xs,
   },

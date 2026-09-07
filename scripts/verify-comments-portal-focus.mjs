@@ -21,6 +21,19 @@ function readSource(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
+function overlayZOrderOk(src) {
+  const commentsSheet = Number(src.match(/commentsSheet:\s*(\d+)/)?.[1]);
+  const lightbox = Number(src.match(/imageLightbox:\s*(\d+)/)?.[1]);
+  const videoOverlay = Number(src.match(/commentsVideoOverlay:\s*(\d+)/)?.[1]);
+  const commentOptions = Number(src.match(/commentOptions:\s*(\d+)/)?.[1]);
+  return (
+    commentsSheet === 99998 &&
+    lightbox === 99999 &&
+    videoOverlay > lightbox &&
+    commentOptions > videoOverlay
+  );
+}
+
 function main() {
   console.log("verify-comments-portal-focus\n");
   let ok = true;
@@ -58,8 +71,11 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Sheet surface stops pointer/touch propagation",
-      sheet.includes("stopPointerEventPropagation") && sheet.includes("pointerdown")
+      "Sheet surface uses localized React bubble stopPropagation (no capture-phase DOM blockers)",
+      sheet.includes("stopReactPropagation") &&
+        sheet.includes("onPointerDown: stopReactPropagation") &&
+        !sheet.includes("stopPointerEventPropagation") &&
+        !sheet.includes("addEventListener")
     ) && ok;
   ok =
     pass(
@@ -86,7 +102,7 @@ function main() {
   ok =
     pass(
       "16px modal input preserved",
-      post.includes('Platform.OS === "web" ? 16 : 15')
+      readSource("components/PostCommentsContent.tsx").includes('Platform.OS === "web" ? 16 : 15')
     ) && ok;
   ok =
     pass(
@@ -95,13 +111,15 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Full-screen layout geometry unchanged",
-      sheet.includes("readVisualViewportHeight") && !sheet.match(/mobileWebSurface[\s\S]*offsetTop/)
+      "Full-screen layout geometry uses visual viewport height",
+      sheet.includes("measureSafariVisualViewport") &&
+        sheet.includes("mobileVisualHeight") &&
+        !sheet.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX")
     ) && ok;
   ok =
     pass(
       "Comment options z-index preserved",
-      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100000")
+      overlayZOrderOk(readSource("lib/overlay-z-index.ts"))
     ) && ok;
   ok =
     pass(

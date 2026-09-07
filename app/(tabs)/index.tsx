@@ -782,6 +782,97 @@ export default function HomeScreen() {
     onMediaPress: () => undefined,
   });
 
+  const openFeedMediaGallery = (
+    post: Post,
+    index: number,
+    options?: { commentsInitiallyOpen?: boolean }
+  ) => {
+    const displayPost = post.shared_post ?? post;
+    const mediaItems = normalizePostMediaItems(displayPost.media_urls ?? [], {
+      postType: displayPost.post_type,
+      thumbnailUrl: displayPost.thumbnail_url,
+    });
+    const isVideo = mediaItems[index]?.kind === "video";
+    const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
+    setFeedVideoFullscreenHandoff(playbackId);
+    const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
+    setCarouselIndex(post.id, index);
+    const immersiveVideo = isVideo ? buildImmersiveVideoContext(post) : undefined;
+
+    let immersiveVideoPlaylist: ImmersiveVideoPlaylistState | undefined;
+    if (isVideo && immersiveVideo && usesMobileWebCommentsRoute()) {
+      const snapshot = buildFeedVideoPlaylistFromPosts(posts, displayPost.id, index);
+      immersiveVideoPlaylist = {
+        entries: snapshot.entries,
+        initialIndex: snapshot.initialIndex,
+        initialHandoff: videoHandoff,
+        initialHandoffPlaybackId: playbackId,
+        hasMore: Boolean(hasNextPage),
+        originMediaIndex: index,
+        getPost: (postId) => {
+          const cachedPosts =
+            queryClient
+              .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+              ?.pages.flatMap((page) => page.posts) ?? posts;
+          return cachedPosts.find(
+            (candidate) => (candidate.shared_post ?? candidate).id === postId
+          );
+        },
+        buildImmersiveContext: buildImmersiveVideoContext,
+        fetchMore: async () => {
+          const beforeCount =
+            queryClient
+              .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+              ?.pages.flatMap((page) => page.posts).length ?? posts.length;
+          await fetchNextPage();
+          const updatedPosts =
+            queryClient
+              .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+              ?.pages.flatMap((page) => page.posts) ?? [];
+          const newPosts = updatedPosts.slice(beforeCount);
+          const entries = buildPlaylistEntriesFromPosts(newPosts);
+          const feedState = queryClient.getQueryState(["feed", userId]);
+          const stillHasMore = Boolean(
+            (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
+              ?.nextCursor
+          );
+          return { entries, hasMore: stillHasMore };
+        },
+      };
+    }
+
+    if (Platform.OS === "web" && immersiveVideoPlaylist) {
+      saveFeedScrollReturnState();
+    }
+
+    openGallery(
+      displayPost.media_urls ?? [],
+      index,
+      (finalIndex, context) => {
+        const restorePostId = context?.postId ?? displayPost.id;
+        const restoreMediaIndex = context?.mediaIndex ?? finalIndex;
+        setCarouselIndex(restorePostId, restoreMediaIndex);
+        if (Platform.OS === "web") {
+          if (immersiveVideoPlaylist) {
+            requestFeedScrollReturnRestore();
+          } else if (restorePostId) {
+            scrollFeedToPost(restorePostId);
+          }
+        }
+      },
+      {
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
+        videoHandoff,
+        immersiveVideo,
+        immersiveVideoPlaylist,
+        immersiveVideoUserId: userId,
+        immersiveVideoAuthorProfile: viewerProfile ?? undefined,
+        commentsInitiallyOpen: options?.commentsInitiallyOpen,
+      }
+    );
+  };
+
   feedActionsRef.current = {
     onPress: (post: Post) => {
       pushScreen(`/post/${getSharedPostTargetId(post)}`);
@@ -802,6 +893,16 @@ export default function HomeScreen() {
       if (!post.liked_by_me) toggleLikePost(post.id);
     },
     onComment: (post: Post) => {
+      const displayPost = post.shared_post ?? post;
+      const mediaItems = normalizePostMediaItems(displayPost.media_urls ?? [], {
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
+      });
+      const mediaIndex = carouselIndices[post.id] ?? 0;
+      if (usesMobileWebCommentsRoute() && mediaItems[mediaIndex]?.kind === "video") {
+        openFeedMediaGallery(post, mediaIndex, { commentsInitiallyOpen: true });
+        return;
+      }
       openComments(post);
     },
     onShare: (post: Post) => {
@@ -823,90 +924,8 @@ export default function HomeScreen() {
     onOwnerActionsPress: (post: Post) => {
       openPostActions(post);
     },
-    onMediaPress: (post: Post, uri: string, index: number) => {
-      const displayPost = post.shared_post ?? post;
-      const mediaItems = normalizePostMediaItems(displayPost.media_urls ?? [], {
-        postType: displayPost.post_type,
-        thumbnailUrl: displayPost.thumbnail_url,
-      });
-      const isVideo = mediaItems[index]?.kind === "video";
-      const playbackId = buildFeedVideoPlaybackId(displayPost.id, index);
-      setFeedVideoFullscreenHandoff(playbackId);
-      const videoHandoff = captureFeedVideoForFullscreen(playbackId) ?? undefined;
-      setCarouselIndex(post.id, index);
-      const immersiveVideo = isVideo ? buildImmersiveVideoContext(post) : undefined;
-
-      let immersiveVideoPlaylist: ImmersiveVideoPlaylistState | undefined;
-      if (isVideo && immersiveVideo && usesMobileWebCommentsRoute()) {
-        const snapshot = buildFeedVideoPlaylistFromPosts(posts, displayPost.id, index);
-        immersiveVideoPlaylist = {
-          entries: snapshot.entries,
-          initialIndex: snapshot.initialIndex,
-          initialHandoff: videoHandoff,
-          initialHandoffPlaybackId: playbackId,
-          hasMore: Boolean(hasNextPage),
-          originMediaIndex: index,
-          getPost: (postId) => {
-            const cachedPosts =
-              queryClient
-                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-                ?.pages.flatMap((page) => page.posts) ?? posts;
-            return cachedPosts.find(
-              (candidate) => (candidate.shared_post ?? candidate).id === postId
-            );
-          },
-          buildImmersiveContext: buildImmersiveVideoContext,
-          fetchMore: async () => {
-            const beforeCount =
-              queryClient
-                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-                ?.pages.flatMap((page) => page.posts).length ?? posts.length;
-            await fetchNextPage();
-            const updatedPosts =
-              queryClient
-                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-                ?.pages.flatMap((page) => page.posts) ?? [];
-            const newPosts = updatedPosts.slice(beforeCount);
-            const entries = buildPlaylistEntriesFromPosts(newPosts);
-            const feedState = queryClient.getQueryState(["feed", userId]);
-            const stillHasMore = Boolean(
-              (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
-                ?.nextCursor
-            );
-            return { entries, hasMore: stillHasMore };
-          },
-        };
-      }
-
-      if (Platform.OS === "web" && immersiveVideoPlaylist) {
-        saveFeedScrollReturnState();
-      }
-
-      openGallery(
-        displayPost.media_urls ?? [],
-        index,
-        (finalIndex, context) => {
-          const restorePostId = context?.postId ?? displayPost.id;
-          const restoreMediaIndex = context?.mediaIndex ?? finalIndex;
-          setCarouselIndex(restorePostId, restoreMediaIndex);
-          if (Platform.OS === "web") {
-            if (immersiveVideoPlaylist) {
-              requestFeedScrollReturnRestore();
-            } else if (restorePostId) {
-              scrollFeedToPost(restorePostId);
-            }
-          }
-        },
-        {
-          postType: displayPost.post_type,
-          thumbnailUrl: displayPost.thumbnail_url,
-          videoHandoff,
-          immersiveVideo,
-          immersiveVideoPlaylist,
-          immersiveVideoUserId: userId,
-          immersiveVideoAuthorProfile: viewerProfile ?? undefined,
-        }
-      );
+    onMediaPress: (post: Post, _uri: string, index: number) => {
+      openFeedMediaGallery(post, index);
     },
   };
 

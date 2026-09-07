@@ -57,6 +57,7 @@ export interface MediaGalleryState {
   immersiveVideoPlaylist?: ImmersiveVideoPlaylistState;
   immersiveVideoUserId?: string;
   immersiveVideoAuthorProfile?: Post["author"];
+  commentsInitiallyOpen?: boolean;
 }
 
 export type GalleryState = ImageGalleryState | MediaGalleryState;
@@ -480,6 +481,8 @@ function LightboxSurface({
     gallery && isMediaGalleryState(gallery) ? gallery.immersiveVideoUserId : undefined;
   const immersiveVideoAuthorProfile =
     gallery && isMediaGalleryState(gallery) ? gallery.immersiveVideoAuthorProfile : undefined;
+  const commentsInitiallyOpen =
+    gallery && isMediaGalleryState(gallery) ? Boolean(gallery.commentsInitiallyOpen) : false;
   const useImmersiveVideo =
     Platform.OS === "web" &&
     isMobileWeb() &&
@@ -721,6 +724,7 @@ function LightboxSurface({
               stageHeight={pageHeight}
               onClose={dismiss}
               onActiveEntryChange={handlePlaylistActiveEntryChange}
+              commentsInitiallyOpen={commentsInitiallyOpen}
             />
           ) : (
           <FlatList

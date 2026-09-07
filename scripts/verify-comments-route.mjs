@@ -22,6 +22,19 @@ function readSource(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
+function overlayZOrderOk(src) {
+  const commentsSheet = Number(src.match(/commentsSheet:\s*(\d+)/)?.[1]);
+  const lightbox = Number(src.match(/imageLightbox:\s*(\d+)/)?.[1]);
+  const videoOverlay = Number(src.match(/commentsVideoOverlay:\s*(\d+)/)?.[1]);
+  const commentOptions = Number(src.match(/commentOptions:\s*(\d+)/)?.[1]);
+  return (
+    commentsSheet === 99998 &&
+    lightbox === 99999 &&
+    videoOverlay > lightbox &&
+    commentOptions > videoOverlay
+  );
+}
+
 function main() {
   console.log("verify-comments-route\n");
   let ok = true;
@@ -119,8 +132,15 @@ function main() {
 
   ok =
     pass(
-      "Comment options z-index above comments route",
-      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100000")
+      "Comment options z-index above comments route and video overlay",
+      overlayZOrderOk(readSource("lib/overlay-z-index.ts"))
+    ) && ok;
+  ok =
+    pass(
+      "Video Feed comments use gallery; photo comments keep this route",
+      readSource("app/(tabs)/index.tsx").includes("commentsInitiallyOpen: true") &&
+        readSource("app/(tabs)/index.tsx").includes("openComments(post)") &&
+        hook.includes("navigateToPostComments")
     ) && ok;
 
   ok =

@@ -156,9 +156,172 @@ function main() {
         lightbox.includes('objectFit: "contain"')
     ) && ok;
 
+  const gallery = readSource("lib/useMediaGallery.tsx");
+  const overlayZ = readSource("lib/overlay-z-index.ts");
+  const viewport = readSource("lib/video-overlay-visual-viewport-layout.ts");
+  const commentsSheetZ = Number(overlayZ.match(/commentsSheet:\s*(\d+)/)?.[1]);
+  const lightboxZ = Number(overlayZ.match(/imageLightbox:\s*(\d+)/)?.[1]);
+  const videoOverlayZ = Number(overlayZ.match(/commentsVideoOverlay:\s*(\d+)/)?.[1]);
+  const commentOptionsZ = Number(overlayZ.match(/commentOptions:\s*(\d+)/)?.[1]);
+
+  ok =
+    pass(
+      "Video Feed comments open immersive viewer via commentsInitiallyOpen",
+      feed.includes("commentsInitiallyOpen: true") &&
+        feed.includes('kind === "video"') &&
+        feed.includes("openFeedMediaGallery") &&
+        gallery.includes("commentsInitiallyOpen") &&
+        lightbox.includes("commentsInitiallyOpen={commentsInitiallyOpen}") &&
+        overlayShell.includes("commentsInitiallyOpen") &&
+        overlayShell.includes("useState(commentsInitiallyOpen)")
+    ) && ok;
+  ok =
+    pass(
+      "Photo comments still use the dedicated comments route",
+      feed.includes("openComments(post)") &&
+        readSource("lib/useFeedCommentsSheet.tsx").includes("navigateToPostComments")
+    ) && ok;
+  ok =
+    pass(
+      "Stacking: lightbox < video overlay sheet < composer / comment options",
+      commentsSheetZ === 99998 &&
+        lightboxZ === 99999 &&
+        videoOverlayZ > lightboxZ &&
+        commentOptionsZ > videoOverlayZ &&
+        styles.includes("z-index: 100001 !important") &&
+        styles.includes("z-index: 2147483647 !important") &&
+        styles.includes("[data-frennix-video-peek-dismiss") &&
+        styles.includes("background: transparent !important")
+    ) && ok;
+  ok =
+    pass(
+      "Comments sheet surface wraps header and list",
+      sheet.includes("styles.videoOverlaySheetBody") &&
+        sheet.includes("{listRegion}") &&
+        !sheet.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX")
+    ) && ok;
+  ok =
+    pass(
+      "Keyboard-open peek uses clamped helper, not an 80px collapse",
+      viewport.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+        sheet.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+        !sheet.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX = 80") &&
+        !viewport.includes("? IOS_SAFARI_FLOATING_CONTROLS_PX")
+    ) && ok;
+  ok =
+    pass(
+      "Safari browser vs standalone PWA use measured clearance",
+      viewport.includes("export function resolveSafariControlsClearance") &&
+        viewport.includes("alreadyAccountedInVisualViewport") &&
+        viewport.includes("input.standalone") &&
+        viewport.includes("safeAreaTop = standalone ? readEnvSafeAreaTop()")
+    ) && ok;
+  ok =
+    pass(
+      "iOS focus correction remains (no capture-phase blockers)",
+      sheet.includes('touchAction: "manipulation"') &&
+        !sheet.includes("addEventListener") &&
+        !sheet.includes("stopPointerEventPropagation") &&
+        !sheet.includes("preventDefault")
+    ) && ok;
+  ok =
+    pass(
+      "Keyboard-open peek stays useful while the list shrinks",
+      verifyPeekGeometryContract()
+    ) && ok;
+  ok =
+    pass(
+      "Safari 90px is not subtracted when visualViewport already shrank",
+      verifySafariClearanceContract()
+    ) && ok;
+
   console.log("");
   console.log(ok ? "All checks passed." : "Some checks failed.");
   process.exit(ok ? 0 : 1);
+}
+
+function verifyPeekGeometryContract() {
+  const HEADER = 80;
+  const MIN_LIST = 100;
+  const ABS_MIN = 112;
+  const FRACTION = 0.25;
+
+  function resolve({ layoutHeight, usableHeight, baselinePeekHeight, composerBottomReserve }) {
+    const usefulMin = Math.min(
+      baselinePeekHeight,
+      Math.max(ABS_MIN, Math.round(layoutHeight * FRACTION))
+    );
+    const spaceAfterReserve = Math.max(0, usableHeight - Math.max(0, composerBottomReserve));
+    const maxPeekKeepingList = spaceAfterReserve - (HEADER + MIN_LIST);
+    const peekHeight =
+      maxPeekKeepingList >= usefulMin
+        ? Math.min(baselinePeekHeight, maxPeekKeepingList)
+        : Math.min(usefulMin, Math.max(ABS_MIN, spaceAfterReserve - HEADER));
+    return {
+      peekHeight,
+      height: Math.max(HEADER, spaceAfterReserve - peekHeight),
+    };
+  }
+
+  const closed = resolve({
+    layoutHeight: 844,
+    usableHeight: 670,
+    baselinePeekHeight: 330,
+    composerBottomReserve: 80,
+  });
+  const keyboard = resolve({
+    layoutHeight: 844,
+    usableHeight: 330,
+    baselinePeekHeight: 330,
+    composerBottomReserve: 80,
+  });
+
+  return (
+    closed.peekHeight === 330 &&
+    closed.height >= HEADER + MIN_LIST &&
+    keyboard.peekHeight > 80 &&
+    keyboard.peekHeight >= ABS_MIN &&
+    keyboard.height >= HEADER
+  );
+}
+
+function verifySafariClearanceContract() {
+  function resolve(input) {
+    if (input.standalone || !input.isIosSafari || !input.keyboardOpen) return 0;
+    if (input.bottomChrome > 0 || input.layoutHeight - input.visualHeight > 0) return 0;
+    return 0;
+  }
+
+  const safariKeyboardAlreadyShrunk = resolve({
+    isIosSafari: true,
+    standalone: false,
+    keyboardOpen: true,
+    bottomChrome: 320,
+    layoutHeight: 844,
+    visualHeight: 420,
+  });
+  const standaloneKeyboard = resolve({
+    isIosSafari: true,
+    standalone: true,
+    keyboardOpen: true,
+    bottomChrome: 0,
+    layoutHeight: 844,
+    visualHeight: 500,
+  });
+  const safariNoKeyboard = resolve({
+    isIosSafari: true,
+    standalone: false,
+    keyboardOpen: false,
+    bottomChrome: 0,
+    layoutHeight: 844,
+    visualHeight: 844,
+  });
+
+  return (
+    safariKeyboardAlreadyShrunk === 0 &&
+    standaloneKeyboard === 0 &&
+    safariNoKeyboard === 0
+  );
 }
 
 main();

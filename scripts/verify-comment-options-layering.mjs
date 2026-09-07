@@ -56,7 +56,7 @@ function verifyProductionBundle() {
   ok =
     pass(
       "Bundle includes comment options z-index above comments sheet",
-      bundle.includes("100000") && bundle.includes("99998")
+      bundle.includes("100002") && bundle.includes("99998") && bundle.includes("100001")
     ) && ok;
   ok = pass("Bundle includes resetCommentActions wiring", bundle.includes("resetCommentActions")) && ok;
   ok = pass("Bundle includes comments sheet portal marker", bundle.includes("frennix-comments-sheet")) && ok;
@@ -67,8 +67,9 @@ function verifyStaticWiring() {
   let ok = true;
   ok =
     pass(
-      "overlay z-index: comment options above comments sheet",
-      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100000") &&
+      "overlay z-index: comment options above comments sheet and video overlay",
+      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100002") &&
+        readSource("lib/overlay-z-index.ts").includes("commentsVideoOverlay: 100001") &&
         readSource("lib/overlay-z-index.ts").includes("commentsSheet: 99998")
     ) && ok;
   ok =
