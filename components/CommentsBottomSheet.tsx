@@ -191,7 +191,7 @@ const WEB_DESKTOP_OVERLAY_ROOT: ViewStyle = Platform.select({
     flexDirection: "column",
     justifyContent: "flex-end",
     overflow: "hidden",
-    touchAction: "none",
+    touchAction: "manipulation",
   },
   default: {
     flex: 1,
@@ -209,7 +209,7 @@ const WEB_MOBILE_FULLSCREEN_ROOT: ViewStyle = Platform.select({
     display: "flex",
     flexDirection: "column",
     backgroundColor: colors.background,
-    touchAction: "none",
+    touchAction: "manipulation",
   },
   default: {},
 }) as ViewStyle;
@@ -223,15 +223,11 @@ const WEB_MOBILE_VIDEO_OVERLAY_ROOT: ViewStyle = Platform.select({
     bottom: 0,
     width: "100%",
     zIndex: COMMENTS_SHEET_Z_INDEX,
-    pointerEvents: "box-none",
-    touchAction: "none",
+    pointerEvents: "auto",
+    touchAction: "manipulation",
   },
   default: {},
 }) as ViewStyle;
-
-function stopPointerEventPropagation(event: Event): void {
-  event.stopPropagation();
-}
 
 function stopReactPropagation(event: { stopPropagation?: () => void }): void {
   event.stopPropagation?.();
@@ -350,44 +346,6 @@ export function CommentsBottomSheet({
       logCommentsPortalInteraction("portal-cleanup");
     };
   }, [postId, visible]);
-
-  useEffect(() => {
-    if (!visible || Platform.OS !== "web" || typeof document === "undefined") return;
-
-    let portal: Element | null = null;
-    let detach: (() => void) | undefined;
-
-    const attach = () => {
-      portal = document.querySelector('[data-frennix-comments-sheet="true"]');
-      if (!portal) return;
-
-      const events = ["pointerdown", "pointerup", "click", "touchstart", "touchend"] as const;
-      events.forEach((eventName) => {
-        portal!.addEventListener(eventName, stopPointerEventPropagation, true);
-      });
-
-      const onFocusIn = (event: FocusEvent) => {
-        if (!portal!.contains(event.target as Node)) return;
-        logCommentsPortalInteraction("composer-focus-in");
-      };
-      portal.addEventListener("focusin", onFocusIn, true);
-
-      detach = () => {
-        events.forEach((eventName) => {
-          portal?.removeEventListener(eventName, stopPointerEventPropagation, true);
-        });
-        portal?.removeEventListener("focusin", onFocusIn, true);
-      };
-    };
-
-    attach();
-    const frame = portal ? undefined : requestAnimationFrame(attach);
-
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      detach?.();
-    };
-  }, [visible]);
 
   const requestClose = useCallback(
     (reason: CommentsCloseReason) => {
@@ -637,7 +595,7 @@ export function CommentsBottomSheet({
               flexDirection: "column",
               minHeight: 0,
               boxSizing: "border-box",
-              pointerEvents: "box-none",
+              pointerEvents: "auto",
             } as ViewStyle
           }
         >
