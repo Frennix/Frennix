@@ -29,9 +29,9 @@ function belongsOnReels(post) {
   return post.post_type === "video" && post.is_reel === true;
 }
 
-function resolveCreateFlag({ intent, hasVideo, explicitIsReel }) {
+function resolveCreateFlag({ destination, hasVideo, explicitIsReel }) {
   if (explicitIsReel !== undefined) return explicitIsReel === true;
-  return intent === "reel" && hasVideo === true;
+  return destination === "reel" && hasVideo === true;
 }
 
 function main() {
@@ -42,6 +42,7 @@ function main() {
   const types = readSource("packages/types/src/index.ts");
   const shareWorkout = readSource("lib/share-workout.ts");
   const createPost = readSource("app/create-post.tsx");
+  const savedSheet = readSource("components/WorkoutSavedSheet.tsx");
   const reels = readSource("app/(tabs)/reels.tsx");
   const journeyMigration = readSource("supabase/migrations/20260908140000_post_journey_category.sql");
   const isReelMigration = readSource("supabase/migrations/20260908200000_post_is_reel.sql");
@@ -78,7 +79,9 @@ function main() {
     pass(
       "Share Your Journey submits is_reel=true; normal posts do not",
       shareWorkout.includes("is_reel: postType === \"video\" && input.isReel === true") &&
-        createPost.includes("isReel: isReelIntent && hasVideo") &&
+        createPost.includes("const postToReels = mode === \"reel\" && hasVideo;") &&
+        createPost.includes("isReel: postToReels") &&
+        createPost.includes("isReel: false") &&
         createPost.includes('paramValue(params.intent) === "reel"')
     ) && ok;
 
@@ -138,7 +141,7 @@ function main() {
   ok =
     pass(
       "A newly uploaded normal video defaults to Feed",
-      resolveCreateFlag({ intent: undefined, hasVideo: true }) === false &&
+      resolveCreateFlag({ destination: "feed", hasVideo: true }) === false &&
         belongsOnFeed(newNormalVideo) &&
         !belongsOnReels(newNormalVideo)
     ) && ok;
@@ -146,8 +149,30 @@ function main() {
   ok =
     pass(
       "Share Your Journey creates is_reel=true",
-      resolveCreateFlag({ intent: "reel", hasVideo: true }) === true &&
-        resolveCreateFlag({ intent: "reel", hasVideo: false }) === false
+      resolveCreateFlag({ destination: "reel", hasVideo: true }) === true &&
+        resolveCreateFlag({ destination: "reel", hasVideo: false }) === false &&
+        resolveCreateFlag({ destination: "feed", hasVideo: true }) === false
+    ) && ok;
+
+  ok =
+    pass(
+      "Post to Reels is rendered first for intent=reel",
+      savedSheet.includes("reelIntent ? [REEL_OPTION, ...BASE_OPTIONS] : BASE_OPTIONS") &&
+        savedSheet.includes('label: "Post to Reels"') &&
+        savedSheet.includes("Share this journey video in Reels") &&
+        createPost.includes("reelIntent={isReelIntent}")
+    ) && ok;
+
+  ok =
+    pass(
+      "Sharing destinations can scroll inside the visible viewport",
+      savedSheet.includes("ScrollView") &&
+        savedSheet.includes('keyboardShouldPersistTaps="handled"') &&
+        savedSheet.includes("minHeight: 0") &&
+        savedSheet.includes("flex: 1") &&
+        savedSheet.includes("sheetMaxHeight") &&
+        savedSheet.includes("measureSafariVisualViewport") &&
+        savedSheet.includes("paddingBottom: scrollBottomPadding")
     ) && ok;
 
   ok =

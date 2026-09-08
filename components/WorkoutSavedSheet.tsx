@@ -1,23 +1,86 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { StoryShareMode } from "@frennix/types";
 import { BottomOverlayShell } from "@/components/BottomOverlayShell";
+import {
+  measureSafariVisualViewport,
+  requestSafariVisualViewportRemeasure,
+  subscribeSafariVisualViewport,
+} from "@/lib/safari-visual-viewport";
 import { colors, spacing, typography } from "@frennix/ui";
 
-const OPTIONS: Array<{ mode: StoryShareMode | "done"; label: string; hint: string; emoji: string }> = [
+export type WorkoutSavedShareMode = StoryShareMode | "done" | "reel";
+
+const BASE_OPTIONS: Array<{
+  mode: WorkoutSavedShareMode;
+  label: string;
+  hint: string;
+  emoji: string;
+}> = [
   { mode: "feed", label: "Post to Feed", hint: "Share on your home feed", emoji: "📰" },
   { mode: "story", label: "Share to Story", hint: "24-hour story only", emoji: "⭕" },
   { mode: "both", label: "Share to Both", hint: "Feed post and story", emoji: "✨" },
   { mode: "done", label: "Done", hint: "Save without sharing", emoji: "✓" },
 ];
 
+const REEL_OPTION = {
+  mode: "reel" as const,
+  label: "Post to Reels",
+  hint: "Share this journey video in Reels",
+  emoji: "🎬",
+};
+
 type WorkoutSavedSheetProps = {
   visible: boolean;
   loading?: boolean;
-  onSelect: (mode: StoryShareMode | "done") => void;
+  /** When true, Post to Reels is the first destination. */
+  reelIntent?: boolean;
+  onSelect: (mode: WorkoutSavedShareMode) => void;
   onClose: () => void;
 };
 
-export function WorkoutSavedSheet({ visible, loading, onSelect, onClose }: WorkoutSavedSheetProps) {
+export function WorkoutSavedSheet({
+  visible,
+  loading,
+  reelIntent = false,
+  onSelect,
+  onClose,
+}: WorkoutSavedSheetProps) {
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [visualHeight, setVisualHeight] = useState(windowHeight);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !visible) return;
+
+    const update = () => {
+      const snap = measureSafariVisualViewport();
+      setVisualHeight(snap.visualHeight);
+    };
+
+    update();
+    requestSafariVisualViewportRemeasure();
+    return subscribeSafariVisualViewport(update);
+  }, [visible]);
+
+  const sheetMaxHeight = useMemo(() => {
+    const visibleHeight = Platform.OS === "web" ? visualHeight : windowHeight;
+    const maxPx = Math.max(Math.round(visibleHeight * 0.82), 280);
+    return Platform.OS === "web" ? (`min(82dvh, ${maxPx}px)` as const) : maxPx;
+  }, [visualHeight, windowHeight]);
+
+  const options = reelIntent ? [REEL_OPTION, ...BASE_OPTIONS] : BASE_OPTIONS;
+  const scrollBottomPadding = Math.max(insets.bottom, spacing.md) + spacing.lg;
+
   return (
     <BottomOverlayShell
       visible={visible}
@@ -25,6 +88,7 @@ export function WorkoutSavedSheet({ visible, loading, onSelect, onClose }: Worko
       animationType="slide"
       backdropColor="rgba(0,0,0,0.5)"
       horizontalPadding={0}
+      sheetMaxHeight={sheetMaxHeight}
       sheetStyle={styles.sheet}
     >
       <View style={styles.header}>
@@ -33,23 +97,31 @@ export function WorkoutSavedSheet({ visible, loading, onSelect, onClose }: Worko
         <Text style={styles.subtitle}>Choose where to share — nothing posts automatically.</Text>
       </View>
 
-      <View style={styles.options}>
-        {OPTIONS.map((option) => (
-          <Pressable
-            key={option.mode}
-            style={[styles.option, loading && styles.optionDisabled]}
-            onPress={() => onSelect(option.mode)}
-            disabled={loading}
-            accessibilityRole="button"
-            accessibilityLabel={option.label}
-          >
-            <Text style={styles.optionEmoji}>{option.emoji}</Text>
-            <View style={styles.optionText}>
-              <Text style={styles.optionLabel}>{option.label}</Text>
-              <Text style={styles.optionHint}>{option.hint}</Text>
-            </View>
-          </Pressable>
-        ))}
+      <View style={styles.optionsViewport}>
+        <ScrollView
+          style={styles.optionsScroll}
+          contentContainerStyle={[styles.optionsContent, { paddingBottom: scrollBottomPadding }]}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
+        >
+          {options.map((option) => (
+            <Pressable
+              key={option.mode}
+              style={[styles.option, loading && styles.optionDisabled]}
+              onPress={() => onSelect(option.mode)}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={option.label}
+            >
+              <Text style={styles.optionEmoji}>{option.emoji}</Text>
+              <View style={styles.optionText}>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionHint}>{option.hint}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
     </BottomOverlayShell>
   );
@@ -62,12 +134,19 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    padding: spacing.lg,
-    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: 0,
+    gap: spacing.md,
+    flexDirection: "column",
+    minHeight: 0,
+    overflow: "hidden",
+    width: "100%",
   },
   header: {
     alignItems: "center",
     gap: spacing.xs,
+    flexShrink: 0,
   },
   emoji: {
     fontSize: 40,
@@ -83,9 +162,17 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
   },
-  options: {
+  optionsViewport: {
+    flex: 1,
+    minHeight: 0,
+  },
+  optionsScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  optionsContent: {
     gap: spacing.sm,
-    paddingBottom: spacing.md,
+    flexGrow: 0,
   },
   option: {
     flexDirection: "row",

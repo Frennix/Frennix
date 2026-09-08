@@ -18,11 +18,10 @@ import {
   STORY_PRIVACY_OPTIONS,
   type JourneyCategory,
   type StoryPrivacy,
-  type StoryShareMode,
 } from "@frennix/types";
 import { isVideoMime } from "@frennix/api";
 import { getSharePostUserMessage } from "@/lib/share-post-errors";
-import { WorkoutSavedSheet } from "@/components/WorkoutSavedSheet";
+import { WorkoutSavedSheet, type WorkoutSavedShareMode } from "@/components/WorkoutSavedSheet";
 import { shareWorkout } from "@/lib/share-workout";
 import { resolveVideoUploadFile } from "@/lib/video-upload";
 import { useAuth } from "@/providers/AuthProvider";
@@ -348,7 +347,7 @@ export default function CreatePostScreen() {
     };
   }
 
-  async function executeShare(mode: StoryShareMode | "done") {
+  async function executeShare(mode: WorkoutSavedShareMode) {
     if (!session?.user.id) return;
 
     setLoading(true);
@@ -363,8 +362,11 @@ export default function CreatePostScreen() {
         return;
       }
 
+      const shareMode = mode === "reel" ? "feed" : mode;
+      const postToReels = mode === "reel" && hasVideo;
+
       const result = await shareWorkout(
-        mode,
+        shareMode,
         {
           userId: session.user.id,
           content: content || undefined,
@@ -379,8 +381,8 @@ export default function CreatePostScreen() {
             durationSeconds: item.durationSeconds,
           })),
           storyPrivacy,
-          journeyCategory: isReelIntent && hasVideo ? journeyCategory : null,
-          isReel: isReelIntent && hasVideo,
+          journeyCategory: postToReels ? journeyCategory : null,
+          isReel: postToReels,
         },
         queryClient
       );
@@ -469,8 +471,8 @@ export default function CreatePostScreen() {
           groupId: groupId ?? null,
           challengeId: challengeId ?? null,
           eventId: eventId ?? null,
-          journeyCategory: isReelIntent && hasVideo ? journeyCategory : null,
-          isReel: isReelIntent && hasVideo,
+          journeyCategory: null,
+          isReel: false,
         },
         queryClient
       );
@@ -798,6 +800,7 @@ export default function CreatePostScreen() {
       <WorkoutSavedSheet
         visible={savedSheetVisible}
         loading={loading}
+        reelIntent={isReelIntent}
         onSelect={(mode) => void executeShare(mode)}
         onClose={() => setSavedSheetVisible(false)}
       />

@@ -254,7 +254,10 @@ export default function TrainingCalendarDetailScreen() {
       <WorkoutSavedSheet
         visible={shareVisible}
         loading={shareLoading}
-        onSelect={(mode) => void handleShare(mode)}
+        onSelect={(mode) => {
+          if (mode === "reel") return;
+          void handleShare(mode);
+        }}
         onClose={() => setShareVisible(false)}
       />
     </>
