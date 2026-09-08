@@ -53,6 +53,10 @@ function clampIndex(value: number, max: number) {
   return Math.min(Math.max(value, 0), Math.max(max, 0));
 }
 
+function isActiveSlideAttr(slideIndex: number, activeIndex: number) {
+  return slideIndex === activeIndex ? "active" : "inactive";
+}
+
 export function ImmersiveVideoPlaylistViewer({
   entries: initialEntries,
   initialIndex,
@@ -144,17 +148,25 @@ export function ImmersiveVideoPlaylistViewer({
 
   const handleWebScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
-      if (!stageHeight) return;
-      const nextIndex = Math.round(event.currentTarget.scrollTop / stageHeight);
+      const pageHeight = event.currentTarget.clientHeight || stageHeight;
+      if (!pageHeight) return;
+      const nextIndex = Math.round(event.currentTarget.scrollTop / pageHeight);
       handleIndexChange(nextIndex);
     },
     [handleIndexChange, stageHeight]
   );
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !webScrollRef.current || !stageHeight) return;
-    webScrollRef.current.scrollTop = initialIndex * stageHeight;
+    if (Platform.OS !== "web" || !webScrollRef.current) return;
+    const pageHeight = webScrollRef.current.clientHeight || stageHeight;
+    if (!pageHeight) return;
+    webScrollRef.current.scrollTop = initialIndex * pageHeight;
   }, [initialIndex, stageHeight]);
+
+  const slideShellSize =
+    Platform.OS === "web"
+      ? ({ width: "100%", height: "100%" } as const)
+      : { width: stageWidth, height: stageHeight };
 
   const renderSlide = useCallback(
     (entry: ImmersiveVideoPlaylistEntry, slideIndex: number) => {
@@ -166,7 +178,7 @@ export function ImmersiveVideoPlaylistViewer({
       if (!shouldRender || !post || !immersiveContext?.postActions) {
         return (
           <View
-            style={[styles.slideShell, { width: stageWidth, height: stageHeight }]}
+            style={[styles.slideShell, slideShellSize]}
             {...(Platform.OS === "web"
               ? ({ "data-frennix-video-playlist-slide": "placeholder" } as object)
               : null)}
@@ -189,7 +201,7 @@ export function ImmersiveVideoPlaylistViewer({
 
       return (
         <View
-          style={[styles.slideShell, { width: stageWidth, height: stageHeight }]}
+          style={[styles.slideShell, slideShellSize]}
           {...(Platform.OS === "web"
             ? ({
                 "data-frennix-video-playlist-slide": isActive ? "active" : "inactive",
@@ -221,6 +233,7 @@ export function ImmersiveVideoPlaylistViewer({
       onClose,
       routePlayback,
       shouldRenderIndex,
+      slideShellSize,
       stageHeight,
       stageWidth,
     ]
@@ -258,11 +271,11 @@ export function ImmersiveVideoPlaylistViewer({
           className="frennix-immersive-video-playlist-scroll"
           onScroll={handleWebScroll}
           style={{
-            width: stageWidth,
-            height: stageHeight,
+            width: "100%",
+            height: "100%",
+            overflowX: "hidden",
             overflowY: "scroll",
             scrollSnapType: "y mandatory",
-            WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
             touchAction: "pan-y",
             backgroundColor: colors.background,
@@ -271,13 +284,18 @@ export function ImmersiveVideoPlaylistViewer({
           {entries.map((entry, slideIndex) => (
             <div
               key={entry.playbackId}
+              data-frennix-video-playlist-page={isActiveSlideAttr(slideIndex, activeIndex)}
               style={{
-                width: stageWidth,
-                height: stageHeight,
+                width: "100%",
+                height: "100%",
+                minHeight: "100%",
+                maxHeight: "100%",
                 scrollSnapAlign: "start",
                 scrollSnapStop: "always",
                 position: "relative",
                 overflow: "hidden",
+                isolation: "isolate",
+                zIndex: 0,
               }}
             >
               {renderSlide(entry, slideIndex)}

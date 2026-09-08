@@ -678,7 +678,7 @@ export const FullscreenVideoSlide = forwardRef<
                 "x-webkit-airplay": "deny",
                 disablePictureInPicture: true,
                 disableRemotePlayback: true,
-                preload: isActive ? "auto" : "metadata",
+                preload: immersiveMode || isActive ? "auto" : "metadata",
                 poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
                 style: {
                   ...mediaFillStyle,

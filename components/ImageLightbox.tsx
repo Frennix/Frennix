@@ -500,7 +500,6 @@ function LightboxSurface({
     useImmersiveVideo && Boolean(immersiveVideoPlaylist?.entries.length);
   const freezeImmersiveLayout =
     useImmersiveVideoPlaylist && (commentsOverlayOpen || commentsInitiallyOpen);
-  const freezeLayoutViewportHeight = useImmersiveVideo && visible;
   const immersiveStageHeight =
     useImmersiveVideo && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight;
   const playlistCloseContextRef = useRef<GalleryCloseContext>({});
@@ -510,16 +509,12 @@ function LightboxSurface({
       const viewport = window.visualViewport;
       setPageWidth(Math.round(viewport?.width ?? window.innerWidth));
       setPageHeight(Math.round(viewport?.height ?? window.innerHeight));
-      const nextInnerHeight = Math.round(window.innerHeight);
-      setLayoutViewportHeight((current) => {
-        if (freezeLayoutViewportHeight && current > 0) {
-          return current;
-        }
-        return nextInnerHeight;
-      });
+      if (!useImmersiveVideo) {
+        setLayoutViewportHeight(Math.round(window.innerHeight));
+      }
       return;
     }
-  }, [freezeLayoutViewportHeight]);
+  }, [useImmersiveVideo]);
 
   const dismiss = useCallback(() => {
     dismissY.setValue(0);
@@ -737,11 +732,17 @@ function LightboxSurface({
           } as object)
         : null)}
       onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
         if (Platform.OS === "web") {
+          if (useImmersiveVideo && height > 0) {
+            setLayoutViewportHeight((current) => {
+              if (freezeImmersiveLayout && current > 0) return current;
+              return Math.round(height);
+            });
+          }
           syncViewportSize();
           return;
         }
-        const { width, height } = event.nativeEvent.layout;
         if (width > 0) setPageWidth(Math.round(width));
         if (height > 0) setPageHeight(Math.round(height));
       }}

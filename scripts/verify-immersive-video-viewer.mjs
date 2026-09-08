@@ -296,7 +296,7 @@ function main() {
       "Comments-open immersive stage is not collapsed by visualViewport pageHeight",
       lightbox.includes("layoutViewportHeight") &&
         lightbox.includes("freezeImmersiveLayout") &&
-        lightbox.includes("freezeLayoutViewportHeight") &&
+        lightbox.includes("if (freezeImmersiveLayout && current > 0) return current") &&
         lightbox.includes("immersiveStageHeight") &&
         lightbox.includes("captureImmersiveSessionLayoutHeight") &&
         lightbox.includes("clearImmersiveSessionLayoutHeight") &&

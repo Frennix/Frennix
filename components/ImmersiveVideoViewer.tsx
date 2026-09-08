@@ -409,8 +409,11 @@ function RailAction({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    width: "100%",
+    height: "100%",
     backgroundColor: colors.black,
     overflow: "hidden",
+    ...(Platform.OS === "web" ? ({ position: "relative" } as const) : null),
   },
   videoStageHost: {
     alignSelf: "stretch",

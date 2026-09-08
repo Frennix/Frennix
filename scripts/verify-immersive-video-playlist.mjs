@@ -116,10 +116,11 @@ function main() {
     pass(
       "Feed tap still sets handoff before opening gallery",
       (() => {
-        const marker = "onMediaPress: (post: Post, uri: string, index: number)";
+        const marker = "const openFeedMediaGallery = (";
         const start = feedIndex.indexOf(marker);
         const block = feedIndex.slice(start, start + 3200);
         return (
+          start >= 0 &&
           block.includes("setFeedVideoFullscreenHandoff(playbackId)") &&
           block.includes("openGallery(") &&
           block.indexOf("setFeedVideoFullscreenHandoff(playbackId)") <
@@ -142,6 +143,65 @@ function main() {
       "Web CSS defines vertical scroll-snap playlist container",
       styles.includes("frennix-immersive-video-playlist-scroll") &&
         styles.includes("scroll-snap-type: y mandatory")
+    ) && ok;
+
+  const playlistSlideCssStart = styles.indexOf(
+    ".frennix-immersive-video-playlist-scroll > [data-frennix-video-playlist-page]"
+  );
+  const playlistSlideCss = styles.slice(
+    playlistSlideCssStart,
+    playlistSlideCssStart >= 0 ? playlistSlideCssStart + 420 : 0
+  );
+  const immersiveFillCssStart = styles.indexOf(
+    '[data-frennix-immersive-video-viewer="true"] .fullscreen-video-mount'
+  );
+  const immersiveFillCssEnd = styles.indexOf(
+    "[data-frennix-immersive-top-bar=\"true\"]",
+    immersiveFillCssStart
+  );
+  const immersiveFillCss = styles.slice(
+    immersiveFillCssStart,
+    immersiveFillCssEnd > immersiveFillCssStart
+      ? immersiveFillCssEnd
+      : immersiveFillCssStart + 220
+  );
+
+  ok =
+    pass(
+      "Playlist pages clip to one full-screen snap and do not overlap",
+      playlistSlideCssStart >= 0 &&
+        playlistSlideCss.includes("overflow: hidden") &&
+        playlistSlideCss.includes("isolation: isolate") &&
+        playlistSlideCss.includes("height: 100%") &&
+        playlistSlideCss.includes("max-height: 100%") &&
+        playlistSlideCss.includes("scroll-snap-align: start") &&
+        playlistSlideCss.includes("scroll-snap-stop: always") &&
+        playlistViewer.includes("data-frennix-video-playlist-page") &&
+        playlistViewer.includes('isolation: "isolate"') &&
+        playlistViewer.includes("event.currentTarget.clientHeight") &&
+        !playlistViewer.includes("WebkitOverflowScrolling")
+    ) && ok;
+
+  ok =
+    pass(
+      "Immersive video fill stays inside the slide, not pinned to the overlay",
+      immersiveFillCssStart >= 0 &&
+        immersiveFillCss.includes("position: absolute") &&
+        immersiveFillCss.includes("width: 100%") &&
+        immersiveFillCss.includes("height: 100%") &&
+        !immersiveFillCss.includes("right: 0") &&
+        !immersiveFillCss.includes("bottom: 0")
+    ) && ok;
+
+  ok =
+    pass(
+      "Adjacent playlist videos preload without playing",
+      readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes(
+        'preload: immersiveMode || isActive ? "auto" : "metadata"'
+      ) &&
+        playlistViewer.includes("isActive={isActive}") &&
+        readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes("if (!isActive || failed)") &&
+        readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes("video.pause()")
     ) && ok;
 
   ok =
