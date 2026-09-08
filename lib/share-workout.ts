@@ -1,5 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { PostType, StoryPrivacy, StoryShareMode, WorkoutStoryMetrics } from "@frennix/types";
+import type {
+  JourneyCategory,
+  PostType,
+  StoryPrivacy,
+  StoryShareMode,
+  WorkoutStoryMetrics,
+} from "@frennix/types";
 import {
   createPost,
   isVideoMime,
@@ -37,6 +43,7 @@ export type WorkoutShareInput = {
   groupId?: string | null;
   challengeId?: string | null;
   eventId?: string | null;
+  journeyCategory?: JourneyCategory | null;
 };
 
 function buildWorkoutSlideData(
@@ -162,6 +169,7 @@ export async function shareWorkout(
         group_id: input.groupId ?? null,
         challenge_id: input.challengeId ?? null,
         event_id: input.eventId ?? null,
+        journey_category: postType === "video" ? input.journeyCategory ?? null : null,
       }),
       POST_CREATE_TIMEOUT_MS,
       "Creating post"
@@ -199,6 +207,7 @@ export async function shareWorkout(
 
   await queryClient.invalidateQueries({ queryKey: ["feed", input.userId] });
   await queryClient.invalidateQueries({ queryKey: ["feed-stories", input.userId] });
+  await queryClient.invalidateQueries({ queryKey: ["reels", input.userId] });
   await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
 
   return { postId: createdPost?.id ?? null, storyId };

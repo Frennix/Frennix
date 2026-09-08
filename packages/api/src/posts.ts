@@ -1,4 +1,4 @@
-import type { Comment, FeedPage, Post, PostType } from "@frennix/types";
+import type { Comment, FeedPage, JourneyCategory, Post, PostType } from "@frennix/types";
 import { normalizePostWorkoutFields } from "@frennix/types";
 import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";
 import { normalizeMediaExt, isVideoMime } from "./media-utils";
@@ -261,12 +261,18 @@ export async function enrichPostsWithInteractions(
 
 export type FeedCorePhase = "scope" | "posts";
 
+export type FeedCoreOptions = {
+  /** When set, only return posts of this type (used by Frennix Reels). */
+  postType?: PostType;
+};
+
 /** Fast path: feed scope + post rows with author profiles — no likes/comments/reactions yet. */
 export async function getFeedCore(
   userId: string,
   cursor?: string,
   limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE,
-  onPhase?: (phase: FeedCorePhase, detail?: Record<string, unknown>) => void
+  onPhase?: (phase: FeedCorePhase, detail?: Record<string, unknown>) => void,
+  options?: FeedCoreOptions
 ): Promise<FeedPage> {
   onPhase?.("scope", { start: true });
   const { authorIds, groupIds, challengeIds } = await getFeedScope(userId);
@@ -287,6 +293,10 @@ export async function getFeedCore(
     .or(orParts.join(","))
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (options?.postType) {
+    q = q.eq("post_type", options.postType);
+  }
 
   if (cursor) {
     q = q.lt("created_at", cursor);
@@ -326,6 +336,19 @@ export async function getFeed(
   limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
 ): Promise<FeedPage> {
   const core = await getFeedCore(userId, cursor, limit);
+  if (!core.posts.length) return core;
+
+  const posts = await enrichPosts(core.posts, userId);
+  return { posts, nextCursor: core.nextCursor };
+}
+
+/** Video-only feed for Frennix Reels — same visibility scope as the home feed. */
+export async function getVideoFeed(
+  userId: string,
+  cursor?: string,
+  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
+): Promise<FeedPage> {
+  const core = await getFeedCore(userId, cursor, limit, undefined, { postType: "video" });
   if (!core.posts.length) return core;
 
   const posts = await enrichPosts(core.posts, userId);
@@ -374,6 +397,7 @@ export async function createPost(input: {
   event_id?: string | null;
   shared_post_id?: string | null;
   story_audience?: import("@frennix/types").StoryAudience;
+  journey_category?: JourneyCategory | null;
 }) {
   const workout_types =
     input.workout_types?.length
@@ -382,8 +406,14 @@ export async function createPost(input: {
         ? [input.workout_type]
         : [];
 
-  const { workout_type: _legacy, workout_types: _ignored, story_audience, workout_metrics, ...rest } =
-    input;
+  const {
+    workout_type: _legacy,
+    workout_types: _ignored,
+    story_audience,
+    workout_metrics,
+    journey_category,
+    ...rest
+  } = input;
 
   const { data, error } = await getSupabase()
     .from("posts")
@@ -392,6 +422,7 @@ export async function createPost(input: {
       workout_types,
       ...(workout_metrics ? { workout_metrics } : {}),
       ...(story_audience ? { story_audience } : {}),
+      ...(journey_category ? { journey_category } : {}),
     })
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
     .single();

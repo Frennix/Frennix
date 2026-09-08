@@ -6,6 +6,7 @@ import {
   Circle,
   CircleCheck,
   CirclePlus,
+  Clapperboard,
   Compass,
   Dumbbell,
   Home,
@@ -20,6 +21,7 @@ import {
 
 export type AppIconName =
   | "feed"
+  | "reels"
   | "discover"
   | "events"
   | "post"
@@ -39,6 +41,7 @@ export type AppIconName =
 
 const ICONS: Record<AppIconName, LucideIcon> = {
   feed: Home,
+  reels: Clapperboard,
   discover: Compass,
   events: Calendar,
   post: CirclePlus,

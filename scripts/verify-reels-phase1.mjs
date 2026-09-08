@@ -1,0 +1,168 @@
+#!/usr/bin/env node
+/**
+ * Phase 1 Frennix Reels — architecture and copy guards.
+ *
+ * Usage:
+ *   node scripts/verify-reels-phase1.mjs
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, "..");
+
+function pass(name, ok, detail = "") {
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
+  return ok;
+}
+
+function readSource(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
+function main() {
+  console.log("verify-reels-phase1\n");
+  let ok = true;
+
+  const tabs = readSource("app/(tabs)/_layout.tsx");
+  const reels = readSource("app/(tabs)/reels.tsx");
+  const createPost = readSource("app/create-post.tsx");
+  const viewer = readSource("components/ImmersiveVideoViewer.tsx");
+  const playlistViewer = readSource("components/ImmersiveVideoPlaylistViewer.tsx");
+  const overlayShell = readSource("components/ImmersiveVideoOverlayShell.tsx");
+  const playlistState = readSource("lib/immersive-video-playlist-state.ts");
+  const postsApi = readSource("packages/api/src/posts.ts");
+  const migration = readSource("supabase/migrations/20260908140000_post_journey_category.sql");
+  const types = readSource("packages/types/src/journey-category.ts");
+  const postType = readSource("packages/types/src/index.ts");
+
+  ok =
+    pass(
+      "Reels tab is registered in primary navigation",
+      tabs.includes('name="reels"') &&
+        tabs.includes('tabBarLabel: "Reels"') &&
+        tabs.includes("Share Your Journey") &&
+        fs.existsSync(path.join(ROOT, "app/(tabs)/reels.tsx"))
+    ) && ok;
+
+  ok =
+    pass(
+      "Reels reuses the existing immersive playlist viewer",
+      reels.includes("openGallery") &&
+        reels.includes("buildFeedVideoPlaylistFromPosts") &&
+        reels.includes("useBuildImmersiveVideoContext") &&
+        !reels.includes("new Video") &&
+        !reels.includes("document.createElement(\"video\")")
+    ) && ok;
+
+  ok =
+    pass(
+      "Reels fetches video-only pages without using the home feed query",
+      reels.includes('queryKey: ["reels", userId]') &&
+        reels.includes("getVideoFeed") &&
+        !reels.includes('queryKey: ["feed"')
+    ) && ok;
+
+  ok =
+    pass(
+      "Reels empty state describes community fitness journeys",
+      reels.includes("Reels are fitness journeys shared by the Frennix community")
+    ) && ok;
+
+  ok =
+    pass(
+      "Create-post keeps the existing uploader and adds the journey prompt",
+      createPost.includes("Your journey could be the reason someone else keeps going. Tell your story.") &&
+        createPost.includes("JOURNEY_CATEGORIES") &&
+        createPost.includes("intent") &&
+        createPost.includes("shareWorkout")
+    ) && ok;
+
+  ok =
+    pass(
+      "Viewer shows a category label only when one exists",
+      viewer.includes("getJourneyCategoryLabel") &&
+        viewer.includes("journeyCategoryLabel") &&
+        viewer.includes("{journeyCategoryLabel ?")
+    ) && ok;
+
+  ok =
+    pass(
+      "API adds a nullable journey_category without a new Reels table",
+      postsApi.includes("journey_category?: JourneyCategory | null") &&
+        postsApi.includes("getVideoFeed") &&
+        postsApi.includes('{ postType: "video" }') &&
+        migration.includes("ADD COLUMN IF NOT EXISTS journey_category TEXT") &&
+        migration.includes("journey_category IS NULL") &&
+        !migration.toLowerCase().includes("create table") &&
+        !migration.toLowerCase().includes("drop table")
+    ) && ok;
+
+  ok =
+    pass(
+      "Journey category catalog matches Phase 1 labels",
+      types.includes("starting_over") &&
+        types.includes("mental_wellness") &&
+        types.includes("weight_loss") &&
+        types.includes("Starting Over") &&
+        types.includes("Mental Wellness") &&
+        postType.includes("journey_category?: JourneyCategory | null")
+    ) && ok;
+
+  ok =
+    pass(
+      "Reels does not add dating copy or a second player",
+      !reels.toLowerCase().includes("dating") &&
+        !reels.toLowerCase().includes("soulmate") &&
+        !reels.includes("<Heart") &&
+        !createPost.toLowerCase().includes("therapy") &&
+        !createPost.toLowerCase().includes("medical treatment")
+    ) && ok;
+
+  ok =
+    pass(
+      "Reels auto-opens the existing overlay on an intentional tab visit",
+      reels.includes("openedThisVisitRef") &&
+        reels.includes("openReelRef.current(firstReel)") &&
+        reels.includes("openGallery") &&
+        !reels.includes("ImmersiveVideoOverlayShell")
+    ) && ok;
+
+  ok =
+    pass(
+      "Tab bar is icon-only with a 48pt item minimum",
+      tabs.includes("tabBarShowLabel: false") &&
+        tabs.includes("minWidth: 48") &&
+        tabs.includes("minHeight: 44") &&
+        tabs.includes('tabBarAccessibilityLabel: "Feed"') &&
+        tabs.includes('tabBarAccessibilityLabel: "Reels"') &&
+        tabs.includes('tabBarAccessibilityLabel: "Discover"') &&
+        tabs.includes('tabBarAccessibilityLabel: "Calendar"') &&
+        tabs.includes('tabBarAccessibilityLabel: "Post"') &&
+        tabs.includes('tabBarAccessibilityLabel: "Messages"') &&
+        tabs.includes('tabBarAccessibilityLabel: "Profile"')
+    ) && ok;
+
+  ok =
+    pass(
+      "Like toggle keeps origin persistence behavior",
+      postsApi.includes("if (error && !isUniqueConstraintError(error)) throw error;") &&
+        postsApi.includes('import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";')
+    ) && ok;
+
+  ok =
+    pass(
+      "Shared playlist viewer has no Reels-only caughtUpLabel fork",
+      !playlistViewer.includes("caughtUpLabel") &&
+        !overlayShell.includes("caughtUpLabel") &&
+        !playlistState.includes("caughtUpLabel") &&
+        !reels.includes("caughtUpLabel")
+    ) && ok;
+
+  console.log("");
+  console.log(ok ? "All checks passed." : "Some checks failed.");
+  process.exit(ok ? 0 : 1);
+}
+
+main();

@@ -56,7 +56,8 @@
     "verify:feed-video-handoff": "node scripts/verify-feed-video-handoff.mjs",
     "verify:feed-video-player-tdz": "node scripts/verify-feed-video-player-tdz.mjs",
     "verify:video-media-delivery": "node scripts/verify-video-media-delivery.mjs",
-    "verify:feed-media-client-fixes": "node scripts/verify-feed-media-client-fixes.mjs"
+    "verify:feed-media-client-fixes": "node scripts/verify-feed-media-client-fixes.mjs",
+    "verify:reels-phase1": "node scripts/verify-reels-phase1.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",

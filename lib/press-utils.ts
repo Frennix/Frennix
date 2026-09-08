@@ -37,11 +37,20 @@ export function guardDoublePress<T extends (...args: never[]) => void>(
 
 let createPostNavLocked = false;
 
+type OpenCreatePostOptions = {
+  /** Opens the existing create-post flow with Reels journey chrome. */
+  intent?: "reel";
+};
+
 /** Open create-post modal once per tap — never queued behind other navigation. */
-export function openCreatePost() {
+export function openCreatePost(options?: OpenCreatePostOptions) {
   if (createPostNavLocked) return;
   createPostNavLocked = true;
-  router.push("/create-post");
+  if (options?.intent === "reel") {
+    router.push({ pathname: "/create-post", params: { intent: "reel" } });
+  } else {
+    router.push("/create-post");
+  }
   setTimeout(() => {
     createPostNavLocked = false;
   }, 400);

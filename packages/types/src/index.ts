@@ -10,6 +10,7 @@ import type {
   ParentType,
   PreferredWorkoutTime,
 } from "./lifestyle";
+import type { JourneyCategory } from "./journey-category";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 export * from "./dedicated-story";
 export * from "./training-calendar";
@@ -323,6 +324,8 @@ export interface Post {
   story_milestones?: string[];
   /** Workout Story audience when this post appears in stories. */
   story_audience?: StoryAudience;
+  /** Optional Frennix Reels journey category. Null/absent on legacy videos. */
+  journey_category?: JourneyCategory | null;
 }
 
 export interface SavedPost {
@@ -680,3 +683,4 @@ export * from "./workout-story";
 export * from "./matching";
 export * from "./lifestyle";
 export * from "./training-partnership";
+export * from "./journey-category";

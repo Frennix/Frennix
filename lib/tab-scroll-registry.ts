@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-export type TabScrollKey = "feed" | "discover" | "events" | "messages" | "profile";
+export type TabScrollKey = "feed" | "reels" | "discover" | "events" | "messages" | "profile";
 
 type TabScrollController = {
   scrollToTop: () => void;

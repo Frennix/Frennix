@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react-native";
-import type { PostMediaItem } from "@frennix/types";
+import { getJourneyCategoryLabel, type PostMediaItem } from "@frennix/types";
 import {
   Avatar,
   FullscreenVideoSlide,
@@ -77,6 +77,9 @@ export function ImmersiveVideoViewer({
   const displayPost = post.shared_post ?? post;
   const author = post.author;
   const caption = (post.content ?? displayPost.content ?? "").trim();
+  const journeyCategoryLabel = getJourneyCategoryLabel(
+    displayPost.journey_category ?? post.journey_category
+  );
   const liked = Boolean(post.liked_by_me);
   const respectActive = post.my_reaction === STRONG_WORK_EMOJI;
 
@@ -320,6 +323,15 @@ export function ImmersiveVideoViewer({
                 @{author.username}
               </Text>
             ) : null}
+            {journeyCategoryLabel ? (
+              <View
+                style={styles.categoryChip}
+                accessibilityRole="text"
+                accessibilityLabel={`Journey category ${journeyCategoryLabel}`}
+              >
+                <Text style={styles.categoryLabel}>{journeyCategoryLabel}</Text>
+              </View>
+            ) : null}
           </View>
           {postActions.showFollow && postActions.onFollow ? (
             <Pressable
@@ -539,6 +551,23 @@ const styles = StyleSheet.create({
   authorUsername: {
     ...typography.caption,
     color: "rgba(255,255,255,0.82)",
+  },
+  categoryChip: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(34, 197, 94, 0.28)",
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.85)",
+  },
+  categoryLabel: {
+    ...typography.caption,
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 11,
+    lineHeight: 14,
   },
   followButton: {
     paddingHorizontal: spacing.md,

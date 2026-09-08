@@ -13,7 +13,10 @@ import {
 } from "react-native";
 import {
   ACTIVITIES,
+  JOURNEY_CATEGORIES,
+  JOURNEY_CATEGORY_LABELS,
   STORY_PRIVACY_OPTIONS,
+  type JourneyCategory,
   type StoryPrivacy,
   type StoryShareMode,
 } from "@frennix/types";
@@ -116,6 +119,7 @@ async function refreshFeedForDestination(
 
   await queryClient.invalidateQueries({ queryKey: ["feed", userId] });
   await queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] });
+  await queryClient.invalidateQueries({ queryKey: ["reels", userId] });
   await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
   await queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] });
   await queryClient.refetchQueries({ queryKey: ["feed", userId] });
@@ -126,10 +130,16 @@ function navigateAfterPost(postId: string) {
 }
 
 export default function CreatePostScreen() {
-  const params = useLocalSearchParams<{ groupId?: string; challengeId?: string; eventId?: string }>();
+  const params = useLocalSearchParams<{
+    groupId?: string;
+    challengeId?: string;
+    eventId?: string;
+    intent?: string;
+  }>();
   const routeGroupId = paramValue(params.groupId);
   const routeChallengeId = paramValue(params.challengeId);
   const routeEventId = paramValue(params.eventId);
+  const isReelIntent = paramValue(params.intent) === "reel";
 
   const { session } = useAuth();
   const userId = session?.user.id;
@@ -148,6 +158,7 @@ export default function CreatePostScreen() {
   const [calories, setCalories] = useState("");
   const [gym, setGym] = useState("");
   const [locationName, setLocationName] = useState("");
+  const [journeyCategory, setJourneyCategory] = useState<JourneyCategory | null>(null);
 
   const {
     hydrated,
@@ -178,6 +189,7 @@ export default function CreatePostScreen() {
   const contextId = groupId ?? challengeId ?? eventId;
   const isContextPost = destination !== "home";
   const hasVideo = selectedMedia.some((item) => isVideoMime(item.mimeType));
+  const showJourneyChrome = isReelIntent || hasVideo;
   const hasPhotos = selectedMedia.some((item) => !isVideoMime(item.mimeType));
   const isSubmitting = loading;
   const isSuccess = uploadStage === "success";
@@ -367,6 +379,7 @@ export default function CreatePostScreen() {
             durationSeconds: item.durationSeconds,
           })),
           storyPrivacy,
+          journeyCategory: hasVideo ? journeyCategory : null,
         },
         queryClient
       );
@@ -455,6 +468,7 @@ export default function CreatePostScreen() {
           groupId: groupId ?? null,
           challengeId: challengeId ?? null,
           eventId: eventId ?? null,
+          journeyCategory: hasVideo ? journeyCategory : null,
         },
         queryClient
       );
@@ -489,9 +503,12 @@ export default function CreatePostScreen() {
 
   const progressLabel = uploadStageLabel(uploadStage, isContextPost, hasVideo);
   const showSubmittingUi = isSubmitting || uploadStage === "uploading_media" || uploadStage === "creating_post";
-  const screenOptions = stackBackOptions(isContextPost ? "Share post" : "Share workout", {
-    presentation: "modal",
-  });
+  const screenOptions = stackBackOptions(
+    isReelIntent ? "Share Your Journey" : isContextPost ? "Share post" : "Share workout",
+    {
+      presentation: "modal",
+    }
+  );
 
   if (!hydrated) {
     return (
@@ -512,6 +529,44 @@ export default function CreatePostScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
       >
+        {showJourneyChrome ? (
+          <View style={styles.journeyPrompt}>
+            <Text style={styles.journeyPromptTitle}>Share your journey</Text>
+            <Text style={styles.journeyPromptText}>
+              Your journey could be the reason someone else keeps going. Tell your story.
+            </Text>
+          </View>
+        ) : null}
+
+        {showJourneyChrome ? (
+          <>
+            <Text style={styles.sectionLabel}>Journey category</Text>
+            <Text style={styles.sectionHint}>Optional — helps others find journeys like yours</Text>
+            <View style={styles.chips}>
+              {JOURNEY_CATEGORIES.map((category) => {
+                const selected = journeyCategory === category;
+                return (
+                  <Pressable
+                    key={category}
+                    style={[styles.chip, selected && styles.chipActive]}
+                    onPress={() =>
+                      setJourneyCategory((current) => (current === category ? null : category))
+                    }
+                    disabled={isFormLocked}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={JOURNEY_CATEGORY_LABELS[category]}
+                  >
+                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                      {JOURNEY_CATEGORY_LABELS[category]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+
         <Text style={styles.sectionLabel}>Workout types</Text>
         <View style={styles.chips}>
           {ACTIVITIES.map((activity) => (
@@ -757,6 +812,24 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     marginBottom: spacing.xs,
+  },
+  journeyPrompt: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  journeyPromptTitle: {
+    ...typography.body,
+    color: colors.accent,
+    fontWeight: "700",
+  },
+  journeyPromptText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    lineHeight: 20,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   metricsRow: { flexDirection: "row", gap: spacing.sm },

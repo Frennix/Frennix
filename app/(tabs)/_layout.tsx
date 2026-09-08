@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { memo, useCallback, useEffect } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTabBadges } from "@/providers/TabBadgeProvider";
 import { CreateTabBarButton } from "@/components/CreateTabBarButton";
@@ -18,7 +18,7 @@ import { LocationDiscoveryPrompt } from "@/components/LocationDiscoveryPrompt";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
 import { openCreatePost, pushScreen } from "@/lib/press-utils";
-import { colors } from "@frennix/ui";
+import { colors, typography } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
 import { useLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
@@ -81,6 +81,22 @@ const TabsShell = memo(function TabsShell() {
     () => (isolateNotificationBadge ? null : <HeaderBell />),
     [isolateNotificationBadge]
   );
+  const renderShareJourney = useCallback(
+    () => (
+      <Pressable
+        onPress={() => openCreatePost({ intent: "reel" })}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Share Your Journey"
+        style={styles.shareJourneyButton}
+      >
+        <Text style={styles.shareJourneyLabel} numberOfLines={1}>
+          Share Your Journey
+        </Text>
+      </Pressable>
+    ),
+    []
+  );
   const renderProfileHeader = useCallback(
     () => (
       <View style={styles.profileHeaderWrap}>
@@ -121,9 +137,10 @@ const TabsShell = memo(function TabsShell() {
         headerTintColor: colors.text,
         headerShadowVisible: false,
         tabBarStyle,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarItemStyle: { minWidth: 56 },
+        tabBarItemStyle: { minWidth: 48, minHeight: 44 },
         sceneContainerStyle: {
           ...flexFill,
           ...webTabSceneShell,
@@ -144,15 +161,30 @@ const TabsShell = memo(function TabsShell() {
             ...(Platform.OS === "web" ? { minHeight: 92 } : null),
           },
           tabBarLabel: "Feed",
+          tabBarAccessibilityLabel: "Feed",
           tabBarIcon: ({ color, size }) => <AppIcon name="feed" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => <FastTabBarButton {...props} href="/(tabs)" tabKey="feed" />,
         }}
       />
       <Tabs.Screen
+        name="reels"
+        options={{
+          title: "Reels",
+          tabBarLabel: "Reels",
+          tabBarAccessibilityLabel: "Reels",
+          tabBarIcon: ({ color, size }) => <AppIcon name="reels" color={color} size={size} />,
+          headerRight: renderShareJourney,
+          tabBarButton: (props) => (
+            <FastTabBarButton {...props} href="/(tabs)/reels" tabKey="reels" />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="discover"
         options={{
           title: "Discover",
+          tabBarAccessibilityLabel: "Discover",
           tabBarIcon: ({ color, size }) => <AppIcon name="discover" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => (
@@ -166,6 +198,7 @@ const TabsShell = memo(function TabsShell() {
           title: "Calendar",
           headerTitle: renderTabHeaderLogo,
           tabBarLabel: "Calendar",
+          tabBarAccessibilityLabel: "Calendar",
           tabBarIcon: ({ color, size }) => <AppIcon name="events" color={color} size={size} />,
           headerRight: renderHeaderBell,
           tabBarButton: (props) => (
@@ -178,6 +211,7 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Post",
           tabBarLabel: "Post",
+          tabBarAccessibilityLabel: "Post",
           tabBarIcon: ({ color, size }) => <AppIcon name="post" color={color} size={size} />,
           tabBarButton: (props) =>
             isolateFab ? null : <CreateTabBarButton {...props} />,
@@ -193,6 +227,7 @@ const TabsShell = memo(function TabsShell() {
         name="messages"
         options={{
           title: "Messages",
+          tabBarAccessibilityLabel: "Messages",
           tabBarIcon: ({ color, size }) => <AppIcon name="messages" color={color} size={size} />,
           tabBarBadge: messagesBadge,
           headerRight: renderHeaderBell,
@@ -206,6 +241,7 @@ const TabsShell = memo(function TabsShell() {
         options={{
           title: "Profile",
           headerTitle: renderTabHeaderLogo,
+          tabBarAccessibilityLabel: "Profile",
           tabBarIcon: ({ color, size }) => <AppIcon name="profile" color={color} size={size} />,
           headerRight: renderProfileHeader,
           tabBarButton: (props) => (
@@ -245,6 +281,18 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   headerRight: { marginRight: 16 },
+  shareJourneyButton: {
+    marginRight: 12,
+    maxWidth: 168,
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  shareJourneyLabel: {
+    ...typography.caption,
+    color: colors.accent,
+    fontWeight: "700",
+    fontSize: 13,
+  },
   profileHeaderWrap: { marginRight: 16 },
   profileHeader: {
     flexDirection: "row",
