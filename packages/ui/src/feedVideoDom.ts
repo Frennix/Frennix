@@ -82,6 +82,9 @@ export function adoptFeedVideoDomForFullscreen(
   video.classList.remove(...INLINE_CLASS.split(/\s+/));
   video.classList.add(FULLSCREEN_CLASS);
   configureFeedWebVideoElement(video);
+  video.style.position = "absolute";
+  video.style.top = "0";
+  video.style.left = "0";
   video.style.width = `${presentation.width}px`;
   video.style.height = `${presentation.height}px`;
   video.style.objectFit = presentation.objectFit;
@@ -106,6 +109,9 @@ export function returnFeedVideoDomFromFullscreen(playbackId: string): HTMLVideoE
   video.classList.remove(FULLSCREEN_CLASS);
   video.classList.add(...INLINE_CLASS.split(/\s+/));
   configureFeedWebVideoElement(video);
+  video.style.position = "";
+  video.style.top = "";
+  video.style.left = "";
   video.style.width = "100%";
   video.style.height = "100%";
   video.style.objectFit = "cover";

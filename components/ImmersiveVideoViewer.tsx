@@ -211,12 +211,20 @@ export function ImmersiveVideoViewer({
       <View
         style={[
           styles.topBar,
-          { paddingTop: topInset },
+          {
+            paddingTop:
+              Platform.OS === "web"
+                ? ("max(env(safe-area-inset-top, 0px), 12px)" as unknown as number)
+                : topInset,
+          },
           commentsOverlayOpen && videoStageTop != null
             ? [styles.topBarPinned, { top: videoStageTop }]
             : null,
         ]}
         pointerEvents="box-none"
+        {...(Platform.OS === "web"
+          ? ({ "data-frennix-immersive-top-bar": "true" } as object)
+          : null)}
       >
         <Pressable
           onPress={onClose}
@@ -405,9 +413,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   videoStageHost: {
-    alignSelf: "center",
-    justifyContent: "center",
-    alignItems: "center",
+    alignSelf: "stretch",
+    justifyContent: "flex-start",
+    alignItems: "stretch",
     backgroundColor: colors.black,
     overflow: "hidden",
   },

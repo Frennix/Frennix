@@ -166,6 +166,30 @@ function main() {
         slide.includes("objectFit: mediaFit") &&
         lightbox.includes('objectFit: "contain"')
     ) && ok;
+  ok =
+    pass(
+      "Immersive stage uses layout viewport, not visualViewport height",
+      lightbox.includes("useImmersiveVideo && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight") &&
+        !lightbox.includes("freezeImmersiveLayout && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight")
+    ) && ok;
+  ok =
+    pass(
+      "Fullscreen mount and video overlay the stage instead of stacking",
+      slide.includes("mediaFillStyle") &&
+        slide.includes('position: "absolute"') &&
+        slide.includes("fullscreen-video-mount") &&
+        styles.includes("[data-frennix-immersive-video-viewer=\"true\"] .fullscreen-video-mount") &&
+        styles.includes("position: absolute !important")
+    ) && ok;
+  ok =
+    pass(
+      "Close/mute overlay uses env(safe-area-inset-top) without a header row",
+      viewer.includes("data-frennix-immersive-top-bar") &&
+        viewer.includes("max(env(safe-area-inset-top, 0px), 12px)") &&
+        viewer.includes('position: "absolute"') &&
+        styles.includes("[data-frennix-immersive-top-bar=\"true\"]") &&
+        styles.includes("padding-top: max(env(safe-area-inset-top, 0px), 12px)")
+    ) && ok;
 
   const gallery = readSource("lib/useMediaGallery.tsx");
   const playlist = readSource("components/ImmersiveVideoPlaylistViewer.tsx");

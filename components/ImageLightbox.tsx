@@ -502,7 +502,7 @@ function LightboxSurface({
     useImmersiveVideoPlaylist && (commentsOverlayOpen || commentsInitiallyOpen);
   const freezeLayoutViewportHeight = useImmersiveVideo && visible;
   const immersiveStageHeight =
-    freezeImmersiveLayout && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight;
+    useImmersiveVideo && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight;
   const playlistCloseContextRef = useRef<GalleryCloseContext>({});
 
   const syncViewportSize = useCallback(() => {

@@ -583,6 +583,14 @@ export const FullscreenVideoSlide = forwardRef<
     stageWidth,
   ]);
 
+  const mediaFillStyle = {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    width: stageWidth,
+    height: stageHeight,
+  };
+
   const SpeakerIcon = muted ? VolumeX : Volume2;
   const chromeControlsVisible = controlsVisible || controlsPinned;
   const progressMax = duration > 0 ? duration : 1;
@@ -647,9 +655,7 @@ export const FullscreenVideoSlide = forwardRef<
             },
             className: "fullscreen-video-mount",
             style: {
-              width: stageWidth,
-              height: stageHeight,
-              position: "relative",
+              ...mediaFillStyle,
               overflow: "hidden",
               backgroundColor: colors.background,
             },
@@ -675,8 +681,7 @@ export const FullscreenVideoSlide = forwardRef<
                 preload: isActive ? "auto" : "metadata",
                 poster: posterState.posterUri ?? thumbnailUrl ?? undefined,
                 style: {
-                  width: stageWidth,
-                  height: stageHeight,
+                  ...mediaFillStyle,
                   objectFit: mediaFit,
                   objectPosition: "center",
                   backgroundColor: colors.background,
@@ -801,7 +806,7 @@ export const FullscreenVideoSlide = forwardRef<
                 }}
                 source={{ uri }}
                 style={{ width: stageWidth, height: stageHeight }}
-                resizeMode={ResizeMode.CONTAIN}
+                resizeMode={mediaFit === "cover" ? ResizeMode.COVER : ResizeMode.CONTAIN}
                 shouldPlay={isActive}
                 isMuted={muted}
                 useNativeControls
@@ -872,8 +877,9 @@ export const FullscreenVideoSlide = forwardRef<
 
 const styles = StyleSheet.create({
   stage: {
-    justifyContent: "center",
-    alignItems: "center",
+    position: "relative",
+    justifyContent: "flex-start",
+    alignItems: "stretch",
     overflow: "hidden",
     backgroundColor: colors.background,
   },
