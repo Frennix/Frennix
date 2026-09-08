@@ -40,6 +40,7 @@ import AnimatedReanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { setLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
+import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 
 /** @deprecated Use MediaGalleryState with typed items. */
@@ -465,6 +466,10 @@ function LightboxSurface({
   const [zoomed, setZoomed] = useState(false);
   const [pageWidth, setPageWidth] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
+  const [layoutViewportHeight, setLayoutViewportHeight] = useState(() =>
+    Platform.OS === "web" && typeof window !== "undefined" ? Math.round(window.innerHeight) : 0
+  );
+  const commentsOverlayOpen = useCommentsOverlayOpen();
   const listRef = useRef<FlatList<PostMediaItem>>(null);
   const dismissY = useRef(new Animated.Value(0)).current;
   const webSwipeStartY = useRef<number | null>(null);
@@ -489,6 +494,10 @@ function LightboxSurface({
     Boolean(immersiveVideo?.postActions);
   const useImmersiveVideoPlaylist =
     useImmersiveVideo && Boolean(immersiveVideoPlaylist?.entries.length);
+  const freezeImmersiveLayout =
+    useImmersiveVideoPlaylist && (commentsOverlayOpen || commentsInitiallyOpen);
+  const immersiveStageHeight =
+    freezeImmersiveLayout && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight;
   const playlistCloseContextRef = useRef<GalleryCloseContext>({});
 
   const syncViewportSize = useCallback(() => {
@@ -496,6 +505,7 @@ function LightboxSurface({
       const viewport = window.visualViewport;
       setPageWidth(Math.round(viewport?.width ?? window.innerWidth));
       setPageHeight(Math.round(viewport?.height ?? window.innerHeight));
+      setLayoutViewportHeight(Math.round(window.innerHeight));
       return;
     }
   }, []);
@@ -694,8 +704,19 @@ function LightboxSurface({
 
   return (
     <View
-      style={[styles.root, LIGHTBOX_WEB_ROOT]}
-      {...(Platform.OS === "web" ? ({ "data-frennix-lightbox": "true" } as object) : null)}
+      style={[
+        styles.root,
+        LIGHTBOX_WEB_ROOT,
+        freezeImmersiveLayout ? ({ overflow: "visible" } as ViewStyle) : null,
+      ]}
+      {...(Platform.OS === "web"
+        ? ({
+            "data-frennix-lightbox": "true",
+            ...(freezeImmersiveLayout
+              ? ({ "data-frennix-immersive-comments-open": "true" } as object)
+              : null),
+          } as object)
+        : null)}
       onLayout={(event) => {
         if (Platform.OS === "web") {
           syncViewportSize();
@@ -711,8 +732,15 @@ function LightboxSurface({
       onTouchEnd={Platform.OS === "web" ? handleWebTouchEnd : undefined}
     >
       <Animated.View
-        style={[styles.stageShell, { transform: [{ translateY: dismissY }] }]}
+        style={[
+          styles.stageShell,
+          freezeImmersiveLayout ? ({ overflow: "visible" } as ViewStyle) : null,
+          freezeImmersiveLayout ? null : { transform: [{ translateY: dismissY }] },
+        ]}
         pointerEvents="box-none"
+        {...(Platform.OS === "web" && freezeImmersiveLayout
+          ? ({ "data-frennix-lightbox-stage-shell": "true" } as object)
+          : null)}
       >
         {pageWidth > 0 && pageHeight > 0 ? (
           useImmersiveVideoPlaylist && immersiveVideoPlaylist && immersiveVideoUserId ? (
@@ -721,7 +749,7 @@ function LightboxSurface({
               userId={immersiveVideoUserId}
               authorProfile={immersiveVideoAuthorProfile}
               stageWidth={pageWidth}
-              stageHeight={pageHeight}
+              stageHeight={immersiveStageHeight}
               onClose={dismiss}
               onActiveEntryChange={handlePlaylistActiveEntryChange}
               commentsInitiallyOpen={commentsInitiallyOpen}

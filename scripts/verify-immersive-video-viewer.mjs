@@ -36,7 +36,7 @@ function main() {
     '[data-frennix-immersive-video-viewer="true"] .fullscreen-video-slide'
   );
   const commentsOpenSlideCssStart = styles.indexOf(
-    '[data-frennix-immersive-comments-open="true"] .fullscreen-video-slide'
+    '[data-frennix-immersive-video-viewer="true"][data-frennix-immersive-comments-open="true"] .fullscreen-video-slide'
   );
   const immersiveSlideCss = styles.slice(
     immersiveSlideCssStart,
@@ -46,7 +46,7 @@ function main() {
   );
   const commentsOpenSlideCss = styles.slice(
     commentsOpenSlideCssStart,
-    commentsOpenSlideCssStart >= 0 ? commentsOpenSlideCssStart + 220 : 0
+    commentsOpenSlideCssStart >= 0 ? commentsOpenSlideCssStart + 420 : 0
   );
 
   ok =
@@ -142,21 +142,30 @@ function main() {
         immersiveSlideCss.includes("object-fit: cover") &&
         immersiveSlideCss.includes("object-position: center") &&
         !immersiveSlideCss.includes("object-fit: contain") &&
-        slide.includes('objectFit: immersiveMode ? "cover" : "contain"') &&
-        slide.includes('objectPosition: "center"') &&
-        slide.includes('contentFit={immersiveMode ? "cover" : "contain"}')
+        slide.includes('contentFit ?? (immersiveMode ? "cover" : "contain")') &&
+        slide.includes("objectFit: mediaFit") &&
+        slide.includes("contentFit={mediaFit}") &&
+        viewer.includes('contentFit={mediaFit}') &&
+        viewer.includes('const mediaFit = commentsOverlayOpen ? "contain" : "cover"')
     ) && ok;
   ok =
     pass(
-      "Comments-open and non-immersive video remain contain",
+      "Comments-open JS and CSS use contain; closed immersive uses cover",
       commentsOpenSlideCssStart >= 0 &&
         commentsOpenSlideCss.includes("object-fit: contain") &&
+        commentsOpenSlideCss.includes("width: 100%") &&
+        commentsOpenSlideCss.includes("height: 100%") &&
+        !commentsOpenSlideCss.includes("width: auto") &&
+        !commentsOpenSlideCss.includes("height: auto") &&
         !commentsOpenSlideCss.includes("object-fit: cover") &&
-        slide.includes('objectFit: immersiveMode ? "cover" : "contain"') &&
+        commentsOpenSlideCss.includes("video.feed-inline-video") &&
+        viewer.includes('commentsOverlayOpen ? "contain" : "cover"') &&
+        slide.includes("objectFit: mediaFit") &&
         lightbox.includes('objectFit: "contain"')
     ) && ok;
 
   const gallery = readSource("lib/useMediaGallery.tsx");
+  const playlist = readSource("components/ImmersiveVideoPlaylistViewer.tsx");
   const overlayZ = readSource("lib/overlay-z-index.ts");
   const viewport = readSource("lib/video-overlay-visual-viewport-layout.ts");
   const commentsSheetZ = Number(overlayZ.match(/commentsSheet:\s*(\d+)/)?.[1]);
@@ -233,6 +242,86 @@ function main() {
     pass(
       "Safari 90px is not subtracted when visualViewport already shrank",
       verifySafariClearanceContract()
+    ) && ok;
+  ok =
+    pass(
+      "Adopted and rendered video stay 100% of the stage",
+      slide.includes("objectFit: mediaFit") &&
+        slide.includes("width: stageWidth") &&
+        slide.includes("height: stageHeight") &&
+        !slide.includes('width: "auto"') &&
+        !slide.includes('height: "auto"') &&
+        !styles.includes("width: auto !important") &&
+        !styles.includes("height: auto !important")
+    ) && ok;
+  ok =
+    pass(
+      "Poster fit follows the same comments-open mode",
+      slide.includes("contentFit={mediaFit}") &&
+        (slide.split("contentFit={mediaFit}").length - 1) >= 2
+    ) && ok;
+  ok =
+    pass(
+      "Comments-open immersive stage is not collapsed by visualViewport pageHeight",
+      lightbox.includes("layoutViewportHeight") &&
+        lightbox.includes("freezeImmersiveLayout") &&
+        lightbox.includes("immersiveStageHeight") &&
+        lightbox.includes("window.innerHeight") &&
+        viewer.includes("window.innerHeight") &&
+        viewer.includes("computeBaselineVideoPeekHeight(layoutFallbackHeight)")
+    ) && ok;
+  ok =
+    pass(
+      "Comments-open removes translateY containing-block clipping",
+      lightbox.includes("freezeImmersiveLayout ? null : { transform: [{ translateY: dismissY }] }") &&
+        lightbox.includes("data-frennix-lightbox-stage-shell") &&
+        styles.includes('[data-frennix-lightbox-stage-shell="true"]') &&
+        !lightbox.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX")
+    ) && ok;
+  const stageHostCssStart = styles.indexOf('[data-frennix-video-stage-host="true"]');
+  const stageHostCss =
+    stageHostCssStart >= 0
+      ? styles.slice(stageHostCssStart, styles.indexOf("}", stageHostCssStart) + 1)
+      : "";
+  const commentsOverlayCssStart = styles.indexOf('[data-frennix-comments-video-overlay="true"] {');
+  const commentsOverlayCss =
+    commentsOverlayCssStart >= 0
+      ? styles.slice(commentsOverlayCssStart, styles.indexOf("}", commentsOverlayCssStart) + 1)
+      : "";
+  ok =
+    pass(
+      "No comments-open wildcard overflow selector",
+      !styles.includes('[data-frennix-lightbox="true"][data-frennix-immersive-comments-open="true"] *') &&
+        !styles.includes('[data-frennix-video-stage-host="true"] *') &&
+        !/\[[^\]]+comments-open[^\]]*\]\s+\*\s*\{/.test(styles)
+    ) && ok;
+  ok =
+    pass(
+      "Video-stage hosts remain overflow:hidden",
+      viewer.includes("videoStageHost") &&
+        viewer.includes('overflow: "hidden"') &&
+        stageHostCss.includes("overflow: hidden !important") &&
+        !stageHostCss.includes("*")
+    ) && ok;
+  ok =
+    pass(
+      "Comments list containers are not forced to overflow:visible",
+      !/data-frennix-comments-sheet[^{]*\{[^}]*overflow:\s*visible/.test(styles) &&
+        !commentsOverlayCss.includes("overflow: visible") &&
+        sheet.includes('overflowY: "auto"') &&
+        sheet.includes("minHeight: 0")
+    ) && ok;
+  ok =
+    pass(
+      "Adjacent playlist slides remain clipped",
+      playlist.includes('overflow: "hidden"') &&
+        playlist.includes('overflowY: "scroll"') &&
+        !playlist.includes('overflowY: commentsOverlayOpen ? "visible"') &&
+        !playlist.includes("slideShellCommentsOpen") &&
+        !playlist.includes("rootCommentsOpen") &&
+        !styles.includes(
+          '[data-frennix-immersive-video-playlist="true"][data-frennix-immersive-comments-open="true"]'
+        )
     ) && ok;
 
   console.log("");

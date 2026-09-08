@@ -66,6 +66,8 @@ interface FullscreenVideoSlideProps {
   playbackHandoff?: FeedVideoFullscreenHandoff;
   /** Immersive social viewer — hide transport/scrubber chrome; parent renders controls. */
   immersiveMode?: boolean;
+  /** Cover fills the stage; contain letterboxes the full frame. Defaults to cover in immersive mode. */
+  contentFit?: "cover" | "contain";
   /** Dedicated /video route — playback is independent from feed autoplay coordinator. */
   routePlayback?: boolean;
 }
@@ -109,10 +111,12 @@ export const FullscreenVideoSlide = forwardRef<
     isActive,
     playbackHandoff,
     immersiveMode = false,
+    contentFit,
     routePlayback = false,
   },
   ref
 ) {
+  const mediaFit = contentFit ?? (immersiveMode ? "cover" : "contain");
   const posterState = useVideoPoster(uri, thumbnailUrl);
   const [muted, setMuted] = useState(
     () => playbackHandoff?.muted ?? (immersiveMode ? !isFeedVideoSoundEnabled() : false)
@@ -495,7 +499,7 @@ export const FullscreenVideoSlide = forwardRef<
     const adopted = adoptFeedVideoDomForFullscreen(playbackHandoff.playbackId, mount, {
       width: stageWidth,
       height: stageHeight,
-      objectFit: immersiveMode ? "cover" : "contain",
+      objectFit: mediaFit,
       immersiveMode,
     });
 
@@ -570,6 +574,7 @@ export const FullscreenVideoSlide = forwardRef<
     handleWebPause,
     handleWebPlay,
     immersiveMode,
+    mediaFit,
     isActive,
     playbackHandoff,
     routePlayback,
@@ -672,7 +677,7 @@ export const FullscreenVideoSlide = forwardRef<
                 style: {
                   width: stageWidth,
                   height: stageHeight,
-                  objectFit: immersiveMode ? "cover" : "contain",
+                  objectFit: mediaFit,
                   objectPosition: "center",
                   backgroundColor: colors.background,
                   ...(Platform.OS === "web" && immersiveMode
@@ -825,7 +830,7 @@ export const FullscreenVideoSlide = forwardRef<
             uri={posterUri!}
             placeholderUri={thumbnailUrl}
             style={{ width: stageWidth, height: stageHeight }}
-            contentFit={immersiveMode ? "cover" : "contain"}
+            contentFit={mediaFit}
             accessibilityLabel="Video poster"
           />
           {buffering ? (
@@ -848,7 +853,7 @@ export const FullscreenVideoSlide = forwardRef<
             uri={posterState.posterUri}
             placeholderUri={thumbnailUrl}
             style={{ width: stageWidth, height: stageHeight }}
-            contentFit={immersiveMode ? "cover" : "contain"}
+            contentFit={mediaFit}
             accessibilityLabel="Video poster"
           />
         </View>

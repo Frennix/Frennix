@@ -151,11 +151,14 @@ export function ImmersiveVideoViewer({
 
   const captionNeedsExpand = caption.length > 96;
   const videoPeekLayout = useCommentsVideoPeekLayout();
-  const fallbackPeekHeight = computeBaselineVideoPeekHeight(stageHeight);
+  const layoutFallbackHeight =
+    Platform.OS === "web" && typeof window !== "undefined" ? window.innerHeight : stageHeight;
+  const fallbackPeekHeight = computeBaselineVideoPeekHeight(layoutFallbackHeight);
   const videoStageHeight = commentsOverlayOpen
     ? videoPeekLayout?.height ?? fallbackPeekHeight
     : stageHeight;
   const videoStageTop = commentsOverlayOpen ? videoPeekLayout?.offsetTop ?? 0 : undefined;
+  const mediaFit = commentsOverlayOpen ? "contain" : "cover";
 
   return (
     <View
@@ -198,6 +201,7 @@ export function ImmersiveVideoViewer({
           isActive={isActive}
           playbackHandoff={playbackHandoff}
           immersiveMode
+          contentFit={mediaFit}
           routePlayback={routePlayback}
         />
       </View>

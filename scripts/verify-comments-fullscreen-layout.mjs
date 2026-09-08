@@ -102,6 +102,75 @@ function main() {
       "16px comment input preserved",
       readSource("components/PostCommentsContent.tsx").includes('Platform.OS === "web" ? 16 : 15')
     ) && ok;
+  const lightbox = readSource("components/ImageLightbox.tsx");
+  const viewer = readSource("components/ImmersiveVideoViewer.tsx");
+  const playlist = readSource("components/ImmersiveVideoPlaylistViewer.tsx");
+  const slide = readSource("packages/ui/src/FullscreenVideoSlide.tsx");
+  const viewportLayout = readSource("lib/video-overlay-visual-viewport-layout.ts");
+  ok =
+    pass(
+      "iOS focus safeguards remain (no capture / preventDefault / delayed focus)",
+      sheet.includes('touchAction: "manipulation"') &&
+        !sheet.includes("addEventListener") &&
+        !sheet.includes("stopPointerEventPropagation") &&
+        !sheet.includes("preventDefault") &&
+        !sheet.includes("setTimeout")
+    ) && ok;
+  ok =
+    pass(
+      "No VIDEO_PEEK_KEYBOARD_OPEN_PX constant returns",
+      !sheet.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
+        !viewportLayout.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
+        !viewer.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
+        !styles.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX")
+    ) && ok;
+  ok =
+    pass(
+      "Comments-open video uses contain at 100% of the peek stage",
+      viewer.includes('commentsOverlayOpen ? "contain" : "cover"') &&
+        slide.includes("objectFit: mediaFit") &&
+        slide.includes("contentFit={mediaFit}") &&
+        styles.includes("object-fit: contain !important") &&
+        styles.includes("width: 100% !important") &&
+        styles.includes("height: 100% !important") &&
+        !styles.includes("width: auto !important")
+    ) && ok;
+  ok =
+    pass(
+      "Comments-open stage uses layout viewport without wildcard overflow",
+      lightbox.includes("freezeImmersiveLayout") &&
+        lightbox.includes("immersiveStageHeight") &&
+        lightbox.includes("layoutViewportHeight") &&
+        lightbox.includes("freezeImmersiveLayout ? null : { transform: [{ translateY: dismissY }] }") &&
+        lightbox.includes("data-frennix-lightbox-stage-shell") &&
+        styles.includes('[data-frennix-lightbox="true"][data-frennix-immersive-comments-open="true"]') &&
+        styles.includes('[data-frennix-lightbox-stage-shell="true"]') &&
+        !styles.includes('[data-frennix-lightbox="true"][data-frennix-immersive-comments-open="true"] *') &&
+        !/\[[^\]]+comments-open[^\]]*\]\s+\*\s*\{/.test(styles)
+    ) && ok;
+  ok =
+    pass(
+      "Video-stage hosts stay clipped; playlist slides stay clipped",
+      viewer.includes('overflow: "hidden"') &&
+        styles.includes('[data-frennix-video-stage-host="true"]') &&
+        playlist.includes('overflow: "hidden"') &&
+        playlist.includes('overflowY: "scroll"') &&
+        !playlist.includes('overflowY: commentsOverlayOpen ? "visible"')
+    ) && ok;
+  ok =
+    pass(
+      "Comments list scroll is not forced to overflow:visible",
+      sheet.includes('overflowY: "auto"') &&
+        !/data-frennix-comments-sheet[^{]*\{[^}]*overflow:\s*visible/.test(styles) &&
+        !/data-frennix-comments-video-overlay[^{]*\{[^}]*overflow:\s*visible/.test(styles)
+    ) && ok;
+  ok =
+    pass(
+      "Peek helper still shrinks the comments list before the video",
+      viewportLayout.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+        viewportLayout.includes("maxPeekKeepingList") &&
+        sheet.includes("resolveVideoOverlayPeekAndSheetHeight")
+    ) && ok;
 
   console.log("");
   console.log(ok ? "All checks passed." : "Some checks failed.");
