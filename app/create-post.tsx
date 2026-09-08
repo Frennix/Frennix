@@ -189,7 +189,7 @@ export default function CreatePostScreen() {
   const contextId = groupId ?? challengeId ?? eventId;
   const isContextPost = destination !== "home";
   const hasVideo = selectedMedia.some((item) => isVideoMime(item.mimeType));
-  const showJourneyChrome = isReelIntent || hasVideo;
+  const showJourneyChrome = isReelIntent;
   const hasPhotos = selectedMedia.some((item) => !isVideoMime(item.mimeType));
   const isSubmitting = loading;
   const isSuccess = uploadStage === "success";
@@ -379,7 +379,8 @@ export default function CreatePostScreen() {
             durationSeconds: item.durationSeconds,
           })),
           storyPrivacy,
-          journeyCategory: hasVideo ? journeyCategory : null,
+          journeyCategory: isReelIntent && hasVideo ? journeyCategory : null,
+          isReel: isReelIntent && hasVideo,
         },
         queryClient
       );
@@ -468,7 +469,8 @@ export default function CreatePostScreen() {
           groupId: groupId ?? null,
           challengeId: challengeId ?? null,
           eventId: eventId ?? null,
-          journeyCategory: hasVideo ? journeyCategory : null,
+          journeyCategory: isReelIntent && hasVideo ? journeyCategory : null,
+          isReel: isReelIntent && hasVideo,
         },
         queryClient
       );

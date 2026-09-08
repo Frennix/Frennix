@@ -326,6 +326,8 @@ export interface Post {
   story_audience?: StoryAudience;
   /** Optional Frennix Reels journey category. Null/absent on legacy videos. */
   journey_category?: JourneyCategory | null;
+  /** True only for videos created through Share Your Journey. Defaults false. */
+  is_reel?: boolean;
 }
 
 export interface SavedPost {

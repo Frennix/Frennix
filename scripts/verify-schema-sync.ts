@@ -101,6 +101,30 @@ const checks: Array<{ name: string; run: () => void }> = [
       );
     },
   },
+  {
+    name: "migration:is_reel is additive and does not backfill",
+    run: () => {
+      mustInclude(
+        "supabase/migrations/20260908200000_post_is_reel.sql",
+        "ADD COLUMN IF NOT EXISTS is_reel BOOLEAN NOT NULL DEFAULT FALSE",
+        "is_reel migration"
+      );
+      mustExclude(
+        "supabase/migrations/20260908200000_post_is_reel.sql",
+        "UPDATE",
+        "is_reel migration"
+      );
+      mustExclude(
+        "supabase/migrations/20260908200000_post_is_reel.sql",
+        "DELETE",
+        "is_reel migration"
+      );
+      const journey = read("supabase/migrations/20260908140000_post_journey_category.sql");
+      if (journey.includes("is_reel")) {
+        throw new Error("journey_category migration must stay unchanged");
+      }
+    },
+  },
 ];
 
 let failed = 0;

@@ -44,6 +44,8 @@ export type WorkoutShareInput = {
   challengeId?: string | null;
   eventId?: string | null;
   journeyCategory?: JourneyCategory | null;
+  /** True only for Share Your Journey videos. Defaults false. */
+  isReel?: boolean;
 };
 
 function buildWorkoutSlideData(
@@ -170,6 +172,7 @@ export async function shareWorkout(
         challenge_id: input.challengeId ?? null,
         event_id: input.eventId ?? null,
         journey_category: postType === "video" ? input.journeyCategory ?? null : null,
+        is_reel: postType === "video" && input.isReel === true,
       }),
       POST_CREATE_TIMEOUT_MS,
       "Creating post"

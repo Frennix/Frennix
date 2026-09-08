@@ -262,8 +262,13 @@ export async function enrichPostsWithInteractions(
 export type FeedCorePhase = "scope" | "posts";
 
 export type FeedCoreOptions = {
-  /** When set, only return posts of this type (used by Frennix Reels). */
+  /** When set, only return posts of this type. */
   postType?: PostType;
+  /**
+   * True: dedicated Reels destination (`is_reel=true`).
+   * False/omitted: normal Feed — Reels are excluded.
+   */
+  isReel?: boolean;
 };
 
 /** Fast path: feed scope + post rows with author profiles — no likes/comments/reactions yet. */
@@ -297,6 +302,9 @@ export async function getFeedCore(
   if (options?.postType) {
     q = q.eq("post_type", options.postType);
   }
+
+  // Never infer Reels from post_type alone. The flag is explicit.
+  q = q.eq("is_reel", options?.isReel === true);
 
   if (cursor) {
     q = q.lt("created_at", cursor);
@@ -342,13 +350,19 @@ export async function getFeed(
   return { posts, nextCursor: core.nextCursor };
 }
 
-/** Video-only feed for Frennix Reels — same visibility scope as the home feed. */
-export async function getVideoFeed(
+/**
+ * Dedicated Reels destination: video posts created through Share Your Journey.
+ * Requires both post_type='video' and is_reel=true.
+ */
+export async function getReelsFeed(
   userId: string,
   cursor?: string,
   limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
 ): Promise<FeedPage> {
-  const core = await getFeedCore(userId, cursor, limit, undefined, { postType: "video" });
+  const core = await getFeedCore(userId, cursor, limit, undefined, {
+    postType: "video",
+    isReel: true,
+  });
   if (!core.posts.length) return core;
 
   const posts = await enrichPosts(core.posts, userId);
@@ -398,6 +412,9 @@ export async function createPost(input: {
   shared_post_id?: string | null;
   story_audience?: import("@frennix/types").StoryAudience;
   journey_category?: JourneyCategory | null;
+  /** Explicit Reels destination. Optional; defaults to false. */
+  is_reel?: boolean;
+  isReel?: boolean;
 }) {
   const workout_types =
     input.workout_types?.length
@@ -412,14 +429,19 @@ export async function createPost(input: {
     story_audience,
     workout_metrics,
     journey_category,
+    is_reel,
+    isReel,
     ...rest
   } = input;
+
+  const isReelPost = is_reel === true || isReel === true;
 
   const { data, error } = await getSupabase()
     .from("posts")
     .insert({
       ...rest,
       workout_types,
+      is_reel: isReelPost,
       ...(workout_metrics ? { workout_metrics } : {}),
       ...(story_audience ? { story_audience } : {}),
       ...(journey_category ? { journey_category } : {}),

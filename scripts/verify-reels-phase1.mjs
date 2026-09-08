@@ -58,16 +58,24 @@ function main() {
 
   ok =
     pass(
-      "Reels fetches video-only pages without using the home feed query",
+      "Reels fetches dedicated Reels pages without using the home feed query",
       reels.includes('queryKey: ["reels", userId]') &&
-        reels.includes("getVideoFeed") &&
+        reels.includes("getReelsFeed") &&
+        !reels.includes("getVideoFeed") &&
         !reels.includes('queryKey: ["feed"')
     ) && ok;
 
   ok =
     pass(
       "Reels empty state describes community fitness journeys",
-      reels.includes("Reels are fitness journeys shared by the Frennix community")
+      reels.includes("Reels are fitness journeys shared by the Frennix community") &&
+        reels.includes("Share Your Journey")
+    ) && ok;
+
+  ok =
+    pass(
+      "Reels screen has one heading and no in-list Reels title",
+      !reels.includes("ListHeaderComponent") && !reels.includes("screenLabel")
     ) && ok;
 
   ok =
@@ -91,8 +99,9 @@ function main() {
     pass(
       "API adds a nullable journey_category without a new Reels table",
       postsApi.includes("journey_category?: JourneyCategory | null") &&
-        postsApi.includes("getVideoFeed") &&
-        postsApi.includes('{ postType: "video" }') &&
+        postsApi.includes("getReelsFeed") &&
+        postsApi.includes('postType: "video"') &&
+        postsApi.includes("isReel: true") &&
         migration.includes("ADD COLUMN IF NOT EXISTS journey_category TEXT") &&
         migration.includes("journey_category IS NULL") &&
         !migration.toLowerCase().includes("create table") &&

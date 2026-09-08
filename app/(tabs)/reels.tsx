@@ -7,10 +7,9 @@ import {
   Platform,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
-import { getErrorMessage, getVideoFeed } from "@frennix/api";
+import { getErrorMessage, getReelsFeed } from "@frennix/api";
 import { type Post } from "@frennix/types";
 import { ReelsFeedItem } from "@/components/ReelsFeedItem";
 import { TabScreenBoundary } from "@/components/TabScreenBoundary";
@@ -35,7 +34,7 @@ import { useImageLightbox } from "@/lib/useImageLightbox";
 import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useAuth } from "@/providers/AuthProvider";
-import { EmptyState, QueryErrorState, colors, spacing, typography } from "@frennix/ui";
+import { EmptyState, QueryErrorState, colors, spacing } from "@frennix/ui";
 
 const REELS_STALE_MS = 60_000;
 
@@ -62,7 +61,7 @@ function ReelsScreen() {
     refetch,
   } = useInfiniteQuery({
     queryKey: ["reels", userId],
-    queryFn: ({ pageParam }) => getVideoFeed(userId, pageParam),
+    queryFn: ({ pageParam }) => getReelsFeed(userId, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(userId) && isFocused,
@@ -207,8 +206,8 @@ function ReelsScreen() {
     </View>
   ) : (
     <EmptyState
-      title="No Reels yet"
-      description="Reels are fitness journeys shared by the Frennix community. Share yours when you are ready."
+      title="Reels are fitness journeys shared by the Frennix community."
+      description="Share yours when you are ready."
       actionLabel="Share Your Journey"
       onAction={() => openCreatePost({ intent: "reel" })}
     />
@@ -225,13 +224,6 @@ function ReelsScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={posts.length ? styles.list : styles.emptyList}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListHeaderComponent={
-          posts.length ? (
-            <Text style={styles.screenLabel} accessibilityRole="header">
-              Reels
-            </Text>
-          ) : null
-        }
         refreshControl={
           <RefreshControl
             refreshing={isRefetching && !isFetchingNextPage}
@@ -295,10 +287,5 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: spacing.lg,
     alignItems: "center",
-  },
-  screenLabel: {
-    ...typography.screenTitle,
-    color: colors.text,
-    marginBottom: spacing.md,
   },
 });
