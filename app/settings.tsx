@@ -13,6 +13,7 @@ import { useState } from "react";
 import { redirectToLogin } from "@/lib/auth-navigation";
 import { LEGAL_ROUTES } from "@/lib/legal/routes";
 import { useAuth } from "@/providers/AuthProvider";
+import { clearFeedCache } from "@/lib/feed-cache";
 import { unregisterPushNotifications } from "@/lib/notifications";
 import { pushScreen } from "@/lib/press-utils";
 import { useStaffAccess } from "@/lib/founder/useStaffAccess";
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
     try {
       if (session?.user.id) {
         await unregisterPushNotifications(session.user.id);
+        await clearFeedCache(session.user.id);
       }
       await signOut();
       queryClient.clear();

@@ -69,6 +69,22 @@ export async function readFeedCache(userId: string): Promise<FeedPage[] | undefi
   }
 }
 
+export async function clearFeedCache(userId: string) {
+  if (!userId) return;
+  try {
+    await AsyncStorage.removeItem(cacheKey(userId));
+  } catch {
+    // Best-effort.
+  }
+  if (Platform.OS === "web" && typeof localStorage !== "undefined") {
+    try {
+      localStorage.removeItem(cacheKey(userId));
+    } catch {
+      // Best-effort.
+    }
+  }
+}
+
 export async function writeFeedCache(userId: string, pages: FeedPage[]) {
   if (!userId || !pages.length) return;
   const payload: CachedFeedPayload = {

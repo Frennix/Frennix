@@ -20,6 +20,22 @@ function buildCommentTree(flat: Comment[]): Comment[] {
   return roots;
 }
 
+export function applyViewerCommentLikes(
+  comments: Comment[],
+  likeCounts: Map<string, number>,
+  likedByMe: Set<string>
+): Comment[] {
+  return comments.map((comment) => ({
+    ...comment,
+    parent_id: comment.parent_id ?? null,
+    like_count: likeCounts.get(comment.id) ?? 0,
+    liked_by_me: likedByMe.has(comment.id),
+    replies: comment.replies?.length
+      ? applyViewerCommentLikes(comment.replies, likeCounts, likedByMe)
+      : comment.replies,
+  }));
+}
+
 async function enrichComments(comments: Comment[], userId: string): Promise<Comment[]> {
   if (!comments.length) return [];
 
@@ -39,12 +55,7 @@ async function enrichComments(comments: Comment[], userId: string): Promise<Comm
   }
   const likedSet = new Set((myLikes ?? []).map((l) => l.comment_id));
 
-  return comments.map((comment) => ({
-    ...comment,
-    parent_id: comment.parent_id ?? null,
-    like_count: likeCounts.get(comment.id) ?? 0,
-    liked_by_me: likedSet.has(comment.id),
-  }));
+  return applyViewerCommentLikes(comments, likeCounts, likedSet);
 }
 
 export async function getComments(postId: string, userId: string): Promise<Comment[]> {

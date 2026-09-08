@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { AuthInteractionHydration } from "@/components/AuthInteractionHydration";
 import { TabBadgeProvider } from "@/providers/TabBadgeProvider";
 import { initSentry } from "@/lib/sentry";
 import { setupNotificationListeners, invalidateQueriesForPushNotification } from "@/lib/notifications";
@@ -167,6 +168,7 @@ export default function RootLayout() {
                 <StartupWatchdog />
                 <StartupMountProbe id="auth-provider">
                   <AuthProvider>
+                    <AuthInteractionHydration />
                     <ClientDiagnosticsBootstrap />
                     <StartupSnapshotBootstrap />
                     <WebAuthenticatedStartupGuard />

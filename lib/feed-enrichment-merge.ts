@@ -17,7 +17,15 @@ export function reconcileEnrichedPost(current: Post, enriched: Post): Post {
     };
   }
 
-  if (!current.liked_by_me && enriched.liked_by_me && currentCount === enrichedCount - 1) {
+  // Only treat this as an optimistic unlike when the cache already had a
+  // real count. Placeholders use like_count 0, which matches every
+  // single-like post (enrichedCount - 1 === 0) and would wipe login hydration.
+  if (
+    !current.liked_by_me &&
+    enriched.liked_by_me &&
+    currentCount > 0 &&
+    currentCount === enrichedCount - 1
+  ) {
     return {
       ...enriched,
       liked_by_me: false,
