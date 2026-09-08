@@ -5,6 +5,8 @@ import { subscribeSafariVisualViewport } from "@/lib/safari-visual-viewport";
 /** Matches VideoOverlayWebComposerPortal clearance — space between composer and keyboard. */
 export const VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX = 12;
 
+export { VIDEO_OVERLAY_SINGLE_LINE_COMPOSER_RESERVE_PX } from "@/lib/video-overlay-peek-geometry";
+
 export const VIDEO_OVERLAY_PORTALED_COMPOSER_SELECTOR = '[data-video-overlay-composer="true"]';
 
 /** Measured portaled composer height plus keyboard clearance. */

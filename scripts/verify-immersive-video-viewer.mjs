@@ -5,6 +5,7 @@
  * Usage:
  *   node scripts/verify-immersive-video-viewer.mjs
  */
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -168,6 +169,7 @@ function main() {
   const playlist = readSource("components/ImmersiveVideoPlaylistViewer.tsx");
   const overlayZ = readSource("lib/overlay-z-index.ts");
   const viewport = readSource("lib/video-overlay-visual-viewport-layout.ts");
+  const peekGeometry = readSource("lib/video-overlay-peek-geometry.ts");
   const commentsSheetZ = Number(overlayZ.match(/commentsSheet:\s*(\d+)/)?.[1]);
   const lightboxZ = Number(overlayZ.match(/imageLightbox:\s*(\d+)/)?.[1]);
   const videoOverlayZ = Number(overlayZ.match(/commentsVideoOverlay:\s*(\d+)/)?.[1]);
@@ -213,7 +215,10 @@ function main() {
     pass(
       "Keyboard-open peek uses clamped helper, not an 80px collapse",
       viewport.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+        peekGeometry.includes("VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX") &&
+        peekGeometry.includes("VIDEO_OVERLAY_SINGLE_LINE_COMPOSER_RESERVE_PX") &&
         sheet.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+        sheet.includes("keyboardOpen") &&
         !sheet.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX = 80") &&
         !viewport.includes("? IOS_SAFARI_FLOATING_CONTROLS_PX")
     ) && ok;
@@ -330,48 +335,14 @@ function main() {
 }
 
 function verifyPeekGeometryContract() {
-  const HEADER = 80;
-  const MIN_LIST = 100;
-  const ABS_MIN = 112;
-  const FRACTION = 0.25;
-
-  function resolve({ layoutHeight, usableHeight, baselinePeekHeight, composerBottomReserve }) {
-    const usefulMin = Math.min(
-      baselinePeekHeight,
-      Math.max(ABS_MIN, Math.round(layoutHeight * FRACTION))
-    );
-    const spaceAfterReserve = Math.max(0, usableHeight - Math.max(0, composerBottomReserve));
-    const maxPeekKeepingList = spaceAfterReserve - (HEADER + MIN_LIST);
-    const peekHeight =
-      maxPeekKeepingList >= usefulMin
-        ? Math.min(baselinePeekHeight, maxPeekKeepingList)
-        : Math.min(usefulMin, Math.max(ABS_MIN, spaceAfterReserve - HEADER));
-    return {
-      peekHeight,
-      height: Math.max(HEADER, spaceAfterReserve - peekHeight),
-    };
-  }
-
-  const closed = resolve({
-    layoutHeight: 844,
-    usableHeight: 670,
-    baselinePeekHeight: 330,
-    composerBottomReserve: 80,
-  });
-  const keyboard = resolve({
-    layoutHeight: 844,
-    usableHeight: 330,
-    baselinePeekHeight: 330,
-    composerBottomReserve: 80,
-  });
-
-  return (
-    closed.peekHeight === 330 &&
-    closed.height >= HEADER + MIN_LIST &&
-    keyboard.peekHeight > 80 &&
-    keyboard.peekHeight >= ABS_MIN &&
-    keyboard.height >= HEADER
+  const result = spawnSync(
+    "npx",
+    ["tsx", "scripts/verify-video-overlay-peek-geometry.ts"],
+    { cwd: ROOT, encoding: "utf8" }
   );
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  return result.status === 0;
 }
 
 function verifySafariClearanceContract() {

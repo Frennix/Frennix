@@ -107,6 +107,7 @@ function main() {
   const playlist = readSource("components/ImmersiveVideoPlaylistViewer.tsx");
   const slide = readSource("packages/ui/src/FullscreenVideoSlide.tsx");
   const viewportLayout = readSource("lib/video-overlay-visual-viewport-layout.ts");
+  const peekGeometry = readSource("lib/video-overlay-peek-geometry.ts");
   ok =
     pass(
       "iOS focus safeguards remain (no capture / preventDefault / delayed focus)",
@@ -121,6 +122,7 @@ function main() {
       "No VIDEO_PEEK_KEYBOARD_OPEN_PX constant returns",
       !sheet.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
         !viewportLayout.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
+        !peekGeometry.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
         !viewer.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX") &&
         !styles.includes("VIDEO_PEEK_KEYBOARD_OPEN_PX")
     ) && ok;
@@ -168,8 +170,10 @@ function main() {
     pass(
       "Peek helper still shrinks the comments list before the video",
       viewportLayout.includes("resolveVideoOverlayPeekAndSheetHeight") &&
-        viewportLayout.includes("maxPeekKeepingList") &&
-        sheet.includes("resolveVideoOverlayPeekAndSheetHeight")
+        peekGeometry.includes("maxPeekKeepingList") &&
+        peekGeometry.includes("keyboardOpen") &&
+        sheet.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+        sheet.includes("keyboardOpen")
     ) && ok;
 
   console.log("");

@@ -41,6 +41,7 @@ import {
   computeVideoOverlayFixedFrameStyle,
   resolveVideoOverlayPeekAndSheetHeight,
   VIDEO_OVERLAY_HEADER_CHROME_PX,
+  VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX,
 } from "@/lib/video-overlay-visual-viewport-layout";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
@@ -92,7 +93,7 @@ function computeVideoOverlaySheetLayout(
 ): VideoOverlaySheetLayout {
   const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
   const frame = measureVideoOverlayViewportFrame();
-  const { offsetTop, visualHeight, usableHeight } = frame;
+  const { offsetTop, visualHeight, usableHeight, keyboardOpen } = frame;
   const baselinePeek =
     baselinePeekHeight ?? computeBaselineVideoPeekHeight(layoutHeight);
   const { peekHeight, height } = resolveVideoOverlayPeekAndSheetHeight({
@@ -100,6 +101,7 @@ function computeVideoOverlaySheetLayout(
     usableHeight,
     baselinePeekHeight: baselinePeek,
     composerBottomReserve,
+    keyboardOpen,
   });
 
   return { offsetTop, visualHeight, peekHeight, top: peekHeight, height };
@@ -586,7 +588,9 @@ export function CommentsBottomSheet({
                 left: undefined,
                 right: undefined,
                 flex: 1,
-                minHeight: VIDEO_OVERLAY_HEADER_CHROME_PX,
+                minHeight: videoOverlayViewportFrame?.keyboardOpen
+                  ? VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX
+                  : VIDEO_OVERLAY_HEADER_CHROME_PX,
                 height: undefined,
                 paddingBottom: portaledComposerReserve,
                 backgroundColor: "transparent",
