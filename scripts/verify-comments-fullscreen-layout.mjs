@@ -156,8 +156,8 @@ function main() {
       viewer.includes('overflow: "hidden"') &&
         styles.includes('[data-frennix-video-stage-host="true"]') &&
         playlist.includes('overflow: "hidden"') &&
-        playlist.includes('overflowY: "scroll"') &&
-        !playlist.includes('overflowY: commentsOverlayOpen ? "visible"')
+        playlist.includes("handleWebPointerDown") &&
+        !playlist.includes('overflowY: "scroll"')
     ) && ok;
   ok =
     pass(

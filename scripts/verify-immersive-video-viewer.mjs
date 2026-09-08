@@ -348,8 +348,8 @@ function main() {
     pass(
       "Adjacent playlist slides remain clipped",
       playlist.includes('overflow: "hidden"') &&
-        playlist.includes('overflowY: "scroll"') &&
-        !playlist.includes('overflowY: commentsOverlayOpen ? "visible"') &&
+        playlist.includes("handleWebPointerDown") &&
+        !playlist.includes('overflowY: "scroll"') &&
         !playlist.includes("slideShellCommentsOpen") &&
         !playlist.includes("rootCommentsOpen") &&
         !styles.includes(

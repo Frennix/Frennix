@@ -4,7 +4,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type UIEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   ActivityIndicator,
@@ -48,13 +49,37 @@ type ImmersiveVideoPlaylistViewerProps = {
 
 const PRELOAD_RADIUS = 1;
 const FETCH_AHEAD_SLIDE_COUNT = 2;
+const SWIPE_LOCK_PX = 14;
+const SWIPE_DISTANCE_PX = 72;
+const SWIPE_VELOCITY_PX_PER_MS = 0.45;
+
+type PlaylistSwipeLock = "none" | "vertical" | "horizontal";
+
+type PlaylistSwipeGesture = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startTime: number;
+  lock: PlaylistSwipeLock;
+};
 
 function clampIndex(value: number, max: number) {
   return Math.min(Math.max(value, 0), Math.max(max, 0));
 }
 
-function isActiveSlideAttr(slideIndex: number, activeIndex: number) {
-  return slideIndex === activeIndex ? "active" : "inactive";
+function isPlaylistChromeTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  if (
+    target.closest("[data-frennix-playlist-swipe-surface='true']") ||
+    target.closest("[aria-label='Play or pause video']")
+  ) {
+    return false;
+  }
+  return Boolean(
+    target.closest(
+      "button, a, input, textarea, [role='button'], [data-frennix-immersive-rail], [data-frennix-immersive-top-bar]"
+    )
+  );
 }
 
 export function ImmersiveVideoPlaylistViewer({
@@ -80,8 +105,14 @@ export function ImmersiveVideoPlaylistViewer({
   const [showEndState, setShowEndState] = useState(false);
   const handoffAppliedRef = useRef(false);
   const fetchInFlightRef = useRef(false);
-  const webScrollRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<FlatList<ImmersiveVideoPlaylistEntry>>(null);
+  const activeIndexRef = useRef(activeIndex);
+  const commentsOpenRef = useRef(commentsOverlayOpen);
+  const gestureRef = useRef<PlaylistSwipeGesture | null>(null);
+  const suppressClickRef = useRef(false);
+
+  activeIndexRef.current = activeIndex;
+  commentsOpenRef.current = commentsOverlayOpen;
 
   useEffect(() => {
     setEntries(initialEntries);
@@ -146,22 +177,82 @@ export function ImmersiveVideoPlaylistViewer({
     [handleIndexChange, stageHeight]
   );
 
-  const handleWebScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      const pageHeight = event.currentTarget.clientHeight || stageHeight;
-      if (!pageHeight) return;
-      const nextIndex = Math.round(event.currentTarget.scrollTop / pageHeight);
-      handleIndexChange(nextIndex);
+  const finishWebSwipe = useCallback(
+    (gesture: PlaylistSwipeGesture, clientX: number, clientY: number) => {
+      if (gesture.lock !== "vertical") return false;
+      const dy = clientY - gesture.startY;
+      const dt = Math.max(1, Date.now() - gesture.startTime);
+      const velocity = dy / dt;
+      const passed =
+        Math.abs(dy) >= SWIPE_DISTANCE_PX || Math.abs(velocity) >= SWIPE_VELOCITY_PX_PER_MS;
+      if (!passed) return false;
+      suppressClickRef.current = true;
+      handleIndexChange(activeIndexRef.current + (dy < 0 ? 1 : -1));
+      return true;
     },
-    [handleIndexChange, stageHeight]
+    [handleIndexChange]
   );
 
-  useEffect(() => {
-    if (Platform.OS !== "web" || !webScrollRef.current) return;
-    const pageHeight = webScrollRef.current.clientHeight || stageHeight;
-    if (!pageHeight) return;
-    webScrollRef.current.scrollTop = initialIndex * pageHeight;
-  }, [initialIndex, stageHeight]);
+  const handleWebPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (commentsOpenRef.current || isPlaylistChromeTarget(event.target)) {
+        gestureRef.current = null;
+        return;
+      }
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      gestureRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startTime: Date.now(),
+        lock: "none",
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    []
+  );
+
+  const handleWebPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    if (gesture.lock === "none") {
+      if (Math.abs(dy) >= SWIPE_LOCK_PX && Math.abs(dy) >= Math.abs(dx)) {
+        gesture.lock = "vertical";
+      } else if (Math.abs(dx) >= SWIPE_LOCK_PX && Math.abs(dx) > Math.abs(dy)) {
+        gesture.lock = "horizontal";
+      }
+    }
+    if (gesture.lock === "vertical") {
+      event.preventDefault();
+    }
+  }, []);
+
+  const handleWebPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const gesture = gestureRef.current;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      const committed = finishWebSwipe(gesture, event.clientX, event.clientY);
+      if (committed) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      gestureRef.current = null;
+    },
+    [finishWebSwipe]
+  );
+
+  const handleWebPointerCancel = useCallback(() => {
+    gestureRef.current = null;
+  }, []);
+
+  const handleWebClickCapture = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!suppressClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClickRef.current = false;
+  }, []);
 
   const slideShellSize =
     Platform.OS === "web"
@@ -267,53 +358,46 @@ export function ImmersiveVideoPlaylistViewer({
         } as object)}
       >
         <div
-          ref={webScrollRef}
           className="frennix-immersive-video-playlist-scroll"
-          onScroll={handleWebScroll}
+          data-frennix-playlist-active-index={String(activeIndex)}
+          onPointerDown={handleWebPointerDown}
+          onPointerMove={handleWebPointerMove}
+          onPointerUp={handleWebPointerUp}
+          onPointerCancel={handleWebPointerCancel}
+          onClickCapture={handleWebClickCapture}
           style={{
+            position: "relative",
             width: "100%",
             height: "100%",
-            overflowX: "hidden",
-            overflowY: "scroll",
-            scrollSnapType: "y mandatory",
-            overscrollBehavior: "contain",
-            touchAction: "pan-y",
+            overflow: "hidden",
+            touchAction: "none",
             backgroundColor: colors.background,
           }}
         >
-          {entries.map((entry, slideIndex) => (
-            <div
-              key={entry.playbackId}
-              data-frennix-video-playlist-page={isActiveSlideAttr(slideIndex, activeIndex)}
-              style={{
-                width: "100%",
-                height: "100%",
-                minHeight: "100%",
-                maxHeight: "100%",
-                scrollSnapAlign: "start",
-                scrollSnapStop: "always",
-                position: "relative",
-                overflow: "hidden",
-                isolation: "isolate",
-                zIndex: 0,
-              }}
-            >
-              {renderSlide(entry, slideIndex)}
-            </div>
-          ))}
-          {footer ? (
-            <div
-              style={{
-                width: stageWidth,
-                scrollSnapAlign: "start",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {footer}
-            </div>
-          ) : null}
+          {entries.map((entry, slideIndex) => {
+            if (!shouldRenderIndex(slideIndex)) return null;
+            const isActive = slideIndex === activeIndex;
+            return (
+              <div
+                key={entry.playbackId}
+                data-frennix-video-playlist-page={isActive ? "active" : "preload"}
+                aria-hidden={isActive ? undefined : true}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  overflow: "hidden",
+                  visibility: isActive ? "visible" : "hidden",
+                  pointerEvents: isActive ? "auto" : "none",
+                  zIndex: isActive ? 1 : 0,
+                }}
+              >
+                {renderSlide(entry, slideIndex)}
+              </div>
+            );
+          })}
+          {footer ? <div style={styles.webFooterHost}>{footer}</div> : null}
         </div>
       </View>
     );
@@ -371,5 +455,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: "center",
+  },
+  webFooterHost: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 24,
+    zIndex: 2,
+    pointerEvents: "none",
   },
 });

@@ -25,14 +25,22 @@ const playwrightPath = (() => {
   try {
     return require.resolve("playwright");
   } catch {
-    return "/tmp/pw-repro/node_modules/playwright/index.js";
+    const fallbacks = [
+      "/tmp/pw-repro/node_modules/playwright/index.mjs",
+      "/tmp/pw-repro/node_modules/playwright/index.js",
+    ];
+    return fallbacks.find((file) => fs.existsSync(file)) ?? fallbacks[0];
   }
 })();
 
 const MOCK_USER_ID = "11111111-1111-4111-8111-111111111111";
-const FIXTURE_VIDEO_PATH = path.join(
-  ROOT,
-  ".video-repair/proof-test/repaired.mp4"
+const FIXTURE_VIDEO_CANDIDATES = [
+  path.join(ROOT, ".video-repair/proof-test/repaired.mp4"),
+  path.join(ROOT, "../mobile/.video-repair/proof-test/repaired.mp4"),
+  "/tmp/frennix-playlist-fixture/repaired.mp4",
+];
+const FIXTURE_VIDEO_PATH = FIXTURE_VIDEO_CANDIDATES.find((candidate) =>
+  fs.existsSync(candidate)
 );
 
 const IPHONE_UA =
@@ -364,7 +372,8 @@ async function readPlaylistState(page) {
     return {
       hasPlaylist,
       hasImmersive,
-      scrollTop: scroller?.scrollTop ?? 0,
+      scrollTop: 0,
+      activeIndex: Number(scroller?.getAttribute("data-frennix-playlist-active-index") ?? 0),
       stageHeight: scroller?.clientHeight ?? 0,
       slides,
       muteLabel: muteButton?.getAttribute("aria-label") ?? null,
@@ -411,29 +420,110 @@ async function readVideoPlaybackState(page) {
   return page.evaluate(() => {
     const scroller = document.querySelector(".frennix-immersive-video-playlist-scroll");
     if (!scroller) {
-      return { activeIndex: 0, videos: [] };
+      return { activeIndex: 0, visiblePageCount: 0, videos: [] };
     }
-    const stageHeight = scroller.clientHeight || 1;
-    const activeIndex = Math.round(scroller.scrollTop / stageHeight);
-    const videos = [...scroller.querySelectorAll("video")].map((video, index) => ({
-      index,
-      paused: video.paused,
-      muted: video.muted,
-    }));
-    return { activeIndex, videos };
+    const activeIndex = Number(scroller.getAttribute("data-frennix-playlist-active-index") ?? 0);
+    const pages = [...scroller.querySelectorAll("[data-frennix-video-playlist-page]")];
+    const visiblePageCount = pages.filter((page) => {
+      const style = getComputedStyle(page);
+      return style.visibility !== "hidden" && style.display !== "none";
+    }).length;
+    const videos = pages.map((page) => {
+      const video = page.querySelector("video");
+      return {
+        page: page.getAttribute("data-frennix-video-playlist-page"),
+        paused: video ? video.paused : null,
+        muted: video ? video.muted : null,
+      };
+    });
+    return { activeIndex, visiblePageCount, videos };
   });
 }
 
-async function swipePlaylist(page, direction) {
-  await page.evaluate((dir) => {
-    const scroller = document.querySelector(".frennix-immersive-video-playlist-scroll");
-    if (!scroller) throw new Error("missing playlist scroller");
-    const step = scroller.clientHeight;
-    const before = scroller.scrollTop;
-    scroller.scrollTop = dir === "up" ? before + step : Math.max(0, before - step);
-    scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
-  }, direction);
-  await page.waitForTimeout(900);
+async function readVisiblePlaylistGeometry(page) {
+  return page.evaluate(() => {
+    const stage = document.querySelector(".frennix-immersive-video-playlist-scroll");
+    const stageRect = stage?.getBoundingClientRect();
+    const pages = [...document.querySelectorAll("[data-frennix-video-playlist-page]")].map(
+      (el) => {
+        const style = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        const visible =
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          Number(style.opacity || "1") > 0.01;
+        return {
+          page: el.getAttribute("data-frennix-video-playlist-page"),
+          visibility: style.visibility,
+          transform: style.transform,
+          top: Math.round(rect.top),
+          height: Math.round(rect.height),
+          offsetFromStage: stageRect ? Math.round(rect.top - stageRect.top) : null,
+          visible,
+        };
+      }
+    );
+    const visiblePages = pages.filter((item) => item.visible);
+    const stackedPartialPages =
+      visiblePages.length > 1 ||
+      visiblePages.some(
+        (item) =>
+          item.offsetFromStage != null &&
+          Math.abs(item.offsetFromStage) > 2 &&
+          item.height > 0 &&
+          item.height < (stageRect?.height ?? item.height) - 2
+      );
+    return {
+      visibleCount: visiblePages.length,
+      stackedPartialPages,
+      pages: visiblePages,
+    };
+  });
+}
+
+async function swipePlaylist(page, direction, distance = 120, { watchStacked = false } = {}) {
+  const target = page.locator(".frennix-immersive-video-playlist-scroll");
+  const box = await target.boundingBox();
+  if (!box) throw new Error("missing playlist scroller");
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  const dy = direction === "up" ? -distance : distance;
+  const belowThreshold = distance < 72;
+  const steps = belowThreshold ? 20 : 8;
+  const samples = [];
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  if (belowThreshold) await page.waitForTimeout(80);
+  for (let step = 1; step <= steps; step += 1) {
+    await page.mouse.move(x, y + (dy * step) / steps);
+    if (watchStacked) {
+      samples.push(await readVisiblePlaylistGeometry(page));
+    }
+  }
+  if (belowThreshold) await page.waitForTimeout(80);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  return samples;
+}
+
+async function swipeElement(page, locator, direction, distance = 120) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("missing swipe target");
+  const x = box.x + box.width / 2;
+  const y = box.y + Math.min(box.height / 2, 24);
+  const dy = direction === "up" ? -distance : distance;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + dy, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+}
+
+async function tapPlaylistCenter(page) {
+  const box = await page.locator(".frennix-immersive-video-playlist-scroll").boundingBox();
+  if (!box) throw new Error("missing playlist scroller");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(250);
 }
 
 async function closeVideoViewer(page) {
@@ -453,24 +543,29 @@ async function getActivePlaylistSlideIndex(page) {
   return page.evaluate(() => {
     const scroller = document.querySelector(".frennix-immersive-video-playlist-scroll");
     if (!scroller) return 0;
-    return Math.round(scroller.scrollTop / (scroller.clientHeight || 1));
+    return Number(scroller.getAttribute("data-frennix-playlist-active-index") ?? 0);
+  });
+}
+
+async function readActivePageText(page) {
+  return page.evaluate(() => {
+    const active = document.querySelector('[data-frennix-video-playlist-page="active"]');
+    return active?.innerText ?? "";
   });
 }
 
 async function readActiveViewerMuteState(page) {
-  const activeIndex = await getActivePlaylistSlideIndex(page);
-  return page.evaluate((index) => {
-    const scroller = document.querySelector(".frennix-immersive-video-playlist-scroll");
-    const slideHost = scroller?.children.item(index) ?? null;
+  return page.evaluate(() => {
     const slide =
-      slideHost?.querySelector('[data-frennix-video-playlist-slide="active"]') ?? slideHost;
+      document.querySelector('[data-frennix-video-playlist-page="active"]') ??
+      document.querySelector('[data-frennix-video-playlist-slide="active"]');
     const button = slide?.querySelector('[aria-label="Mute video"], [aria-label="Unmute video"]');
     const video = slide?.querySelector("video");
     return {
       label: button?.getAttribute("aria-label") ?? null,
       videoMuted: video?.muted ?? null,
     };
-  }, activeIndex);
+  });
 }
 
 async function toggleActiveViewerMute(page) {
@@ -500,8 +595,7 @@ async function toggleActiveViewerMute(page) {
     return;
   }
 
-  const activeIndex = await getActivePlaylistSlideIndex(page);
-  const selector = `.frennix-immersive-video-playlist-scroll > div:nth-child(${activeIndex + 1}) [aria-label="Mute video"], .frennix-immersive-video-playlist-scroll > div:nth-child(${activeIndex + 1}) [aria-label="Unmute video"]`;
+  const selector = `[data-frennix-video-playlist-page="active"] [aria-label="Mute video"], [data-frennix-video-playlist-page="active"] [aria-label="Unmute video"]`;
 
   let toggled = (await invokeReactPress(page, selector)).ok;
   if (!toggled) {
@@ -553,9 +647,8 @@ async function openOverlayComments(page) {
 
   const runtimeTrigger = page.getByRole("button", { name: "Open comments runtime test" });
   const runtimeTriggerCount = await runtimeTrigger.count();
-  const activeIndex = await getActivePlaylistSlideIndex(page);
-  const addSelector = `.frennix-immersive-video-playlist-scroll > div:nth-child(${activeIndex + 1}) [aria-label="Add a comment"]`;
-  const commentSelector = `.frennix-immersive-video-playlist-scroll > div:nth-child(${activeIndex + 1}) [aria-label="Comment"]`;
+  const addSelector = `[data-frennix-video-playlist-page="active"] [aria-label="Add a comment"]`;
+  const commentSelector = `[data-frennix-video-playlist-page="active"] [aria-label="Comment"]`;
 
   let invoked = await invokeReactPress(page, addSelector);
   if (!invoked.ok) {
@@ -759,8 +852,8 @@ async function main() {
   if (!fs.existsSync(path.join(exportDir, "index.html"))) {
     throw new Error(`Missing index.html in export dir: ${exportDir}`);
   }
-  if (!fs.existsSync(FIXTURE_VIDEO_PATH)) {
-    throw new Error(`Missing fixture video: ${FIXTURE_VIDEO_PATH}`);
+  if (!FIXTURE_VIDEO_PATH || !fs.existsSync(FIXTURE_VIDEO_PATH)) {
+    throw new Error(`Missing fixture video. Looked in: ${FIXTURE_VIDEO_CANDIDATES.join(", ")}`);
   }
 
   const supabaseRef = readSupabaseProjectRef(exportDir);
@@ -772,7 +865,9 @@ async function main() {
 
   const pwModule = await import(pathToFileURL(playwrightPath).href);
   const { chromium } = pwModule.default ?? pwModule;
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium
+    .launch({ channel: "chrome", headless: true })
+    .catch(() => chromium.launch({ headless: true }));
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -904,6 +999,21 @@ async function main() {
       `bottom=${composer.composerBottom} viewport=${composer.viewport.height} focused=${composer.inputFocused}`
     ) && ok;
 
+  const commentField = page
+    .locator('[data-frennix-comment-input="true"], [data-video-comment-field="true"] textarea, textarea')
+    .first();
+  if (await commentField.count()) {
+    await swipeElement(page, commentField, "up", 140);
+  } else {
+    await swipePlaylist(page, "up");
+  }
+  playlist = await readPlaylistState(page);
+  ok =
+    pass(
+      "Controls: swipe on the comment field does not change videos",
+      playlist.activeIndex === 0 && /Playlist video alpha/i.test(playlist.bodyText)
+    ) && ok;
+
   await closeOverlayComments(page);
   playlist = await readPlaylistState(page);
   let commentsClosed = await page.evaluate(() => ({
@@ -918,19 +1028,64 @@ async function main() {
       !commentsClosed.hasCommentsOverlay && /Playlist video alpha/i.test(commentsClosed.activeText)
     ) && ok;
 
-  await swipePlaylist(page, "up");
+  await tapPlaylistCenter(page);
   playlist = await readPlaylistState(page);
+  ok =
+    pass(
+      "Controls: a normal tap does not change videos",
+      playlist.activeIndex === 0 && /Playlist video alpha/i.test(playlist.bodyText)
+    ) && ok;
+
+  const muteControl = page
+    .locator(
+      '[data-frennix-video-playlist-page="active"] [aria-label="Mute video"], [data-frennix-video-playlist-page="active"] [aria-label="Unmute video"]'
+    )
+    .first();
+  if (await muteControl.count()) {
+    await muteControl.click({ force: true, timeout: 4000 }).catch(() => undefined);
+  }
+  playlist = await readPlaylistState(page);
+  ok =
+    pass(
+      "Controls: tapping mute does not change videos",
+      playlist.activeIndex === 0 && /Playlist video alpha/i.test(playlist.bodyText)
+    ) && ok;
+
+  await swipePlaylist(page, "up", 36);
+  playlist = await readPlaylistState(page);
+  let activeText = await readActivePageText(page);
+  ok =
+    pass(
+      "1. Sub-threshold swipe stays on the current video",
+      playlist.activeIndex === 0 && /Playlist video alpha/i.test(activeText)
+    ) && ok;
+
+  const upSamples = await swipePlaylist(page, "up", 120, { watchStacked: true });
+  playlist = await readPlaylistState(page);
+  activeText = await readActivePageText(page);
   const playback = await readVideoPlaybackState(page);
   ok =
     pass(
-      "1. Swipe up advances to next video",
-      /Playlist video beta/i.test(playlist.bodyText)
+      "1. Swipe up advances exactly one video",
+      playlist.activeIndex === 1 && /Playlist video beta/i.test(activeText)
+    ) && ok;
+  ok =
+    pass(
+      "1. Only one playlist page is visible after the change",
+      playback.visiblePageCount === 1,
+      `visiblePageCount=${playback.visiblePageCount}`
+    ) && ok;
+  ok =
+    pass(
+      "1. No stacked partial pages during the upward swipe",
+      upSamples.length > 0 && upSamples.every((sample) => !sample.stackedPartialPages && sample.visibleCount === 1),
+      JSON.stringify(upSamples.map((sample) => ({ visibleCount: sample.visibleCount, stacked: sample.stackedPartialPages })))
     ) && ok;
 
   const inactivePaused = playback.videos
-    .filter((video) => video.index !== playback.activeIndex)
+    .filter((video) => video.page !== "active")
     .every((video) => video.paused === true);
-  const activeVideo = playback.videos.find((video) => video.index === playback.activeIndex);
+  const activeVideo = playback.videos.find((video) => video.page === "active");
   ok =
     pass(
       "2. Previous videos pause when advancing",
@@ -950,21 +1105,35 @@ async function main() {
       `activePaused=${activeVideo?.paused}`
     ) && ok;
 
-  await swipePlaylist(page, "down");
+  const downSamples = await swipePlaylist(page, "down", 120, { watchStacked: true });
   playlist = await readPlaylistState(page);
+  activeText = await readActivePageText(page);
   ok =
     pass(
-      "3. Swipe down returns to previous video",
-      /Playlist video alpha/i.test(playlist.bodyText)
+      "3. Swipe down returns exactly one video",
+      playlist.activeIndex === 0 && /Playlist video alpha/i.test(activeText)
+    ) && ok;
+  ok =
+    pass(
+      "3. No stacked partial pages during the downward swipe",
+      downSamples.length > 0 &&
+        downSamples.every((sample) => !sample.stackedPartialPages && sample.visibleCount === 1),
+      JSON.stringify(
+        downSamples.map((sample) => ({
+          visibleCount: sample.visibleCount,
+          stacked: sample.stackedPartialPages,
+        }))
+      )
     ) && ok;
 
   await swipePlaylist(page, "up");
   await page.waitForTimeout(400);
   playlist = await readPlaylistState(page);
+  activeText = await readActivePageText(page);
   ok =
     pass(
       "Setup: back on beta for mute coverage",
-      /Playlist video beta/i.test(playlist.bodyText)
+      playlist.activeIndex === 1 && /Playlist video beta/i.test(activeText)
     ) && ok;
 
   let muteBefore = await readActiveViewerMuteState(page);

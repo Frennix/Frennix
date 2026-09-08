@@ -44,11 +44,15 @@ function main() {
 
   ok =
     pass(
-      "Playlist viewer uses scroll snap and preloads adjacent slides only",
+      "Playlist viewer uses controlled swipe gestures and preloads adjacent slides only",
       playlistViewer.includes("PRELOAD_RADIUS = 1") &&
-        playlistViewer.includes("scrollSnapType") &&
+        playlistViewer.includes("SWIPE_DISTANCE_PX") &&
+        playlistViewer.includes("handleWebPointerDown") &&
+        playlistViewer.includes("data-frennix-playlist-swipe-surface") &&
         playlistViewer.includes("shouldRenderIndex") &&
-        playlistViewer.includes("data-frennix-immersive-video-playlist")
+        playlistViewer.includes("data-frennix-immersive-video-playlist") &&
+        !playlistViewer.includes("scrollSnapType") &&
+        !playlistViewer.includes("overflowY: \"scroll\"")
     ) && ok;
 
   ok =
@@ -140,17 +144,16 @@ function main() {
 
   ok =
     pass(
-      "Web CSS defines vertical scroll-snap playlist container",
+      "Web CSS keeps the playlist stage clipped without native scroll-snap",
       styles.includes("frennix-immersive-video-playlist-scroll") &&
-        styles.includes("scroll-snap-type: y mandatory")
+        styles.includes("touch-action: none") &&
+        !styles.includes("scroll-snap-type: y mandatory")
     ) && ok;
 
-  const playlistSlideCssStart = styles.indexOf(
-    ".frennix-immersive-video-playlist-scroll > [data-frennix-video-playlist-page]"
-  );
-  const playlistSlideCss = styles.slice(
-    playlistSlideCssStart,
-    playlistSlideCssStart >= 0 ? playlistSlideCssStart + 420 : 0
+  const playlistStageCssStart = styles.indexOf(".frennix-immersive-video-playlist-scroll {");
+  const playlistStageCss = styles.slice(
+    playlistStageCssStart,
+    playlistStageCssStart >= 0 ? playlistStageCssStart + 280 : 0
   );
   const immersiveFillCssStart = styles.indexOf(
     '[data-frennix-immersive-video-viewer="true"] .fullscreen-video-mount'
@@ -168,18 +171,16 @@ function main() {
 
   ok =
     pass(
-      "Playlist pages clip to one full-screen snap and do not overlap",
-      playlistSlideCssStart >= 0 &&
-        playlistSlideCss.includes("overflow: hidden") &&
-        playlistSlideCss.includes("isolation: isolate") &&
-        playlistSlideCss.includes("height: 100%") &&
-        playlistSlideCss.includes("max-height: 100%") &&
-        playlistSlideCss.includes("scroll-snap-align: start") &&
-        playlistSlideCss.includes("scroll-snap-stop: always") &&
-        playlistViewer.includes("data-frennix-video-playlist-page") &&
-        playlistViewer.includes('isolation: "isolate"') &&
-        playlistViewer.includes("event.currentTarget.clientHeight") &&
-        !playlistViewer.includes("WebkitOverflowScrolling")
+      "Web playlist advances by gesture threshold, not finger-dragged scrolling",
+      playlistStageCssStart >= 0 &&
+        playlistStageCss.includes("overflow: hidden") &&
+        playlistStageCss.includes("touch-action: none") &&
+        !playlistStageCss.includes("overflow-y: scroll") &&
+        !playlistStageCss.includes("scroll-snap") &&
+        playlistViewer.includes("data-frennix-playlist-active-index") &&
+        playlistViewer.includes("visibility: isActive ? \"visible\" : \"hidden\"") &&
+        playlistViewer.includes("finishWebSwipe") &&
+        playlistViewer.includes("SWIPE_VELOCITY_PX_PER_MS")
     ) && ok;
 
   ok =
@@ -199,6 +200,9 @@ function main() {
       readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes(
         'preload: immersiveMode || isActive ? "auto" : "metadata"'
       ) &&
+        readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes(
+          "data-frennix-playlist-swipe-surface"
+        ) &&
         playlistViewer.includes("isActive={isActive}") &&
         readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes("if (!isActive || failed)") &&
         readSource("packages/ui/src/FullscreenVideoSlide.tsx").includes("video.pause()")

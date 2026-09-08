@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · 2c5238c7</title>
+    <title>Frennix · b7f4f7b7</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="2c5238c7940c852fa8f969e853350d9ed5ea7fc1" />
-    <meta name="frennix-build-bundle" content="index-3994d74c9111d34993e16d1a9a41a74d.js" />
-    <meta name="frennix-build-at" content="2026-09-08T16:52:42.357Z" />
+    <meta name="frennix-build-sha" content="b7f4f7b7ec2c370a2e40c09622ecbdeac60beccb" />
+    <meta name="frennix-build-bundle" content="index-daa1c190bfbb740a56c92d07a59ba433.js" />
+    <meta name="frennix-build-at" content="2026-09-08T20:39:44.443Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -453,24 +453,20 @@
     position: relative !important;
     width: 100% !important;
     height: 100% !important;
-    overflow-x: hidden !important;
-    overflow-y: scroll !important;
-    scroll-snap-type: y mandatory !important;
-    overscroll-behavior: contain !important;
-    touch-action: pan-y !important;
+    overflow: hidden !important;
+    touch-action: none !important;
+    overscroll-behavior: none !important;
   }
   .frennix-immersive-video-playlist-scroll > [data-frennix-video-playlist-page] {
-    position: relative !important;
-    box-sizing: border-box !important;
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    min-height: 100% !important;
-    max-height: 100% !important;
     overflow: hidden !important;
-    isolation: isolate !important;
-    scroll-snap-align: start !important;
-    scroll-snap-stop: always !important;
-    z-index: 0 !important;
+  }
+  .frennix-immersive-video-playlist-scroll > [data-frennix-video-playlist-page="preload"] {
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
   [data-frennix-comments-video-overlay="true"] {
     pointer-events: none !important;
@@ -713,7 +709,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="2c5238c7940c852fa8f969e853350d9ed5ea7fc1" data-bundle="index-3994d74c9111d34993e16d1a9a41a74d.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="b7f4f7b7ec2c370a2e40c09622ecbdeac60beccb" data-bundle="index-daa1c190bfbb740a56c92d07a59ba433.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -759,7 +755,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-3994d74c9111d34993e16d1a9a41a74d.js?v=2c5238c7" defer></script>
+  <script src="/_expo/static/js/web/index-daa1c190bfbb740a56c92d07a59ba433.js?v=b7f4f7b7" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {

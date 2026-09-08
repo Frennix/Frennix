@@ -712,6 +712,9 @@ export const FullscreenVideoSlide = forwardRef<
             onPress={immersiveMode ? togglePlayPause : revealControls}
             accessibilityRole="button"
             accessibilityLabel={immersiveMode ? "Play or pause video" : "Show video controls"}
+            {...(Platform.OS === "web" && immersiveMode
+              ? ({ "data-frennix-playlist-swipe-surface": "true" } as object)
+              : null)}
           />
 
           {!immersiveMode ? (
