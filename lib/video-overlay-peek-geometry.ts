@@ -12,6 +12,27 @@ export const VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX = 280;
 /** Handle wrap (24) + title/X row (36) + column paddingTop (6). Never below ~56. */
 export const VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX = 66;
 
+/** Fraction of layout viewport used to seed the baseline preview before keyboard focus. */
+export const COMMENTS_VIDEO_PEEK_FRACTION = 0.31;
+/** Target preview band on large phones — preserved while typing when space allows. */
+export const COMMENTS_VIDEO_PEEK_TARGET_MIN_PX = 330;
+export const COMMENTS_VIDEO_PEEK_TARGET_MAX_PX = 400;
+
+/** Baseline preview height from the full layout viewport — not keyboard-reduced visual height. */
+export function computeBaselineVideoPeekHeight(layoutHeight: number): number {
+  const fromFraction = Math.round(layoutHeight * COMMENTS_VIDEO_PEEK_FRACTION);
+  const layoutTargetMin = Math.round(layoutHeight * 0.38);
+  const targetMin = Math.min(
+    COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
+    Math.max(COMMENTS_VIDEO_PEEK_TARGET_MIN_PX, layoutTargetMin)
+  );
+  const targetMax = Math.min(
+    COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
+    Math.round(layoutHeight * 0.46)
+  );
+  return Math.min(targetMax, Math.max(fromFraction, targetMin));
+}
+
 export type VideoOverlayPeekBandInput = {
   layoutHeight: number;
   usableHeight: number;

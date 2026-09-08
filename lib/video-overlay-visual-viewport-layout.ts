@@ -33,6 +33,8 @@ export type VideoOverlayViewportFrame = {
   safariControlsClearance: number;
   safeAreaTop: number;
   keyboardOpen: boolean;
+  /** Layout viewport height (`window.innerHeight`) at sample time. */
+  layoutHeight: number;
 };
 
 export type SafariControlsClearanceInput = {
@@ -93,6 +95,7 @@ export function measureVideoOverlayViewportFrame(): VideoOverlayViewportFrame {
     safariControlsClearance,
     safeAreaTop,
     keyboardOpen,
+    layoutHeight: snapshot.layoutHeight,
   };
 }
 

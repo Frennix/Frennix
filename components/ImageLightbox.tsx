@@ -41,6 +41,10 @@ import AnimatedReanimated, {
 } from "react-native-reanimated";
 import { setLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
 import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
+import {
+  captureImmersiveSessionLayoutHeight,
+  clearImmersiveSessionLayoutHeight,
+} from "@/lib/immersive-session-layout";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 
 /** @deprecated Use MediaGalleryState with typed items. */
@@ -496,6 +500,7 @@ function LightboxSurface({
     useImmersiveVideo && Boolean(immersiveVideoPlaylist?.entries.length);
   const freezeImmersiveLayout =
     useImmersiveVideoPlaylist && (commentsOverlayOpen || commentsInitiallyOpen);
+  const freezeLayoutViewportHeight = useImmersiveVideo && visible;
   const immersiveStageHeight =
     freezeImmersiveLayout && layoutViewportHeight > 0 ? layoutViewportHeight : pageHeight;
   const playlistCloseContextRef = useRef<GalleryCloseContext>({});
@@ -505,10 +510,16 @@ function LightboxSurface({
       const viewport = window.visualViewport;
       setPageWidth(Math.round(viewport?.width ?? window.innerWidth));
       setPageHeight(Math.round(viewport?.height ?? window.innerHeight));
-      setLayoutViewportHeight(Math.round(window.innerHeight));
+      const nextInnerHeight = Math.round(window.innerHeight);
+      setLayoutViewportHeight((current) => {
+        if (freezeLayoutViewportHeight && current > 0) {
+          return current;
+        }
+        return nextInnerHeight;
+      });
       return;
     }
-  }, []);
+  }, [freezeLayoutViewportHeight]);
 
   const dismiss = useCallback(() => {
     dismissY.setValue(0);
@@ -538,7 +549,15 @@ function LightboxSurface({
   }, [gallery, dismissY, pageWidth]);
 
   useEffect(() => {
-    if (!visible || Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!visible || Platform.OS !== "web" || typeof window === "undefined") {
+      if (!visible) {
+        clearImmersiveSessionLayoutHeight();
+      }
+      return;
+    }
+    if (useImmersiveVideo) {
+      captureImmersiveSessionLayoutHeight(Math.round(window.innerHeight), false);
+    }
     syncViewportSize();
     window.addEventListener("resize", syncViewportSize);
     window.visualViewport?.addEventListener("resize", syncViewportSize);
@@ -546,7 +565,7 @@ function LightboxSurface({
       window.removeEventListener("resize", syncViewportSize);
       window.visualViewport?.removeEventListener("resize", syncViewportSize);
     };
-  }, [syncViewportSize, visible]);
+  }, [syncViewportSize, useImmersiveVideo, visible]);
 
   useEffect(() => {
     if (items[index]?.kind === "video") {

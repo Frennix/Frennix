@@ -4,6 +4,7 @@
  * Imports the production helper — do not copy the formula here.
  */
 import {
+  computeBaselineVideoPeekHeight,
   resolveVideoOverlayPeekAndSheetHeight,
   VIDEO_OVERLAY_HEADER_CHROME_PX,
   VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX,
@@ -11,6 +12,11 @@ import {
   VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX,
   VIDEO_OVERLAY_MIN_LIST_PX,
 } from "../lib/video-overlay-peek-geometry";
+import {
+  captureImmersiveSessionLayoutHeight,
+  clearImmersiveSessionLayoutHeight,
+  getImmersiveSessionLayoutHeight,
+} from "../lib/immersive-session-layout";
 
 function pass(name: string, ok: boolean, detail = ""): boolean {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
@@ -151,9 +157,124 @@ function main(): void {
       `peek=${tightKeyboard.peekHeight} height=${tightKeyboard.height}`
     ) && ok;
 
+  ok = runLifecycleContract() && ok;
+
   console.log("");
   console.log(ok ? "All checks passed." : "Some checks failed.");
   process.exit(ok ? 0 : 1);
+}
+
+function resolveWithSession(input: {
+  layoutHeight: number;
+  usableHeight: number;
+  composerBottomReserve: number;
+  keyboardOpen: boolean;
+}) {
+  captureImmersiveSessionLayoutHeight(input.layoutHeight, input.keyboardOpen);
+  const frozenLayout = getImmersiveSessionLayoutHeight() ?? input.layoutHeight;
+  return {
+    sessionLayoutHeight: frozenLayout,
+    ...resolveVideoOverlayPeekAndSheetHeight({
+      layoutHeight: frozenLayout,
+      usableHeight: input.usableHeight,
+      baselinePeekHeight: computeBaselineVideoPeekHeight(frozenLayout),
+      composerBottomReserve: input.composerBottomReserve,
+      keyboardOpen: input.keyboardOpen,
+    }),
+  };
+}
+
+function runLifecycleContract(): boolean {
+  console.log("\nlifecycle\n");
+  let ok = true;
+  clearImmersiveSessionLayoutHeight();
+
+  const firstClosed = resolveWithSession({
+    layoutHeight: 844,
+    usableHeight: 670,
+    composerBottomReserve: 80,
+    keyboardOpen: false,
+  });
+  ok =
+    pass(
+      "First Comments opening with keyboard closed captures 844 and peek 330",
+      getImmersiveSessionLayoutHeight() === 844 && firstClosed.peekHeight === 330,
+      `session=${getImmersiveSessionLayoutHeight()} peek=${firstClosed.peekHeight}`
+    ) && ok;
+
+  const afterComposerMeasured = resolveWithSession({
+    layoutHeight: 400,
+    usableHeight: 400,
+    composerBottomReserve: 80,
+    keyboardOpen: true,
+  });
+  ok =
+    pass(
+      "Keyboard opening after composer measured keeps session 844 and 240–280 peek",
+      getImmersiveSessionLayoutHeight() === 844 &&
+        afterComposerMeasured.sessionLayoutHeight === 844 &&
+        inKeyboardPeekBand(afterComposerMeasured.peekHeight),
+      `session=${getImmersiveSessionLayoutHeight()} peek=${afterComposerMeasured.peekHeight}`
+    ) && ok;
+
+  const closingWhileKeyboardTransitioning = resolveWithSession({
+    layoutHeight: 360,
+    usableHeight: 380,
+    composerBottomReserve: 80,
+    keyboardOpen: true,
+  });
+  const recapturedBaseline = computeBaselineVideoPeekHeight(360);
+  ok =
+    pass(
+      "Closing Comments while keyboard is transitioning does not recapture baseline",
+      getImmersiveSessionLayoutHeight() === 844 &&
+        recapturedBaseline < 240 &&
+        closingWhileKeyboardTransitioning.peekHeight === 380 - 80 - 66 &&
+        closingWhileKeyboardTransitioning.peekHeight !== recapturedBaseline,
+      `session=${getImmersiveSessionLayoutHeight()} peek=${closingWhileKeyboardTransitioning.peekHeight} recapturedBaseline=${recapturedBaseline}`
+    ) && ok;
+
+  const reopenPeeks: number[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const oneLine = resolveWithSession({
+      layoutHeight: 340 - i * 20,
+      usableHeight: 400,
+      composerBottomReserve: 80,
+      keyboardOpen: true,
+    });
+    const fiveLine = resolveWithSession({
+      layoutHeight: 320 - i * 20,
+      usableHeight: 400,
+      composerBottomReserve: 126,
+      keyboardOpen: true,
+    });
+    reopenPeeks.push(oneLine.peekHeight, fiveLine.peekHeight);
+    ok =
+      pass(
+        `Reopen ${i + 1} with keyboard visible: one-line and five-line peek match`,
+        oneLine.peekHeight === fiveLine.peekHeight &&
+          oneLine.peekHeight === afterComposerMeasured.peekHeight &&
+          getImmersiveSessionLayoutHeight() === 844,
+        `peek=${oneLine.peekHeight}/${fiveLine.peekHeight} session=${getImmersiveSessionLayoutHeight()}`
+      ) && ok;
+  }
+
+  ok =
+    pass(
+      "Three keyboard-visible reopenings keep the same video height",
+      reopenPeeks.every((peek) => peek === afterComposerMeasured.peekHeight),
+      `peeks=${reopenPeeks.join(",")}`
+    ) && ok;
+
+  clearImmersiveSessionLayoutHeight();
+  ok =
+    pass(
+      "Session layout clears only when the immersive viewer session ends",
+      getImmersiveSessionLayoutHeight() == null,
+      `session=${getImmersiveSessionLayoutHeight()}`
+    ) && ok;
+
+  return ok;
 }
 
 main();

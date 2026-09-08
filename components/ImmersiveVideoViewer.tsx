@@ -22,7 +22,8 @@ import {
   typography,
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
-import { computeBaselineVideoPeekHeight } from "@/components/CommentsBottomSheet";
+import { computeBaselineVideoPeekHeight } from "@/lib/video-overlay-peek-geometry";
+import { getImmersiveSessionLayoutHeight } from "@/lib/immersive-session-layout";
 import { useOpenImmersiveVideoComments } from "@/lib/immersive-video-comments-context";
 import { useCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
@@ -152,7 +153,8 @@ export function ImmersiveVideoViewer({
   const captionNeedsExpand = caption.length > 96;
   const videoPeekLayout = useCommentsVideoPeekLayout();
   const layoutFallbackHeight =
-    Platform.OS === "web" && typeof window !== "undefined" ? window.innerHeight : stageHeight;
+    getImmersiveSessionLayoutHeight() ??
+    (Platform.OS === "web" && typeof window !== "undefined" ? window.innerHeight : stageHeight);
   const fallbackPeekHeight = computeBaselineVideoPeekHeight(layoutFallbackHeight);
   const videoStageHeight = commentsOverlayOpen
     ? videoPeekLayout?.height ?? fallbackPeekHeight

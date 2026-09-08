@@ -70,7 +70,7 @@ function main() {
       overlayShell.includes('presentation="videoOverlay"') &&
         overlayShell.includes("PostCommentsSheet") &&
         sheet.includes("videoOverlay") &&
-        sheet.includes("VIDEO_PEEK_FRACTION")
+        sheet.includes("COMMENTS_VIDEO_PEEK_FRACTION")
     ) && ok;
   ok =
     pass(
@@ -127,7 +127,9 @@ function main() {
         viewer.includes("useCommentsVideoPeekLayout") &&
         sheet.includes("computeBaselineVideoPeekHeight") &&
         sheet.includes("COMMENTS_VIDEO_PEEK_TARGET_MIN_PX") &&
-        sheet.includes("videoPeekBaselineRef") &&
+        sheet.includes("captureImmersiveSessionLayoutHeight") &&
+        sheet.includes("overlayViewport") &&
+        !sheet.includes("videoPeekBaselineRef") &&
         sheet.includes("videoOverlayColumn") &&
         styles.includes("data-frennix-immersive-comments-open")
     ) && ok;
@@ -270,9 +272,11 @@ function main() {
       "Comments-open immersive stage is not collapsed by visualViewport pageHeight",
       lightbox.includes("layoutViewportHeight") &&
         lightbox.includes("freezeImmersiveLayout") &&
+        lightbox.includes("freezeLayoutViewportHeight") &&
         lightbox.includes("immersiveStageHeight") &&
-        lightbox.includes("window.innerHeight") &&
-        viewer.includes("window.innerHeight") &&
+        lightbox.includes("captureImmersiveSessionLayoutHeight") &&
+        lightbox.includes("clearImmersiveSessionLayoutHeight") &&
+        viewer.includes("getImmersiveSessionLayoutHeight") &&
         viewer.includes("computeBaselineVideoPeekHeight(layoutFallbackHeight)")
     ) && ok;
   ok =

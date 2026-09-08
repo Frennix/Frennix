@@ -42,7 +42,18 @@ import {
   resolveVideoOverlayPeekAndSheetHeight,
   VIDEO_OVERLAY_HEADER_CHROME_PX,
   VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX,
+  type VideoOverlayViewportFrame,
 } from "@/lib/video-overlay-visual-viewport-layout";
+import {
+  computeBaselineVideoPeekHeight,
+  COMMENTS_VIDEO_PEEK_FRACTION,
+  COMMENTS_VIDEO_PEEK_TARGET_MIN_PX,
+  COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
+} from "@/lib/video-overlay-peek-geometry";
+import {
+  captureImmersiveSessionLayoutHeight,
+  getImmersiveSessionLayoutHeight,
+} from "@/lib/immersive-session-layout";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { colors, radius, spacing, touchTarget, typography } from "@frennix/ui";
 
@@ -50,12 +61,13 @@ const COMMENTS_SHEET_Z_INDEX = OVERLAY_Z_INDEX.commentsSheet;
 const COMMENTS_VIDEO_OVERLAY_Z_INDEX = OVERLAY_Z_INDEX.commentsVideoOverlay;
 const SHEET_OPEN_RATIO = 0.7;
 const SHEET_MAX_RATIO = 0.75;
-/** Fraction of layout viewport used to seed the baseline preview before keyboard focus. */
-export const COMMENTS_VIDEO_PEEK_FRACTION = 0.31;
-const VIDEO_PEEK_FRACTION = COMMENTS_VIDEO_PEEK_FRACTION;
-/** Target preview band on large phones — preserved while typing when space allows. */
-export const COMMENTS_VIDEO_PEEK_TARGET_MIN_PX = 330;
-export const COMMENTS_VIDEO_PEEK_TARGET_MAX_PX = 400;
+
+export {
+  computeBaselineVideoPeekHeight,
+  COMMENTS_VIDEO_PEEK_FRACTION,
+  COMMENTS_VIDEO_PEEK_TARGET_MIN_PX,
+  COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
+};
 
 export type CommentsSheetPresentation = "fullscreen" | "videoOverlay";
 
@@ -72,39 +84,29 @@ type VideoOverlaySheetLayout = {
   height: number;
 };
 
-/** Baseline preview height from the full layout viewport — not keyboard-reduced visual height. */
-export function computeBaselineVideoPeekHeight(layoutHeight: number): number {
-  const fromFraction = Math.round(layoutHeight * VIDEO_PEEK_FRACTION);
-  const layoutTargetMin = Math.round(layoutHeight * 0.38);
-  const targetMin = Math.min(
-    COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
-    Math.max(COMMENTS_VIDEO_PEEK_TARGET_MIN_PX, layoutTargetMin)
-  );
-  const targetMax = Math.min(
-    COMMENTS_VIDEO_PEEK_TARGET_MAX_PX,
-    Math.round(layoutHeight * 0.46)
-  );
-  return Math.min(targetMax, Math.max(fromFraction, targetMin));
-}
-
 function computeVideoOverlaySheetLayout(
-  baselinePeekHeight: number | null,
+  overlayViewport: VideoOverlayViewportFrame | null,
   composerBottomReserve = 0
 ): VideoOverlaySheetLayout {
-  const layoutHeight = typeof window !== "undefined" ? window.innerHeight : 640;
-  const frame = measureVideoOverlayViewportFrame();
-  const { offsetTop, visualHeight, usableHeight, keyboardOpen } = frame;
-  const baselinePeek =
-    baselinePeekHeight ?? computeBaselineVideoPeekHeight(layoutHeight);
+  const frame = overlayViewport ?? measureVideoOverlayViewportFrame();
+  const sessionLayoutHeight = getImmersiveSessionLayoutHeight();
+  const layoutHeight = sessionLayoutHeight ?? frame.layoutHeight;
+  const baselinePeek = computeBaselineVideoPeekHeight(layoutHeight);
   const { peekHeight, height } = resolveVideoOverlayPeekAndSheetHeight({
     layoutHeight,
-    usableHeight,
+    usableHeight: frame.usableHeight,
     baselinePeekHeight: baselinePeek,
     composerBottomReserve,
-    keyboardOpen,
+    keyboardOpen: frame.keyboardOpen,
   });
 
-  return { offsetTop, visualHeight, peekHeight, top: peekHeight, height };
+  return {
+    offsetTop: frame.offsetTop,
+    visualHeight: frame.visualHeight,
+    peekHeight,
+    top: peekHeight,
+    height,
+  };
 }
 
 type CommentsBottomSheetProps = {
@@ -211,28 +213,24 @@ export function CommentsBottomSheet({
   const portaledComposerReserve = useVideoOverlayPortaledComposerReserve(
     visible && Platform.OS === "web" && suppressWebVideoInlineComposer
   );
-  const videoPeekBaselineRef = useRef<number | null>(null);
   const [mobileViewport, setMobileViewport] = useState<SafariVisualViewportSnapshot | null>(() =>
     Platform.OS === "web" ? measureSafariVisualViewport() : null
   );
+  const [overlayViewport, setOverlayViewport] = useState<VideoOverlayViewportFrame | null>(null);
   const videoOverlayLayout = useMemo(
     () =>
       computeVideoOverlaySheetLayout(
-        videoPeekBaselineRef.current,
+        overlayViewport,
         suppressWebVideoInlineComposer ? portaledComposerReserve : 0
       ),
-    [mobileViewport, portaledComposerReserve, suppressWebVideoInlineComposer]
+    [
+      overlayViewport,
+      overlayViewport?.keyboardOpen,
+      overlayViewport?.usableHeight,
+      portaledComposerReserve,
+      suppressWebVideoInlineComposer,
+    ]
   );
-
-  useEffect(() => {
-    if (!visible || !useVideoOverlay) {
-      videoPeekBaselineRef.current = null;
-      return;
-    }
-    if (typeof window !== "undefined") {
-      videoPeekBaselineRef.current = computeBaselineVideoPeekHeight(window.innerHeight);
-    }
-  }, [useVideoOverlay, visible]);
 
   useEffect(() => {
     if (!visible || Platform.OS !== "web" || !isMobileWebFullscreenMode() || typeof window === "undefined") {
@@ -244,6 +242,19 @@ export function CommentsBottomSheet({
     };
     syncHeight();
     return subscribeSafariVisualViewport(syncHeight);
+  }, [useVideoOverlay, visible]);
+
+  useLayoutEffect(() => {
+    if (!visible || !useVideoOverlay || Platform.OS !== "web") {
+      return;
+    }
+    const sampleOverlayViewport = () => {
+      const frame = measureVideoOverlayViewportFrame();
+      captureImmersiveSessionLayoutHeight(frame.layoutHeight, frame.keyboardOpen);
+      setOverlayViewport(frame);
+    };
+    sampleOverlayViewport();
+    return subscribeSafariVisualViewport(sampleOverlayViewport);
   }, [useVideoOverlay, visible]);
 
   useLayoutEffect(() => {
@@ -408,10 +419,7 @@ export function CommentsBottomSheet({
   const mobileOverlayTop = mobileViewport?.offsetTop ?? 0;
   const mobileVisualHeight = mobileViewport?.visualHeight ?? 640;
   const mobileOverlayHeight = Math.max(180, mobileVisualHeight - overlayBottomReserve);
-  const videoOverlayViewportFrame = useMemo(
-    () => (suppressWebVideoInlineComposer ? measureVideoOverlayViewportFrame() : null),
-    [mobileViewport, suppressWebVideoInlineComposer]
-  );
+  const videoOverlayViewportFrame = suppressWebVideoInlineComposer ? overlayViewport : null;
   const videoOverlayFixedFrameStyle = videoOverlayViewportFrame
     ? computeVideoOverlayFixedFrameStyle(videoOverlayViewportFrame)
     : null;
