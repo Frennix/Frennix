@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · c505ba0e</title>
+    <title>Frennix · 30533c6f</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="c505ba0e97ddf70257d633581951f1f320796d73" />
-    <meta name="frennix-build-bundle" content="index-6b463f7ba739877bd3694875ccf68eb5.js" />
-    <meta name="frennix-build-at" content="2026-09-05T00:38:22.390Z" />
+    <meta name="frennix-build-sha" content="30533c6f75fb3c4c8b928af98f18d01152bc7058" />
+    <meta name="frennix-build-bundle" content="index-2e742d161a4b16145ebe29038d438a1e.js" />
+    <meta name="frennix-build-at" content="2026-09-08T00:02:24.221Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -424,6 +424,10 @@
   }
   [data-frennix-comments-video-overlay="true"] {
     pointer-events: none !important;
+    background: transparent !important;
+  }
+  [data-frennix-video-peek-dismiss="true"] {
+    background: transparent !important;
   }
   [data-frennix-comments-video-overlay="true"] > * {
     pointer-events: auto !important;
@@ -576,6 +580,10 @@
     isolation: isolate;
     z-index: 99998 !important;
   }
+  body[data-frennix-comments-open="true"] [data-frennix-comments-video-overlay="true"] {
+    z-index: 100001 !important;
+    background: transparent !important;
+  }
   #frennix-boot-shell[style*="display: none"],
   #frennix-boot-shell[hidden] {
     display: none !important;
@@ -655,7 +663,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="c505ba0e97ddf70257d633581951f1f320796d73" data-bundle="index-6b463f7ba739877bd3694875ccf68eb5.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="30533c6f75fb3c4c8b928af98f18d01152bc7058" data-bundle="index-2e742d161a4b16145ebe29038d438a1e.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -701,7 +709,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-6b463f7ba739877bd3694875ccf68eb5.js?v=c505ba0e" defer></script>
+  <script src="/_expo/static/js/web/index-2e742d161a4b16145ebe29038d438a1e.js?v=30533c6f" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
