@@ -86,7 +86,7 @@ function main() {
     pass(
       "D/E: shared comment content supports post/like/reply",
       content.includes("addComment") &&
-        content.includes("toggleCommentLike") &&
+        content.includes("useCommentLike") &&
         content.includes("CommentThread") &&
         content.includes("useCommentActions")
     ) && ok;

@@ -17,9 +17,10 @@ import {
   type NativeSyntheticEvent,
   type TextInputContentSizeChangeEventData,
 } from "react-native";
-import { addComment, getComments, toggleCommentLike } from "@frennix/api";
+import { addComment, getComments } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
+import { useCommentLike } from "@/lib/useCommentLike";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import { hapticLight } from "@/lib/haptics";
 import { WebCommentComposerRow } from "@/components/WebCommentComposerRow";
@@ -408,13 +409,7 @@ export function usePostCommentsContent({
     },
   });
 
-  const commentLikeMutation = useMutation({
-    mutationFn: ({ commentId, liked }: { commentId: string; liked: boolean }) =>
-      toggleCommentLike(commentId, userId, liked),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comments", postId] });
-    },
-  });
+  const { toggleCommentLikeState } = useCommentLike(postId, userId);
 
   const commentPlaceholder = replyTo
     ? `Reply to ${replyTo.author?.display_name ?? "comment"}…`
@@ -485,9 +480,7 @@ export function usePostCommentsContent({
         comments={comments}
         currentUserId={userId}
         onReply={setReplyTo}
-        onLike={(comment) =>
-          commentLikeMutation.mutate({ commentId: comment.id, liked: !!comment.liked_by_me })
-        }
+        onLike={(comment) => toggleCommentLikeState(comment.id, !!comment.liked_by_me)}
         onMenuPress={openCommentActions}
       />
     </>

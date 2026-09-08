@@ -1,6 +1,6 @@
 import type { Comment, FeedPage, Post, PostType } from "@frennix/types";
 import { normalizePostWorkoutFields } from "@frennix/types";
-import { formatSupabaseError } from "./profile-utils";
+import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";
 import { normalizeMediaExt, isVideoMime } from "./media-utils";
 import {
   readMediaUploadBody,
@@ -451,7 +451,7 @@ export async function toggleLike(postId: string, userId: string, liked: boolean)
     if (error) throw error;
   } else {
     const { error } = await getSupabase().from("likes").insert({ post_id: postId, user_id: userId });
-    if (error) throw error;
+    if (error && !isUniqueConstraintError(error)) throw error;
   }
 }
 

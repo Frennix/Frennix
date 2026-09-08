@@ -1,5 +1,5 @@
 import type { Comment } from "@frennix/types";
-import { formatSupabaseError } from "./profile-utils";
+import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";
 import { getSupabase } from "./supabase";
 
 function buildCommentTree(flat: Comment[]): Comment[] {
@@ -120,6 +120,6 @@ export async function toggleCommentLike(commentId: string, userId: string, liked
     const { error } = await getSupabase()
       .from("comment_likes")
       .insert({ comment_id: commentId, user_id: userId });
-    if (error) throw error;
+    if (error && !isUniqueConstraintError(error)) throw error;
   }
 }

@@ -40,6 +40,12 @@ export function getTechnicalErrorMessage(error: unknown): string {
     .join(" | ");
 }
 
+/** Postgres unique_violation — safe to treat as an idempotent like insert. */
+export function isUniqueConstraintError(error: unknown): boolean {
+  const { code, message } = getSupabaseErrorDetails(error);
+  return code === "23505" || /duplicate key|unique constraint/i.test(message);
+}
+
 const USER_ERROR_FALLBACK = "Something went wrong. Please try again.";
 
 const ERROR_CODE_MESSAGES: Record<string, string> = {

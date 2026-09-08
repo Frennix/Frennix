@@ -1,5 +1,6 @@
+import { useRef } from "react";
 import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { getErrorMessage, toggleLike } from "@frennix/api";
+import { getErrorMessage, getTechnicalErrorMessage, toggleLike } from "@frennix/api";
 import type { FeedPage, Post } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
 import { hapticLike } from "@/lib/haptics";
@@ -41,8 +42,12 @@ function patchFeed(
 
 type LikeVars = { postId: string; liked: boolean };
 
+const DUPLICATE_PRESS_MS = 400;
+
 export function useFeedLike(userId: string) {
   const queryClient = useQueryClient();
+  const likeChainRef = useRef(new Map<string, Promise<void>>());
+  const lastToggleAtRef = useRef(new Map<string, number>());
 
   const likeMutation = useMutation({
     mutationFn: ({ postId, liked }: LikeVars) => toggleLike(postId, userId, liked),
@@ -74,16 +79,41 @@ export function useFeedLike(userId: string) {
       if (context?.previousPost) {
         queryClient.setQueryData(["post", postId, userId], context.previousPost);
       }
-      showAlert("Like failed", getErrorMessage(error));
+      if (typeof __DEV__ !== "undefined" && __DEV__) {
+        console.error("[like] post failed", {
+          postId,
+          userId,
+          error: getTechnicalErrorMessage(error),
+        });
+      }
+      showAlert("Like failed", getErrorMessage(error, "Couldn't update that like. Please try again."));
     },
   });
+
+  function readLiked(postId: string): boolean {
+    const feed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+    return !!(
+      findPostInFeed(feed, postId)?.liked_by_me ??
+      queryClient.getQueryData<Post>(["post", postId, userId])?.liked_by_me
+    );
+  }
 
   function toggleLikePost(postId: string) {
     if (!userId) return;
 
-    const feed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-    const liked = !!findPostInFeed(feed, postId)?.liked_by_me;
-    likeMutation.mutate({ postId, liked });
+    const now = Date.now();
+    const lastToggleAt = lastToggleAtRef.current.get(postId) ?? 0;
+    if (now - lastToggleAt < DUPLICATE_PRESS_MS) return;
+    lastToggleAtRef.current.set(postId, now);
+
+    const previous = likeChainRef.current.get(postId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(async () => {
+        await likeMutation.mutateAsync({ postId, liked: readLiked(postId) });
+      })
+      .catch(() => undefined);
+    likeChainRef.current.set(postId, next);
   }
 
   return { toggleLikePost };
