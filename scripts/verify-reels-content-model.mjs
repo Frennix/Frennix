@@ -165,6 +165,15 @@ function main() {
 
   ok =
     pass(
+      "Reel delete uses the post row first and refreshes Reels cache",
+      readSource("packages/api/src/posts.ts").includes("deletePost storage cleanup") &&
+        readSource("lib/post-cache.ts").includes('["reels", userId]') &&
+        readSource("lib/usePostActions.tsx").includes("deleteMutation.mutate(activePost.id)") &&
+        readSource("app/(tabs)/reels.tsx").includes("onDeleted: () => closeGallery(0)")
+    ) && ok;
+
+  ok =
+    pass(
       "Sharing destinations can scroll inside the visible viewport",
       savedSheet.includes("ScrollView") &&
         savedSheet.includes('keyboardShouldPersistTaps="handled"') &&

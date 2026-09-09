@@ -157,7 +157,28 @@ function main() {
     pass(
       "Like toggle keeps origin persistence behavior",
       postsApi.includes("if (error && !isUniqueConstraintError(error)) throw error;") &&
-        postsApi.includes('import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";')
+        postsApi.includes("formatSupabaseError") &&
+        postsApi.includes("isUniqueConstraintError") &&
+        postsApi.includes("./profile-utils")
+    ) && ok;
+
+  ok =
+    pass(
+      "Immersive Reels controls stay above swipe capture",
+      viewer.includes("function RailAction(") &&
+        viewer.includes('data-frennix-immersive-control') &&
+        viewer.includes("hitSlop={CONTROL_HIT_SLOP}") &&
+        playlistViewer.includes("isPlaylistChromeTarget") &&
+        playlistViewer.includes("captured: false") &&
+        playlistViewer.includes("if (!gesture.captured)")
+    ) && ok;
+
+  ok =
+    pass(
+      "Owner Reel delete uses the selected post id and closes the viewer",
+      reels.includes("onDeleted: () => closeGallery(0)") &&
+        postsApi.includes("deletePost storage cleanup") &&
+        postsApi.includes('.eq("author_id", userId)')
     ) && ok;
 
   ok =

@@ -357,6 +357,49 @@ function main() {
         )
     ) && ok;
 
+  const playlistViewer = readSource("components/ImmersiveVideoPlaylistViewer.tsx");
+  const postsApi = readSource("packages/api/src/posts.ts");
+  const postActions = readSource("lib/usePostActions.tsx");
+  const postCache = readSource("lib/post-cache.ts");
+  const reels = readSource("app/(tabs)/reels.tsx");
+
+  ok =
+    pass(
+      "Side controls are independent Pressables above the swipe layer",
+      viewer.includes("function RailAction(") &&
+        viewer.includes("hitSlop={CONTROL_HIT_SLOP}") &&
+        viewer.includes("minHeight: touchTarget") &&
+        viewer.includes('data-frennix-immersive-control') &&
+        viewer.includes("pointerEvents: \"auto\"") &&
+        slide.includes("immersiveTapSurface") &&
+        slide.includes("right: 72")
+    ) && ok;
+
+  ok =
+    pass(
+      "Swipe capture excludes chrome and waits for a vertical lock",
+      playlistViewer.includes("isPlaylistChromeTarget") &&
+        playlistViewer.includes('data-frennix-immersive-control') &&
+        playlistViewer.includes("captured: false") &&
+        playlistViewer.includes("if (!gesture.captured)") &&
+        !playlistViewer.includes("event.currentTarget.setPointerCapture?.(event.pointerId);\n    },")
+    ) && ok;
+
+  ok =
+    pass(
+      "Owner delete uses the selected post id and closes the Reel viewer",
+      postActions.includes("deleteMutation.mutate(activePost.id)") &&
+        postActions.includes("confirmDeletePost") &&
+        postsApi.includes(".eq(\"id\", postId)") &&
+        postsApi.includes(".eq(\"author_id\", userId)") &&
+        postsApi.includes("maybeSingle()") &&
+        postsApi.includes("deletePost storage cleanup") &&
+        postCache.includes('["reels", userId]') &&
+        postActions.includes("rootPortal") &&
+        reels.includes("onDeleted: () => closeGallery(0)") &&
+        viewer.includes('label="Comment"')
+    ) && ok;
+
   console.log("");
   console.log(ok ? "All checks passed." : "Some checks failed.");
   process.exit(ok ? 0 : 1);

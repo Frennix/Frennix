@@ -17,13 +17,21 @@ export type BuildImmersiveVideoContextBundle = {
   postActionSheets: ReactNode;
 };
 
+type BuildImmersiveVideoContextOptions = {
+  onDeleted?: (postId: string) => void;
+};
+
 /** Shared post actions for immersive video overlay and /video deep links. */
-export function useBuildImmersiveVideoContext(userId: string): BuildImmersiveVideoContextBundle {
+export function useBuildImmersiveVideoContext(
+  userId: string,
+  options?: BuildImmersiveVideoContextOptions
+): BuildImmersiveVideoContextBundle {
   const { toggleLikePost } = useFeedLike(userId);
   const postReaction = usePostReaction(userId);
   const { openShare, shareSheet } = useSharePost(userId);
   const { openPostActions, postActionSheets } = usePostActions({
     userId,
+    onDeleted: options?.onDeleted,
     onShareInApp: (target) => openShare(target.shared_post ?? target),
   });
   const { toggleFollow, isFollowing } = useSuggestedFollow(userId);

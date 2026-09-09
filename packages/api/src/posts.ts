@@ -1,6 +1,6 @@
 import type { Comment, FeedPage, JourneyCategory, Post, PostType } from "@frennix/types";
 import { normalizePostWorkoutFields } from "@frennix/types";
-import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";
+import { formatSupabaseError, isUniqueConstraintError, logProfileError } from "./profile-utils";
 import { normalizeMediaExt, isVideoMime } from "./media-utils";
 import {
   readMediaUploadBody,
@@ -620,24 +620,11 @@ export async function deletePost(postId: string, userId: string) {
     .from("posts")
     .select("id, author_id, media_urls, thumbnail_url")
     .eq("id", postId)
-    .single();
+    .eq("author_id", userId)
+    .maybeSingle();
 
   if (fetchError) throw formatSupabaseError(fetchError, "Failed to load post");
-  if (!post) throw new Error("Post not found");
-  if (post.author_id !== userId) throw new Error("You can only delete your own posts");
-
-  const mediaUrls = (post.media_urls ?? []) as string[];
-  const storageUrls = [...mediaUrls];
-  if (post.thumbnail_url) storageUrls.push(post.thumbnail_url as string);
-
-  const paths = storageUrls
-    .map(extractPostsStoragePath)
-    .filter((path): path is string => Boolean(path));
-
-  if (paths.length) {
-    const { error: storageError } = await getSupabase().storage.from("posts").remove(paths);
-    if (storageError) throw formatSupabaseError(storageError, "Failed to delete post media");
-  }
+  if (!post) throw new Error("You can only delete your own posts");
 
   const { error: deleteError } = await getSupabase()
     .from("posts")
@@ -646,4 +633,25 @@ export async function deletePost(postId: string, userId: string) {
     .eq("author_id", userId);
 
   if (deleteError) throw formatSupabaseError(deleteError, "Failed to delete post");
+
+  const mediaUrls = (post.media_urls ?? []) as string[];
+  const storageUrls = [...mediaUrls];
+  if (post.thumbnail_url) storageUrls.push(post.thumbnail_url as string);
+  const paths = storageUrls
+    .map(extractPostsStoragePath)
+    .filter((path): path is string => Boolean(path));
+
+  if (!paths.length) return;
+
+  try {
+    const { error: storageError } = await getSupabase().storage.from("posts").remove(paths);
+    if (storageError) {
+      logProfileError("deletePost storage cleanup", storageError, {
+        postId,
+        path_count: paths.length,
+      });
+    }
+  } catch (storageError) {
+    logProfileError("deletePost storage cleanup", storageError, { postId });
+  }
 }

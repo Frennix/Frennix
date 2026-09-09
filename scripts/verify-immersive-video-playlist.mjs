@@ -215,6 +215,17 @@ function main() {
         playlistViewer.includes("mergeUniquePlaylistEntries")
     ) && ok;
 
+  ok =
+    pass(
+      "Swipe capture excludes chrome controls and waits for a vertical lock",
+      playlistViewer.includes("isPlaylistChromeTarget") &&
+        playlistViewer.includes("[data-frennix-immersive-control='true']") &&
+        playlistViewer.includes("captured: false") &&
+        playlistViewer.includes("if (!gesture.captured)") &&
+        immersive.includes('data-frennix-immersive-control') &&
+        immersive.includes("function RailAction(")
+    ) && ok;
+
   console.log(`\n${ok ? "All checks passed." : "Some checks failed."}`);
   process.exit(ok ? 0 : 1);
 }

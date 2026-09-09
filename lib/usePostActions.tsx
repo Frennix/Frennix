@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import type { Post } from "@frennix/types";
-import { blockUser, deletePost, getErrorMessage, reportPost } from "@frennix/api";
+import { blockUser, deletePost, getErrorMessage, getTechnicalErrorMessage, reportPost } from "@frennix/api";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
 import { ReportReasonSheet } from "@/components/ReportReasonSheet";
 import { type EntityActionId, isPlaceholderAction } from "@/lib/entity-actions";
@@ -11,6 +11,7 @@ import { postActionsForRole } from "@/lib/post-actions";
 import { confirmBlockUser, confirmDeletePost, showAlert, showSuccess } from "@/lib/alerts";
 import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { invalidatePostQueries, removePostFromAllCaches } from "@/lib/post-cache";
 import { getSharedPostTargetId } from "@frennix/ui";
 
@@ -52,15 +53,21 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     mutationFn: (postId: string) => deletePost(postId, userId),
     onMutate: async (postId) => {
       await queryClient.cancelQueries({ queryKey: ["feed", userId] });
-      const previous = queryClient.getQueryData(["feed", userId]);
+      await queryClient.cancelQueries({ queryKey: ["reels", userId] });
+      const previousFeed = queryClient.getQueryData(["feed", userId]);
+      const previousReels = queryClient.getQueryData(["reels", userId]);
       removePostFromAllCaches(queryClient, userId, postId);
-      return { previous };
+      return { previousFeed, previousReels };
     },
     onError: (error, _postId, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["feed", userId], context.previous);
+      if (context?.previousFeed) {
+        queryClient.setQueryData(["feed", userId], context.previousFeed);
       }
-      showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
+      if (context?.previousReels) {
+        queryClient.setQueryData(["reels", userId], context.previousReels);
+      }
+      console.error("[deletePost]", getTechnicalErrorMessage(error));
+      showAlert("Could not delete", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
     onSuccess: async (_data, postId) => {
       queryClient.removeQueries({ queryKey: ["post", postId] });
@@ -157,6 +164,8 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
         actions={menuActions}
         onSelect={handleAction}
         onClose={closeMenu}
+        rootPortal
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
       />
       <ReportReasonSheet
         visible={reportVisible}
@@ -166,6 +175,8 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
           setActivePost(null);
         }}
         onSelect={(reason) => reportMutation.mutate(reason)}
+        rootPortal
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
       />
     </>
   );

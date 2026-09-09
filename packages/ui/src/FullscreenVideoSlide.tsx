@@ -708,7 +708,7 @@ export const FullscreenVideoSlide = forwardRef<
             : null}
 
           <Pressable
-            style={styles.tapSurface}
+            style={[styles.tapSurface, immersiveMode ? styles.immersiveTapSurface : null]}
             onPress={immersiveMode ? togglePlayPause : revealControls}
             accessibilityRole="button"
             accessibilityLabel={immersiveMode ? "Play or pause video" : "Show video controls"}
@@ -889,6 +889,12 @@ const styles = StyleSheet.create({
   tapSurface: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
+  },
+  immersiveTapSurface: {
+    top: 56,
+    right: 72,
+    bottom: 96,
+    left: 0,
   },
   controlsOverlay: {
     ...StyleSheet.absoluteFillObject,

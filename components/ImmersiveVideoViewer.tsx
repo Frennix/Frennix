@@ -30,6 +30,17 @@ import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 
 const STRONG_WORK_EMOJI = "💪";
 const CAPTION_COLLAPSE_LINES = 2;
+const CONTROL_HIT_SLOP = 8;
+
+const webControlProps =
+  Platform.OS === "web"
+    ? ({
+        "data-frennix-immersive-control": "true",
+        onPointerDown: (event: { stopPropagation?: () => void }) => {
+          event.stopPropagation?.();
+        },
+      } as const)
+    : null;
 
 function formatActionCount(value?: number | null): string {
   const count = value ?? 0;
@@ -226,12 +237,16 @@ export function ImmersiveVideoViewer({
         ]}
         pointerEvents="box-none"
         {...(Platform.OS === "web"
-          ? ({ "data-frennix-immersive-top-bar": "true" } as object)
+          ? ({
+              "data-frennix-immersive-top-bar": "true",
+              "data-frennix-immersive-control": "true",
+            } as object)
           : null)}
       >
         <Pressable
           onPress={onClose}
-          hitSlop={10}
+          hitSlop={8}
+          {...webControlProps}
           accessibilityRole="button"
           accessibilityLabel="Close video"
           style={styles.iconButton}
@@ -241,7 +256,8 @@ export function ImmersiveVideoViewer({
 
         <Pressable
           onPress={toggleMute}
-          hitSlop={10}
+          hitSlop={8}
+          {...webControlProps}
           accessibilityRole="button"
           accessibilityLabel={muted ? "Unmute video" : "Mute video"}
           style={styles.iconButton}
@@ -258,9 +274,12 @@ export function ImmersiveVideoViewer({
         <>
           <View
             style={[styles.actionRail, { bottom: bottomInset + 120 }]}
-            pointerEvents="box-none"
+            pointerEvents="auto"
             {...(Platform.OS === "web"
-              ? ({ "data-frennix-immersive-rail": "true" } as object)
+              ? ({
+                  "data-frennix-immersive-rail": "true",
+                  "data-frennix-immersive-control": "true",
+                } as object)
               : null)}
           >
         <RailAction
@@ -306,7 +325,13 @@ export function ImmersiveVideoViewer({
         </RailAction>
           </View>
 
-          <View style={[styles.bottomMeta, { paddingBottom: bottomInset + 58 }]} pointerEvents="box-none">
+          <View
+            style={[styles.bottomMeta, { paddingBottom: bottomInset + 58 }]}
+            pointerEvents="box-none"
+            {...(Platform.OS === "web"
+              ? ({ "data-frennix-immersive-meta": "true" } as object)
+              : null)}
+          >
         <Pressable
           style={styles.authorRow}
           onPress={postActions.onAuthorPress}
@@ -370,10 +395,19 @@ export function ImmersiveVideoViewer({
         ) : null}
           </View>
 
-          <View style={[styles.commentComposerHost, { paddingBottom: bottomInset + spacing.sm }]}>
+          <View
+            style={[styles.commentComposerHost, { paddingBottom: bottomInset + spacing.sm }]}
+            {...(Platform.OS === "web"
+              ? ({
+                  "data-frennix-immersive-composer": "true",
+                  "data-frennix-immersive-control": "true",
+                } as object)
+              : null)}
+          >
             <Pressable
               style={styles.commentComposerTrigger}
               onPress={() => openComments()}
+              {...webControlProps}
               accessibilityRole="button"
               accessibilityLabel="Add a comment"
             >
@@ -408,10 +442,12 @@ function RailAction({
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={CONTROL_HIT_SLOP}
       style={styles.railButton}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
+      {...webControlProps}
     >
       {children}
     </Pressable>
@@ -433,6 +469,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     backgroundColor: colors.black,
     overflow: "hidden",
+    zIndex: 0,
   },
   videoStageHostFull: {
     flex: 1,
@@ -492,7 +529,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     ...(Platform.OS === "web"
       ? ({
-          pointerEvents: "box-none",
+          pointerEvents: "auto",
+          isolation: "isolate",
+          transform: "translateZ(0)",
         } as const)
       : null),
   },
@@ -500,6 +539,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minWidth: touchTarget,
+    minHeight: touchTarget,
     gap: 4,
     ...(Platform.OS === "web"
       ? ({

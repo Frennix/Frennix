@@ -48,7 +48,9 @@ function ReelsScreen() {
   const { onScroll, isAtTop } = useScrollAtTop();
   const { openGallery, closeGallery, lightbox, lightboxVisible } = useImageLightbox();
   const { buildImmersiveContext, shareSheet, postActionSheets } =
-    useBuildImmersiveVideoContext(userId);
+    useBuildImmersiveVideoContext(userId, {
+      onDeleted: () => closeGallery(0),
+    });
 
   const {
     data,

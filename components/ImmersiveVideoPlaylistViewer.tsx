@@ -61,6 +61,7 @@ type PlaylistSwipeGesture = {
   startY: number;
   startTime: number;
   lock: PlaylistSwipeLock;
+  captured: boolean;
 };
 
 function clampIndex(value: number, max: number) {
@@ -70,15 +71,22 @@ function clampIndex(value: number, max: number) {
 function isPlaylistChromeTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
   if (
+    target.closest("[data-frennix-immersive-control='true']") ||
+    target.closest("[data-frennix-immersive-rail]") ||
+    target.closest("[data-frennix-immersive-top-bar]") ||
+    target.closest("[data-frennix-immersive-composer]") ||
+    target.closest("[data-frennix-immersive-meta]")
+  ) {
+    return true;
+  }
+  if (
     target.closest("[data-frennix-playlist-swipe-surface='true']") ||
     target.closest("[aria-label='Play or pause video']")
   ) {
     return false;
   }
   return Boolean(
-    target.closest(
-      "button, a, input, textarea, [role='button'], [data-frennix-immersive-rail], [data-frennix-immersive-top-bar]"
-    )
+    target.closest("button, a, input, textarea, [role='button']")
   );
 }
 
@@ -206,8 +214,8 @@ export function ImmersiveVideoPlaylistViewer({
         startY: event.clientY,
         startTime: Date.now(),
         lock: "none",
+        captured: false,
       };
-      event.currentTarget.setPointerCapture?.(event.pointerId);
     },
     []
   );
@@ -215,6 +223,10 @@ export function ImmersiveVideoPlaylistViewer({
   const handleWebPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (isPlaylistChromeTarget(event.target)) {
+      gestureRef.current = null;
+      return;
+    }
     const dx = event.clientX - gesture.startX;
     const dy = event.clientY - gesture.startY;
     if (gesture.lock === "none") {
@@ -226,6 +238,10 @@ export function ImmersiveVideoPlaylistViewer({
     }
     if (gesture.lock === "vertical") {
       event.preventDefault();
+      if (!gesture.captured) {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        gesture.captured = true;
+      }
     }
   }, []);
 

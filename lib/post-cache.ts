@@ -51,6 +51,14 @@ export function removePostFromAllCaches(queryClient: QueryClient, userId: string
       pages: removePostFromFeedPages(old.pages, postId),
     };
   });
+
+  queryClient.setQueryData<InfiniteData<FeedPage>>(["reels", userId], (old) => {
+    if (!old) return old;
+    return {
+      ...old,
+      pages: removePostFromFeedPages(old.pages, postId),
+    };
+  });
 }
 
 export function updatePostInAllCaches(queryClient: QueryClient, userId: string, updated: Post) {
@@ -104,6 +112,7 @@ export async function invalidatePostQueries(
     queryClient.invalidateQueries({ queryKey: ["challenge-posts"] }),
     queryClient.invalidateQueries({ queryKey: ["event-posts"] }),
     queryClient.invalidateQueries({ queryKey: ["saved-posts", userId] }),
+    queryClient.invalidateQueries({ queryKey: ["reels", userId] }),
     queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] }),
     queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] }),
   ];
