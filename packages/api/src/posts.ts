@@ -271,6 +271,12 @@ export type FeedCoreOptions = {
   isReel?: boolean;
 };
 
+export function applyReelDestinationFilter(posts: Post[], wantReels: boolean): Post[] {
+  return posts.filter((post) =>
+    wantReels ? post.post_type === "video" && post.is_reel === true : post.is_reel !== true
+  );
+}
+
 /** Fast path: feed scope + post rows with author profiles — no likes/comments/reactions yet. */
 export async function getFeedCore(
   userId: string,
@@ -303,7 +309,7 @@ export async function getFeedCore(
     q = q.eq("post_type", options.postType);
   }
 
-  // Never infer Reels from post_type alone. The flag is explicit.
+  // Never infer Reels from post_type alone. Explicit flag + post-fetch guard.
   q = q.eq("is_reel", options?.isReel === true);
 
   if (cursor) {
@@ -317,7 +323,10 @@ export async function getFeedCore(
     return { posts: [], nextCursor: null };
   }
 
-  const posts = (data as Post[]).map((post) => normalizePostWorkoutFields(post));
+  const posts = applyReelDestinationFilter(
+    (data as Post[]).map((post) => normalizePostWorkoutFields(post)),
+    options?.isReel === true
+  );
   const nextCursor = data.length === limit ? data[data.length - 1].created_at : null;
   onPhase?.("posts", { count: posts.length });
 

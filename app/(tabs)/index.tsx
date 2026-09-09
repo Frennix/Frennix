@@ -530,7 +530,11 @@ export default function HomeScreen() {
   });
   markFeedHook("suggestions-query");
 
-  const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+  const posts = useMemo(
+    () =>
+      (data?.pages.flatMap((page) => page.posts) ?? []).filter((post) => post.is_reel !== true),
+    [data?.pages]
+  );
 
   useEffect(() => {
     if (Platform.OS !== "web" || !userId) return;
@@ -813,7 +817,8 @@ export default function HomeScreen() {
           const cachedPosts =
             queryClient
               .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-              ?.pages.flatMap((page) => page.posts) ?? posts;
+              ?.pages.flatMap((page) => page.posts)
+              .filter((candidate) => candidate.is_reel !== true) ?? posts;
           return cachedPosts.find(
             (candidate) => (candidate.shared_post ?? candidate).id === postId
           );

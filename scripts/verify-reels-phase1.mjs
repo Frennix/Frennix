@@ -202,11 +202,22 @@ function main() {
 
   ok =
     pass(
-      "Shared playlist viewer has no Reels-only caughtUpLabel fork",
-      !playlistViewer.includes("caughtUpLabel") &&
-        !overlayShell.includes("caughtUpLabel") &&
-        !playlistState.includes("caughtUpLabel") &&
-        !reels.includes("caughtUpLabel")
+      "Caught-up copy is a dedicated non-video end state, never an overlay on an active Reel",
+      playlistViewer.includes("caughtUpLabel") &&
+        playlistViewer.includes("DEFAULT_CAUGHT_UP_LABEL = \"You're caught up on feed videos\"") &&
+        playlistViewer.includes("showEndState") &&
+        playlistViewer.includes("activeIndex >= entries.length") &&
+        playlistViewer.includes("data-frennix-playlist-end-state") &&
+        playlistViewer.includes("endStateSlide") &&
+        !playlistViewer.includes("webFooterHost") &&
+        overlayShell.includes("caughtUpLabel={playlist.caughtUpLabel}") &&
+        playlistState.includes("caughtUpLabel?: string") &&
+        reels.includes('caughtUpLabel: "You\'re caught up on Reels"') &&
+        !reels.includes("You're caught up on feed videos") &&
+        viewer.includes("metadataStack") &&
+        viewer.includes("data-frennix-immersive-metadata-stack") &&
+        viewer.includes("data-frennix-immersive-category") &&
+        viewer.includes("data-frennix-immersive-caption")
     ) && ok;
 
   console.log("");

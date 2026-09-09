@@ -122,6 +122,7 @@ export function ImmersiveVideoOverlayShell({
           onActiveEntryChange={handleActiveEntryChange}
           commentsOverlayOpen={commentsVisible}
           routePlayback={routePlayback}
+          caughtUpLabel={playlist.caughtUpLabel}
         />
         {Platform.OS === "web" && usesMobileWebCommentsRoute() && activePost ? (
           <PostCommentsSheet

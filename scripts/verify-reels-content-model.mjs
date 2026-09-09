@@ -78,11 +78,15 @@ function main() {
   ok =
     pass(
       "Share Your Journey submits is_reel=true; normal posts do not",
-      shareWorkout.includes("is_reel: postType === \"video\" && input.isReel === true") &&
-        createPost.includes("const postToReels = mode === \"reel\" && hasVideo;") &&
-        createPost.includes("isReel: postToReels") &&
+      shareWorkout.includes("const shouldReel = mode === \"reel\"") &&
+        shareWorkout.includes("is_reel: true") &&
+        shareWorkout.includes("is_reel: false") &&
+        !shareWorkout.includes('mode === "reel" ? "feed"') &&
+        createPost.includes("if (mode === \"reel\" && !hasVideo)") &&
+        createPost.includes("isReel: mode === \"reel\"") &&
         createPost.includes("isReel: false") &&
-        createPost.includes('paramValue(params.intent) === "reel"')
+        createPost.includes('paramValue(params.intent) === "reel"') &&
+        !createPost.includes('mode === "reel" ? "feed"')
     ) && ok;
 
   ok =
@@ -101,6 +105,8 @@ function main() {
     pass(
       "Normal Feed excludes is_reel=true",
       postsApi.includes('q = q.eq("is_reel", options?.isReel === true)') &&
+        postsApi.includes("export function applyReelDestinationFilter") &&
+        postsApi.includes("applyReelDestinationFilter(") &&
         /export async function getFeed\(/.test(postsApi) &&
         postsApi.includes("const core = await getFeedCore(userId, cursor, limit);")
     ) && ok;
@@ -210,6 +216,54 @@ function main() {
         !belongsOnReels({ post_type: "video" }) &&
         belongsOnReels({ post_type: "video", is_reel: true }) &&
         !belongsOnReels({ post_type: "photo", is_reel: true })
+    ) && ok;
+
+  const reelBlock = shareWorkout.slice(
+    shareWorkout.indexOf("if (shouldReel)"),
+    shareWorkout.indexOf("} else if (shouldFeed)")
+  );
+  const bothBlockHint =
+    shareWorkout.includes('const shouldFeed = mode === "feed" || mode === "both"') &&
+    shareWorkout.includes('const shouldStory = mode === "story" || mode === "both"') &&
+    shareWorkout.includes('const shouldReel = mode === "reel"');
+
+  ok =
+    pass(
+      "Post to Reels creates one video row with is_reel=true and no story",
+      (reelBlock.match(/createPost\(/g) || []).length === 1 &&
+        reelBlock.includes("is_reel: true") &&
+        reelBlock.includes('postType !== "video"') &&
+        !reelBlock.includes("publishStory") &&
+        !reelBlock.includes("is_reel: false")
+    ) && ok;
+
+  ok =
+    pass(
+      "Share to Both stays Feed + Story and does not add Reels",
+      bothBlockHint &&
+        shareWorkout.includes("} else if (shouldFeed)") &&
+        shareWorkout.includes("is_reel: false") &&
+        !shareWorkout.includes('mode === "both" || mode === "reel"')
+    ) && ok;
+
+  const feedIndex = readSource("app/(tabs)/index.tsx");
+  const feedCache = readSource("lib/feed-cache.ts");
+  const banner = readSource("lib/useFeedNewPostsBanner.ts");
+
+  ok =
+    pass(
+      "Every Home Feed query path excludes is_reel=true",
+      feedIndex.includes("getFeedCore(userId, undefined, undefined") &&
+        feedIndex.includes("getFeed(userId, pageParam)") &&
+        !feedIndex.includes("isReel: true") &&
+        feedIndex.includes("post.is_reel !== true") &&
+        banner.includes("getFeed(userId)") &&
+        feedCache.includes('CACHE_PREFIX = "feed-cache:v2:"') &&
+        feedCache.includes("excludeReelsFromFeedPages") &&
+        feedCache.includes("stripReelsFromFeedQuery") &&
+        shareWorkout.includes("stripReelsFromFeedQuery(queryClient, input.userId)") &&
+        readSource("lib/useFeedLike.ts").includes('["reels", userId]') &&
+        readSource("lib/usePostReaction.ts").includes('["reels", userId]')
     ) && ok;
 
   console.log("");

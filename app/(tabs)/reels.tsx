@@ -90,6 +90,7 @@ function ReelsScreen() {
           initialIndex: snapshot.initialIndex,
           hasMore: Boolean(hasNextPage),
           originMediaIndex: video.mediaIndex,
+          caughtUpLabel: "You're caught up on Reels",
           getPost: (postId) => {
             const cachedPosts =
               queryClient

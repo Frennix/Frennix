@@ -362,11 +362,19 @@ export default function CreatePostScreen() {
         return;
       }
 
-      const shareMode = mode === "reel" ? "feed" : mode;
-      const postToReels = mode === "reel" && hasVideo;
+      if (mode === "reel" && !hasVideo) {
+        const message = "Reels require a video";
+        setError(message);
+        showAlert("Could not share", message);
+        setUploadStage("idle");
+        setLoading(false);
+        submittingRef.current = false;
+        setPersistPaused(false);
+        return;
+      }
 
       const result = await shareWorkout(
-        shareMode,
+        mode,
         {
           userId: session.user.id,
           content: content || undefined,
@@ -381,8 +389,8 @@ export default function CreatePostScreen() {
             durationSeconds: item.durationSeconds,
           })),
           storyPrivacy,
-          journeyCategory: postToReels ? journeyCategory : null,
-          isReel: postToReels,
+          journeyCategory: mode === "reel" ? journeyCategory : null,
+          isReel: mode === "reel",
         },
         queryClient
       );

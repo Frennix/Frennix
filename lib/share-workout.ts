@@ -17,6 +17,7 @@ import {
   THUMBNAIL_CAPTURE_TIMEOUT_MS,
 } from "@frennix/api";
 import { generateAndUploadVideoThumbnail } from "@/lib/video-thumbnail";
+import { stripReelsFromFeedQuery } from "@/lib/feed-cache";
 import {
   formatStoryCalories,
   formatStoryDistance,
@@ -145,19 +146,49 @@ function buildStorySlidesFromInput(
 }
 
 export async function shareWorkout(
-  mode: StoryShareMode | "done",
+  mode: StoryShareMode | "done" | "reel",
   input: WorkoutShareInput,
   queryClient: QueryClient
 ) {
   if (mode === "done") return { postId: null, storyId: null };
 
+  const shouldReel = mode === "reel";
   const shouldFeed = mode === "feed" || mode === "both";
   const shouldStory = mode === "story" || mode === "both";
 
   let createdPost: Awaited<ReturnType<typeof createPost>> | null = null;
   let storyId: string | null = null;
 
-  if (shouldFeed) {
+  if (shouldReel) {
+    const hasVideo = input.media.some((item) => isVideoMime(item.mimeType));
+    if (!hasVideo) {
+      throw new Error("Reels require a video");
+    }
+
+    const { mediaUrls, thumbnailUrl, postType } = await uploadFeedMediaAssets(input.userId, input.media);
+    if (postType !== "video") {
+      throw new Error("Reels require a video");
+    }
+
+    createdPost = await withTimeout(
+      createPost({
+        author_id: input.userId,
+        content: input.content,
+        media_urls: mediaUrls,
+        thumbnail_url: thumbnailUrl,
+        post_type: postType,
+        workout_types: input.workoutTypes,
+        workout_metrics: input.metrics,
+        group_id: input.groupId ?? null,
+        challenge_id: input.challengeId ?? null,
+        event_id: input.eventId ?? null,
+        journey_category: input.journeyCategory ?? null,
+        is_reel: true,
+      }),
+      POST_CREATE_TIMEOUT_MS,
+      "Creating post"
+    );
+  } else if (shouldFeed) {
     const { mediaUrls, thumbnailUrl, postType } = await uploadFeedMediaAssets(input.userId, input.media);
     createdPost = await withTimeout(
       createPost({
@@ -172,7 +203,7 @@ export async function shareWorkout(
         challenge_id: input.challengeId ?? null,
         event_id: input.eventId ?? null,
         journey_category: postType === "video" ? input.journeyCategory ?? null : null,
-        is_reel: postType === "video" && input.isReel === true,
+        is_reel: false,
       }),
       POST_CREATE_TIMEOUT_MS,
       "Creating post"
@@ -207,6 +238,8 @@ export async function shareWorkout(
     });
     storyId = story.id;
   }
+
+  stripReelsFromFeedQuery(queryClient, input.userId);
 
   await queryClient.invalidateQueries({ queryKey: ["feed", input.userId] });
   await queryClient.invalidateQueries({ queryKey: ["feed-stories", input.userId] });

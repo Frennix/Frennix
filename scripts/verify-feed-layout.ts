@@ -279,6 +279,38 @@ const checks: Array<{ name: string; run: () => void }> = [
       }
     },
   },
+  {
+    name: "Home Feed owner More opens Delete and videos open the immersive viewer",
+    run: () => {
+      const card = read("packages/ui/src/FeedPostCard.tsx");
+      const ownerIdx = card.indexOf("if (isOwn && onOwnerActionsPress) return onOwnerActionsPress;");
+      const interactIdx = card.indexOf("if (onInteractPress) return () => onInteractPress();");
+      if (ownerIdx < 0 || interactIdx < 0 || ownerIdx > interactIdx) {
+        throw new Error("Owner More must call onOwnerActionsPress before onInteractPress");
+      }
+      if (!card.includes("hasVideoMedia")) {
+        throw new Error("FeedPostCard must detect video media separately from photos");
+      }
+      const videoBranch = card.slice(card.indexOf("{hasVideoMedia ? ("), card.indexOf(") : ("));
+      if (!videoBranch.includes("<FeedMedia") || videoBranch.includes("delayPressIn")) {
+        throw new Error("Home Feed video media must not be wrapped in delayPressIn");
+      }
+      const index = read("app/(tabs)/index.tsx");
+      if (!index.includes("openFeedMediaGallery")) {
+        throw new Error("Home Feed must open media through openFeedMediaGallery");
+      }
+      if (!index.includes("saveFeedScrollReturnState") || !index.includes("requestFeedScrollReturnRestore")) {
+        throw new Error("Home Feed must preserve scroll restoration around the immersive viewer");
+      }
+      const actions = read("lib/post-actions.ts");
+      if (!actions.includes('entityAction("delete", "Delete Post"') || !actions.includes("POST_OWNER_ACTIONS")) {
+        throw new Error("Owner post menu must include Delete Post");
+      }
+      if (!actions.includes("return isOwner ? POST_OWNER_ACTIONS : POST_VIEWER_ACTIONS")) {
+        throw new Error("Non-owners must not receive Edit/Delete actions");
+      }
+    },
+  },
 ];
 
 let failed = 0;

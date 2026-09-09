@@ -237,6 +237,17 @@ function main() {
         immersive.includes('label="Share"')
     ) && ok;
 
+  ok =
+    pass(
+      "Caught-up message is a full-viewport end slide, never over the active video",
+      playlistViewer.includes("caughtUpLabel") &&
+        playlistViewer.includes("activeIndex >= entries.length") &&
+        playlistViewer.includes("data-frennix-playlist-end-state") &&
+        playlistViewer.includes("endStateSlide") &&
+        playlistViewer.includes("DEFAULT_CAUGHT_UP_LABEL") &&
+        !playlistViewer.includes("webFooterHost")
+    ) && ok;
+
   console.log(`\n${ok ? "All checks passed." : "Some checks failed."}`);
   process.exit(ok ? 0 : 1);
 }

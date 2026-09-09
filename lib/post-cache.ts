@@ -68,6 +68,9 @@ export function updatePostInAllCaches(queryClient: QueryClient, userId: string, 
 
   queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
     if (!old) return old;
+    if (updated.is_reel === true) {
+      return { ...old, pages: removePostFromFeedPages(old.pages, updated.id) };
+    }
     return { ...old, pages: updatePostInFeedPages(old.pages, updated) };
   });
 

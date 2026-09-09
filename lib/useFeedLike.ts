@@ -40,6 +40,17 @@ function patchFeed(
   };
 }
 
+function patchInfiniteFeedQuery(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  postId: string,
+  liked: boolean
+) {
+  const current = queryClient.getQueryData<InfiniteData<FeedPage>>(queryKey);
+  if (!current) return;
+  queryClient.setQueryData<InfiniteData<FeedPage>>(queryKey, patchFeed(current, postId, liked));
+}
+
 type LikeVars = { postId: string; liked: boolean };
 
 const DUPLICATE_PRESS_MS = 400;
@@ -55,26 +66,27 @@ export function useFeedLike(userId: string) {
       if (!liked) hapticLike();
 
       const previousFeed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+      const previousReels = queryClient.getQueryData<InfiniteData<FeedPage>>(["reels", userId]);
       const previousPost = queryClient.getQueryData<Post>(["post", postId, userId]);
 
-      if (previousFeed) {
-        queryClient.setQueryData<InfiniteData<FeedPage>>(
-          ["feed", userId],
-          patchFeed(previousFeed, postId, liked)
-        );
-      }
+      patchInfiniteFeedQuery(queryClient, ["feed", userId], postId, liked);
+      patchInfiniteFeedQuery(queryClient, ["reels", userId], postId, liked);
 
       if (previousPost) {
         queryClient.setQueryData<Post>(["post", postId, userId], patchPostLike(previousPost, liked));
       }
 
       void queryClient.cancelQueries({ queryKey: ["feed", userId] });
+      void queryClient.cancelQueries({ queryKey: ["reels", userId] });
 
-      return { previousFeed, previousPost };
+      return { previousFeed, previousReels, previousPost };
     },
     onError: (error, { postId }, context) => {
       if (context?.previousFeed) {
         queryClient.setQueryData(["feed", userId], context.previousFeed);
+      }
+      if (context?.previousReels) {
+        queryClient.setQueryData(["reels", userId], context.previousReels);
       }
       if (context?.previousPost) {
         queryClient.setQueryData(["post", postId, userId], context.previousPost);
@@ -92,8 +104,10 @@ export function useFeedLike(userId: string) {
 
   function readLiked(postId: string): boolean {
     const feed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+    const reels = queryClient.getQueryData<InfiniteData<FeedPage>>(["reels", userId]);
     return !!(
       findPostInFeed(feed, postId)?.liked_by_me ??
+      findPostInFeed(reels, postId)?.liked_by_me ??
       queryClient.getQueryData<Post>(["post", postId, userId])?.liked_by_me
     );
   }

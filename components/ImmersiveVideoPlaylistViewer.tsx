@@ -45,6 +45,8 @@ type ImmersiveVideoPlaylistViewerProps = {
   commentsOverlayOpen?: boolean;
   /** Dedicated /video route — decouple non-handoff slides from feed coordinator. */
   routePlayback?: boolean;
+  /** End-of-playlist copy. Shown only on a dedicated non-video slide. */
+  caughtUpLabel?: string;
 };
 
 const PRELOAD_RADIUS = 1;
@@ -52,6 +54,7 @@ const FETCH_AHEAD_SLIDE_COUNT = 2;
 const SWIPE_LOCK_PX = 14;
 const SWIPE_DISTANCE_PX = 72;
 const SWIPE_VELOCITY_PX_PER_MS = 0.45;
+const DEFAULT_CAUGHT_UP_LABEL = "You're caught up on feed videos";
 
 type PlaylistSwipeLock = "none" | "vertical" | "horizontal";
 
@@ -105,12 +108,14 @@ export function ImmersiveVideoPlaylistViewer({
   onActiveEntryChange,
   commentsOverlayOpen = false,
   routePlayback = false,
+  caughtUpLabel = DEFAULT_CAUGHT_UP_LABEL,
 }: ImmersiveVideoPlaylistViewerProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [fetchingMore, setFetchingMore] = useState(false);
-  const [showEndState, setShowEndState] = useState(false);
+  const hasMoreRef = useRef(initialHasMore);
+  hasMoreRef.current = hasMore;
   const handoffAppliedRef = useRef(false);
   const fetchInFlightRef = useRef(false);
   const listRef = useRef<FlatList<ImmersiveVideoPlaylistEntry>>(null);
@@ -142,9 +147,6 @@ export function ImmersiveVideoPlaylistViewer({
       const result = await fetchMore();
       setEntries((current) => mergeUniquePlaylistEntries(current, result.entries));
       setHasMore(result.hasMore);
-      if (!result.hasMore && result.entries.length === 0) {
-        setShowEndState(true);
-      }
     } finally {
       fetchInFlightRef.current = false;
       setFetchingMore(false);
@@ -155,12 +157,13 @@ export function ImmersiveVideoPlaylistViewer({
     if (activeIndex >= entries.length - FETCH_AHEAD_SLIDE_COUNT) {
       void requestFetchMore();
     }
-    if (!hasMore && activeIndex === entries.length - 1 && entries.length > 0) {
-      setShowEndState(true);
-    } else if (activeIndex < entries.length - 1) {
-      setShowEndState(false);
+    const pastLastVideo = entries.length > 0 && activeIndex >= entries.length;
+    if (hasMore && pastLastVideo) {
+      setActiveIndex(Math.max(0, entries.length - 1));
     }
   }, [activeIndex, entries.length, hasMore, requestFetchMore]);
+
+  const showEndState = !hasMore && entries.length > 0 && activeIndex >= entries.length;
 
   useEffect(() => {
     const entry = entries[activeIndex];
@@ -170,7 +173,9 @@ export function ImmersiveVideoPlaylistViewer({
 
   const handleIndexChange = useCallback(
     (nextIndex: number) => {
-      const clamped = clampIndex(nextIndex, entries.length - 1);
+      const lastVideoIndex = Math.max(entries.length - 1, 0);
+      const maxIndex = hasMoreRef.current || entries.length === 0 ? lastVideoIndex : entries.length;
+      const clamped = clampIndex(nextIndex, maxIndex);
       setActiveIndex((current) => (current === clamped ? current : clamped));
     },
     [entries.length]
@@ -346,7 +351,7 @@ export function ImmersiveVideoPlaylistViewer({
     ]
   );
 
-  const footer = useMemo(() => {
+  const nativeFooter = useMemo(() => {
     if (fetchingMore) {
       return (
         <View style={[styles.footer, { height: stageHeight * 0.18 }]}>
@@ -354,15 +359,32 @@ export function ImmersiveVideoPlaylistViewer({
         </View>
       );
     }
-    if (showEndState && !hasMore) {
+    if (!hasMore) {
       return (
-        <View style={[styles.footer, styles.endState, { minHeight: stageHeight * 0.18 }]}>
-          <Text style={styles.endStateText}>You're caught up on feed videos</Text>
+        <View
+          style={[styles.endStateSlide, { width: stageWidth, height: stageHeight }]}
+          accessibilityRole="text"
+          accessibilityLabel={caughtUpLabel}
+        >
+          <Text style={styles.endStateText}>{caughtUpLabel}</Text>
         </View>
       );
     }
     return null;
-  }, [fetchingMore, hasMore, showEndState, stageHeight]);
+  }, [caughtUpLabel, fetchingMore, hasMore, stageHeight, stageWidth]);
+
+  const webEndStateSlide = showEndState ? (
+    <View
+      style={[styles.endStateSlide, { width: "100%", height: "100%" }]}
+      accessibilityRole="text"
+      accessibilityLabel={caughtUpLabel}
+      {...(Platform.OS === "web"
+        ? ({ "data-frennix-playlist-end-state": "true" } as object)
+        : null)}
+    >
+      <Text style={styles.endStateText}>{caughtUpLabel}</Text>
+    </View>
+  ) : null;
 
   if (Platform.OS === "web") {
     return (
@@ -392,7 +414,7 @@ export function ImmersiveVideoPlaylistViewer({
         >
           {entries.map((entry, slideIndex) => {
             if (!shouldRenderIndex(slideIndex)) return null;
-            const isActive = slideIndex === activeIndex;
+            const isActive = !showEndState && slideIndex === activeIndex;
             return (
               <div
                 key={entry.playbackId}
@@ -413,7 +435,22 @@ export function ImmersiveVideoPlaylistViewer({
               </div>
             );
           })}
-          {footer ? <div style={styles.webFooterHost}>{footer}</div> : null}
+          {webEndStateSlide ? (
+            <div
+              data-frennix-video-playlist-page="end-state"
+              data-frennix-playlist-end-state="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                overflow: "hidden",
+                zIndex: 1,
+              }}
+            >
+              {webEndStateSlide}
+            </div>
+          ) : null}
         </div>
       </View>
     );
@@ -443,7 +480,7 @@ export function ImmersiveVideoPlaylistViewer({
         initialNumToRender={Math.min(3, entries.length)}
         maxToRenderPerBatch={2}
         windowSize={3}
-        ListFooterComponent={footer ? () => footer : undefined}
+        ListFooterComponent={nativeFooter ? () => nativeFooter : undefined}
         renderItem={({ item, index: slideIndex }) => renderSlide(item, slideIndex)}
       />
     </View>
@@ -464,20 +501,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
   },
-  endState: {
-    opacity: 0.72,
+  endStateSlide: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
   },
   endStateText: {
     ...typography.body,
     color: colors.textSecondary,
     textAlign: "center",
-  },
-  webFooterHost: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 24,
-    zIndex: 2,
-    pointerEvents: "none",
   },
 });

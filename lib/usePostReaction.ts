@@ -18,11 +18,21 @@ export function usePostReaction(userId: string) {
       togglePostReaction(postId, userId, emoji, currentEmoji),
     onMutate: async ({ postId, emoji, currentEmoji }) => {
       await queryClient.cancelQueries({ queryKey: ["feed", userId] });
+      await queryClient.cancelQueries({ queryKey: ["reels", userId] });
 
       const previousFeed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+      const previousReels = queryClient.getQueryData<InfiniteData<FeedPage>>(["reels", userId]);
       const previousPosts = queryClient.getQueriesData<Post>({ queryKey: ["post"] });
 
       queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => patchPostsInFeedPage(page, postId, emoji, currentEmoji)),
+        };
+      });
+
+      queryClient.setQueryData<InfiniteData<FeedPage>>(["reels", userId], (old) => {
         if (!old) return old;
         return {
           ...old,
@@ -61,11 +71,14 @@ export function usePostReaction(userId: string) {
         );
       });
 
-      return { previousFeed, previousPosts };
+      return { previousFeed, previousReels, previousPosts };
     },
     onError: (error, _vars, context) => {
       if (context?.previousFeed) {
         queryClient.setQueryData(["feed", userId], context.previousFeed);
+      }
+      if (context?.previousReels) {
+        queryClient.setQueryData(["reels", userId], context.previousReels);
       }
       showAlert("Reaction failed", getErrorMessage(error));
     },

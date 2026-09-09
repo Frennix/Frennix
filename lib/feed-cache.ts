@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import type { FeedPage } from "@frennix/types";
 
-const CACHE_PREFIX = "feed-cache:v1:";
+const CACHE_PREFIX = "feed-cache:v2:";
 const CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 
 type CachedFeedPayload = {
@@ -13,6 +13,13 @@ type CachedFeedPayload = {
 
 function cacheKey(userId: string) {
   return `${CACHE_PREFIX}${userId}`;
+}
+
+function excludeReelsFromFeedPages(pages: FeedPage[]): FeedPage[] {
+  return pages.map((page) => ({
+    ...page,
+    posts: page.posts.filter((post) => post.is_reel !== true),
+  }));
 }
 
 function parseCachedFeedPayload(raw: string): FeedPage[] | undefined {
@@ -40,7 +47,7 @@ function readFeedCacheSync(userId: string): FeedPage[] | undefined {
 
 function applyFeedCachePages(queryClient: QueryClient, userId: string, pages: FeedPage[]) {
   queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], {
-    pages,
+    pages: excludeReelsFromFeedPages(pages),
     pageParams: pages.reduce<(string | undefined)[]>(
       (params, page, index) => {
         if (index === 0) return [undefined];
@@ -89,7 +96,7 @@ export async function writeFeedCache(userId: string, pages: FeedPage[]) {
   if (!userId || !pages.length) return;
   const payload: CachedFeedPayload = {
     savedAt: Date.now(),
-    pages: pages.slice(0, 2),
+    pages: excludeReelsFromFeedPages(pages).slice(0, 2),
   };
   try {
     await AsyncStorage.setItem(cacheKey(userId), JSON.stringify(payload));
@@ -122,7 +129,7 @@ export async function hydrateFeedCache(queryClient: QueryClient, userId: string)
   if (!pages?.length) return false;
 
   queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], {
-    pages,
+    pages: excludeReelsFromFeedPages(pages),
     pageParams: pages.reduce<(string | undefined)[]>(
       (params, page, index) => {
         if (index === 0) return [undefined];
@@ -134,4 +141,16 @@ export async function hydrateFeedCache(queryClient: QueryClient, userId: string)
   });
 
   return true;
+}
+
+/** Drop Reel rows from the in-memory Home Feed query so they cannot linger after a Reels post. */
+export function stripReelsFromFeedQuery(queryClient: QueryClient, userId: string) {
+  if (!userId) return;
+  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
+    if (!old) return old;
+    return {
+      ...old,
+      pages: excludeReelsFromFeedPages(old.pages),
+    };
+  });
 }

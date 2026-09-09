@@ -66,6 +66,18 @@ function main() {
     ) && ok;
   ok =
     pass(
+      "Reel metadata keeps category and caption in a dedicated stack above the composer",
+      viewer.includes("metadataStack") &&
+        viewer.includes("data-frennix-immersive-metadata-stack") &&
+        viewer.includes("data-frennix-immersive-category") &&
+        viewer.includes("data-frennix-immersive-caption") &&
+        viewer.includes("paddingBottom: bottomInset + 72") &&
+        viewer.indexOf("style={styles.authorTextCol}") < viewer.indexOf("style={styles.metadataStack}") &&
+        viewer.indexOf("style={styles.metadataStack}") < viewer.indexOf("styles.commentComposerHost") &&
+        viewer.indexOf("styles.categoryChip") > viewer.indexOf("style={styles.metadataStack}")
+    ) && ok;
+  ok =
+    pass(
       "Shared overlay shell opens videoOverlay comments sheet",
       overlayShell.includes('presentation="videoOverlay"') &&
         overlayShell.includes("PostCommentsSheet") &&

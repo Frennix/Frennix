@@ -326,7 +326,7 @@ export function ImmersiveVideoViewer({
           </View>
 
           <View
-            style={[styles.bottomMeta, { paddingBottom: bottomInset + 58 }]}
+            style={[styles.bottomMeta, { paddingBottom: bottomInset + 72 }]}
             pointerEvents="box-none"
             {...(Platform.OS === "web"
               ? ({ "data-frennix-immersive-meta": "true" } as object)
@@ -348,15 +348,6 @@ export function ImmersiveVideoViewer({
                 @{author.username}
               </Text>
             ) : null}
-            {journeyCategoryLabel ? (
-              <View
-                style={styles.categoryChip}
-                accessibilityRole="text"
-                accessibilityLabel={`Journey category ${journeyCategoryLabel}`}
-              >
-                <Text style={styles.categoryLabel}>{journeyCategoryLabel}</Text>
-              </View>
-            ) : null}
           </View>
           {postActions.showFollow && postActions.onFollow ? (
             <Pressable
@@ -373,26 +364,51 @@ export function ImmersiveVideoViewer({
           ) : null}
         </Pressable>
 
-        {caption ? (
-          <View style={styles.captionBlock}>
-            <Text
-              style={styles.captionText}
-              numberOfLines={captionExpanded ? undefined : CAPTION_COLLAPSE_LINES}
+        <View
+          style={styles.metadataStack}
+          {...(Platform.OS === "web"
+            ? ({ "data-frennix-immersive-metadata-stack": "true" } as object)
+            : null)}
+        >
+          {journeyCategoryLabel ? (
+            <View
+              style={styles.categoryChip}
+              accessibilityRole="text"
+              accessibilityLabel={`Journey category ${journeyCategoryLabel}`}
+              {...(Platform.OS === "web"
+                ? ({ "data-frennix-immersive-category": "true" } as object)
+                : null)}
             >
-              {caption}
-            </Text>
-            {captionNeedsExpand && !captionExpanded ? (
-              <Pressable
-                onPress={() => setCaptionExpanded(true)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Show more caption"
+              <Text style={styles.categoryLabel}>{journeyCategoryLabel}</Text>
+            </View>
+          ) : null}
+
+          {caption ? (
+            <View
+              style={styles.captionBlock}
+              {...(Platform.OS === "web"
+                ? ({ "data-frennix-immersive-caption": "true" } as object)
+                : null)}
+            >
+              <Text
+                style={styles.captionText}
+                numberOfLines={captionExpanded ? undefined : CAPTION_COLLAPSE_LINES}
               >
-                <Text style={styles.moreLabel}>more</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
+                {caption}
+              </Text>
+              {captionNeedsExpand && !captionExpanded ? (
+                <Pressable
+                  onPress={() => setCaptionExpanded(true)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show more caption"
+                >
+                  <Text style={styles.moreLabel}>more</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
           </View>
 
           <View
@@ -572,7 +588,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 35,
     paddingHorizontal: spacing.md,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   authorRow: {
     flexDirection: "row",
@@ -592,9 +608,12 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: "rgba(255,255,255,0.82)",
   },
+  metadataStack: {
+    gap: spacing.sm,
+    minWidth: 0,
+  },
   categoryChip: {
     alignSelf: "flex-start",
-    marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,

@@ -19,4 +19,6 @@ export type ImmersiveVideoPlaylistState = {
   fetchMore?: () => Promise<ImmersiveVideoPlaylistFetchResult>;
   /** Original tapped post media index — restored to feed carousel on close. */
   originMediaIndex: number;
+  /** Shown only after the last video, never over an active slide. */
+  caughtUpLabel?: string;
 };

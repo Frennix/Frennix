@@ -10,7 +10,7 @@ import {
   formatFeedPostHeaderMeta,
   formatReactionSummary,
 } from "./formatRelativeTime";
-import { normalizeWorkoutTypes } from "@frennix/types";
+import { normalizePostMediaItems, normalizeWorkoutTypes } from "@frennix/types";
 import { ReactionBar } from "./ReactionBar";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
 import { WorkoutStatsPills } from "./WorkoutStatsPills";
@@ -113,6 +113,14 @@ export const FeedPostCard = memo(function FeedPostCard({
   const engagement = useMemo(() => formatEngagementSummary(post), [post]);
   const reactionSummary = useMemo(() => formatReactionSummary(post.reactions), [post.reactions]);
   const hasMedia = Boolean(displayPost.media_urls?.length);
+  const hasVideoMedia = useMemo(
+    () =>
+      normalizePostMediaItems(displayPost.media_urls ?? [], {
+        postType: displayPost.post_type,
+        thumbnailUrl: displayPost.thumbnail_url,
+      }).some((item) => item.kind === "video"),
+    [displayPost.media_urls, displayPost.post_type, displayPost.thumbnail_url]
+  );
   const showCaption = Boolean(post.content);
   const { title: contentTitle, description: contentDescription } = useMemo(
     () => splitWorkoutCopy(isShared ? post.content : displayPost.content),
@@ -127,9 +135,9 @@ export const FeedPostCard = memo(function FeedPostCard({
   const workoutDescription = contentDescription ?? (contentTitle ? null : displayPost.content);
 
   const handleMorePress = useMemo(() => {
-    if (onInteractPress) return () => onInteractPress();
     if (isOwn && onOwnerActionsPress) return onOwnerActionsPress;
     if (onModerationPress) return onModerationPress;
+    if (onInteractPress) return () => onInteractPress();
     return undefined;
   }, [isOwn, onInteractPress, onModerationPress, onOwnerActionsPress]);
 
@@ -230,11 +238,7 @@ export const FeedPostCard = memo(function FeedPostCard({
         </FeedLayout.Media>
       ) : hasMedia ? (
         <View style={styles.mediaTapShell}>
-          <Pressable
-            onPress={onDoubleTapLike ? handleMediaAreaPress : undefined}
-            disabled={!onDoubleTapLike}
-            delayPressIn={onDoubleTapLike ? 280 : undefined}
-          >
+          {hasVideoMedia ? (
             <FeedMedia
               mediaUrls={displayPost.media_urls ?? []}
               postType={displayPost.post_type}
@@ -249,7 +253,28 @@ export const FeedPostCard = memo(function FeedPostCard({
               overlay={slots?.mediaOverlay}
               onPrimaryMediaReady={onPrimaryMediaReady}
             />
-          </Pressable>
+          ) : (
+            <Pressable
+              onPress={onDoubleTapLike ? handleMediaAreaPress : undefined}
+              disabled={!onDoubleTapLike}
+              delayPressIn={onDoubleTapLike ? 280 : undefined}
+            >
+              <FeedMedia
+                mediaUrls={displayPost.media_urls ?? []}
+                postType={displayPost.post_type}
+                thumbnailUrl={displayPost.thumbnail_url}
+                onMediaPress={onMediaPress}
+                videoRouteHrefForIndex={videoRouteHrefForIndex}
+                onVideoRouteNavigate={onVideoRouteNavigate}
+                pageIndex={mediaPageIndex}
+                onPageIndexChange={onMediaPageIndexChange}
+                visible={mediaActive}
+                playbackScopeId={displayPost.id}
+                overlay={slots?.mediaOverlay}
+                onPrimaryMediaReady={onPrimaryMediaReady}
+              />
+            </Pressable>
+          )}
           {heartVisible ? (
             <Animated.View
               pointerEvents="none"
