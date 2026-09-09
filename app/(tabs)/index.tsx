@@ -78,6 +78,7 @@ import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
+import { buildDedicatedStorySlides, prefetchAuthorizedViewerMedia } from "@/lib/story-utils";
 import { usePostInteraction } from "@/lib/usePostInteraction";
 import { useFeedCommentsSheet } from "@/lib/useFeedCommentsSheet";
 import { handleTabRetap, scrollFlatListToTop, scrollScrollViewToTop } from "@/lib/tab-scroll-registry";
@@ -1027,6 +1028,14 @@ export default function HomeScreen() {
           onStoryPress={(story) => {
             if (!story.active_stories.length) return;
             const index = stories.findIndex((item) => item.user_id === story.user_id);
+            const nextStory = index >= 0 ? stories[index + 1] : undefined;
+            prefetchAuthorizedViewerMedia({
+              currentSlides: buildDedicatedStorySlides(story.active_stories),
+              currentIndex: 0,
+              nextStoryFirstSlide: nextStory
+                ? buildDedicatedStorySlides(nextStory.active_stories ?? [])[0]
+                : undefined,
+            });
             setActiveStoryIndex(index >= 0 ? index : null);
           }}
           onFollowPress={(profileId) => toggleFollow(profileId)}

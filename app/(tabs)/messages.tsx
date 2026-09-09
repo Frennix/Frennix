@@ -26,6 +26,7 @@ import {
 import type { Conversation, Profile } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
+import { buildDedicatedStorySlides, prefetchAuthorizedViewerMedia } from "@/lib/story-utils";
 import { openTrainingCalendarCreate } from "@/lib/training-calendar-navigation";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
 import { ConversationRow } from "@/components/ConversationRow";
@@ -726,6 +727,15 @@ export default function MessagesScreen() {
           (story) => story.user_id === partnerId && story.active_stories.length > 0
         );
         if (index >= 0) {
+          const current = partnerStories[index];
+          const nextStory = partnerStories[index + 1];
+          prefetchAuthorizedViewerMedia({
+            currentSlides: buildDedicatedStorySlides(current?.active_stories ?? []),
+            currentIndex: 0,
+            nextStoryFirstSlide: nextStory
+              ? buildDedicatedStorySlides(nextStory.active_stories ?? [])[0]
+              : undefined,
+          });
           setStoryViewerIndex(index);
         } else {
           showAlert("No story", "This partner does not have an active workout story right now.");

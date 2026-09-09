@@ -6,6 +6,10 @@ import type {
 } from "@frennix/types";
 import { normalizePostMediaItems } from "@frennix/types";
 import { prefetchCachedImages } from "../packages/ui/src/CachedImage";
+import {
+  collectViewerPreloadUrls,
+  isAuthorizedStoryMediaUrl,
+} from "./story-media-ready";
 
 export type WorkoutStorySlide =
   | {
@@ -169,9 +173,45 @@ export function buildStorySlides(lastWorkout: FeedStoryLastWorkout | null): Work
 }
 
 export function prefetchStorySlide(slide: WorkoutStorySlide | undefined) {
-  if (!slide || slide.kind !== "media" || slide.mediaKind !== "image") return;
-  void prefetchCachedImages([slide.url]);
-  if (slide.thumbnailUrl) void prefetchCachedImages([slide.thumbnailUrl]);
+  if (!slide || slide.kind !== "media") return;
+  prefetchAuthorizedStoryUrls(
+    [slide.url, slide.thumbnailUrl].filter((url): url is string => Boolean(url))
+  );
+}
+
+function prefetchWebMedia(urls: string[]) {
+  if (typeof globalThis.Image === "function") {
+    for (const url of urls) {
+      const image = new globalThis.Image();
+      image.decoding = "async";
+      image.src = url;
+    }
+  }
+  if (typeof document !== "undefined") {
+    for (const url of urls) {
+      if (!/\.(mp4|mov|webm|m4v)(\?|$)/i.test(url) && !url.includes("/video")) continue;
+      const video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "auto";
+      video.src = url;
+    }
+  }
+}
+
+export function prefetchAuthorizedStoryUrls(urls: string[]) {
+  const safe = [...new Set(urls.filter(isAuthorizedStoryMediaUrl))];
+  if (!safe.length) return;
+  prefetchWebMedia(safe);
+  void prefetchCachedImages(safe);
+}
+
+export function prefetchAuthorizedViewerMedia(input: {
+  currentSlides: WorkoutStorySlide[];
+  currentIndex: number;
+  nextStoryFirstSlide?: WorkoutStorySlide;
+}) {
+  prefetchAuthorizedStoryUrls(collectViewerPreloadUrls(input));
 }
 
 /** Map flat slide index to story + slide ids for engagement tracking. */

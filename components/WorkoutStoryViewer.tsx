@@ -17,6 +17,7 @@ import type { StoryChallengeKey, StoryQuickReactionEmoji } from "@frennix/types"
 import type { StoryInsights } from "@frennix/types";
 import {
   Avatar,
+  Button,
   FeedVideoPlayer,
   ProgressiveImage,
   WorkoutTypeChips,
@@ -27,6 +28,7 @@ import {
   touchTarget,
   typography,
 } from "@frennix/ui";
+import { FrennixBrandMark } from "./FrennixLogo";
 import { StoryWorkoutSlideCard } from "./story/StoryWorkoutSlideCard";
 import { StoryQuickActionsBar } from "./story/StoryQuickActionsBar";
 import { StoryReplyBar } from "./story/StoryReplyBar";
@@ -55,8 +57,12 @@ import { StoryControlsSheet } from "./story/StoryControlsSheet";
 import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
 import type { FrennixStory } from "@frennix/types";
 import {
+  STORY_MEDIA_LOAD_TIMEOUT_MS,
+  storySlideNeedsMedia,
+} from "@/lib/story-media-ready";
+import {
   buildDedicatedStorySlides,
-  prefetchStorySlide,
+  prefetchAuthorizedViewerMedia,
   resolveSlideContext,
   type WorkoutStorySlide,
 } from "../lib/story-utils";
@@ -113,12 +119,16 @@ function StorySlideContent({
   playbackEpoch,
   width,
   height,
+  onMediaReady,
+  onMediaError,
 }: {
   slide: WorkoutStorySlide;
   shouldPlayVideo: boolean;
   playbackEpoch: number;
   width: number;
   height: number;
+  onMediaReady: () => void;
+  onMediaError: () => void;
 }) {
   if (slide.kind === "empty") {
     return (
@@ -159,6 +169,9 @@ function StorySlideContent({
         uri={slide.url}
         thumbnailUrl={slide.thumbnailUrl}
         shouldPlay={shouldPlayVideo}
+        fillParent
+        onRenderedFrame={onMediaReady}
+        onPlaybackError={onMediaError}
         style={{ width, height }}
       />
     );
@@ -170,7 +183,10 @@ function StorySlideContent({
       placeholderUri={slide.thumbnailUrl}
       style={{ width, height }}
       contentFit="contain"
+      showPlaceholder={false}
       accessibilityLabel="Workout story photo"
+      onLoad={onMediaReady}
+      onError={onMediaError}
     />
   );
 }
@@ -278,6 +294,8 @@ export function WorkoutStoryViewer({
   const didHoldRef = useRef(false);
   const lastNavAtRef = useRef(0);
   const [playbackEpoch, setPlaybackEpoch] = useState(0);
+  const [mediaReady, setMediaReady] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
 
   const story = stories[storyIndex] ?? null;
   const activeStories = story?.active_stories ?? [];
@@ -296,6 +314,9 @@ export function WorkoutStoryViewer({
   }, [activeStories, slideContext]);
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
+  const needsMedia = storySlideNeedsMedia(activeSlide);
+  const mediaIdentity =
+    activeSlide?.kind === "media" ? `${activeSlide.mediaKind}:${activeSlide.url}` : activeSlide?.kind ?? "none";
   const autoAdvancePaused = paused || interactionLocked || showReply || controlsOpen;
 
   useEffect(() => {
@@ -458,15 +479,28 @@ export function WorkoutStoryViewer({
     setPlaybackEpoch(0);
   }, [timerKey, progress]);
 
-  const restartCurrentSlide = useCallback(() => {
+  const markMediaReady = useCallback(() => {
+    setMediaFailed(false);
+    setMediaReady(true);
+  }, []);
+
+  const markMediaFailed = useCallback(() => {
+    setMediaReady(false);
+    setMediaFailed(true);
+  }, []);
+
+  const retryCurrentMedia = useCallback(() => {
     stopTimer();
     elapsedMsRef.current = 0;
     progress.setValue(0);
+    setMediaFailed(false);
+    setMediaReady(!needsMedia);
     setPlaybackEpoch((epoch) => epoch + 1);
-    if (!paused && !interactionLocked && !showReply && !controlsOpen) {
-      startTimer(0);
-    }
-  }, [controlsOpen, interactionLocked, paused, progress, showReply, startTimer, stopTimer]);
+  }, [needsMedia, progress, stopTimer]);
+
+  const restartCurrentSlide = useCallback(() => {
+    retryCurrentMedia();
+  }, [retryCurrentMedia]);
 
   const handleLeftTap = useCallback(() => {
     if (slideIndex > 0) {
@@ -500,7 +534,28 @@ export function WorkoutStoryViewer({
   }, [timerKey, slideOpacity]);
 
   useEffect(() => {
+    setMediaFailed(false);
+    setMediaReady(!needsMedia);
+  }, [timerKey, mediaIdentity, needsMedia]);
+
+  useEffect(() => {
+    if (!visible || mediaReady || mediaFailed || !needsMedia) return;
+    const timeout = setTimeout(() => {
+      setMediaFailed(true);
+      setMediaReady(false);
+    }, STORY_MEDIA_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timeout);
+  }, [timerKey, playbackEpoch, visible, mediaReady, mediaFailed, needsMedia]);
+
+  useEffect(() => {
     if (!visible || !story) {
+      stopTimer();
+      progress.setValue(0);
+      elapsedMsRef.current = 0;
+      return;
+    }
+
+    if (mediaFailed || !mediaReady) {
       stopTimer();
       progress.setValue(0);
       elapsedMsRef.current = 0;
@@ -517,16 +572,29 @@ export function WorkoutStoryViewer({
 
     startTimer(elapsedMsRef.current);
     return stopTimer;
-  }, [timerKey, visible, story, autoAdvancePaused, startTimer, stopTimer, progress]);
+  }, [
+    timerKey,
+    visible,
+    story,
+    autoAdvancePaused,
+    mediaReady,
+    mediaFailed,
+    startTimer,
+    stopTimer,
+    progress,
+  ]);
 
   useEffect(() => {
-    prefetchStorySlide(slides[slideIndex + 1]);
+    if (!visible) return;
     const nextStory = stories[storyIndex + 1];
-    if (slideIndex >= slides.length - 1 && nextStory) {
-      const firstSlide = buildDedicatedStorySlides(nextStory.active_stories ?? [])[0];
-      prefetchStorySlide(firstSlide);
-    }
-  }, [slideIndex, slides, storyIndex, stories]);
+    prefetchAuthorizedViewerMedia({
+      currentSlides: slides,
+      currentIndex: slideIndex,
+      nextStoryFirstSlide: nextStory
+        ? buildDedicatedStorySlides(nextStory.active_stories ?? [])[0]
+        : undefined,
+    });
+  }, [visible, slideIndex, slides, storyIndex, stories]);
 
   const beginHold = useCallback(() => {
     didHoldRef.current = false;
@@ -691,15 +759,38 @@ export function WorkoutStoryViewer({
           style={[styles.stage, { transform: [{ translateY: dismissY }] }]}
           {...panResponder.panHandlers}
         >
-          <Animated.View style={[styles.mediaStage, { opacity: slideOpacity }]} pointerEvents="none">
+          <Animated.View
+            style={[styles.mediaStage, { opacity: slideOpacity }]}
+            pointerEvents={mediaFailed ? "auto" : "none"}
+          >
             <StorySlideContent
               key={`${timerKey}-${playbackEpoch}`}
               slide={activeSlide}
-              shouldPlayVideo={visible && isVideoSlide && !autoAdvancePaused}
+              shouldPlayVideo={visible && isVideoSlide && !autoAdvancePaused && !mediaFailed}
               playbackEpoch={playbackEpoch}
               width={width}
               height={height}
+              onMediaReady={markMediaReady}
+              onMediaError={markMediaFailed}
             />
+            {needsMedia && !mediaReady && !mediaFailed ? (
+              <View style={styles.mediaStatus} pointerEvents="none" accessibilityLabel="Loading story">
+                <Animated.View style={{ opacity: slideOpacity }}>
+                  <FrennixBrandMark style={styles.loaderMark} accessibilityLabel="Frennix" />
+                </Animated.View>
+                <Text style={styles.loaderLabel}>Loading</Text>
+              </View>
+            ) : null}
+            {mediaFailed ? (
+              <View style={styles.mediaStatus} pointerEvents="auto">
+                <Text style={styles.failTitle}>Couldn't load this story</Text>
+                <Text style={styles.failBody}>Check your connection and try again.</Text>
+                <View style={styles.failActions}>
+                  <Button title="Retry" onPress={retryCurrentMedia} />
+                  <Button title="Close" variant="secondary" onPress={onClose} />
+                </View>
+              </View>
+            ) : null}
           </Animated.View>
 
           <View style={styles.scrimTop} pointerEvents="none" />
@@ -1018,6 +1109,39 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     alignItems: "center",
     justifyContent: "center",
+  },
+  mediaStatus: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: "rgba(0, 0, 0, 0.28)",
+  },
+  loaderMark: {
+    opacity: 0.72,
+  },
+  loaderLabel: {
+    ...typography.caption,
+    color: "rgba(255,255,255,0.62)",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  failTitle: {
+    ...typography.title,
+    color: colors.text,
+    textAlign: "center",
+  },
+  failBody: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.72)",
+    textAlign: "center",
+  },
+  failActions: {
+    marginTop: spacing.sm,
+    width: "100%",
+    maxWidth: 280,
+    gap: spacing.sm,
   },
   scrimTop: {
     position: "absolute",

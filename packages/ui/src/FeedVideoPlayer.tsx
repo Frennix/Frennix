@@ -88,6 +88,11 @@ interface FeedVideoPlayerProps {
   /** Side effect before following videoRouteHref (feed scroll save, playback handoff). */
   onVideoRouteNavigate?: () => void;
   onVisualReady?: () => void;
+  /** Story viewer: start playback without feed intersection coordination. */
+  shouldPlay?: boolean;
+  /** Fires once a decoded frame is visible. Does not change feed autoplay. */
+  onRenderedFrame?: () => void;
+  onPlaybackError?: () => void;
   fillParent?: boolean;
   feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
 }
@@ -107,6 +112,9 @@ export function FeedVideoPlayer({
   videoRouteHref,
   onVideoRouteNavigate,
   onVisualReady,
+  shouldPlay: shouldPlayOverride,
+  onRenderedFrame,
+  onPlaybackError,
   fillParent = false,
   feedFrameBucket,
 }: FeedVideoPlayerProps) {
@@ -181,8 +189,9 @@ export function FeedVideoPlayer({
       }
       clearStallSpinner();
       setFailed(true);
+      onPlaybackError?.();
     },
-    [clearStallSpinner, playbackId, uri]
+    [clearStallSpinner, onPlaybackError, playbackId, uri]
   );
 
   const notifyVisualReady = useCallback(() => {
@@ -190,6 +199,13 @@ export function FeedVideoPlayer({
     visualReadyRef.current = true;
     onVisualReady?.();
   }, [onVisualReady]);
+
+  const renderedFrameRef = useRef(false);
+  const notifyRenderedFrame = useCallback(() => {
+    if (renderedFrameRef.current) return;
+    renderedFrameRef.current = true;
+    onRenderedFrame?.();
+  }, [onRenderedFrame]);
 
   const isActiveVideo = Boolean(playbackId && isActiveFeedVideo(playbackId));
 
@@ -232,14 +248,17 @@ export function FeedVideoPlayer({
     setFeedVideoPreloadCandidate(playbackId, false);
   }, [playbackId]);
 
-  const shouldPlay = Boolean(
-    inView &&
-      playbackId &&
-      (isFeedVideoPlaybackAllowed() || isFeedVideoFullscreenHandoff(playbackId)) &&
-      (isActiveVideo || isFeedVideoFullscreenHandoff(playbackId)) &&
-      slideActive &&
-      !failed
-  );
+  const shouldPlay =
+    shouldPlayOverride !== undefined
+      ? Boolean(shouldPlayOverride && slideActive && !failed)
+      : Boolean(
+          inView &&
+            playbackId &&
+            (isFeedVideoPlaybackAllowed() || isFeedVideoFullscreenHandoff(playbackId)) &&
+            (isActiveVideo || isFeedVideoFullscreenHandoff(playbackId)) &&
+            slideActive &&
+            !failed
+        );
   shouldPlayRef.current = shouldPlay;
 
   const attemptWebAutoplay = useCallback(() => {
@@ -378,12 +397,14 @@ export function FeedVideoPlayer({
     autoRetryAttemptRef.current = 0;
     setFailed(false);
     setHasRenderedFrame(false);
+    renderedFrameRef.current = false;
     clearStallSpinner();
   }, [clearStallSpinner, uri]);
 
   useEffect(() => {
     setFailed(false);
     setHasRenderedFrame(false);
+    renderedFrameRef.current = false;
     clearStallSpinner();
   }, [clearStallSpinner, retryKey]);
 
@@ -396,8 +417,9 @@ export function FeedVideoPlayer({
     video.style.opacity = "1";
     clearStallSpinner();
     notifyVisualReady();
+    notifyRenderedFrame();
     return true;
-  }, [clearStallSpinner, notifyVisualReady]);
+  }, [clearStallSpinner, notifyRenderedFrame, notifyVisualReady]);
 
   const scheduleVideoFrameCallbackReveal = useCallback(
     (video: HTMLVideoElement) => {
@@ -652,6 +674,7 @@ export function FeedVideoPlayer({
         else await video.pauseAsync();
       } catch {
         setFailed(true);
+        onPlaybackError?.();
       }
     })();
   }, [shouldPlay, muted, failed, uri, retryKey]);
@@ -918,12 +941,16 @@ export function FeedVideoPlayer({
               usePoster={Boolean(presentationPosterUri)}
               onPlaybackStatusUpdate={(status) => {
                 if (!status.isLoaded) {
-                  if ("error" in status && status.error) setFailed(true);
+                  if ("error" in status && status.error) {
+                    setFailed(true);
+                    onPlaybackError?.();
+                  }
                   return;
                 }
                 if (status.isPlaying && status.durationMillis != null) {
                   setHasRenderedFrame(true);
                   clearStallSpinner();
+                  notifyRenderedFrame();
                 }
                 if (status.isBuffering) {
                   scheduleStallSpinner();
