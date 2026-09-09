@@ -194,9 +194,12 @@ function main() {
 
   ok =
     pass(
-      "Share Your Journey uses Post Workout without changing destination labels",
-      readSource("app/create-post.tsx").includes('isReelIntent\n                  ? "Post Workout"') &&
-        readSource("app/create-post.tsx").includes('"Save Workout"') &&
+      "Share Your Journey and regular Share Workout both use Post Workout",
+      createPost.includes('"Post Workout"') &&
+        !createPost.includes('"Save Workout"') &&
+        createPost.includes('? "Share post"') &&
+        createPost.includes(': "Post Workout"') &&
+        createPost.includes("isReelIntent") &&
         readSource("components/WorkoutSavedSheet.tsx").includes('label: "Post to Reels"')
     ) && ok;
 

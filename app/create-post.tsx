@@ -797,9 +797,7 @@ export default function CreatePostScreen() {
                 : "Workout shared!"
               : isContextPost
                 ? "Share post"
-                : isReelIntent
-                  ? "Post Workout"
-                  : "Save Workout"
+                : "Post Workout"
           }
           loadingTitle={isContextPost ? "Sharing…" : "Saving…"}
           onPress={submit}

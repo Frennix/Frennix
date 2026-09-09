@@ -169,16 +169,32 @@ function main() {
         createPost.includes("reelIntent={isReelIntent}")
     ) && ok;
 
+  const submitButtonStart = createPost.lastIndexOf("<Button", createPost.indexOf("<WorkoutSavedSheet"));
+  const createPostButton = createPost.slice(submitButtonStart, createPost.indexOf("<WorkoutSavedSheet"));
+  const editPost = readSource("app/edit-post/[id].tsx");
+
   ok =
     pass(
-      "intent=reel shows Post Workout; other workout flows keep Save Workout",
-      createPost.includes("isReelIntent") &&
-        createPost.includes('"Post Workout"') &&
-        createPost.includes('"Save Workout"') &&
-        createPost.includes("isReelIntent\n                  ? \"Post Workout\"\n                  : \"Save Workout\"") &&
-        !createPost.includes('title="Post Workout"') &&
+      "Create-post primary button says Post Workout for photos, Feed videos, and Reels",
+      createPostButton.includes('"Post Workout"') &&
+        !createPostButton.includes('"Save Workout"') &&
+        !createPostButton.includes("isReelIntent") &&
+        !createPostButton.includes("hasVideo") &&
+        !createPostButton.includes("selectedMedia") &&
+        createPostButton.includes("onPress={submit}") &&
+        createPostButton.includes("loading={showSubmittingUi}") &&
+        createPostButton.includes("disabled={isFormLocked}") &&
+        createPost.includes("if (submittingRef.current || loading || isSuccess || navigateTimeoutRef.current) return") &&
         savedSheet.includes('label: "Post to Reels"') &&
         savedSheet.includes('label: "Post to Feed"')
+    ) && ok;
+
+  ok =
+    pass(
+      "Editing an existing post uses Save changes, not Save Workout",
+      editPost.includes('title="Save changes"') &&
+        !editPost.includes('"Save Workout"') &&
+        !editPost.includes('"Post Workout"')
     ) && ok;
 
   ok =
