@@ -3,8 +3,11 @@ import type { ImagePickerAsset } from "expo-image-picker";
 import { isVideoMime } from "@frennix/api";
 
 export const VIDEO_MAX_SECONDS = 60;
+export const REEL_MAX_SECONDS = 90;
 export const VIDEO_TOO_LONG_MESSAGE =
   "Video is too long. Please choose a video that is 60 seconds or less.";
+export const REEL_TOO_LONG_MESSAGE =
+  "Video is too long. Please choose a video that is 90 seconds or less.";
 
 /** Normalize picker duration to seconds (native reports ms; web reports seconds). */
 export function normalizeVideoDuration(duration: number | null | undefined): number | null {
@@ -57,6 +60,9 @@ export async function getVideoDurationSeconds(
   return readVideoDurationSeconds(asset.uri);
 }
 
-export function isVideoTooLong(durationSeconds: number | null): boolean {
-  return durationSeconds != null && durationSeconds > VIDEO_MAX_SECONDS;
+export function isVideoTooLong(
+  durationSeconds: number | null,
+  maxSeconds: number = VIDEO_MAX_SECONDS
+): boolean {
+  return durationSeconds != null && durationSeconds > maxSeconds;
 }

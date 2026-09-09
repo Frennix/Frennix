@@ -162,11 +162,14 @@ function main() {
 
   ok =
     pass(
-      "Post to Reels is rendered first for intent=reel",
-      savedSheet.includes("reelIntent ? [REEL_OPTION, ...BASE_OPTIONS] : BASE_OPTIONS") &&
-        savedSheet.includes('label: "Post to Reels"') &&
-        savedSheet.includes("Share this journey video in Reels") &&
-        createPost.includes("reelIntent={isReelIntent}")
+      "Share Your Journey bypasses the destination panel and posts one Reel",
+      createPost.includes("if (isReelIntent)") &&
+        createPost.includes('await executeShare("reel")') &&
+        createPost.includes("visible={savedSheetVisible && !isReelIntent}") &&
+        createPost.includes('switchTab("/(tabs)/reels")') &&
+        savedSheet.includes('label: "Post to Feed"') &&
+        savedSheet.includes('label: "Share to Story"') &&
+        savedSheet.includes('label: "Share to Both"')
     ) && ok;
 
   const submitButtonStart = createPost.lastIndexOf("<Button", createPost.indexOf("<WorkoutSavedSheet"));
@@ -175,17 +178,15 @@ function main() {
 
   ok =
     pass(
-      "Create-post primary button says Post Workout for photos, Feed videos, and Reels",
-      createPostButton.includes('"Post Workout"') &&
+      "Create-post primary button says Post Your Journey for Reels and Post Workout otherwise",
+      createPostButton.includes('"Post Your Journey"') &&
+        createPostButton.includes('"Post Workout"') &&
+        createPostButton.includes("isReelIntent") &&
         !createPostButton.includes('"Save Workout"') &&
-        !createPostButton.includes("isReelIntent") &&
-        !createPostButton.includes("hasVideo") &&
-        !createPostButton.includes("selectedMedia") &&
         createPostButton.includes("onPress={submit}") &&
         createPostButton.includes("loading={showSubmittingUi}") &&
         createPostButton.includes("disabled={isFormLocked}") &&
         createPost.includes("if (submittingRef.current || loading || isSuccess || navigateTimeoutRef.current) return") &&
-        savedSheet.includes('label: "Post to Reels"') &&
         savedSheet.includes('label: "Post to Feed"')
     ) && ok;
 

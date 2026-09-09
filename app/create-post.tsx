@@ -30,6 +30,9 @@ import {
   formatVideoDuration,
   getVideoDurationSeconds,
   isVideoTooLong,
+  REEL_MAX_SECONDS,
+  REEL_TOO_LONG_MESSAGE,
+  VIDEO_MAX_SECONDS,
   VIDEO_TOO_LONG_MESSAGE,
 } from "@/lib/media-duration";
 import { showAlert } from "@/lib/alerts";
@@ -38,6 +41,7 @@ import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
 import { UploadProgressBar } from "@/components/UploadProgressBar";
 import { stackBackOptions } from "@/lib/stack-navigation";
+import { switchTab } from "@/lib/press-utils";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
 import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
@@ -189,6 +193,8 @@ export default function CreatePostScreen() {
   const isContextPost = destination !== "home";
   const hasVideo = selectedMedia.some((item) => isVideoMime(item.mimeType));
   const showJourneyChrome = isReelIntent;
+  const videoMaxSeconds = isReelIntent ? REEL_MAX_SECONDS : VIDEO_MAX_SECONDS;
+  const videoTooLongMessage = isReelIntent ? REEL_TOO_LONG_MESSAGE : VIDEO_TOO_LONG_MESSAGE;
   const hasPhotos = selectedMedia.some((item) => !isVideoMime(item.mimeType));
   const isSubmitting = loading;
   const isSuccess = uploadStage === "success";
@@ -227,14 +233,18 @@ export default function CreatePostScreen() {
       return;
     }
 
-    const pickingVideo = selectedMedia.length === 0 || hasVideo;
+    const pickingVideo = isReelIntent || selectedMedia.length === 0 || hasVideo;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: pickingVideo ? ImagePicker.MediaTypeOptions.All : ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: isReelIntent
+        ? ImagePicker.MediaTypeOptions.Videos
+        : pickingVideo
+          ? ImagePicker.MediaTypeOptions.All
+          : ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
-      allowsMultipleSelection: !pickingVideo,
-      selectionLimit: pickingVideo ? 1 : MAX_PHOTOS - selectedMedia.length,
+      allowsMultipleSelection: !pickingVideo && !isReelIntent,
+      selectionLimit: pickingVideo || isReelIntent ? 1 : MAX_PHOTOS - selectedMedia.length,
       quality: 0.8,
-      videoMaxDuration: 60,
+      videoMaxDuration: videoMaxSeconds,
     });
 
     if (result.canceled) return;
@@ -248,8 +258,8 @@ export default function CreatePostScreen() {
       const pickedFile = "file" in asset ? asset.file ?? undefined : undefined;
       const file = await resolveVideoUploadFile(asset.uri, mime, pickedFile);
       const durationSeconds = await getVideoDurationSeconds(asset, mime);
-      if (isVideoTooLong(durationSeconds)) {
-        showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
+      if (isVideoTooLong(durationSeconds, videoMaxSeconds)) {
+        showAlert("Video too long", videoTooLongMessage);
         return;
       }
       setSelectedMedia([{ uri: asset.uri, mimeType: mime, file, durationSeconds }]);
@@ -263,6 +273,11 @@ export default function CreatePostScreen() {
     }
 
     if (!photoAssets.length) return;
+
+    if (isReelIntent) {
+      showAlert("Reels require a video", "Please choose a video for your journey.");
+      return;
+    }
 
     const adjustedPhotos: SelectedMediaItem[] = [];
 
@@ -399,6 +414,15 @@ export default function CreatePostScreen() {
       setSelectedMedia([]);
       setUploadStage("success");
 
+      if (mode === "reel") {
+        switchTab("/(tabs)/reels");
+        setUploadStage("idle");
+        submittingRef.current = false;
+        setPersistPaused(false);
+        setLoading(false);
+        return;
+      }
+
       navigateTimeoutRef.current = setTimeout(() => {
         if (result.postId) {
           navigateAfterPost(result.postId);
@@ -430,12 +454,20 @@ export default function CreatePostScreen() {
       showAlert("Create post", message);
       return;
     }
-    if (!content && !selectedMedia.length && !workoutTypes.length) {
+
+    if (isReelIntent && !hasVideo) {
+      const message = "Reels require a video";
+      setError(message);
+      showAlert("Could not share", message);
+      return;
+    }
+
+    if (!isReelIntent && !content && !selectedMedia.length && !workoutTypes.length) {
       setError("Add a caption, workout type, or photo/video");
       return;
     }
-    if (hasVideo && selectedMedia.some((item) => isVideoTooLong(item.durationSeconds ?? null))) {
-      showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
+    if (hasVideo && selectedMedia.some((item) => isVideoTooLong(item.durationSeconds ?? null, videoMaxSeconds))) {
+      showAlert("Video too long", videoTooLongMessage);
       return;
     }
 
@@ -445,6 +477,11 @@ export default function CreatePostScreen() {
 
     try {
       await flushDraft();
+
+      if (isReelIntent) {
+        await executeShare("reel");
+        return;
+      }
 
       if (!isContextPost) {
         submittingRef.current = false;
@@ -579,29 +616,48 @@ export default function CreatePostScreen() {
           </>
         ) : null}
 
-        <Text style={styles.sectionLabel}>Workout types</Text>
-        <View style={styles.chips}>
-          {ACTIVITIES.map((activity) => (
-            <Pressable
-              key={activity}
-              style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
-              onPress={() =>
-                setWorkoutTypes((current) =>
-                  current.includes(activity)
-                    ? current.filter((item) => item !== activity)
-                    : [...current, activity]
-                )
-              }
-              disabled={isFormLocked}
-            >
-              <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
-                {formatActivity(activity)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        {showJourneyChrome ? (
+          <View style={styles.captionBlock}>
+            <Input
+              label="What part of your journey are you sharing?"
+              value={content}
+              onChangeText={setContent}
+              multiline
+              maxLength={CAPTION_MAX}
+              editable={!isFormLocked}
+              placeholder="Crushed leg day, hit a PR, finished a 5K..."
+            />
+            <Text style={styles.charCount}>
+              {content.length}/{CAPTION_MAX}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.sectionLabel}>Workout types</Text>
+            <View style={styles.chips}>
+              {ACTIVITIES.map((activity) => (
+                <Pressable
+                  key={activity}
+                  style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
+                  onPress={() =>
+                    setWorkoutTypes((current) =>
+                      current.includes(activity)
+                        ? current.filter((item) => item !== activity)
+                        : [...current, activity]
+                    )
+                  }
+                  disabled={isFormLocked}
+                >
+                  <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
+                    {formatActivity(activity)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
-        {!isContextPost ? (
+        {!isContextPost && !isReelIntent ? (
           <>
             <Text style={styles.sectionLabel}>Workout details</Text>
             <View style={styles.metricsRow}>
@@ -668,20 +724,22 @@ export default function CreatePostScreen() {
           </>
         ) : null}
 
-        <View style={styles.captionBlock}>
-          <Input
-            label="What did you accomplish?"
-            value={content}
-            onChangeText={setContent}
-            multiline
-            maxLength={CAPTION_MAX}
-            editable={!isFormLocked}
-            placeholder="Crushed leg day, hit a PR, finished a 5K..."
-          />
-          <Text style={styles.charCount}>
-            {content.length}/{CAPTION_MAX}
-          </Text>
-        </View>
+        {!showJourneyChrome ? (
+          <View style={styles.captionBlock}>
+            <Input
+              label="What did you accomplish?"
+              value={content}
+              onChangeText={setContent}
+              multiline
+              maxLength={CAPTION_MAX}
+              editable={!isFormLocked}
+              placeholder="Crushed leg day, hit a PR, finished a 5K..."
+            />
+            <Text style={styles.charCount}>
+              {content.length}/{CAPTION_MAX}
+            </Text>
+          </View>
+        ) : null}
 
         {selectedMedia.length ? (
           <View style={styles.mediaSection}>
@@ -729,8 +787,11 @@ export default function CreatePostScreen() {
                   ? `${selectedMedia.length} photo${selectedMedia.length === 1 ? "" : "s"} selected`
                   : "Media selected"}
             </Text>
+            {isReelIntent ? (
+              <Text style={styles.mediaHelper}>Videos up to 90 seconds.</Text>
+            ) : null}
 
-            {!hasVideo && selectedMedia.length < MAX_PHOTOS ? (
+            {!hasVideo && !isReelIntent && selectedMedia.length < MAX_PHOTOS ? (
               <Button
                 title="Add more photos"
                 variant="secondary"
@@ -739,7 +800,7 @@ export default function CreatePostScreen() {
               />
             ) : null}
             <Button
-              title={hasVideo ? "Replace video" : "Replace photos"}
+              title={hasVideo || isReelIntent ? "Replace video" : "Replace photos"}
               variant="secondary"
               onPress={pickMedia}
               disabled={isFormLocked}
@@ -754,7 +815,7 @@ export default function CreatePostScreen() {
         ) : (
           <View style={styles.addMediaBlock}>
             <Button
-              title="Add photos or video"
+              title={isReelIntent ? "Add video" : "Add photos or video"}
               variant="secondary"
               onPress={pickMedia}
               disabled={isFormLocked || pickingMedia}
@@ -762,10 +823,39 @@ export default function CreatePostScreen() {
               loadingTitle="Opening library…"
             />
             <Text style={styles.mediaHelper}>
-              Add up to {MAX_PHOTOS} photos or one workout video up to 60 seconds.
+              {isReelIntent
+                ? "Videos up to 90 seconds."
+                : `Add up to ${MAX_PHOTOS} photos or one workout video up to 60 seconds.`}
             </Text>
           </View>
         )}
+
+        {showJourneyChrome ? (
+          <>
+            <Text style={styles.sectionLabel}>Related activity</Text>
+            <Text style={styles.sectionHint}>Optional — add an activity connected to your journey.</Text>
+            <View style={styles.chips}>
+              {ACTIVITIES.map((activity) => (
+                <Pressable
+                  key={activity}
+                  style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
+                  onPress={() =>
+                    setWorkoutTypes((current) =>
+                      current.includes(activity)
+                        ? current.filter((item) => item !== activity)
+                        : [...current, activity]
+                    )
+                  }
+                  disabled={isFormLocked}
+                >
+                  <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
+                    {formatActivity(activity)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {progressLabel || showSubmittingUi ? (
           <UploadProgressBar
@@ -792,21 +882,25 @@ export default function CreatePostScreen() {
         <Button
           title={
             isSuccess
-              ? isContextPost
-                ? "Post shared!"
-                : "Workout shared!"
-              : isContextPost
-                ? "Share post"
-                : "Post Workout"
+              ? isReelIntent
+                ? "Journey posted!"
+                : isContextPost
+                  ? "Post shared!"
+                  : "Workout shared!"
+              : isReelIntent
+                ? "Post Your Journey"
+                : isContextPost
+                  ? "Share post"
+                  : "Post Workout"
           }
-          loadingTitle={isContextPost ? "Sharing…" : "Saving…"}
+          loadingTitle={isReelIntent || isContextPost ? "Sharing…" : "Saving…"}
           onPress={submit}
           loading={showSubmittingUi}
           disabled={isFormLocked}
         />
       </ScrollView>
       <WorkoutSavedSheet
-        visible={savedSheetVisible}
+        visible={savedSheetVisible && !isReelIntent}
         loading={loading}
         reelIntent={isReelIntent}
         onSelect={(mode) => void executeShare(mode)}

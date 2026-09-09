@@ -18,6 +18,8 @@ import {
 } from "@frennix/api";
 import { generateAndUploadVideoThumbnail } from "@/lib/video-thumbnail";
 import { stripReelsFromFeedQuery } from "@/lib/feed-cache";
+import { isVideoTooLong, REEL_MAX_SECONDS, REEL_TOO_LONG_MESSAGE } from "@/lib/media-duration";
+import { prependReelToReelsQuery, setPendingActiveReelId } from "@/lib/reels-cache";
 import {
   formatStoryCalories,
   formatStoryDistance,
@@ -150,7 +152,7 @@ export async function shareWorkout(
   input: WorkoutShareInput,
   queryClient: QueryClient
 ) {
-  if (mode === "done") return { postId: null, storyId: null };
+  if (mode === "done") return { postId: null, storyId: null, post: null };
 
   const shouldReel = mode === "reel";
   const shouldFeed = mode === "feed" || mode === "both";
@@ -163,6 +165,15 @@ export async function shareWorkout(
     const hasVideo = input.media.some((item) => isVideoMime(item.mimeType));
     if (!hasVideo) {
       throw new Error("Reels require a video");
+    }
+    if (
+      input.media.some(
+        (item) =>
+          isVideoMime(item.mimeType) &&
+          isVideoTooLong(item.durationSeconds ?? null, REEL_MAX_SECONDS)
+      )
+    ) {
+      throw new Error(REEL_TOO_LONG_MESSAGE);
     }
 
     const { mediaUrls, thumbnailUrl, postType } = await uploadFeedMediaAssets(input.userId, input.media);
@@ -241,10 +252,22 @@ export async function shareWorkout(
 
   stripReelsFromFeedQuery(queryClient, input.userId);
 
+  if (shouldReel && createdPost) {
+    const confirmedReel = createdPost;
+    prependReelToReelsQuery(queryClient, input.userId, confirmedReel);
+    setPendingActiveReelId(confirmedReel.id);
+    void queryClient.invalidateQueries({ queryKey: ["reels", input.userId] }).then(() => {
+      prependReelToReelsQuery(queryClient, input.userId, confirmedReel);
+    });
+    void queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+    void queryClient.invalidateQueries({ queryKey: ["profile-stats", input.userId] });
+    return { postId: confirmedReel.id, storyId: null, post: confirmedReel };
+  }
+
   await queryClient.invalidateQueries({ queryKey: ["feed", input.userId] });
   await queryClient.invalidateQueries({ queryKey: ["feed-stories", input.userId] });
   await queryClient.invalidateQueries({ queryKey: ["reels", input.userId] });
   await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
 
-  return { postId: createdPost?.id ?? null, storyId };
+  return { postId: createdPost?.id ?? null, storyId, post: createdPost };
 }

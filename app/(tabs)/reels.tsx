@@ -22,6 +22,7 @@ import {
 import type { ImmersiveVideoPlaylistState } from "@/lib/immersive-video-playlist-state";
 import { usesMobileWebCommentsRoute } from "@/lib/mobile-web-comments-route";
 import { openCreatePost } from "@/lib/press-utils";
+import { consumePendingActiveReelId } from "@/lib/reels-cache";
 import {
   frennixRefreshControlProps,
   tabScreenContainer,
@@ -45,6 +46,7 @@ function ReelsScreen() {
   const queryClient = useQueryClient();
   const listRef = useRef<FlatList<Post>>(null);
   const openedThisVisitRef = useRef(false);
+  const pendingActiveReelIdRef = useRef<string | null>(null);
   const { onScroll, isAtTop } = useScrollAtTop();
   const { openGallery, closeGallery, lightbox, lightboxVisible } = useImageLightbox();
   const { buildImmersiveContext, shareSheet, postActionSheets } =
@@ -162,9 +164,30 @@ function ReelsScreen() {
   openReelRef.current = openReel;
 
   useEffect(() => {
+    if (!pendingActiveReelIdRef.current) {
+      const pendingId = consumePendingActiveReelId();
+      if (pendingId) pendingActiveReelIdRef.current = pendingId;
+    }
+
     if (!isFocused) {
       openedThisVisitRef.current = false;
       if (lightboxVisible) closeGallery(0);
+      return;
+    }
+
+    const pendingId = pendingActiveReelIdRef.current;
+    const pendingReel = pendingId
+      ? posts.find((post) => post.id === pendingId) ?? null
+      : null;
+
+    if (pendingId && !pendingReel) {
+      return;
+    }
+
+    if (pendingReel) {
+      pendingActiveReelIdRef.current = null;
+      openedThisVisitRef.current = true;
+      openReelRef.current(pendingReel);
       return;
     }
 

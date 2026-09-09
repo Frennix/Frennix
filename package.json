@@ -59,6 +59,8 @@
     "verify:feed-media-client-fixes": "node scripts/verify-feed-media-client-fixes.mjs",
     "verify:reels-phase1": "node scripts/verify-reels-phase1.mjs",
     "verify:reels-content-model": "node scripts/verify-reels-content-model.mjs",
+    "verify:reels-creation-experience": "node scripts/verify-reels-creation-experience.mjs",
+    "verify:reels-cache-prepend": "npx tsx scripts/verify-reels-cache-prepend.ts",
     "verify:like-toggle": "npx tsx scripts/verify-like-toggle.ts"
   },
   "dependencies": {

@@ -194,13 +194,15 @@ function main() {
 
   ok =
     pass(
-      "Share Your Journey and regular Share Workout both use Post Workout",
-      createPost.includes('"Post Workout"') &&
+      "Share Your Journey uses Post Your Journey; regular Share Workout uses Post Workout",
+      createPost.includes('"Post Your Journey"') &&
+        createPost.includes('"Post Workout"') &&
         !createPost.includes('"Save Workout"') &&
         createPost.includes('? "Share post"') &&
         createPost.includes(': "Post Workout"') &&
         createPost.includes("isReelIntent") &&
-        readSource("components/WorkoutSavedSheet.tsx").includes('label: "Post to Reels"')
+        createPost.includes('await executeShare("reel")') &&
+        readSource("components/WorkoutSavedSheet.tsx").includes('label: "Post to Feed"')
     ) && ok;
 
   ok =
