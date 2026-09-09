@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import type { Challenge, Conversation, Group, Post } from "@frennix/types";
 import { BottomOverlayShell } from "@/components/BottomOverlayShell";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { Avatar, colors, spacing, typography } from "@frennix/ui";
 
 type ShareStep = "menu" | "message" | "group" | "challenge";
@@ -174,6 +175,8 @@ export function SharePostSheet({
       onClose={handleClose}
       sheetMaxHeight="70%"
       dismissOnBackdrop={!sharing}
+      rootPortal
+      webZIndex={OVERLAY_Z_INDEX.shareSheet}
     >
       {post ? (
         <Text style={styles.previewHint} numberOfLines={2}>

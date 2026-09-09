@@ -165,6 +165,18 @@ function main() {
 
   ok =
     pass(
+      "intent=reel shows Post Workout; other workout flows keep Save Workout",
+      createPost.includes("isReelIntent") &&
+        createPost.includes('"Post Workout"') &&
+        createPost.includes('"Save Workout"') &&
+        createPost.includes("isReelIntent\n                  ? \"Post Workout\"\n                  : \"Save Workout\"") &&
+        !createPost.includes('title="Post Workout"') &&
+        savedSheet.includes('label: "Post to Reels"') &&
+        savedSheet.includes('label: "Post to Feed"')
+    ) && ok;
+
+  ok =
+    pass(
       "Reel delete uses the post row first and refreshes Reels cache",
       readSource("packages/api/src/posts.ts").includes("deletePost storage cleanup") &&
         readSource("lib/post-cache.ts").includes('["reels", userId]') &&

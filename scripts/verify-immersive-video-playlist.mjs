@@ -226,6 +226,17 @@ function main() {
         immersive.includes("function RailAction(")
     ) && ok;
 
+  ok =
+    pass(
+      "Shared Share sheet portals above Feed and Reels immersive viewers",
+      readSource("components/SharePostSheet.tsx").includes("rootPortal") &&
+        readSource("components/SharePostSheet.tsx").includes("OVERLAY_Z_INDEX.shareSheet") &&
+        readSource("lib/useSharePost.tsx").includes("<SharePostSheet") &&
+        !readSource("lib/useSharePost.tsx").includes("closeGallery") &&
+        feedIndex.includes("onShare: () => openShare(post.shared_post ?? post)") &&
+        immersive.includes('label="Share"')
+    ) && ok;
+
   console.log(`\n${ok ? "All checks passed." : "Some checks failed."}`);
   process.exit(ok ? 0 : 1);
 }

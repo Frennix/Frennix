@@ -200,6 +200,7 @@ function main() {
   const lightboxZ = Number(overlayZ.match(/imageLightbox:\s*(\d+)/)?.[1]);
   const videoOverlayZ = Number(overlayZ.match(/commentsVideoOverlay:\s*(\d+)/)?.[1]);
   const commentOptionsZ = Number(overlayZ.match(/commentOptions:\s*(\d+)/)?.[1]);
+  const shareSheetZ = Number(overlayZ.match(/shareSheet:\s*(\d+)/)?.[1]);
 
   ok =
     pass(
@@ -225,6 +226,7 @@ function main() {
         lightboxZ === 99999 &&
         videoOverlayZ > lightboxZ &&
         commentOptionsZ > videoOverlayZ &&
+        shareSheetZ > lightboxZ &&
         styles.includes("z-index: 100001 !important") &&
         styles.includes("z-index: 2147483647 !important") &&
         styles.includes("[data-frennix-video-peek-dismiss") &&
@@ -398,6 +400,25 @@ function main() {
         postActions.includes("rootPortal") &&
         reels.includes("onDeleted: () => closeGallery(0)") &&
         viewer.includes('label="Comment"')
+    ) && ok;
+
+  const shareSheet = readSource("components/SharePostSheet.tsx");
+  const shareHook = readSource("lib/useSharePost.tsx");
+  const feedIndex = readSource("app/(tabs)/index.tsx");
+  const immersiveContext = readSource("lib/useBuildImmersiveVideoContext.ts");
+
+  ok =
+    pass(
+      "Shared Share sheet portals above the immersive lightbox for Feed and Reels",
+      shareSheet.includes("rootPortal") &&
+        shareSheet.includes("OVERLAY_Z_INDEX.shareSheet") &&
+        overlayZ.includes("imageLightbox: 99999") &&
+        overlayZ.includes("shareSheet: 100002") &&
+        shareHook.includes("<SharePostSheet") &&
+        !shareHook.includes("closeGallery") &&
+        immersiveContext.includes("onShare: () => openShare(post.shared_post ?? post)") &&
+        feedIndex.includes("onShare: () => openShare(post.shared_post ?? post)") &&
+        viewer.includes('label="Share"')
     ) && ok;
 
   console.log("");

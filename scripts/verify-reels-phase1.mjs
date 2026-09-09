@@ -183,6 +183,25 @@ function main() {
 
   ok =
     pass(
+      "Share sheet uses the shared root portal and does not close the Reel",
+      readSource("components/SharePostSheet.tsx").includes("rootPortal") &&
+        readSource("components/SharePostSheet.tsx").includes("OVERLAY_Z_INDEX.shareSheet") &&
+        readSource("lib/useSharePost.tsx").includes("<SharePostSheet") &&
+        !readSource("lib/useSharePost.tsx").includes("closeGallery") &&
+        reels.includes("{shareSheet}") &&
+        viewer.includes('label="Share"')
+    ) && ok;
+
+  ok =
+    pass(
+      "Share Your Journey uses Post Workout without changing destination labels",
+      readSource("app/create-post.tsx").includes('isReelIntent\n                  ? "Post Workout"') &&
+        readSource("app/create-post.tsx").includes('"Save Workout"') &&
+        readSource("components/WorkoutSavedSheet.tsx").includes('label: "Post to Reels"')
+    ) && ok;
+
+  ok =
+    pass(
       "Shared playlist viewer has no Reels-only caughtUpLabel fork",
       !playlistViewer.includes("caughtUpLabel") &&
         !overlayShell.includes("caughtUpLabel") &&
