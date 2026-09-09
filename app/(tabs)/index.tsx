@@ -40,6 +40,7 @@ import {
   STORY_CHALLENGE_RESPONSES,
   normalizePostMediaItems,
   type FeedStory,
+  type FrennixStory,
   type Post,
   type StoryChallengeKey,
   type StoryQuickReactionEmoji,
@@ -1393,6 +1394,33 @@ export default function HomeScreen() {
         }}
         onFollow={handleStoryFollow}
         onInviteToTrain={handleStoryInviteToTrain}
+        onStoryUpdated={(updated: FrennixStory) => {
+          queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
+            current?.map((item) => ({
+              ...item,
+              active_stories: item.active_stories.map((story) =>
+                story.id === updated.id ? { ...story, ...updated } : story
+              ),
+            }))
+          );
+          void queryClient.invalidateQueries({ queryKey: ["feed-stories"] });
+        }}
+        onStoryDeleted={(storyId, ownerId) => {
+          queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
+            current
+              ?.map((item) =>
+                item.user_id === ownerId
+                  ? {
+                      ...item,
+                      active_stories: item.active_stories.filter((story) => story.id !== storyId),
+                    }
+                  : item
+              )
+              .filter((item) => item.is_self || item.active_stories.length > 0)
+          );
+          void queryClient.removeQueries({ queryKey: ["story-viewer-count"] });
+          void queryClient.removeQueries({ queryKey: ["story-insights"] });
+        }}
         onMarkCommitmentComplete={
           activeStory?.is_self
             ? () => {

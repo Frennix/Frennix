@@ -1,13 +1,35 @@
 import type { WorkoutStoryMetrics } from "./workout-story";
 
-/** Who can view a story. Custom lists reserved for future. */
-export type StoryPrivacy = "everyone" | "followers" | "friends";
+/** Who can view a story. `followers` and `friends` are legacy values kept for existing rows. */
+export type StoryPrivacy = "everyone" | "followers" | "friends" | "connections" | "only_me";
 
-export const STORY_PRIVACY_OPTIONS: Array<{ value: StoryPrivacy; label: string; hint: string }> = [
-  { value: "everyone", label: "Everyone", hint: "Anyone on Frennix" },
+export type StoryPrivacyOption = { value: StoryPrivacy; label: string; hint: string };
+
+export const STORY_PRIVACY_OPTIONS: StoryPrivacyOption[] = [
+  { value: "everyone", label: "Everyone", hint: "Any eligible Frennix user can view it" },
+  { value: "connections", label: "Connections", hint: "Only accepted matches can view it" },
+  { value: "only_me", label: "Only me", hint: "Only you can view it" },
+];
+
+export const STORY_PRIVACY_LEGACY_OPTIONS: StoryPrivacyOption[] = [
   { value: "followers", label: "Followers", hint: "People who follow you" },
   { value: "friends", label: "Friends", hint: "Mutual connections" },
 ];
+
+const STORY_PRIVACY_BY_VALUE = new Map<StoryPrivacy, StoryPrivacyOption>(
+  [...STORY_PRIVACY_OPTIONS, ...STORY_PRIVACY_LEGACY_OPTIONS].map((option) => [option.value, option])
+);
+
+export function getStoryPrivacyOption(value: StoryPrivacy): StoryPrivacyOption {
+  return STORY_PRIVACY_BY_VALUE.get(value) ?? STORY_PRIVACY_OPTIONS[0];
+}
+
+/** New-story choices, plus the current legacy value so existing visibility is not remapped. */
+export function storyPrivacyChoices(current?: StoryPrivacy | null): StoryPrivacyOption[] {
+  if (!current) return STORY_PRIVACY_OPTIONS;
+  const legacy = STORY_PRIVACY_LEGACY_OPTIONS.find((option) => option.value === current);
+  return legacy ? [legacy, ...STORY_PRIVACY_OPTIONS] : STORY_PRIVACY_OPTIONS;
+}
 
 export type StorySlideMediaType = "photo" | "video" | "text" | "workout";
 
@@ -58,6 +80,7 @@ export interface FrennixStory {
   id: string;
   user_id: string;
   privacy: StoryPrivacy;
+  commenting_enabled: boolean;
   post_id: string | null;
   workout_tag: string | null;
   location_name: string | null;

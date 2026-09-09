@@ -50,7 +50,10 @@ import {
 import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
 import { StoryViewerEyeButton } from "./story/StoryViewerEyeButton";
+import { StoryControlsButton } from "./story/StoryControlsButton";
+import { StoryControlsSheet } from "./story/StoryControlsSheet";
 import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
+import type { FrennixStory } from "@frennix/types";
 import {
   buildDedicatedStorySlides,
   prefetchStorySlide,
@@ -218,6 +221,8 @@ export interface WorkoutStoryViewerProps {
   onDiscoverLocation?: (location: string) => void;
   onViewProfileFromStory?: (storyUserId: string, username: string) => void;
   onMarkCommitmentComplete?: () => void | Promise<void>;
+  onStoryUpdated?: (story: FrennixStory) => void;
+  onStoryDeleted?: (storyId: string, ownerId: string) => void;
   storyInsights?: StoryInsights | null;
   followLoading?: boolean;
   inviteLoading?: boolean;
@@ -247,6 +252,8 @@ export function WorkoutStoryViewer({
   onDiscoverLocation,
   onViewProfileFromStory,
   onMarkCommitmentComplete,
+  onStoryUpdated,
+  onStoryDeleted,
   storyInsights,
   followLoading,
   inviteLoading,
@@ -260,6 +267,8 @@ export function WorkoutStoryViewer({
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [questionAnswersVisible, setQuestionAnswersVisible] = useState(false);
   const [showReply, setShowReply] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const slideOpacity = useRef(new Animated.Value(1)).current;
@@ -287,7 +296,7 @@ export function WorkoutStoryViewer({
   }, [activeStories, slideContext]);
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
-  const autoAdvancePaused = paused || interactionLocked || showReply;
+  const autoAdvancePaused = paused || interactionLocked || showReply || controlsOpen;
 
   useEffect(() => {
     if (!visible) return;
@@ -297,6 +306,8 @@ export function WorkoutStoryViewer({
     setInteractionLocked(false);
     setCaptionExpanded(false);
     setShowReply(false);
+    setControlsOpen(false);
+    setStatusMessage("");
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
@@ -333,6 +344,13 @@ export function WorkoutStoryViewer({
   ]);
 
   useEffect(() => {
+    if (!visible) return;
+    if (!story || activeStories.length === 0) {
+      onClose();
+    }
+  }, [activeStories.length, onClose, story, visible]);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
 
     if (!visible) {
@@ -363,6 +381,50 @@ export function WorkoutStoryViewer({
     }
     onClose();
   }, [onClose, slideIndex, slides.length, stories.length, storyIndex]);
+
+  const showStatus = useCallback((message: string) => {
+    setStatusMessage(message);
+    setTimeout(() => setStatusMessage(""), 2200);
+  }, []);
+
+  const handleControlsUpdated = useCallback(
+    (updated: FrennixStory) => {
+      onStoryUpdated?.(updated);
+    },
+    [onStoryUpdated]
+  );
+
+  const handleControlsDeleted = useCallback(
+    (deletedStoryId: string) => {
+      const ownerId = story?.user_id ?? "";
+      const remainingStories = activeStories.filter((item) => item.id !== deletedStoryId);
+      onStoryDeleted?.(deletedStoryId, ownerId);
+      setControlsOpen(false);
+      showStatus("Story deleted.");
+
+      if (remainingStories.length > 0) {
+        const deletedAt = activeStories.findIndex((item) => item.id === deletedStoryId);
+        const nextStory = remainingStories[deletedAt] ?? remainingStories[Math.max(0, deletedAt - 1)];
+        const nextSlides = buildDedicatedStorySlides(remainingStories);
+        const nextIndex = nextSlides.findIndex((slide) => slide.storyId === nextStory.id);
+        setSlideIndex(Math.max(0, nextIndex));
+        return;
+      }
+
+      if (storyIndex < stories.length - 1) {
+        setStoryIndex((current) => current + 1);
+        setSlideIndex(0);
+        return;
+      }
+      if (storyIndex > 0) {
+        setStoryIndex((current) => current - 1);
+        setSlideIndex(0);
+        return;
+      }
+      setTimeout(() => onClose(), 700);
+    },
+    [activeStories, onClose, onStoryDeleted, showStatus, story?.user_id, storyIndex, stories.length]
+  );
 
   const stopTimer = useCallback(() => {
     timerRef.current?.stop();
@@ -401,10 +463,10 @@ export function WorkoutStoryViewer({
     elapsedMsRef.current = 0;
     progress.setValue(0);
     setPlaybackEpoch((epoch) => epoch + 1);
-    if (!paused && !interactionLocked && !showReply) {
+    if (!paused && !interactionLocked && !showReply && !controlsOpen) {
       startTimer(0);
     }
-  }, [interactionLocked, paused, progress, showReply, startTimer, stopTimer]);
+  }, [controlsOpen, interactionLocked, paused, progress, showReply, startTimer, stopTimer]);
 
   const handleLeftTap = useCallback(() => {
     if (slideIndex > 0) {
@@ -416,13 +478,13 @@ export function WorkoutStoryViewer({
 
   const tryNavigate = useCallback(
     (action: () => void) => {
-      if (didHoldRef.current || interactionLocked) return;
+      if (didHoldRef.current || interactionLocked || controlsOpen) return;
       const now = Date.now();
       if (now - lastNavAtRef.current < NAV_DEBOUNCE_MS) return;
       lastNavAtRef.current = now;
       action();
     },
-    [interactionLocked]
+    [controlsOpen, interactionLocked]
   );
 
   useEffect(() => {
@@ -603,6 +665,7 @@ export function WorkoutStoryViewer({
   const showCaption = Boolean(caption) && activeSlide?.kind !== "workout";
   const captionNeedsMore = caption.length > 96 || caption.includes("\n");
   const activeStoryId = slideContext?.storyId ?? currentDedicatedStory?.id ?? null;
+  const commentingEnabled = currentDedicatedStory?.commenting_enabled !== false;
   const canEngage = Boolean(activeStoryId) && !story.is_self;
 
   const timePosted = currentDedicatedStory
@@ -669,6 +732,15 @@ export function WorkoutStoryViewer({
                 <StoryViewerEyeButton
                   count={viewerCount}
                   onPress={() => onOpenViewers(activeSlideIdForQuery)}
+                />
+              ) : null}
+
+              {story.is_self && currentDedicatedStory ? (
+                <StoryControlsButton
+                  onPress={() => {
+                    setControlsOpen(true);
+                    setPaused(true);
+                  }}
                 />
               ) : null}
 
@@ -807,7 +879,7 @@ export function WorkoutStoryViewer({
 
             {canEngage ? (
               <View style={styles.engageStack}>
-                {showReply ? (
+                {showReply && commentingEnabled ? (
                   <StoryReplyBar
                     disabled={paused}
                     compact
@@ -829,6 +901,7 @@ export function WorkoutStoryViewer({
                   disabled={paused || showReply}
                   hasChallenge={hasTrainingChallenge}
                   inviteLoading={inviteLoading}
+                  showMessage={commentingEnabled}
                   onMessage={() => setShowReply(true)}
                   onInviteWorkout={() =>
                     onInviteToTrain?.(story.user_id, currentDedicatedStory?.post_id ?? null)
@@ -852,7 +925,7 @@ export function WorkoutStoryViewer({
             ) : null}
           </View>
 
-          <View style={styles.tapZones} pointerEvents="box-none">
+          <View style={styles.tapZones} pointerEvents={controlsOpen ? "none" : "box-none"}>
             <Pressable
               style={styles.tapZoneLeft}
               onPress={() => tryNavigate(handleLeftTap)}
@@ -880,7 +953,42 @@ export function WorkoutStoryViewer({
             />
           </View>
         </Animated.View>
+        {statusMessage ? (
+          <View style={styles.statusToast} pointerEvents="none">
+            <Text style={styles.statusToastText}>{statusMessage}</Text>
+          </View>
+        ) : null}
       </View>
+      <StoryControlsSheet
+        visible={controlsOpen && story.is_self}
+        story={currentDedicatedStory}
+        mediaType={
+          activeSlide?.kind === "media"
+            ? activeSlide.mediaKind === "video"
+              ? "video"
+              : "photo"
+            : null
+        }
+        mediaUrl={activeSlide?.kind === "media" ? activeSlide.url : null}
+        userId={session?.user.id ?? ""}
+        onClose={() => {
+          setControlsOpen(false);
+          setPaused(false);
+        }}
+        onUpdated={handleControlsUpdated}
+        onDeleted={handleControlsDeleted}
+        onSaveResult={(result, kind) => {
+          if (result === "shared") {
+            showStatus(
+              kind === "video"
+                ? "Use Save Video in the share sheet."
+                : "Use Save Image in the share sheet."
+            );
+            return;
+          }
+          showStatus(kind === "video" ? "Video saved." : "Photo saved.");
+        }}
+      />
       <StoryQuestionAnswersModal
         visible={questionAnswersVisible}
         answers={questionAnswers}
@@ -1005,6 +1113,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: "800",
+  },
+  statusToast: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: 120,
+    alignItems: "center",
+  },
+  statusToastText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: "700",
+    backgroundColor: "rgba(10, 10, 11, 0.92)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    overflow: "hidden",
   },
   compactWorkoutMeta: {
     gap: 4,

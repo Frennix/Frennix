@@ -15,7 +15,6 @@ import {
   ACTIVITIES,
   JOURNEY_CATEGORIES,
   JOURNEY_CATEGORY_LABELS,
-  STORY_PRIVACY_OPTIONS,
   type JourneyCategory,
   type StoryPrivacy,
 } from "@frennix/types";
@@ -36,6 +35,8 @@ import {
   VIDEO_TOO_LONG_MESSAGE,
 } from "@/lib/media-duration";
 import { showAlert } from "@/lib/alerts";
+import { StoryPrivacySelector } from "@/components/story/StoryPrivacySelector";
+import { readLastStoryPrivacy, writeLastStoryPrivacy } from "@/lib/story-privacy-preferences";
 import { logCreatePostError, logCreatePostInfo } from "@/lib/create-post-logging";
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
@@ -154,7 +155,7 @@ export default function CreatePostScreen() {
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
   const [error, setError] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<SelectedMediaItem[]>([]);
-  const [storyPrivacy, setStoryPrivacy] = useState<StoryPrivacy>("followers");
+  const [storyPrivacy, setStoryPrivacy] = useState<StoryPrivacy>("everyone");
   const [savedSheetVisible, setSavedSheetVisible] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState("");
   const [distanceKm, setDistanceKm] = useState("");
@@ -218,6 +219,12 @@ export default function CreatePostScreen() {
     return () => {
       if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    void readLastStoryPrivacy().then((saved) => {
+      if (saved) setStoryPrivacy(saved);
+    });
   }, []);
 
   async function pickMedia() {
@@ -409,6 +416,10 @@ export default function CreatePostScreen() {
         },
         queryClient
       );
+
+      if (mode === "story" || mode === "both") {
+        await writeLastStoryPrivacy(storyPrivacy);
+      }
 
       await clearDraft();
       setSelectedMedia([]);
@@ -705,22 +716,11 @@ export default function CreatePostScreen() {
 
             <Text style={styles.sectionLabel}>Story privacy</Text>
             <Text style={styles.sectionHint}>Used when sharing to Story</Text>
-            <View style={styles.chips}>
-              {STORY_PRIVACY_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.value}
-                  style={[styles.chip, storyPrivacy === option.value && styles.chipActive]}
-                  onPress={() => setStoryPrivacy(option.value)}
-                  disabled={isFormLocked}
-                >
-                  <Text
-                    style={[styles.chipText, storyPrivacy === option.value && styles.chipTextActive]}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <StoryPrivacySelector
+              value={storyPrivacy}
+              onChange={setStoryPrivacy}
+              disabled={isFormLocked}
+            />
           </>
         ) : null}
 

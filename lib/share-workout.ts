@@ -224,7 +224,7 @@ export async function shareWorkout(
       const slides = buildStorySlidesFromInput(input, mediaUrls);
       const story = await publishStory({
         user_id: input.userId,
-        privacy: input.storyPrivacy ?? "followers",
+        privacy: input.storyPrivacy ?? "everyone",
         post_id: createdPost.id,
         workout_tag: input.workoutTypes[0] ?? null,
         location_name: input.locationName ?? input.gym ?? null,
@@ -240,7 +240,7 @@ export async function shareWorkout(
     const slides = buildStorySlidesFromInput(input, storyMediaUrls);
     const story = await publishStory({
       user_id: input.userId,
-      privacy: input.storyPrivacy ?? "followers",
+      privacy: input.storyPrivacy ?? "everyone",
       post_id: null,
       workout_tag: input.workoutTypes[0] ?? null,
       location_name: input.locationName ?? input.gym ?? null,

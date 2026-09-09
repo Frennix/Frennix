@@ -21,6 +21,7 @@ type StoryQuickActionsBarProps = {
   onInviteEvent: () => void;
   onJoinChallenge?: () => void;
   onViewProfile: () => void;
+  showMessage?: boolean;
 };
 
 function ActionTile({
@@ -66,9 +67,10 @@ export function StoryQuickActionsBar({
   onInviteEvent,
   onJoinChallenge,
   onViewProfile,
+  showMessage = true,
 }: StoryQuickActionsBarProps) {
   const actions: QuickAction[] = [
-    { key: "message", emoji: "💬", label: "Message", onPress: onMessage },
+    ...(showMessage ? [{ key: "message", emoji: "💬", label: "Message", onPress: onMessage }] : []),
     { key: "workout", emoji: "🤝", label: "Invite to Workout", onPress: onInviteWorkout, loading: inviteLoading },
     { key: "event", emoji: "📅", label: "Invite to Event", onPress: onInviteEvent },
     ...(hasChallenge && onJoinChallenge

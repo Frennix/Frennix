@@ -40,6 +40,8 @@ export async function markDedicatedStoryViewed(
   storyOwnerId: string
 ) {
   if (viewerId === storyOwnerId) return;
+  const { assertCanViewStory } = await import("./story-controls");
+  await assertCanViewStory(storyId);
 
   const viewedAt = new Date().toISOString();
 
@@ -114,6 +116,8 @@ export async function sendDedicatedStoryReaction(
   slideId?: string | null
 ) {
   if (viewerId === storyOwnerId) return;
+  const { assertCanViewStory } = await import("./story-controls");
+  await assertCanViewStory(storyId);
 
   const { error } = await getSupabase().from("story_item_reactions").upsert(
     {
@@ -198,6 +202,8 @@ export async function sendDedicatedStoryReply(
   const trimmed = replyText.trim();
   if (!trimmed) throw new Error("Reply cannot be empty");
   if (viewerId === storyOwnerId) throw new Error("You cannot reply to your own story");
+  const { assertCanReplyToStory } = await import("./story-controls");
+  await assertCanReplyToStory(storyId);
 
   const conversationId = await getOrCreateConversation(viewerId, storyOwnerId);
   const message = await sendMessage(conversationId, viewerId, trimmed, null, null, null, storyId);
