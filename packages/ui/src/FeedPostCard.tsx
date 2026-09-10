@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { memo, useMemo } from "react";
+import { Pressable, Text } from "react-native";
 import type { Post, Profile } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { ScalePressable } from "./ScalePressable";
@@ -10,7 +10,7 @@ import {
   formatFeedPostHeaderMeta,
   formatReactionSummary,
 } from "./formatRelativeTime";
-import { normalizePostMediaItems, normalizeWorkoutTypes } from "@frennix/types";
+import { normalizeWorkoutTypes } from "@frennix/types";
 import { ReactionBar } from "./ReactionBar";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
 import { WorkoutStatsPills } from "./WorkoutStatsPills";
@@ -46,8 +46,6 @@ interface FeedPostCardProps {
   onMediaPress?: (uri: string, index: number) => void;
   videoRouteHrefForIndex?: (index: number) => string | undefined;
   onVideoRouteNavigate?: (index: number) => void;
-  /** Double-tap media to like (Instagram-style). */
-  onDoubleTapLike?: () => void;
   /** Defer heavy media until the row is near the viewport. */
   mediaActive?: boolean;
   mediaPageIndex?: number;
@@ -87,7 +85,6 @@ export const FeedPostCard = memo(function FeedPostCard({
   onMediaPress,
   videoRouteHrefForIndex,
   onVideoRouteNavigate,
-  onDoubleTapLike,
   mediaActive = true,
   mediaPageIndex,
   onMediaPageIndexChange,
@@ -113,14 +110,6 @@ export const FeedPostCard = memo(function FeedPostCard({
   const engagement = useMemo(() => formatEngagementSummary(post), [post]);
   const reactionSummary = useMemo(() => formatReactionSummary(post.reactions), [post.reactions]);
   const hasMedia = Boolean(displayPost.media_urls?.length);
-  const hasVideoMedia = useMemo(
-    () =>
-      normalizePostMediaItems(displayPost.media_urls ?? [], {
-        postType: displayPost.post_type,
-        thumbnailUrl: displayPost.thumbnail_url,
-      }).some((item) => item.kind === "video"),
-    [displayPost.media_urls, displayPost.post_type, displayPost.thumbnail_url]
-  );
   const showCaption = Boolean(post.content);
   const { title: contentTitle, description: contentDescription } = useMemo(
     () => splitWorkoutCopy(isShared ? post.content : displayPost.content),
@@ -147,43 +136,6 @@ export const FeedPostCard = memo(function FeedPostCard({
   );
 
   const openPostDetail = onPress;
-
-  const lastMediaTapAt = useRef(0);
-  const heartScale = useRef(new Animated.Value(0)).current;
-  const [heartVisible, setHeartVisible] = useState(false);
-
-  const playLikeHeart = useCallback(() => {
-    setHeartVisible(true);
-    heartScale.setValue(0);
-    Animated.sequence([
-      Animated.spring(heartScale, {
-        toValue: 1,
-        friction: 4,
-        tension: 120,
-        useNativeDriver: true,
-      }),
-      Animated.timing(heartScale, {
-        toValue: 0,
-        duration: 240,
-        delay: 350,
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) setHeartVisible(false);
-    });
-  }, [heartScale]);
-
-  const handleMediaAreaPress = useCallback(() => {
-    if (!onDoubleTapLike) return;
-    const now = Date.now();
-    if (now - lastMediaTapAt.current < 280) {
-      lastMediaTapAt.current = 0;
-      onDoubleTapLike();
-      playLikeHeart();
-      return;
-    }
-    lastMediaTapAt.current = now;
-  }, [onDoubleTapLike, playLikeHeart]);
 
   return (
     <FeedLayout.Root active={interactionActive}>
@@ -237,62 +189,20 @@ export const FeedPostCard = memo(function FeedPostCard({
           />
         </FeedLayout.Media>
       ) : hasMedia ? (
-        <View style={styles.mediaTapShell}>
-          {hasVideoMedia ? (
-            <FeedMedia
-              mediaUrls={displayPost.media_urls ?? []}
-              postType={displayPost.post_type}
-              thumbnailUrl={displayPost.thumbnail_url}
-              onMediaPress={onMediaPress}
-              videoRouteHrefForIndex={videoRouteHrefForIndex}
-              onVideoRouteNavigate={onVideoRouteNavigate}
-              pageIndex={mediaPageIndex}
-              onPageIndexChange={onMediaPageIndexChange}
-              visible={mediaActive}
-              playbackScopeId={displayPost.id}
-              overlay={slots?.mediaOverlay}
-              onPrimaryMediaReady={onPrimaryMediaReady}
-            />
-          ) : (
-            <Pressable
-              onPress={onDoubleTapLike ? handleMediaAreaPress : undefined}
-              disabled={!onDoubleTapLike}
-              delayPressIn={onDoubleTapLike ? 280 : undefined}
-            >
-              <FeedMedia
-                mediaUrls={displayPost.media_urls ?? []}
-                postType={displayPost.post_type}
-                thumbnailUrl={displayPost.thumbnail_url}
-                onMediaPress={onMediaPress}
-                videoRouteHrefForIndex={videoRouteHrefForIndex}
-                onVideoRouteNavigate={onVideoRouteNavigate}
-                pageIndex={mediaPageIndex}
-                onPageIndexChange={onMediaPageIndexChange}
-                visible={mediaActive}
-                playbackScopeId={displayPost.id}
-                overlay={slots?.mediaOverlay}
-                onPrimaryMediaReady={onPrimaryMediaReady}
-              />
-            </Pressable>
-          )}
-          {heartVisible ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.likeHeartOverlay,
-                {
-                  opacity: heartScale.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, 1, 0.85],
-                  }),
-                  transform: [{ scale: heartScale }],
-                },
-              ]}
-            >
-              <Text style={styles.likeHeartIcon}>♥</Text>
-            </Animated.View>
-          ) : null}
-        </View>
+        <FeedMedia
+          mediaUrls={displayPost.media_urls ?? []}
+          postType={displayPost.post_type}
+          thumbnailUrl={displayPost.thumbnail_url}
+          onMediaPress={onMediaPress}
+          videoRouteHrefForIndex={videoRouteHrefForIndex}
+          onVideoRouteNavigate={onVideoRouteNavigate}
+          pageIndex={mediaPageIndex}
+          onPageIndexChange={onMediaPageIndexChange}
+          visible={mediaActive}
+          playbackScopeId={displayPost.id}
+          overlay={slots?.mediaOverlay}
+          onPrimaryMediaReady={onPrimaryMediaReady}
+        />
       ) : null}
 
       {workoutTitle ? (
@@ -418,26 +328,3 @@ export const FeedPostCard = memo(function FeedPostCard({
 });
 
 export { getSharedPostTargetId };
-
-const styles = {
-  mediaTapShell: {
-    position: "relative" as const,
-    width: "100%" as const,
-  },
-  likeHeartOverlay: {
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-  },
-  likeHeartIcon: {
-    fontSize: 88,
-    color: "#fff",
-    textShadowColor: "rgba(0,0,0,0.35)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-};

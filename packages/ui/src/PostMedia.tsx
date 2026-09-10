@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Platform,
+  Pressable,
   StyleSheet,
-  TouchableOpacity,
   View,
   type StyleProp,
   type ViewStyle,
@@ -21,6 +21,17 @@ import { WebVideoFrame } from "./WebVideoFrame";
 import { FEED_VIDEO_FALLBACK_RATIO, type MediaLayout } from "./mediaLayout";
 import { feedMediaRules } from "./feed-layout/feedMediaRules";
 import { colors, radius } from "./theme";
+
+const PHOTO_DOUBLE_TAP_MS = 280;
+const PHOTO_OPEN_LOCK_MS = PHOTO_DOUBLE_TAP_MS + 170;
+const PHOTO_TAP_MOVE_PX = 10;
+
+const WEB_PHOTO_TOUCH_STYLE: ViewStyle | undefined =
+  Platform.OS === "web"
+    ? ({
+        touchAction: "manipulation",
+      } as ViewStyle)
+    : undefined;
 
 interface PostMediaProps {
   uri: string;
@@ -227,7 +238,7 @@ function FeedImage({
   style,
   layout,
   onImagePress,
-  pressDelayMs,
+  pressDelayMs: _pressDelayMs,
   maxHeight,
   fillParent = false,
   feedFrameBucket,
@@ -247,11 +258,22 @@ function FeedImage({
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const openedAt = useRef(0);
+  const tapMoved = useRef(false);
+  const tapStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setImageFailed(false);
     setImageLoaded(false);
   }, [uri, retryKey]);
+
+  const handlePhotoPress = () => {
+    if (!onImagePress || imageFailed || !imageLoaded || tapMoved.current) return;
+    const now = Date.now();
+    if (now - openedAt.current < PHOTO_OPEN_LOCK_MS) return;
+    openedAt.current = now;
+    onImagePress();
+  };
 
   const content = (
     <MediaAspectFrame
@@ -300,19 +322,31 @@ function FeedImage({
 
   if (onImagePress) {
     return (
-      <TouchableOpacity
-        activeOpacity={0.95}
-        delayPressIn={pressDelayMs ?? 0}
-        onPress={() => {
-          if (imageFailed || !imageLoaded) return;
-          onImagePress();
+      <Pressable
+        onPress={handlePhotoPress}
+        onTouchStart={(event) => {
+          tapMoved.current = false;
+          const touch = event.nativeEvent.touches[0];
+          tapStart.current = touch ? { x: touch.pageX, y: touch.pageY } : null;
         }}
+        onTouchMove={(event) => {
+          const touch = event.nativeEvent.touches[0];
+          if (!touch || !tapStart.current) return;
+          if (
+            Math.hypot(touch.pageX - tapStart.current.x, touch.pageY - tapStart.current.y) >
+            PHOTO_TAP_MOVE_PX
+          ) {
+            tapMoved.current = true;
+          }
+        }}
+        style={WEB_PHOTO_TOUCH_STYLE}
         accessibilityRole="button"
         accessibilityLabel="View full image"
+        accessibilityHint="Double tap or tap to open the full-screen photo"
         accessibilityState={{ disabled: imageFailed || !imageLoaded }}
       >
         {content}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 

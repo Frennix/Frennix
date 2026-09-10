@@ -37,7 +37,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import AnimatedReanimated, {
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
+  withSpring,
 } from "react-native-reanimated";
 import { setLightboxOverlayOpen } from "@/lib/lightbox-overlay-state";
 import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
@@ -132,8 +132,83 @@ const WEB_LIGHTBOX_PLAIN_IMG_STYLE = {
   touchAction: "none",
 } as const;
 
+const ZOOM_SCALE = 2;
+const ZOOM_ANIM_MS = 240;
+const SNAP_ANIM_MS = 260;
+const RUBBERBAND_RATIO = 0.38;
+const ZOOM_EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
+const ZOOM_SPRING = { damping: 20, stiffness: 240, mass: 0.7 };
+
 function clampScale(value: number) {
+  "worklet";
   return Math.min(Math.max(value, 1), 4);
+}
+
+function getPanBounds(
+  scale: number,
+  rendered: { width: number; height: number },
+  viewport: { width: number; height: number }
+) {
+  "worklet";
+  return {
+    maxX: Math.max(0, (rendered.width * scale - viewport.width) / 2),
+    maxY: Math.max(0, (rendered.height * scale - viewport.height) / 2),
+  };
+}
+
+function clampAxis(value: number, max: number) {
+  "worklet";
+  if (max <= 0) return 0;
+  return Math.min(max, Math.max(-max, value));
+}
+
+function clampPan(x: number, y: number, bounds: { maxX: number; maxY: number }) {
+  "worklet";
+  return { x: clampAxis(x, bounds.maxX), y: clampAxis(y, bounds.maxY) };
+}
+
+function rubberbandAxis(offset: number, max: number, dimension: number) {
+  "worklet";
+  const resistance = Math.max(dimension * RUBBERBAND_RATIO, 24);
+  if (max <= 0) {
+    return (offset * RUBBERBAND_RATIO) / (1 + Math.abs(offset) / resistance);
+  }
+  if (offset > max) {
+    const extra = offset - max;
+    return max + extra / (1 + extra / resistance);
+  }
+  if (offset < -max) {
+    const extra = -max - offset;
+    return -max - extra / (1 + extra / resistance);
+  }
+  return offset;
+}
+
+function getContainedRenderedSize(
+  naturalWidth: number,
+  naturalHeight: number,
+  viewport: { width: number; height: number }
+) {
+  if (!naturalWidth || !naturalHeight || viewport.width <= 0 || viewport.height <= 0) {
+    return { width: viewport.width, height: viewport.height };
+  }
+  const fit = Math.min(viewport.width / naturalWidth, viewport.height / naturalHeight);
+  return { width: naturalWidth * fit, height: naturalHeight * fit };
+}
+
+function zoomPanForDoubleTap(
+  clientX: number,
+  clientY: number,
+  stage: { left: number; top: number; width: number; height: number },
+  nextScale = ZOOM_SCALE
+) {
+  const dx = clientX - (stage.left + stage.width / 2);
+  const dy = clientY - (stage.top + stage.height / 2);
+  return {
+    x: dx * (1 - nextScale),
+    y: dy * (1 - nextScale),
+    scale: nextScale,
+  };
 }
 
 function isPointInsideContainedImage(
@@ -176,6 +251,8 @@ function NativeZoomableImage({
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+  const viewWidth = useSharedValue(1);
+  const viewHeight = useSharedValue(1);
 
   useEffect(() => {
     scale.value = 1;
@@ -188,10 +265,10 @@ function NativeZoomableImage({
   }, [uri, isActive, onZoomChange, scale, savedScale, translateX, translateY, savedTranslateX, savedTranslateY]);
 
   const resetZoom = useCallback(() => {
-    scale.value = withTiming(1);
+    scale.value = withSpring(1, ZOOM_SPRING);
     savedScale.value = 1;
-    translateX.value = withTiming(0);
-    translateY.value = withTiming(0);
+    translateX.value = withSpring(0, ZOOM_SPRING);
+    translateY.value = withSpring(0, ZOOM_SPRING);
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
     onZoomChange(false);
@@ -201,14 +278,38 @@ function NativeZoomableImage({
     .onUpdate((event) => {
       const next = clampScale(savedScale.value * event.scale);
       scale.value = next;
-      onZoomChange(next > 1.01);
+      if (next <= 1.01) {
+        translateX.value = 0;
+        translateY.value = 0;
+        onZoomChange(false);
+        return;
+      }
+      const bounds = getPanBounds(
+        next,
+        { width: viewWidth.value, height: viewHeight.value },
+        { width: viewWidth.value, height: viewHeight.value }
+      );
+      translateX.value = clampAxis(savedTranslateX.value, bounds.maxX);
+      translateY.value = clampAxis(savedTranslateY.value, bounds.maxY);
+      onZoomChange(true);
     })
     .onEnd(() => {
       if (scale.value <= 1.01) {
         resetZoom();
         return;
       }
+      const bounds = getPanBounds(
+        scale.value,
+        { width: viewWidth.value, height: viewHeight.value },
+        { width: viewWidth.value, height: viewHeight.value }
+      );
+      const next = clampPan(translateX.value, translateY.value, bounds);
+      scale.value = withSpring(scale.value, ZOOM_SPRING);
+      translateX.value = withSpring(next.x, ZOOM_SPRING);
+      translateY.value = withSpring(next.y, ZOOM_SPRING);
       savedScale.value = scale.value;
+      savedTranslateX.value = next.x;
+      savedTranslateY.value = next.y;
       onZoomChange(true);
     });
 
@@ -219,23 +320,59 @@ function NativeZoomableImage({
       else state.fail();
     })
     .onUpdate((event) => {
-      translateX.value = savedTranslateX.value + event.translationX;
-      translateY.value = savedTranslateY.value + event.translationY;
+      const bounds = getPanBounds(
+        scale.value,
+        { width: viewWidth.value, height: viewHeight.value },
+        { width: viewWidth.value, height: viewHeight.value }
+      );
+      translateX.value = rubberbandAxis(
+        savedTranslateX.value + event.translationX,
+        bounds.maxX,
+        viewWidth.value
+      );
+      translateY.value = rubberbandAxis(
+        savedTranslateY.value + event.translationY,
+        bounds.maxY,
+        viewHeight.value
+      );
     })
     .onEnd(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
+      const bounds = getPanBounds(
+        scale.value,
+        { width: viewWidth.value, height: viewHeight.value },
+        { width: viewWidth.value, height: viewHeight.value }
+      );
+      const next = clampPan(translateX.value, translateY.value, bounds);
+      translateX.value = withSpring(next.x, ZOOM_SPRING);
+      translateY.value = withSpring(next.y, ZOOM_SPRING);
+      savedTranslateX.value = next.x;
+      savedTranslateY.value = next.y;
     });
 
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
-    .onEnd(() => {
+    .onEnd((event) => {
       if (scale.value > 1.01) {
         resetZoom();
         return;
       }
-      scale.value = withTiming(2);
-      savedScale.value = 2;
+      const nextScale = ZOOM_SCALE;
+      const bounds = getPanBounds(
+        nextScale,
+        { width: viewWidth.value, height: viewHeight.value },
+        { width: viewWidth.value, height: viewHeight.value }
+      );
+      const next = clampPan(
+        (event.x - viewWidth.value / 2) * (1 - nextScale),
+        (event.y - viewHeight.value / 2) * (1 - nextScale),
+        bounds
+      );
+      scale.value = withSpring(nextScale, ZOOM_SPRING);
+      translateX.value = withSpring(next.x, ZOOM_SPRING);
+      translateY.value = withSpring(next.y, ZOOM_SPRING);
+      savedScale.value = nextScale;
+      savedTranslateX.value = next.x;
+      savedTranslateY.value = next.y;
       onZoomChange(true);
     });
 
@@ -248,7 +385,14 @@ function NativeZoomableImage({
   }));
 
   return (
-    <View style={styles.imageStage}>
+    <View
+      style={styles.imageStage}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        if (width > 0) viewWidth.value = width;
+        if (height > 0) viewHeight.value = height;
+      }}
+    >
       <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
         <AnimatedReanimated.View style={[styles.zoomLayer, animatedStyle]}>
           <CachedImage
@@ -276,21 +420,87 @@ function WebZoomableImage({
   onLetterboxPress?: () => void;
   onMediaError?: () => void;
 }) {
-  const [scale, setScale] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
+  const pinchStart = useRef<{ distance: number; scale: number; x: number; y: number } | null>(null);
   const lastTap = useRef(0);
+  const lastTapPos = useRef<{ x: number; y: number } | null>(null);
+  const zoomToggledAt = useRef(0);
+  const scaleRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
+  const stageRef = useRef<View>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const movedDuringTouch = useRef(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
+  function getStageRect() {
+    const node = stageRef.current as unknown as { getBoundingClientRect?: () => DOMRect } | null;
+    return node?.getBoundingClientRect?.() ?? null;
+  }
+
+  function measureViewportAndRendered() {
+    const stage = getStageRect();
+    const img = imgRef.current;
+    const viewport = stage
+      ? { width: stage.width, height: stage.height }
+      : {
+          width: typeof window === "undefined" ? 1 : window.innerWidth,
+          height: typeof window === "undefined" ? 1 : window.innerHeight,
+        };
+    const rendered = img
+      ? getContainedRenderedSize(img.naturalWidth, img.naturalHeight, viewport)
+      : viewport;
+    return { viewport, rendered, stage };
+  }
+
+  function writeTransform(
+    nextScale: number,
+    x: number,
+    y: number,
+    animate: "none" | "zoom" | "snap" = "none"
+  ) {
+    scaleRef.current = nextScale;
+    panRef.current = { x, y };
+    const img = imgRef.current;
+    if (!img) return;
+    const duration = animate === "zoom" ? ZOOM_ANIM_MS : SNAP_ANIM_MS;
+    img.style.transition = animate === "none" ? "none" : `transform ${duration}ms ${ZOOM_EASING}`;
+    img.style.setProperty("--lx", `${x}px`);
+    img.style.setProperty("--ly", `${y}px`);
+    img.style.setProperty("--ls", String(nextScale));
+    img.style.transform = "translate(var(--lx), var(--ly)) scale(var(--ls))";
+  }
+
+  function commitTransform(
+    nextScale: number,
+    x: number,
+    y: number,
+    animate: "none" | "zoom" | "snap" = "none"
+  ) {
+    writeTransform(nextScale, x, y, animate);
+    onZoomChange(nextScale > 1.01);
+  }
+
+  function snapPanToBounds(nextScale: number, animate: "zoom" | "snap" = "snap") {
+    if (nextScale <= 1.01) {
+      commitTransform(1, 0, 0, animate);
+      return;
+    }
+    const { viewport, rendered } = measureViewportAndRendered();
+    const next = clampPan(
+      panRef.current.x,
+      panRef.current.y,
+      getPanBounds(nextScale, rendered, viewport)
+    );
+    commitTransform(nextScale, next.x, next.y, animate);
+  }
+
   useEffect(() => {
-    setScale(1);
-    setPan({ x: 0, y: 0 });
+    writeTransform(1, 0, 0);
     setFailed(false);
+    lastTap.current = 0;
+    lastTapPos.current = null;
     onZoomChange(false);
   }, [uri, retryKey, onZoomChange]);
 
@@ -299,12 +509,18 @@ function WebZoomableImage({
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const delta = event.deltaY > 0 ? -0.15 : 0.15;
-      setScale((current) => {
-        const next = clampScale(current + delta);
-        onZoomChange(next > 1.01);
-        if (next <= 1) setPan({ x: 0, y: 0 });
-        return next;
-      });
+      const next = clampScale(scaleRef.current + delta);
+      if (next <= 1.01) {
+        commitTransform(1, 0, 0);
+        return;
+      }
+      const { viewport, rendered } = measureViewportAndRendered();
+      const clamped = clampPan(
+        panRef.current.x,
+        panRef.current.y,
+        getPanBounds(next, rendered, viewport)
+      );
+      commitTransform(next, clamped.x, clamped.y);
     }
 
     window.addEventListener("wheel", onWheel, { passive: false });
@@ -318,25 +534,40 @@ function WebZoomableImage({
     return Math.hypot(dx, dy);
   }
 
-  function handleDoubleTap() {
-    const now = Date.now();
-    if (now - lastTap.current < 300) {
-      if (scale > 1.01) {
-        setScale(1);
-        setPan({ x: 0, y: 0 });
-        onZoomChange(false);
-      } else {
-        setScale(2);
-        onZoomChange(true);
-      }
-      lastTap.current = 0;
+  function toggleZoomAt(clientX: number, clientY: number) {
+    if (scaleRef.current > 1.01) {
+      commitTransform(1, 0, 0, "zoom");
       return;
     }
+    const { viewport, rendered, stage } = measureViewportAndRendered();
+    const raw = stage
+      ? zoomPanForDoubleTap(clientX, clientY, stage, ZOOM_SCALE)
+      : { x: 0, y: 0, scale: ZOOM_SCALE };
+    const next = clampPan(raw.x, raw.y, getPanBounds(raw.scale, rendered, viewport));
+    commitTransform(raw.scale, next.x, next.y, "zoom");
+  }
+
+  function handlePossibleDoubleTap(clientX: number, clientY: number) {
+    const now = Date.now();
+    if (now - zoomToggledAt.current < 80) return true;
+    if (
+      now - lastTap.current < 300 &&
+      lastTapPos.current &&
+      Math.hypot(clientX - lastTapPos.current.x, clientY - lastTapPos.current.y) < 40
+    ) {
+      lastTap.current = 0;
+      lastTapPos.current = null;
+      zoomToggledAt.current = now;
+      toggleZoomAt(clientX, clientY);
+      return true;
+    }
     lastTap.current = now;
+    lastTapPos.current = { x: clientX, y: clientY };
+    return false;
   }
 
   function maybeDismissFromLetterbox(clientX: number, clientY: number) {
-    if (scale > 1.01 || movedDuringTouch.current || !onLetterboxPress || failed) return;
+    if (scaleRef.current > 1.01 || movedDuringTouch.current || !onLetterboxPress || failed) return;
     const img = imgRef.current;
     if (!img) {
       onLetterboxPress();
@@ -364,27 +595,34 @@ function WebZoomableImage({
 
   return (
     <View
+      ref={stageRef}
       style={styles.imageStage}
       collapsable={false}
       onTouchStart={(event) => {
         movedDuringTouch.current = false;
         touchStart.current = null;
+        writeTransform(scaleRef.current, panRef.current.x, panRef.current.y);
         const touches = event.nativeEvent.touches;
         if (touches.length === 1) {
           touchStart.current = { x: touches[0].pageX, y: touches[0].pageY };
         }
         if (touches.length === 2) {
           const dist = distance(touches as unknown as TouchList);
-          pinchStart.current = { distance: dist, scale };
+          pinchStart.current = {
+            distance: dist,
+            scale: scaleRef.current,
+            x: panRef.current.x,
+            y: panRef.current.y,
+          };
           dragStart.current = null;
           return;
         }
-        if (touches.length === 1 && scale > 1) {
+        if (touches.length === 1 && scaleRef.current > 1.01) {
           dragStart.current = {
             x: touches[0].pageX,
             y: touches[0].pageY,
-            panX: pan.x,
-            panY: pan.y,
+            panX: panRef.current.x,
+            panY: panRef.current.y,
           };
         }
       }}
@@ -399,37 +637,98 @@ function WebZoomableImage({
           const dist = distance(touches as unknown as TouchList);
           if (!pinchStart.current.distance) return;
           const next = clampScale((pinchStart.current.scale * dist) / pinchStart.current.distance);
-          setScale(next);
-          onZoomChange(next > 1.01);
-          if (next <= 1) setPan({ x: 0, y: 0 });
+          if (next <= 1.01) {
+            writeTransform(1, 0, 0);
+            onZoomChange(false);
+            return;
+          }
+          const { viewport, rendered } = measureViewportAndRendered();
+          const bounds = getPanBounds(next, rendered, viewport);
+          writeTransform(
+            next,
+            clampAxis(pinchStart.current.x, bounds.maxX),
+            clampAxis(pinchStart.current.y, bounds.maxY)
+          );
+          onZoomChange(true);
           return;
         }
-        if (touches.length === 1 && dragStart.current && scale > 1) {
-          setPan({
-            x: dragStart.current.panX + (touches[0].pageX - dragStart.current.x),
-            y: dragStart.current.panY + (touches[0].pageY - dragStart.current.y),
-          });
+        if (touches.length === 1 && dragStart.current && scaleRef.current > 1.01) {
+          const { viewport, rendered } = measureViewportAndRendered();
+          const bounds = getPanBounds(scaleRef.current, rendered, viewport);
+          writeTransform(
+            scaleRef.current,
+            rubberbandAxis(
+              dragStart.current.panX + (touches[0].pageX - dragStart.current.x),
+              bounds.maxX,
+              viewport.width
+            ),
+            rubberbandAxis(
+              dragStart.current.panY + (touches[0].pageY - dragStart.current.y),
+              bounds.maxY,
+              viewport.height
+            )
+          );
         }
       }}
       onTouchEnd={(event) => {
-        const touch = event.nativeEvent.changedTouches[0];
-        if (touch) {
-          maybeDismissFromLetterbox(touch.pageX, touch.pageY);
-        }
-        dragStart.current = null;
-        pinchStart.current = null;
-        touchStart.current = null;
-        setScale((current) => {
-          if (current <= 1.01) {
-            setPan({ x: 0, y: 0 });
-            onZoomChange(false);
-            return 1;
+        const remaining = event.nativeEvent.touches?.length ?? 0;
+        const wasPinch = Boolean(pinchStart.current);
+        const wasDrag = Boolean(dragStart.current) && movedDuringTouch.current;
+        if (remaining > 0) {
+          if (remaining === 1 && scaleRef.current > 1.01) {
+            const nextTouch = event.nativeEvent.touches[0];
+            if (nextTouch) {
+              dragStart.current = {
+                x: nextTouch.pageX,
+                y: nextTouch.pageY,
+                panX: panRef.current.x,
+                panY: panRef.current.y,
+              };
+            }
+            pinchStart.current = null;
           }
-          return current;
-        });
+          return;
+        }
+
+        const touch = event.nativeEvent.changedTouches[0];
+        pinchStart.current = null;
+        dragStart.current = null;
+        touchStart.current = null;
+
+        if (wasPinch) {
+          snapPanToBounds(scaleRef.current);
+          return;
+        }
+        if (wasDrag) {
+          snapPanToBounds(scaleRef.current);
+          return;
+        }
+        if (touch && !movedDuringTouch.current) {
+          const didZoom = handlePossibleDoubleTap(touch.pageX, touch.pageY);
+          if (!didZoom) {
+            maybeDismissFromLetterbox(touch.pageX, touch.pageY);
+          }
+        }
+        if (Date.now() - zoomToggledAt.current < 80) return;
+        if (scaleRef.current <= 1.01) {
+          commitTransform(1, 0, 0);
+        }
+      }}
+      onTouchCancel={() => {
+        pinchStart.current = null;
+        dragStart.current = null;
+        touchStart.current = null;
+        snapPanToBounds(scaleRef.current);
       }}
       // @ts-expect-error web double-click zoom
-      onDoubleClick={handleDoubleTap}
+      onDoubleClick={(event: { clientX: number; clientY: number }) => {
+        const now = Date.now();
+        if (now - zoomToggledAt.current < 80) return;
+        zoomToggledAt.current = now;
+        lastTap.current = 0;
+        lastTapPos.current = null;
+        toggleZoomAt(event.clientX, event.clientY);
+      }}
     >
       {createElement("img", {
         key: retryKey,
@@ -439,10 +738,14 @@ function WebZoomableImage({
         draggable: false,
         style: {
           ...WEB_LIGHTBOX_PLAIN_IMG_STYLE,
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+          transform: "translate(var(--lx, 0px), var(--ly, 0px)) scale(var(--ls, 1))",
           transformOrigin: "center center",
+          willChange: "transform",
         },
-        onLoad: () => setFailed(false),
+        onLoad: () => {
+          setFailed(false);
+          writeTransform(scaleRef.current, panRef.current.x, panRef.current.y);
+        },
         onError: () => {
           setFailed(true);
           onMediaError?.();
