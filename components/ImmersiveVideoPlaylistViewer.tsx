@@ -78,6 +78,7 @@ function isPlaylistChromeTarget(target: EventTarget | null) {
     target.closest("[data-frennix-immersive-rail]") ||
     target.closest("[data-frennix-immersive-top-bar]") ||
     target.closest("[data-frennix-immersive-composer]") ||
+    target.closest("[data-frennix-reel-scrubber='true']") ||
     target.closest("[data-frennix-immersive-meta]")
   ) {
     return true;
@@ -120,19 +121,27 @@ export function ImmersiveVideoPlaylistViewer({
   const fetchInFlightRef = useRef(false);
   const listRef = useRef<FlatList<ImmersiveVideoPlaylistEntry>>(null);
   const activeIndexRef = useRef(activeIndex);
+  const [scrubbing, setScrubbing] = useState(false);
+  const scrubbingRef = useRef(false);
   const commentsOpenRef = useRef(commentsOverlayOpen);
   const gestureRef = useRef<PlaylistSwipeGesture | null>(null);
   const suppressClickRef = useRef(false);
 
   activeIndexRef.current = activeIndex;
   commentsOpenRef.current = commentsOverlayOpen;
+  scrubbingRef.current = scrubbing;
 
   useEffect(() => {
     setEntries(initialEntries);
     setActiveIndex(initialIndex);
     setHasMore(initialHasMore);
     handoffAppliedRef.current = false;
+    setScrubbing(false);
   }, [initialEntries, initialHasMore, initialIndex]);
+
+  useEffect(() => {
+    setScrubbing(false);
+  }, [activeIndex]);
 
   const shouldRenderIndex = useCallback(
     (index: number) => Math.abs(index - activeIndex) <= PRELOAD_RADIUS,
@@ -208,7 +217,7 @@ export function ImmersiveVideoPlaylistViewer({
 
   const handleWebPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (commentsOpenRef.current || isPlaylistChromeTarget(event.target)) {
+      if (commentsOpenRef.current || scrubbingRef.current || isPlaylistChromeTarget(event.target)) {
         gestureRef.current = null;
         return;
       }
@@ -331,6 +340,7 @@ export function ImmersiveVideoPlaylistViewer({
             postActions={immersiveContext.postActions}
             onClose={onClose}
             commentsOverlayOpen={isActive && commentsOverlayOpen}
+            onScrubbingChange={isActive ? setScrubbing : undefined}
           />
         </View>
       );
@@ -398,6 +408,7 @@ export function ImmersiveVideoPlaylistViewer({
         <div
           className="frennix-immersive-video-playlist-scroll"
           data-frennix-playlist-active-index={String(activeIndex)}
+          data-frennix-reel-scrubbing={scrubbing ? "true" : "false"}
           onPointerDown={handleWebPointerDown}
           onPointerMove={handleWebPointerMove}
           onPointerUp={handleWebPointerUp}
@@ -408,6 +419,7 @@ export function ImmersiveVideoPlaylistViewer({
             width: "100%",
             height: "100%",
             overflow: "hidden",
+            overflowY: scrubbing ? "hidden" : "hidden",
             touchAction: "none",
             backgroundColor: colors.background,
           }}
@@ -474,6 +486,7 @@ export function ImmersiveVideoPlaylistViewer({
           offset: stageHeight * index,
           index,
         })}
+        scrollEnabled={!scrubbing}
         onMomentumScrollEnd={handleNativeScroll}
         onScroll={handleNativeScroll}
         scrollEventThrottle={16}

@@ -84,6 +84,9 @@ export type FullscreenVideoSlideHandle = {
   play: () => void;
   toggleMute: () => void;
   isMuted: () => boolean;
+  seekTo: (time: number, options?: { silent?: boolean }) => void;
+  getDuration: () => number;
+  getVideoElement: () => HTMLVideoElement | null;
 };
 
 function formatVideoTime(seconds: number) {
@@ -417,8 +420,17 @@ export const FullscreenVideoSlide = forwardRef<
         const video = webVideoRef.current;
         return video ? video.muted : muted;
       },
+      seekTo,
+      getDuration: () => {
+        const video = webVideoRef.current;
+        if (video && Number.isFinite(video.duration) && video.duration > 0) {
+          return video.duration;
+        }
+        return duration;
+      },
+      getVideoElement: () => webVideoRef.current,
     }),
-    [currentTime, isPaused, muted, toggleMute]
+    [currentTime, duration, isPaused, muted, seekTo, toggleMute]
   );
 
   const togglePlayPause = useCallback(() => {
@@ -446,11 +458,23 @@ export const FullscreenVideoSlide = forwardRef<
   );
 
   const seekTo = useCallback(
-    (value: number) => {
+    (value: number, options?: { silent?: boolean }) => {
       const video = webVideoRef.current;
       if (!video) return;
       const max = Number.isFinite(video.duration) ? video.duration : duration;
       const next = Math.min(Math.max(0, value), Math.max(0, max));
+      if (options?.silent) {
+        if (typeof video.fastSeek === "function") {
+          try {
+            video.fastSeek(next);
+          } catch {
+            video.currentTime = next;
+          }
+        } else {
+          video.currentTime = next;
+        }
+        return;
+      }
       video.currentTime = next;
       setCurrentTime(next);
       revealControls();

@@ -22,6 +22,7 @@ import {
   typography,
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
+import { ReelScrubBar } from "@/components/ReelScrubBar";
 import { computeBaselineVideoPeekHeight } from "@/lib/video-overlay-peek-geometry";
 import { getImmersiveSessionLayoutHeight } from "@/lib/immersive-session-layout";
 import { useOpenImmersiveVideoComments } from "@/lib/immersive-video-comments-context";
@@ -63,6 +64,8 @@ type ImmersiveVideoViewerProps = {
   onClose: () => void;
   /** Comments sheet is open over the lower portion — shrink video into the peek region. */
   commentsOverlayOpen?: boolean;
+  /** Horizontal scrubbing should not move the vertical Reel playlist. */
+  onScrubbingChange?: (scrubbing: boolean) => void;
 };
 
 export function ImmersiveVideoViewer({
@@ -76,6 +79,7 @@ export function ImmersiveVideoViewer({
   postActions,
   onClose,
   commentsOverlayOpen = false,
+  onScrubbingChange,
 }: ImmersiveVideoViewerProps) {
   const insets = useSafeAreaInsets();
   const videoRef = useRef<FullscreenVideoSlideHandle>(null);
@@ -421,12 +425,20 @@ export function ImmersiveVideoViewer({
                 } as object)
               : null)}
           >
+            <ReelScrubBar
+              videoRef={videoRef}
+              isActive={isActive}
+              onScrubbingChange={onScrubbingChange}
+            />
             <Pressable
               style={styles.commentComposerTrigger}
               onPress={() => openComments()}
               {...webControlProps}
               accessibilityRole="button"
               accessibilityLabel="Add a comment"
+              {...(Platform.OS === "web"
+                ? ({ "data-frennix-reel-comment-field": "true" } as object)
+                : null)}
             >
               <Text style={styles.commentComposerPlaceholder}>Add a comment…</Text>
             </Pressable>
