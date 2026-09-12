@@ -3,6 +3,7 @@
  * Records environment + auth + DOM state to console, local storage, Sentry, and analytics.
  */
 import { Platform } from "react-native";
+import { isSupabaseInitialized } from "@frennix/api";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAnalyticsEvent } from "@/lib/product-analytics";
 import { Sentry } from "@/lib/sentry";
@@ -278,7 +279,9 @@ function sendSnapshotToServer(snapshot: StartupSnapshot) {
     ...snapshot.detail,
   };
 
-  trackAnalyticsEvent("startup_snapshot", payload);
+  if (isSupabaseInitialized()) {
+    trackAnalyticsEvent("startup_snapshot", payload);
+  }
 
   try {
     if (snapshot.phase === "snapshot:black-screen" || snapshot.phase === "login:failure") {

@@ -1,12 +1,14 @@
 import type { ProductAnalyticsSummary } from "@frennix/types";
 import { formatSupabaseError } from "./profile-utils";
-import { getSupabase } from "./supabase";
+import { getSupabase, isSupabaseInitialized } from "./supabase";
 
 export async function trackProductEvent(
   eventName: string,
   properties: Record<string, unknown> = {},
   context?: { appVersion?: string; platform?: string }
 ): Promise<void> {
+  if (!isSupabaseInitialized()) return;
+
   const { error } = await getSupabase().rpc("track_product_event", {
     p_event_name: eventName,
     p_properties: properties,
@@ -23,6 +25,8 @@ export async function trackDailyActiveUser(context?: {
   appVersion?: string;
   platform?: string;
 }): Promise<void> {
+  if (!isSupabaseInitialized()) return;
+
   const { error } = await getSupabase().rpc("track_daily_active_user", {
     p_app_version: context?.appVersion ?? null,
     p_platform: context?.platform ?? null,
