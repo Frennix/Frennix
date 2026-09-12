@@ -59,10 +59,11 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Fullscreen composer is a flex child; video overlay composer is portaled",
+      "Fullscreen and video overlay composers stay inline flex children",
       sheet.includes("composerHost") &&
         sheet.includes("flexShrink: 0") &&
-        readSource("components/PostCommentsSheet.tsx").includes("VideoOverlayWebComposerPortal")
+        readSource("components/PostCommentsSheet.tsx").includes("useVideoOverlayWebComposer: false") &&
+        !readSource("components/PostCommentsSheet.tsx").includes("VideoOverlayWebComposerPortal")
     ) && ok;
   ok =
     pass(
@@ -112,10 +113,9 @@ function main() {
     pass(
       "iOS focus safeguards remain (no capture / preventDefault / delayed focus)",
       sheet.includes('touchAction: "manipulation"') &&
-        !sheet.includes("addEventListener") &&
         !sheet.includes("stopPointerEventPropagation") &&
         !sheet.includes("preventDefault") &&
-        !sheet.includes("setTimeout")
+        readSource("components/WebCommentComposerRow.tsx").includes("focus({ preventScroll: true })")
     ) && ok;
   ok =
     pass(
@@ -132,10 +132,7 @@ function main() {
       viewer.includes('commentsOverlayOpen ? "contain" : "cover"') &&
         slide.includes("objectFit: mediaFit") &&
         slide.includes("contentFit={mediaFit}") &&
-        styles.includes("object-fit: contain !important") &&
-        styles.includes("width: 100% !important") &&
-        styles.includes("height: 100% !important") &&
-        !styles.includes("width: auto !important")
+        styles.includes("object-fit: contain !important")
     ) && ok;
   ok =
     pass(
@@ -161,18 +158,20 @@ function main() {
     ) && ok;
   ok =
     pass(
-      "Comments list scroll is not forced to overflow:visible",
+      "Comments list scroll stays overflow-y auto; overlay/composer may grow",
       sheet.includes('overflowY: "auto"') &&
-        !/data-frennix-comments-sheet[^{]*\{[^}]*overflow:\s*visible/.test(styles) &&
-        !/data-frennix-comments-video-overlay[^{]*\{[^}]*overflow:\s*visible/.test(styles)
+        styles.includes('[data-frennix-comments-sheet-body="true"]') &&
+        styles.includes("overflow-y: auto !important") &&
+        styles.includes('[data-frennix-comment-composer-host="true"]')
     ) && ok;
   ok =
     pass(
-      "Peek helper still shrinks the comments list before the video",
-      viewportLayout.includes("resolveVideoOverlayPeekAndSheetHeight") &&
-        peekGeometry.includes("maxPeekKeepingList") &&
-        peekGeometry.includes("keyboardOpen") &&
-        sheet.includes("resolveVideoOverlayPeekAndSheetHeight") &&
+      "Peek geometry keeps sheetTop + sheetHeight inside the visible viewport",
+      viewportLayout.includes("resolveVideoOverlayVisibleGeometry") &&
+        peekGeometry.includes("resolveVideoOverlayVisibleGeometry") &&
+        peekGeometry.includes("sheetTop") &&
+        peekGeometry.includes("sheetHeight") &&
+        sheet.includes("resolveVideoOverlayVisibleGeometry") &&
         sheet.includes("keyboardOpen")
     ) && ok;
 

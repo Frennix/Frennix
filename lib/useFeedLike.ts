@@ -1,18 +1,10 @@
 import { useRef } from "react";
-import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage, getTechnicalErrorMessage, toggleLike } from "@frennix/api";
-import type { FeedPage, Post } from "@frennix/types";
+import type { Post } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
 import { hapticLike } from "@/lib/haptics";
-
-function findPostInFeed(feed: InfiniteData<FeedPage> | undefined, postId: string): Post | undefined {
-  if (!feed) return undefined;
-  for (const page of feed.pages) {
-    const post = page.posts.find((p) => p.id === postId);
-    if (post) return post;
-  }
-  return undefined;
-}
+import { findPostInAllCaches, mapPostInAllCaches } from "@/lib/post-cache";
 
 function patchPostLike(post: Post, liked: boolean): Post {
   return {
@@ -20,35 +12,6 @@ function patchPostLike(post: Post, liked: boolean): Post {
     liked_by_me: !liked,
     like_count: Math.max(0, (post.like_count ?? 0) + (liked ? -1 : 1)),
   };
-}
-
-function patchPostsInFeedPage(page: FeedPage, postId: string, liked: boolean): FeedPage {
-  return {
-    ...page,
-    posts: page.posts.map((p) => (p.id === postId ? patchPostLike(p, liked) : p)),
-  };
-}
-
-function patchFeed(
-  feed: InfiniteData<FeedPage>,
-  postId: string,
-  liked: boolean
-): InfiniteData<FeedPage> {
-  return {
-    ...feed,
-    pages: feed.pages.map((page) => patchPostsInFeedPage(page, postId, liked)),
-  };
-}
-
-function patchInfiniteFeedQuery(
-  queryClient: ReturnType<typeof useQueryClient>,
-  queryKey: readonly unknown[],
-  postId: string,
-  liked: boolean
-) {
-  const current = queryClient.getQueryData<InfiniteData<FeedPage>>(queryKey);
-  if (!current) return;
-  queryClient.setQueryData<InfiniteData<FeedPage>>(queryKey, patchFeed(current, postId, liked));
 }
 
 type LikeVars = { postId: string; liked: boolean };
@@ -65,31 +28,17 @@ export function useFeedLike(userId: string) {
     onMutate: ({ postId, liked }) => {
       if (!liked) hapticLike();
 
-      const previousFeed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-      const previousReels = queryClient.getQueryData<InfiniteData<FeedPage>>(["reels", userId]);
-      const previousPost = queryClient.getQueryData<Post>(["post", postId, userId]);
-
-      patchInfiniteFeedQuery(queryClient, ["feed", userId], postId, liked);
-      patchInfiniteFeedQuery(queryClient, ["reels", userId], postId, liked);
-
-      if (previousPost) {
-        queryClient.setQueryData<Post>(["post", postId, userId], patchPostLike(previousPost, liked));
-      }
+      const previous = findPostInAllCaches(queryClient, userId, postId);
+      mapPostInAllCaches(queryClient, userId, postId, (post) => patchPostLike(post, liked));
 
       void queryClient.cancelQueries({ queryKey: ["feed", userId] });
       void queryClient.cancelQueries({ queryKey: ["reels", userId] });
 
-      return { previousFeed, previousReels, previousPost };
+      return { previous };
     },
     onError: (error, { postId }, context) => {
-      if (context?.previousFeed) {
-        queryClient.setQueryData(["feed", userId], context.previousFeed);
-      }
-      if (context?.previousReels) {
-        queryClient.setQueryData(["reels", userId], context.previousReels);
-      }
-      if (context?.previousPost) {
-        queryClient.setQueryData(["post", postId, userId], context.previousPost);
+      if (context?.previous) {
+        mapPostInAllCaches(queryClient, userId, postId, () => context.previous as Post);
       }
       if (typeof __DEV__ !== "undefined" && __DEV__) {
         console.error("[like] post failed", {
@@ -100,16 +49,15 @@ export function useFeedLike(userId: string) {
       }
       showAlert("Like failed", getErrorMessage(error, "Couldn't update that like. Please try again."));
     },
+    onSettled: (_data, _error, { postId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["post", postId] });
+      void queryClient.invalidateQueries({ queryKey: ["reels", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["feed", userId] });
+    },
   });
 
   function readLiked(postId: string): boolean {
-    const feed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-    const reels = queryClient.getQueryData<InfiniteData<FeedPage>>(["reels", userId]);
-    return !!(
-      findPostInFeed(feed, postId)?.liked_by_me ??
-      findPostInFeed(reels, postId)?.liked_by_me ??
-      queryClient.getQueryData<Post>(["post", postId, userId])?.liked_by_me
-    );
+    return Boolean(findPostInAllCaches(queryClient, userId, postId)?.liked_by_me);
   }
 
   function toggleLikePost(postId: string) {

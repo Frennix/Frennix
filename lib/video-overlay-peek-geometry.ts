@@ -6,9 +6,10 @@ export const VIDEO_OVERLAY_MIN_LIST_PX = 100;
 export const VIDEO_PEEK_ABSOLUTE_MIN_PX = 112;
 export const VIDEO_PEEK_MIN_LAYOUT_FRACTION = 0.25;
 
-/** Keyboard-open preview floor — list/header yield before the peek drops below this. */
-export const VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX = 240;
-export const VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX = 280;
+/** Keyboard-open preview floor — shrink the list before the peek drops below this. */
+export const VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX = 160;
+/** @deprecated Kept for source checks; keyboard peek is no longer capped below the closed snap. */
+export const VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX = 400;
 /** Handle wrap (24) + title/X row (36) + column paddingTop (6). Never below ~56. */
 export const VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX = 66;
 
@@ -38,70 +39,65 @@ export type VideoOverlayPeekBandInput = {
   usableHeight: number;
   baselinePeekHeight: number;
   composerBottomReserve: number;
-  /** When true, cap composer reserve at one line and keep a 240–280px peek. */
+  /** When true, keep the closed peek if it fits; otherwise shrink the list first. */
   keyboardOpen?: boolean;
 };
 
-function resolveKeyboardOpenPeekAndSheetHeight(input: VideoOverlayPeekBandInput): {
+export type VideoOverlayVisibleGeometry = {
+  visibleHeight: number;
+  overlayTop: 0;
+  overlayHeight: number;
+  /** Sheet starts here inside the overlay — equal to the video peek. */
+  sheetTop: number;
+  /** Remaining visible space under the peek. Never the full visual height. */
+  sheetHeight: number;
   peekHeight: number;
-  height: number;
-} {
-  const { usableHeight, baselinePeekHeight, composerBottomReserve } = input;
-  const fullReserve = Math.max(0, composerBottomReserve);
-  const peekReserve = Math.min(fullReserve, VIDEO_OVERLAY_SINGLE_LINE_COMPOSER_RESERVE_PX);
-  const available = Math.max(
-    0,
-    usableHeight - peekReserve - VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX
+};
+
+function resolvePeekHeight(input: VideoOverlayPeekBandInput, visibleHeight: number): number {
+  const fullReserve = Math.max(0, input.composerBottomReserve);
+  const peekReserve = Math.max(
+    VIDEO_OVERLAY_SINGLE_LINE_COMPOSER_RESERVE_PX,
+    Math.min(fullReserve, VIDEO_OVERLAY_SINGLE_LINE_COMPOSER_RESERVE_PX)
   );
-  const peekHeight = Math.min(
-    baselinePeekHeight,
-    VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX,
-    available < VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX
-      ? available
-      : Math.max(
-          VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX,
-          Math.min(available, VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX)
-        )
-  );
+  const minSheetChrome =
+    VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX + VIDEO_OVERLAY_MIN_LIST_PX + peekReserve;
+  const maxPeek = Math.max(0, visibleHeight - minSheetChrome);
+  if (maxPeek >= VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX) {
+    return Math.min(input.baselinePeekHeight, maxPeek);
+  }
+  return maxPeek;
+}
+
+/**
+ * One coordinate model: overlay fills the visual viewport (top 0).
+ * The sheet begins at `peekHeight` and its height is the remaining visible
+ * space. Never `sheetTop = peek` and `sheetHeight = visualHeight` together.
+ */
+export function resolveVideoOverlayVisibleGeometry(
+  input: VideoOverlayPeekBandInput
+): VideoOverlayVisibleGeometry {
+  const visibleHeight = Math.max(0, Math.round(input.usableHeight));
+  const peekHeight = resolvePeekHeight(input, visibleHeight);
+  const sheetHeight = Math.max(0, visibleHeight - peekHeight);
   return {
+    visibleHeight,
+    overlayTop: 0,
+    overlayHeight: visibleHeight,
+    sheetTop: peekHeight,
+    sheetHeight,
     peekHeight,
-    height: Math.max(
-      VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX,
-      usableHeight - fullReserve - peekHeight
-    ),
   };
 }
 
-/** Keep a useful video peek; shrink the comments list when the keyboard reduces space. */
+/** Peek + sheet height. `height` is the sheet, not the overlay. */
 export function resolveVideoOverlayPeekAndSheetHeight(input: VideoOverlayPeekBandInput): {
   peekHeight: number;
   height: number;
 } {
-  if (input.keyboardOpen) {
-    return resolveKeyboardOpenPeekAndSheetHeight(input);
-  }
-
-  const { layoutHeight, usableHeight, baselinePeekHeight, composerBottomReserve } = input;
-  const usefulMin = Math.min(
-    baselinePeekHeight,
-    Math.max(VIDEO_PEEK_ABSOLUTE_MIN_PX, Math.round(layoutHeight * VIDEO_PEEK_MIN_LAYOUT_FRACTION))
-  );
-  const spaceAfterReserve = Math.max(0, usableHeight - Math.max(0, composerBottomReserve));
-  const minCommentsSheetHeight = VIDEO_OVERLAY_HEADER_CHROME_PX + VIDEO_OVERLAY_MIN_LIST_PX;
-  const maxPeekKeepingList = spaceAfterReserve - minCommentsSheetHeight;
-
-  let peekHeight: number;
-  if (maxPeekKeepingList >= usefulMin) {
-    peekHeight = Math.min(baselinePeekHeight, maxPeekKeepingList);
-  } else {
-    peekHeight = Math.min(
-      usefulMin,
-      Math.max(VIDEO_PEEK_ABSOLUTE_MIN_PX, spaceAfterReserve - VIDEO_OVERLAY_HEADER_CHROME_PX)
-    );
-  }
-
+  const geometry = resolveVideoOverlayVisibleGeometry(input);
   return {
-    peekHeight,
-    height: Math.max(VIDEO_OVERLAY_HEADER_CHROME_PX, spaceAfterReserve - peekHeight),
+    peekHeight: geometry.peekHeight,
+    height: geometry.sheetHeight,
   };
 }

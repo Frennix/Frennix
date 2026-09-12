@@ -136,6 +136,7 @@ export function ImmersiveVideoViewer({
   const [runtimeTestEnabled, setRuntimeTestEnabled] = useState(false);
 
   useEffect(() => {
+    if (typeof __DEV__ === "undefined" || !__DEV__) return;
     if (Platform.OS !== "web" || typeof window === "undefined" || !isActive) return;
     if (
       (window as Window & { __FRENNIX_PLAYLIST_RUNTIME_TEST__?: boolean })

@@ -49,7 +49,7 @@ function ReelsScreen() {
   const pendingActiveReelIdRef = useRef<string | null>(null);
   const { onScroll, isAtTop } = useScrollAtTop();
   const { openGallery, closeGallery, lightbox, lightboxVisible } = useImageLightbox();
-  const { buildImmersiveContext, shareSheet, postActionSheets } =
+  const { buildImmersiveContext, shareSheet, postActionSheets, resetOverlayMenus } =
     useBuildImmersiveVideoContext(userId, {
       onDeleted: () => closeGallery(0),
     });
@@ -99,7 +99,8 @@ function ReelsScreen() {
                 .getQueryData<{ pages: { posts: Post[] }[] }>(["reels", userId])
                 ?.pages.flatMap((page) => page.posts) ?? posts;
             return cachedPosts.find(
-              (candidate) => (candidate.shared_post ?? candidate).id === postId
+              (candidate) =>
+                candidate.id === postId || (candidate.shared_post ?? candidate).id === postId
             );
           },
           buildImmersiveContext,
@@ -159,6 +160,10 @@ function ReelsScreen() {
   }, [isAtTop, refetch]);
 
   useTabScrollRegistration("reels", scrollToTop);
+
+  useEffect(() => {
+    if (!lightboxVisible) resetOverlayMenus();
+  }, [lightboxVisible, resetOverlayMenus]);
 
   const openReelRef = useRef(openReel);
   openReelRef.current = openReel;

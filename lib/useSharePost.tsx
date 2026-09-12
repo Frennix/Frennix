@@ -10,8 +10,10 @@ import {
   sharePostToConversation,
   sharePostToGroup,
 } from "@frennix/api";
+import { Platform } from "react-native";
 import { showAlert, showSuccess } from "@/lib/alerts";
 import { SharePostSheet } from "@/components/SharePostSheet";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 
 export function useSharePost(userId: string) {
   const queryClient = useQueryClient();
@@ -80,11 +82,18 @@ export function useSharePost(userId: string) {
     if (!shareMutation.isPending) setPost(null);
   }, [shareMutation.isPending]);
 
+  const resetShare = useCallback(() => {
+    setPost(null);
+  }, []);
+
   const shareSheet = (
     <SharePostSheet
       visible={visible}
       post={post}
       onClose={closeShare}
+      rootPortal={Platform.OS === "web"}
+      webZIndex={OVERLAY_Z_INDEX.shareSheet}
+      portalDataAttribute="frennix-share-post"
       conversations={conversations}
       groups={groups}
       challenges={challenges}
@@ -94,5 +103,5 @@ export function useSharePost(userId: string) {
     />
   );
 
-  return { openShare, shareSheet, shareVisible: visible };
+  return { openShare, closeShare, resetShare, shareSheet, shareVisible: visible };
 }

@@ -23,6 +23,7 @@ import { useCommentActions } from "@/lib/useCommentActions";
 import { useCommentLike } from "@/lib/useCommentLike";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import { hapticLight } from "@/lib/haptics";
+import { adjustPostCommentCount } from "@/lib/post-cache";
 import { WebCommentComposerRow } from "@/components/WebCommentComposerRow";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
@@ -32,8 +33,8 @@ const ESTIMATED_LINE_HEIGHT = 22;
 const COMPOSER_AVATAR_WIDTH_PX = 32;
 const COMPOSER_POST_WIDTH_PX = 48;
 const COMPOSER_ROW_GAP_PX = spacing.xs;
-/** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
-const MAX_VISIBLE_LINES = 5;
+/** Instagram-like cap: grow through 6 visible lines, then scroll internally. */
+const MAX_VISIBLE_LINES = 6;
 /** Internal textarea inset — included in border-box height/width. */
 const COMMENT_TEXTAREA_PADDING_X_PX = 14;
 const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
@@ -154,6 +155,7 @@ export function CommentComposerRow({
   posting,
   onComposerFocus,
   onComposerBlur,
+  compactComposer = false,
 }: CommentComposerRowProps) {
   if (Platform.OS === "web") {
     return (
@@ -167,6 +169,7 @@ export function CommentComposerRow({
         posting={posting}
         onFocus={onComposerFocus}
         onBlur={onComposerBlur}
+        hideAvatar={compactComposer}
       />
     );
   }
@@ -333,6 +336,7 @@ export function usePostCommentsContent({
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
       queryClient.invalidateQueries({ queryKey: ["post", postId] });
       queryClient.invalidateQueries({ queryKey: ["feed"] });
+      queryClient.invalidateQueries({ queryKey: ["reels"] });
     },
   });
 
@@ -358,6 +362,7 @@ export function usePostCommentsContent({
     queryClient.invalidateQueries({ queryKey: ["comments", postId] });
     queryClient.invalidateQueries({ queryKey: ["post", postId] });
     queryClient.invalidateQueries({ queryKey: ["feed"] });
+    queryClient.invalidateQueries({ queryKey: ["reels"] });
   }, [postId, queryClient]);
 
   type CommentMutationVars = {
@@ -392,14 +397,27 @@ export function usePostCommentsContent({
         appendOptimisticComment(old, optimistic, parentId)
       );
 
+      if (!parentId) {
+        adjustPostCommentCount(queryClient, userId, postId, 1);
+        if (post.id !== postId) {
+          adjustPostCommentCount(queryClient, userId, post.id, 1);
+        }
+      }
+
       setCommentText("");
       setReplyTo(null);
 
-      return { previousComments, replyToComment };
+      return { previousComments, replyToComment, incrementedTopLevel: !parentId };
     },
     onError: (_error, { text, replyToComment }, context) => {
       if (context?.previousComments) {
         queryClient.setQueryData(["comments", postId, userId], context.previousComments);
+      }
+      if (context?.incrementedTopLevel) {
+        adjustPostCommentCount(queryClient, userId, postId, -1);
+        if (post.id !== postId) {
+          adjustPostCommentCount(queryClient, userId, post.id, -1);
+        }
       }
       setCommentText(text);
       if (replyToComment) setReplyTo(replyToComment);
@@ -427,8 +445,7 @@ export function usePostCommentsContent({
     });
   }, [commentMutation, commentText, replyTo]);
 
-  const useVideoOverlayWebComposer =
-    useVideoOverlayWebComposerOption || (compactComposer && Platform.OS === "web");
+  const useVideoOverlayWebComposer = useVideoOverlayWebComposerOption;
 
   const replyBanner = replyTo ? (
     <View style={styles.replyBanner}>

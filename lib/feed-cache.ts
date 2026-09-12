@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+import { excludeReelPosts } from "@frennix/api";
 import type { FeedPage } from "@frennix/types";
 
 const CACHE_PREFIX = "feed-cache:v2:";
@@ -18,7 +19,7 @@ function cacheKey(userId: string) {
 function excludeReelsFromFeedPages(pages: FeedPage[]): FeedPage[] {
   return pages.map((page) => ({
     ...page,
-    posts: page.posts.filter((post) => post.is_reel !== true),
+    posts: excludeReelPosts(page.posts),
   }));
 }
 

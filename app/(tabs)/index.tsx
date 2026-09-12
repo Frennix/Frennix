@@ -15,6 +15,7 @@ import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getFeed,
   getFeedCore,
+  excludeReelPosts,
   enrichPostsWithInteractions,
   applyDefaultPostInteractions,
   getFeedStories,
@@ -151,9 +152,9 @@ export default function HomeScreen() {
   const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
   const [activeInsightStoryId, setActiveInsightStoryId] = useState<string | null>(null);
   const [activeInsightSlideId, setActiveInsightSlideId] = useState<string | null>(null);
-  const { openShare, shareSheet, shareVisible } = useSharePost(userId);
+  const { openShare, resetShare, shareSheet, shareVisible } = useSharePost(userId);
   markFeedHook("share-post");
-  const { openPostActions, postActionSheets } = usePostActions({
+  const { openPostActions, resetPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
@@ -166,6 +167,12 @@ export default function HomeScreen() {
   markFeedHook("feed-like");
   const { openGallery, lightbox, lightboxVisible, closeGallery } = useImageLightbox();
   markFeedHook("image-lightbox");
+  useEffect(() => {
+    if (!lightboxVisible) {
+      resetShare();
+      resetPostActions();
+    }
+  }, [lightboxVisible, resetPostActions, resetShare]);
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
   const [storiesDeferred, setStoriesDeferred] = useState(false);
@@ -534,7 +541,7 @@ export default function HomeScreen() {
 
   const posts = useMemo(
     () =>
-      (data?.pages.flatMap((page) => page.posts) ?? []).filter((post) => post.is_reel !== true),
+      excludeReelPosts(data?.pages.flatMap((page) => page.posts) ?? []),
     [data?.pages]
   );
 
@@ -818,10 +825,10 @@ export default function HomeScreen() {
           const cachedPosts =
             queryClient
               .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-              ?.pages.flatMap((page) => page.posts)
-              .filter((candidate) => candidate.is_reel !== true) ?? posts;
-          return cachedPosts.find(
-            (candidate) => (candidate.shared_post ?? candidate).id === postId
+              ?.pages.flatMap((page) => page.posts) ?? posts;
+          return excludeReelPosts(cachedPosts).find(
+            (candidate) =>
+              candidate.id === postId || (candidate.shared_post ?? candidate).id === postId
           );
         },
         buildImmersiveContext: buildImmersiveVideoContext,

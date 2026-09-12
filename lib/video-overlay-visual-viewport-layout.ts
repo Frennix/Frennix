@@ -1,6 +1,6 @@
+import { getImmersiveSessionLayoutHeight } from "@/lib/immersive-session-layout";
 import { isIosSafariBrowser, isWebStandalone } from "@/lib/pwa";
 import {
-  isVisualViewportKeyboardOpen,
   measureSafariVisualViewport,
   readEnvSafeAreaTop,
   type SafariVisualViewportSnapshot,
@@ -9,6 +9,7 @@ import { VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX } from "@/lib/use-video-overlay-por
 
 export {
   resolveVideoOverlayPeekAndSheetHeight,
+  resolveVideoOverlayVisibleGeometry,
   VIDEO_OVERLAY_HEADER_CHROME_PX,
   VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX,
   VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX,
@@ -18,12 +19,14 @@ export {
   VIDEO_PEEK_ABSOLUTE_MIN_PX,
   VIDEO_PEEK_MIN_LAYOUT_FRACTION,
   type VideoOverlayPeekBandInput,
+  type VideoOverlayVisibleGeometry,
 } from "@/lib/video-overlay-peek-geometry";
 
 /** Historical Safari toolbar estimate — never subtract when visualViewport already shrank. */
 export const IOS_SAFARI_FLOATING_CONTROLS_PX = 90;
 
-const KEYBOARD_OPEN_THRESHOLD_PX = 100;
+/** Visual shrink must exceed Safari toolbar/URL-bar motion (~40–90px). */
+export const KEYBOARD_OPEN_THRESHOLD_PX = 140;
 
 export type VideoOverlayViewportFrame = {
   offsetTop: number;
@@ -65,11 +68,14 @@ export function resolveSafariControlsClearance(input: SafariControlsClearanceInp
   return 0;
 }
 
-function isVideoOverlayKeyboardOpen(snapshot: SafariVisualViewportSnapshot): boolean {
-  return (
-    isVisualViewportKeyboardOpen(snapshot) ||
-    snapshot.layoutHeight - snapshot.visualHeight > KEYBOARD_OPEN_THRESHOLD_PX
-  );
+/**
+ * Keyboard open = visual viewport dropped vs the frozen session (or current
+ * layout height) by more than the toolbar/URL-bar band. Do not use a live
+ * `innerHeight` that iOS already shrank with the keyboard.
+ */
+export function isVideoOverlayKeyboardOpen(snapshot: SafariVisualViewportSnapshot): boolean {
+  const baselineHeight = getImmersiveSessionLayoutHeight() ?? snapshot.layoutHeight;
+  return baselineHeight - snapshot.visualHeight > KEYBOARD_OPEN_THRESHOLD_PX;
 }
 
 /** Mode-aware visual viewport frame for the immersive video comments overlay. */
@@ -97,6 +103,12 @@ export function measureVideoOverlayViewportFrame(): VideoOverlayViewportFrame {
     keyboardOpen,
     layoutHeight: snapshot.layoutHeight,
   };
+}
+
+/** Gap between the layout viewport bottom and the visible visual-viewport bottom. */
+export function computeVideoOverlayComposerBottom(frame: VideoOverlayViewportFrame): number {
+  const visualBottom = frame.offsetTop + frame.visualHeight - frame.safariControlsClearance;
+  return Math.max(0, Math.round(frame.layoutHeight - visualBottom + VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX));
 }
 
 /** Fixed `top` for the portaled composer — matches the overlay frame bottom. */

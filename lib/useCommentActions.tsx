@@ -14,10 +14,12 @@ import { ReportReasonSheet } from "@/components/ReportReasonSheet";
 import { type EntityActionId } from "@/lib/entity-actions";
 import { commentActionsForRole } from "@/lib/comment-actions";
 import {
+  findCommentInTree,
   patchCommentsCache,
   removeCommentFromTree,
   updateCommentInTree,
 } from "@/lib/comment-cache";
+import { adjustPostCommentCount } from "@/lib/post-cache";
 import { copyCommentLink, shareCommentLink } from "@/lib/comment-link";
 import { confirmBlockUser, confirmDeleteComment, showAlert, showSuccess } from "@/lib/alerts";
 import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
@@ -70,18 +72,29 @@ export function useCommentActions({ userId, postId, onDeleted, rootPortal = fals
   const deleteMutation = useMutation({
     mutationFn: (commentId: string) => deleteComment(commentId, userId),
     onMutate: async (commentId) => {
+      const existing = queryClient.getQueryData<Comment[]>(["comments", postId, userId]);
+      const target = findCommentInTree(existing, commentId);
+      const decrementedTopLevel = Boolean(target && !target.parent_id);
       patchCommentsCache(queryClient, postId, userId, (comments) =>
         removeCommentFromTree(comments, commentId)
       );
+      if (decrementedTopLevel) {
+        adjustPostCommentCount(queryClient, userId, postId, -1);
+      }
+      return { decrementedTopLevel };
     },
     onSuccess: () => {
       closeMenu();
       showSuccess(ownershipMessages.deleted("Comment"));
       queryClient.invalidateQueries({ queryKey: ["post", postId] });
       queryClient.invalidateQueries({ queryKey: ["feed"] });
+      queryClient.invalidateQueries({ queryKey: ["reels"] });
       onDeleted?.();
     },
-    onError: (error) => {
+    onError: (error, _commentId, context) => {
+      if (context?.decrementedTopLevel) {
+        adjustPostCommentCount(queryClient, userId, postId, 1);
+      }
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
       showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },

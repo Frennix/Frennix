@@ -273,7 +273,7 @@ function main() {
       feedIndex.includes("getFeedCore(userId, undefined, undefined") &&
         feedIndex.includes("getFeed(userId, pageParam)") &&
         !feedIndex.includes("isReel: true") &&
-        feedIndex.includes("post.is_reel !== true") &&
+        feedIndex.includes("excludeReelPosts") &&
         banner.includes("getFeed(userId)") &&
         feedCache.includes('CACHE_PREFIX = "feed-cache:v2:"') &&
         feedCache.includes("excludeReelsFromFeedPages") &&

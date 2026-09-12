@@ -7,6 +7,7 @@ import { ImmersiveVideoCommentsProvider } from "@/lib/immersive-video-comments-c
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import type { ImmersiveVideoPlaylistState } from "@/lib/immersive-video-playlist-state";
 import { usesMobileWebCommentsRoute } from "@/lib/mobile-web-comments-route";
+import { usePostCacheTick } from "@/lib/usePostCacheTick";
 
 type ImmersiveVideoOverlayShellProps = {
   playlist: ImmersiveVideoPlaylistState;
@@ -41,8 +42,10 @@ export function ImmersiveVideoOverlayShell({
     mediaIndex: initialEntry?.mediaIndex ?? playlist.originMediaIndex,
   }));
   const [runtimeTestEnabled, setRuntimeTestEnabled] = useState(false);
+  const postCacheTick = usePostCacheTick(userId);
 
   useEffect(() => {
+    if (typeof __DEV__ === "undefined" || !__DEV__) return;
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     if (!(window as Window & { __FRENNIX_PLAYLIST_RUNTIME_TEST__?: boolean }).__FRENNIX_PLAYLIST_RUNTIME_TEST__) {
       return;
@@ -62,12 +65,15 @@ export function ImmersiveVideoOverlayShell({
 
   const wrappedBuildImmersiveContext = useCallback(
     (post: Post): ImmersiveVideoGalleryContext | undefined => {
-      const context = playlist.buildImmersiveContext(post);
+      const live =
+        playlist.getPost(post.shared_post?.id ?? post.id) ?? playlist.getPost(post.id) ?? post;
+      const context = playlist.buildImmersiveContext(live);
       if (!context) return undefined;
       return {
         ...context,
         postActions: {
           ...context.postActions,
+          post: live,
           onComment: (_playback, draft) => {
             if (Platform.OS === "web" && usesMobileWebCommentsRoute()) {
               openCommentsOverlay(draft);
@@ -78,7 +84,7 @@ export function ImmersiveVideoOverlayShell({
         },
       };
     },
-    [openCommentsOverlay, playlist]
+    [openCommentsOverlay, playlist, postCacheTick]
   );
 
   const handleActiveEntryChange = useCallback(
@@ -91,12 +97,13 @@ export function ImmersiveVideoOverlayShell({
 
   const activePost = useMemo(
     () => playlist.getPost(activeEntry.postId),
-    [activeEntry.postId, playlist]
+    [activeEntry.postId, playlist, postCacheTick]
   );
 
   const commentsAuthorProfile = activePost?.author ?? authorProfile;
 
   useEffect(() => {
+    if (typeof __DEV__ === "undefined" || !__DEV__) return;
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     if (!(window as Window & { __FRENNIX_PLAYLIST_RUNTIME_TEST__?: boolean }).__FRENNIX_PLAYLIST_RUNTIME_TEST__) {
       return;

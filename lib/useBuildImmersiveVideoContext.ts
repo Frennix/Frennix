@@ -15,6 +15,7 @@ export type BuildImmersiveVideoContextBundle = {
   buildImmersiveContext: (post: Post) => ImmersiveVideoGalleryContext | undefined;
   shareSheet: ReactNode;
   postActionSheets: ReactNode;
+  resetOverlayMenus: () => void;
 };
 
 type BuildImmersiveVideoContextOptions = {
@@ -28,18 +29,21 @@ export function useBuildImmersiveVideoContext(
 ): BuildImmersiveVideoContextBundle {
   const { toggleLikePost } = useFeedLike(userId);
   const postReaction = usePostReaction(userId);
-  const { openShare, shareSheet } = useSharePost(userId);
-  const { openPostActions, postActionSheets } = usePostActions({
+  const { openShare, resetShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, resetPostActions, postActionSheets } = usePostActions({
     userId,
     onDeleted: options?.onDeleted,
     onShareInApp: (target) => openShare(target.shared_post ?? target),
   });
+  const resetOverlayMenus = useCallback(() => {
+    resetShare();
+    resetPostActions();
+  }, [resetPostActions, resetShare]);
   const { toggleFollow, isFollowing } = useSuggestedFollow(userId);
 
   const buildImmersiveContext = useCallback(
     (post: Post): ImmersiveVideoGalleryContext | undefined => {
       if (!usesMobileWebCommentsRoute()) return undefined;
-      const displayPost = post.shared_post ?? post;
       const authorId = post.author?.id;
       const showFollow = Boolean(authorId && authorId !== userId && !isFollowing(authorId));
       return {
@@ -50,7 +54,6 @@ export function useBuildImmersiveVideoContext(
             postReaction.mutate({
               postId: post.id,
               emoji: STRONG_WORK_EMOJI,
-              currentEmoji: post.my_reaction,
             }),
           onComment: () => {
             /* ImmersiveVideoOverlayShell opens the comments sheet. */
@@ -81,7 +84,8 @@ export function useBuildImmersiveVideoContext(
       buildImmersiveContext,
       shareSheet,
       postActionSheets,
+      resetOverlayMenus,
     }),
-    [buildImmersiveContext, postActionSheets, shareSheet]
+    [buildImmersiveContext, postActionSheets, resetOverlayMenus, shareSheet]
   );
 }

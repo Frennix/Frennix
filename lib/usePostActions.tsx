@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
+import { Platform } from "react-native";
 import type { Post } from "@frennix/types";
 import { blockUser, deletePost, getErrorMessage, getTechnicalErrorMessage, reportPost } from "@frennix/api";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
@@ -37,6 +38,12 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
 
   const closeMenu = useCallback(() => {
     setMenuVisible(false);
+    setActivePost(null);
+  }, []);
+
+  const resetPostActions = useCallback(() => {
+    setMenuVisible(false);
+    setReportVisible(false);
     setActivePost(null);
   }, []);
 
@@ -164,8 +171,9 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
         actions={menuActions}
         onSelect={handleAction}
         onClose={closeMenu}
-        rootPortal
+        rootPortal={Platform.OS === "web"}
         webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-post-options"
       />
       <ReportReasonSheet
         visible={reportVisible}
@@ -175,14 +183,16 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
           setActivePost(null);
         }}
         onSelect={(reason) => reportMutation.mutate(reason)}
-        rootPortal
+        rootPortal={Platform.OS === "web"}
         webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-post-report"
       />
     </>
   );
 
   return {
     openPostActions,
+    resetPostActions,
     postActionSheets,
     isDeleting: deleteMutation.isPending,
     /** @deprecated Use openPostActions — kept for gradual migration */

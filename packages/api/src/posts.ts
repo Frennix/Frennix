@@ -277,6 +277,24 @@ export function applyReelDestinationFilter(posts: Post[], wantReels: boolean): P
   );
 }
 
+export function isReelPost(
+  post: { is_reel?: boolean | null } | null | undefined
+): boolean {
+  return post?.is_reel === true;
+}
+
+export function excludeReelPosts<
+  T extends { is_reel?: boolean | null; shared_post?: { is_reel?: boolean | null } | null },
+>(posts: T[]): T[] {
+  return posts.filter((post) => !isReelPost(post) && !isReelPost(post.shared_post));
+}
+
+export function onlyReelPosts<
+  T extends { is_reel?: boolean | null; shared_post?: { is_reel?: boolean | null } | null },
+>(posts: T[]): T[] {
+  return posts.filter((post) => isReelPost(post) || isReelPost(post.shared_post));
+}
+
 /** Fast path: feed scope + post rows with author profiles — no likes/comments/reactions yet. */
 export async function getFeedCore(
   userId: string,

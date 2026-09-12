@@ -193,7 +193,7 @@ function main() {
         belongsOnReels(journeyReel) &&
         !belongsOnFeed(journeyReel) &&
         postsApi.includes('q = q.eq("is_reel", options?.isReel === true)') &&
-        feedIndex.includes("post.is_reel !== true") &&
+        feedIndex.includes("excludeReelPosts") &&
         shareWorkout.includes("is_reel: false") &&
         shareWorkout.includes("is_reel: true")
     ) && ok;

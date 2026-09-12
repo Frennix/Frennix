@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 import { CommentsBottomSheet, type CommentsSheetPresentation } from "@/components/CommentsBottomSheet";
 import { usePostCommentsContent } from "@/components/PostCommentsContent";
-import { VideoOverlayWebComposerPortal } from "@/components/VideoOverlayWebComposerPortal";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { restoreWebHorizontalScrollPosition } from "@/lib/web-horizontal-scroll-restore";
 import type { Post } from "@frennix/types";
@@ -58,7 +57,7 @@ function PostCommentsSheetBody({
   onClose,
   presentation,
 }: PostCommentsSheetProps & { post: Post; visible: boolean }) {
-  const { postId, title, commentActionSheets, composer, thread, videoOverlayWebComposer } =
+  const { postId, title, commentActionSheets, composer, thread } =
     usePostCommentsContent({
     post,
     userId,
@@ -68,11 +67,8 @@ function PostCommentsSheetBody({
     rootPortal: true,
     trackInputZoom: Platform.OS === "web",
     compactComposer: presentation === "videoOverlay",
-    useVideoOverlayWebComposer: Platform.OS === "web" && presentation === "videoOverlay",
+    useVideoOverlayWebComposer: false,
   });
-
-  const showVideoOverlayPortal =
-    Platform.OS === "web" && presentation === "videoOverlay" && visible;
 
   useEffect(() => {
     if (Platform.OS !== "web" || visible) return;
@@ -82,9 +78,6 @@ function PostCommentsSheetBody({
   return (
     <>
       {commentActionSheets}
-      {showVideoOverlayPortal && videoOverlayWebComposer ? (
-        <VideoOverlayWebComposerPortal {...videoOverlayWebComposer} />
-      ) : null}
       <CommentsBottomSheet
         visible={visible}
         onClose={onClose}
@@ -92,7 +85,6 @@ function PostCommentsSheetBody({
         title={title}
         composer={composer}
         presentation={presentation}
-        suppressInlineComposer={Platform.OS === "web" && presentation === "videoOverlay"}
       >
         {thread}
       </CommentsBottomSheet>

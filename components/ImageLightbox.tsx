@@ -44,7 +44,9 @@ import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import {
   captureImmersiveSessionLayoutHeight,
   clearImmersiveSessionLayoutHeight,
+  getImmersiveSessionLayoutHeight,
 } from "@/lib/immersive-session-layout";
+import { KEYBOARD_OPEN_THRESHOLD_PX } from "@/lib/video-overlay-visual-viewport-layout";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 
 /** @deprecated Use MediaGalleryState with typed items. */
@@ -811,13 +813,27 @@ function LightboxSurface({
     if (Platform.OS === "web" && typeof window !== "undefined") {
       const viewport = window.visualViewport;
       setPageWidth(Math.round(viewport?.width ?? window.innerWidth));
+      const sessionHeight = getImmersiveSessionLayoutHeight();
+      if (useImmersiveVideoPlaylist && sessionHeight) {
+        setPageHeight(sessionHeight);
+        if (!useImmersiveVideo) {
+          setLayoutViewportHeight(Math.round(window.innerHeight));
+        }
+        return;
+      }
+      if (useImmersiveVideoPlaylist) {
+        setPageHeight(Math.round(window.innerHeight));
+        if (!useImmersiveVideo) {
+          setLayoutViewportHeight(Math.round(window.innerHeight));
+        }
+        return;
+      }
       setPageHeight(Math.round(viewport?.height ?? window.innerHeight));
       if (!useImmersiveVideo) {
         setLayoutViewportHeight(Math.round(window.innerHeight));
       }
-      return;
     }
-  }, [useImmersiveVideo]);
+  }, [useImmersiveVideo, useImmersiveVideoPlaylist]);
 
   const dismiss = useCallback(() => {
     dismissY.setValue(0);
@@ -854,7 +870,12 @@ function LightboxSurface({
       return;
     }
     if (useImmersiveVideo) {
-      captureImmersiveSessionLayoutHeight(Math.round(window.innerHeight), false);
+      const layoutHeight = Math.round(window.innerHeight);
+      const visualHeight = Math.round(window.visualViewport?.height ?? layoutHeight);
+      captureImmersiveSessionLayoutHeight(
+        layoutHeight,
+        layoutHeight - visualHeight > KEYBOARD_OPEN_THRESHOLD_PX
+      );
     }
     syncViewportSize();
     window.addEventListener("resize", syncViewportSize);

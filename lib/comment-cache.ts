@@ -1,6 +1,19 @@
 import type { Comment } from "@frennix/types";
 import type { QueryClient } from "@tanstack/react-query";
 
+export function findCommentInTree(
+  comments: Comment[] | undefined,
+  commentId: string
+): Comment | undefined {
+  if (!comments) return undefined;
+  for (const comment of comments) {
+    if (comment.id === commentId) return comment;
+    const nested = findCommentInTree(comment.replies, commentId);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 export function removeCommentFromTree(comments: Comment[], commentId: string): Comment[] {
   return comments
     .filter((comment) => comment.id !== commentId)

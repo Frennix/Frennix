@@ -20,6 +20,7 @@ export type ImmersiveVideoPostActionsBundle = {
   actions: ImmersiveVideoPostActions | undefined;
   shareSheet: ReactNode;
   postActionSheets: ReactNode;
+  resetOverlayMenus: () => void;
 };
 
 export function useImmersiveVideoPostActions(
@@ -28,8 +29,8 @@ export function useImmersiveVideoPostActions(
 ): ImmersiveVideoPostActionsBundle {
   const { toggleLikePost } = useFeedLike(userId);
   const postReaction = usePostReaction(userId);
-  const { openShare, shareSheet } = useSharePost(userId);
-  const { openPostActions, postActionSheets } = usePostActions({
+  const { openShare, resetShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, resetPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (target) => openShare(target.shared_post ?? target),
   });
@@ -83,5 +84,13 @@ export function useImmersiveVideoPostActions(
     userId,
   ]);
 
-  return { actions, shareSheet, postActionSheets };
+  return {
+    actions,
+    shareSheet,
+    postActionSheets,
+    resetOverlayMenus: () => {
+      resetShare();
+      resetPostActions();
+    },
+  };
 }
