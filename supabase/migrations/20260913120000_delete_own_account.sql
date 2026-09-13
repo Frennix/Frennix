@@ -8,33 +8,13 @@
 -- supabase/functions/delete-own-account).
 -- Do not DELETE FROM storage.objects. File cleanup uses the Storage API
 -- in the trusted server process. Do not swallow cleanup errors.
+-- Auth delete is admin.auth.admin.deleteUser in delete-own-account.
+-- DELETE FROM auth.users WHERE id = uid is not granted to signed-in clients.
 
+-- Drop policies this feature previously added. Service-role cleanup does not need them.
 DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
-CREATE POLICY "Users can delete own avatar"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'avatars'
-  AND auth.uid()::text = split_part(name, '/', 1)
-);
-
 DROP POLICY IF EXISTS "Users can delete own message media" ON storage.objects;
-CREATE POLICY "Users can delete own message media"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'messages'
-  AND auth.uid()::text = split_part(name, '/', 1)
-);
-
 DROP POLICY IF EXISTS "Users can delete own feedback attachments" ON storage.objects;
-CREATE POLICY "Users can delete own feedback attachments"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'feedback-attachments'
-  AND auth.uid()::text = split_part(name, '/', 1)
-);
 
 CREATE TABLE IF NOT EXISTS public.account_deletion_jobs (
   user_id uuid PRIMARY KEY,
@@ -56,26 +36,14 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, auth
 AS $$
-DECLARE
-  uid uuid;
 BEGIN
-  uid := auth.uid();
-  IF uid IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
-
-  DELETE FROM auth.users WHERE id = uid;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Account could not be deleted';
-  END IF;
-
-  RETURN jsonb_build_object('ok', true, 'user_id', uid);
+  RAISE EXCEPTION 'Account deletion must use the delete-own-account function';
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.delete_own_account() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.delete_own_account() FROM anon;
-GRANT EXECUTE ON FUNCTION public.delete_own_account() TO authenticated;
+REVOKE ALL ON FUNCTION public.delete_own_account() FROM authenticated;
 
 COMMENT ON FUNCTION public.delete_own_account() IS
-  'Deletes the authenticated auth user only. Owned files are removed by the trusted Storage API process.';
+  'Rejected for clients. Account deletion uses the delete-own-account Edge Function.';

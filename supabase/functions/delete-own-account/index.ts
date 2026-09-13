@@ -80,12 +80,21 @@ async function listPaths(
   return paths;
 }
 
+function assertOwnedPaths(userId: string, paths: string[]) {
+  const prefix = `${userId}/`;
+  const owned = paths.filter((path) => path === userId || path.startsWith(prefix));
+  if (owned.length !== paths.length) {
+    throw new Error("refusing to remove storage paths outside the job user prefix");
+  }
+  return owned;
+}
+
 async function removeBucket(
   admin: ReturnType<typeof createClient>,
   bucket: string,
   userId: string
 ) {
-  const paths = await listPaths(admin, bucket, userId);
+  const paths = assertOwnedPaths(userId, await listPaths(admin, bucket, userId));
   if (!paths.length) return 0;
   const { error } = await admin.storage.from(bucket).remove(paths);
   if (error) throw new Error(error.message);

@@ -38,8 +38,19 @@ assertIncludes(migration, "CREATE OR REPLACE FUNCTION public.delete_own_account(
 assertIncludes(migration, "SECURITY DEFINER", "migration definer");
 assertIncludes(migration, "DELETE FROM storage.objects", "migration storage purge");
 assertIncludes(migration, "DELETE FROM auth.users WHERE id = uid", "migration auth delete");
-assertIncludes(migration, "GRANT EXECUTE ON FUNCTION public.delete_own_account() TO authenticated", "migration grant");
 assertIncludes(migration, "REVOKE ALL ON FUNCTION public.delete_own_account() FROM anon", "migration revoke anon");
+assertIncludes(migration, "REVOKE ALL ON FUNCTION public.delete_own_account() FROM authenticated", "migration revoke authenticated");
+assertNotIncludes(migration, "GRANT EXECUTE ON FUNCTION public.delete_own_account() TO authenticated", "migration must not grant clients");
+assertIncludes(migration, "Account deletion must use the delete-own-account function", "migration rejects client RPC");
+assertNotIncludes(migration, 'CREATE POLICY "Users can delete own avatar"', "migration has no extra avatar delete policy");
+assertNotIncludes(migration, 'CREATE POLICY "Users can delete own message media"', "migration has no extra message delete policy");
+assertNotIncludes(migration, 'CREATE POLICY "Users can delete own feedback attachments"', "migration has no extra feedback delete policy");
+const deleteFn = read("supabase/functions/delete-own-account/index.ts");
+assertIncludes(deleteFn, "assertOwnedPaths", "delete function prefix-checks paths");
+assertIncludes(deleteFn, "refusing to remove storage paths outside the job user prefix", "delete function refuses unsafe paths");
+const retryFn = read("supabase/functions/retry-account-deletion-jobs/index.ts");
+assertIncludes(retryFn, "MAX_WORKER_ATTEMPTS", "retry worker has attempt cap");
+assertIncludes(retryFn, "cleanup_exhausted", "retry worker records exhausted jobs");
 assertIncludes(migration, "FILE ONLY until a production rollout is explicitly approved", "migration stays unapplied");
 
 assertIncludes(api, 'rpc("delete_own_account")', "api rpc");

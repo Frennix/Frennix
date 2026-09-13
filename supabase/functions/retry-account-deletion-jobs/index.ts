@@ -17,6 +17,7 @@ const BUCKETS = [
 
 const JOB_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_WORKER_ATTEMPTS = 25;
 
 Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -39,6 +40,15 @@ Deno.serve(async (req) => {
       const userId = String(job.user_id ?? "");
       if (!JOB_UUID.test(userId)) {
         results.push({ user_id: userId, outcome: "ignored", last_error: "invalid user id" });
+        continue;
+      }
+      if (Number(job.attempt_count ?? 0) >= MAX_WORKER_ATTEMPTS) {
+        await admin.from("account_deletion_jobs").update({
+          status: "cleanup_exhausted",
+          last_error: "max worker attempts reached",
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", userId);
+        results.push({ user_id: userId, outcome: "exhausted", last_error: "max worker attempts reached" });
         continue;
       }
       const { data: authData } = await admin.auth.admin.getUserById(userId);

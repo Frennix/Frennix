@@ -16,7 +16,8 @@ export type DeletionJobStatus =
   | "account_deleted"
   | "storage_pending"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cleanup_exhausted";
 
 export type TrustedDeletionResult = {
   ok: boolean;
@@ -107,7 +108,7 @@ export async function listOwnedStoragePaths(
   return paths;
 }
 
-function assertOwnedPaths(userId: string, paths: string[]): string[] {
+export function assertOwnedPaths(userId: string, paths: string[]): string[] {
   const prefix = `${userId}/`;
   const owned = paths.filter((path) => path === userId || path.startsWith(prefix));
   if (owned.length !== paths.length) {
@@ -135,7 +136,7 @@ export async function authUserExists(admin: SupabaseClient, userId: string): Pro
 
 const JOB_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_WORKER_ATTEMPTS = 25;
+export const MAX_WORKER_ATTEMPTS = 25;
 const CLEANUP_JOB_STATUSES: DeletionJobStatus[] = [
   "pending",
   "failed",
@@ -145,7 +146,7 @@ const CLEANUP_JOB_STATUSES: DeletionJobStatus[] = [
 
 export type WorkerJobOutcome = {
   user_id: string;
-  outcome: "completed" | "skipped_live_account" | "failed" | "ignored";
+  outcome: "completed" | "skipped_live_account" | "failed" | "ignored" | "exhausted";
   last_error?: string;
 };
 
@@ -182,9 +183,18 @@ export async function retryPendingAccountDeletionJobs(
       continue;
     }
     if (Number(row.attempt_count ?? 0) >= MAX_WORKER_ATTEMPTS) {
+      await upsertJob(admin, {
+        user_id: userId,
+        status: "cleanup_exhausted",
+        buckets_completed: (await readJob(admin, userId))?.buckets_completed ?? [],
+        buckets_failed: (await readJob(admin, userId))?.buckets_failed ?? [],
+        files_removed: (await readJob(admin, userId))?.files_removed ?? 0,
+        attempt_count: Number(row.attempt_count ?? 0),
+        last_error: "max worker attempts reached",
+      });
       results.push({
         user_id: userId,
-        outcome: "failed",
+        outcome: "exhausted",
         last_error: "max worker attempts reached",
       });
       failed += 1;

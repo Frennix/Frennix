@@ -16,6 +16,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ACCOUNT_STORAGE_BUCKETS,
+  MAX_WORKER_ATTEMPTS,
+  assertOwnedPaths,
   retryPendingAccountDeletionJobs,
   runTrustedAccountDeletion,
 } from "../packages/api/src/account-deletion-server.ts";
@@ -132,6 +134,24 @@ function sourceChecks() {
   assert(
     worker.includes("refusing to remove storage paths outside the job user prefix"),
     "edge worker is prefix-safe"
+  );
+  assert(worker.includes("MAX_WORKER_ATTEMPTS"), "edge worker has attempt cap");
+  assert(worker.includes("cleanup_exhausted"), "edge worker records exhausted jobs");
+  const deleteFn = fs.readFileSync(
+    path.join(ROOT, "supabase/functions/delete-own-account/index.ts"),
+    "utf8"
+  );
+  assert(
+    deleteFn.includes("refusing to remove storage paths outside the job user prefix"),
+    "delete function is prefix-safe"
+  );
+  assert(
+    migration.includes("REVOKE ALL ON FUNCTION public.delete_own_account() FROM authenticated"),
+    "authenticated clients cannot execute delete_own_account"
+  );
+  assert(
+    !/CREATE POLICY "Users can delete own (avatar|message media|feedback attachments)"/.test(migration),
+    "migration does not add authenticated storage DELETE policies"
   );
 }
 
@@ -280,6 +300,55 @@ try {
   }
 
   {
+    const item = await createDisposable("authenticated_rpc_cannot_bypass_cleanup");
+    const userClient = createClient(env.url, env.anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const signedIn = await userClient.auth.signInWithPassword({
+      email: item.email,
+      password: item.password,
+    });
+    if (signedIn.error) throw new Error(signedIn.error.message);
+    const rpc = await userClient.rpc("delete_own_account");
+    const leftovers = await leftoverForUser(admin, item.userId, item.filesByBucket);
+    const { data: job } = await admin
+      .from("account_deletion_jobs")
+      .select("user_id")
+      .eq("user_id", item.userId)
+      .maybeSingle();
+    if (!rpc.error) {
+      record(item.caseName, "fail", "signed-in RPC unexpectedly succeeded");
+    } else if (leftovers.length === 0 || job) {
+      record(
+        item.caseName,
+        "fail",
+        `RPC bypass changed account leftovers=${JSON.stringify(leftovers)} job=${Boolean(job)}`
+      );
+    } else {
+      record(item.caseName, "pass", "signed-in RPC denied; auth, files, and no cleanup job");
+    }
+    await cleanupTracked(item);
+    item.userId = null;
+    item.filesByBucket = {};
+  }
+
+  {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    let refused = false;
+    try {
+      assertOwnedPaths(userId, [`${userId}/ok.png`, "other-user/secret.png"]);
+    } catch (error) {
+      refused = /outside the job user prefix/.test(error instanceof Error ? error.message : String(error));
+    }
+    const owned = assertOwnedPaths(userId, [`${userId}/ok.png`, userId]);
+    record(
+      "unsafe_paths_refused",
+      refused && owned.length === 2 ? "pass" : "fail",
+      refused ? "prefix check refuses foreign paths" : "unsafe path was accepted"
+    );
+  }
+
+  {
     const bystander = await createDisposable("bystander_files_untouched", [...ACCOUNT_STORAGE_BUCKETS]);
     const item = await createDisposable("worker_retries_pending_job_all_buckets", [...ACCOUNT_STORAGE_BUCKETS]);
     const failed = await runTrustedAccountDeletion(admin, item.userId, {
@@ -376,6 +445,55 @@ try {
         : "fail",
       "mock-preview source is not part of the production build"
     );
+  }
+
+  {
+    const item = await createDisposable("worker_records_exhausted_retries");
+    await admin.auth.admin.deleteUser(item.userId);
+    const { error: jobError } = await admin.from("account_deletion_jobs").upsert(
+      {
+        user_id: item.userId,
+        status: "storage_pending",
+        buckets_completed: [],
+        buckets_failed: ["posts"],
+        files_removed: 0,
+        attempt_count: MAX_WORKER_ATTEMPTS,
+        last_error: "forced pending for retry cap",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+    if (jobError) throw new Error(jobError.message);
+    const before = await leftoverForUser(admin, item.userId, item.filesByBucket);
+    const worker = await retryPendingAccountDeletionJobs(admin, { limit: 20 });
+    const { data: job } = await admin
+      .from("account_deletion_jobs")
+      .select("status,last_error,attempt_count")
+      .eq("user_id", item.userId)
+      .maybeSingle();
+    const after = await leftoverForUser(admin, item.userId, item.filesByBucket);
+    const exhausted = worker.results.some(
+      (row) => row.user_id === item.userId && row.outcome === "exhausted"
+    );
+    const filesUntouched = after.some((row) => row.type === "file");
+    if (
+      exhausted &&
+      job?.status === "cleanup_exhausted" &&
+      job?.last_error === "max worker attempts reached" &&
+      job?.attempt_count === MAX_WORKER_ATTEMPTS &&
+      filesUntouched &&
+      before.some((row) => row.type === "file")
+    ) {
+      record(item.caseName, "pass", "exhausted job recorded and files left for investigation");
+    } else {
+      record(
+        item.caseName,
+        "fail",
+        `status=${job?.status} error=${job?.last_error} exhausted=${exhausted} leftovers=${JSON.stringify(after)}`
+      );
+    }
+    item.userId = null;
+    item.filesByBucket = {};
   }
 } catch (error) {
   record("harness", "fail", error instanceof Error ? error.message : String(error));
