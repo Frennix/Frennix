@@ -1,0 +1,24 @@
+-- FILE ONLY until production rollout is explicitly approved.
+-- Do not run this against the production project yet.
+--
+-- After delete-own-account and retry-account-deletion-jobs are deployed,
+-- schedule the worker every 5 minutes with the service-role bearer token.
+-- pg_cron + pg_net example (replace PROJECT_REF; store the service role in Vault):
+
+-- select cron.unschedule('retry-account-deletion-jobs')
+--  where exists (select 1 from cron.job where jobname = 'retry-account-deletion-jobs');
+--
+-- select cron.schedule(
+--   'retry-account-deletion-jobs',
+--   '*/5 * * * *',
+--   $$
+--   select net.http_post(
+--     url := 'https://PROJECT_REF.supabase.co/functions/v1/retry-account-deletion-jobs',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')
+--     ),
+--     body := '{}'::jsonb
+--   );
+--   $$
+-- );

@@ -79,6 +79,10 @@ export default function SettingsScreen() {
       <FrennixBrandMark style={styles.brandMark} />
       <Text style={styles.section}>Account</Text>
       <Text style={styles.row}>{formatUsername(profile?.username)}</Text>
+      <Pressable onPress={() => pushScreen("/delete-account")}>
+        <Text style={styles.dangerLink}>Delete account</Text>
+        <Text style={styles.linkHint}>Permanently remove your profile, posts, and login</Text>
+      </Pressable>
 
       <Text style={styles.section}>Matching</Text>
       <Pressable onPress={() => pushScreen("/matching")}>
@@ -232,6 +236,7 @@ const styles = StyleSheet.create({
   brandMark: { marginBottom: spacing.sm },
   section: { ...typography.heading, fontSize: 16, marginTop: spacing.lg, marginBottom: spacing.sm },
   row: { ...typography.body },
+  dangerLink: { ...typography.body, color: colors.danger, paddingVertical: spacing.xs },
   link: { ...typography.body, color: colors.accent, paddingVertical: spacing.xs },
   linkHint: { ...typography.caption, color: colors.textMuted, marginTop: -2, marginBottom: spacing.xs },
   muted: { ...typography.bodySmall },
