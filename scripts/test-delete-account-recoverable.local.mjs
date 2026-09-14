@@ -146,6 +146,10 @@ function sourceChecks() {
     "delete function is prefix-safe"
   );
   assert(
+    deleteFn.includes('headers: { "Content-Type": "application/json" }'),
+    "delete function marks JSON so the web client can parse success"
+  );
+  assert(
     migration.includes("REVOKE ALL ON FUNCTION public.delete_own_account() FROM authenticated"),
     "authenticated clients cannot execute delete_own_account"
   );
@@ -422,10 +426,54 @@ try {
 
   {
     process.env.EXPO_PUBLIC_DELETE_ACCOUNT_PREVIEW = "";
-    const { initSupabase, deleteOwnAccount, ACCOUNT_DELETION_INTACT_MESSAGE } = await import(
-      path.join(ROOT, "packages/api/src/index.ts")
-    );
+    const {
+      initSupabase,
+      deleteOwnAccount,
+      parseDeleteOwnAccountResult,
+      ACCOUNT_DELETION_INTACT_MESSAGE,
+    } = await import(path.join(ROOT, "packages/api/src/index.ts"));
     initSupabase(env.url, env.anon);
+    const parsedPlain = parseDeleteOwnAccountResult(
+      '{"account_deleted":true,"status":"completed"}'
+    );
+    record(
+      "client_parses_text_plain_function_body",
+      parsedPlain.account_deleted === true && parsedPlain.status === "completed" ? "pass" : "fail",
+      "string JSON from a missing Content-Type is treated as a delete result"
+    );
+    {
+      const item = await createDisposable("edge_function_delete_own_account");
+      const { getSupabase } = await import(path.join(ROOT, "packages/api/src/index.ts"));
+      const signedIn = await getSupabase().auth.signInWithPassword({
+        email: item.email,
+        password: item.password,
+      });
+      if (signedIn.error) throw new Error(signedIn.error.message);
+      let result = null;
+      let invokeError = null;
+      try {
+        result = await deleteOwnAccount();
+      } catch (error) {
+        invokeError = error instanceof Error ? error.message : String(error);
+      }
+      const leftovers = await leftoverForUser(admin, item.userId, item.filesByBucket);
+      if (result?.account_deleted && leftovers.length === 0) {
+        record(item.caseName, "pass", `status=${result.status} auth profile and files gone`);
+      } else {
+        record(
+          item.caseName,
+          "fail",
+          `deleted=${Boolean(result?.account_deleted)} status=${result?.status ?? "none"} error=${invokeError || "none"} leftovers=${JSON.stringify(leftovers)}`
+        );
+      }
+      item.userId = (await authExists(admin, item.userId)) ? item.userId : null;
+      item.filesByBucket = {};
+      try {
+        await getSupabase().auth.signOut();
+      } catch {
+        // Session is already invalid after a successful delete.
+      }
+    }
     let intactMessage = null;
     try {
       await deleteOwnAccount();

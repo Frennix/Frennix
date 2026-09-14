@@ -10,6 +10,13 @@ const BUCKETS = [
   "feedback-attachments",
 ] as const;
 
+function jsonResponse(payload: unknown, status: number) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   try {
     const url = Deno.env.get("SUPABASE_URL") ?? "";
@@ -21,7 +28,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData.user) {
-      return new Response(JSON.stringify({ ok: false, account_deleted: false }), { status: 401 });
+      return jsonResponse({ ok: false, account_deleted: false }, 401);
     }
 
     const admin = createClient(url, service);
@@ -30,11 +37,9 @@ Deno.serve(async (req) => {
     const result = body?.retry
       ? await retryCleanup(admin, userId)
       : await runDeletion(admin, userId);
-    return new Response(JSON.stringify(result), {
-      status: result.account_deleted ? 200 : 400,
-    });
+    return jsonResponse(result, result.account_deleted ? 200 : 400);
   } catch (error) {
-    return new Response(JSON.stringify({ ok: false, error: String(error) }), { status: 500 });
+    return jsonResponse({ ok: false, error: String(error) }, 500);
   }
 });
 

@@ -34,6 +34,22 @@ export function shouldAnnounceStoragePending(result: DeleteOwnAccountResult): bo
   return Boolean(result.account_deleted && result.status === "storage_pending");
 }
 
+/** Edge Functions without an application/json Content-Type arrive as text. */
+export function parseDeleteOwnAccountResult(data: unknown): DeleteOwnAccountResult {
+  let payload = data;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return {};
+    }
+  }
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+  return payload as DeleteOwnAccountResult;
+}
+
 function isMissingServerCapability(error: unknown): boolean {
   const { message, code } = getSupabaseErrorDetails(error);
   return (
@@ -70,6 +86,10 @@ export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
   }
 
   const { data, error } = await supabase.functions.invoke("delete-own-account");
+  const result = parseDeleteOwnAccountResult(data);
+  if (result.account_deleted) {
+    return result;
+  }
   if (error) {
     throw formatSupabaseError(
       error,
@@ -78,9 +98,5 @@ export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
         : ACCOUNT_DELETION_INTACT_MESSAGE
     );
   }
-  const result = (data ?? {}) as DeleteOwnAccountResult;
-  if (!result.account_deleted) {
-    throw new Error(ACCOUNT_DELETION_INTACT_MESSAGE);
-  }
-  return result;
+  throw new Error(ACCOUNT_DELETION_INTACT_MESSAGE);
 }
