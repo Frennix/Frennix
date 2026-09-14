@@ -1,0 +1,2 @@
+# Invoked by cron or ops with the service role. No user JWT.
+verify_jwt = false

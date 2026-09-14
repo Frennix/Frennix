@@ -1,0 +1,3 @@
+# Browser OPTIONS has no Authorization. Gateway JWT checks return 401 without CORS.
+# The function validates the caller JWT with auth.getUser() before any deletion.
+verify_jwt = false

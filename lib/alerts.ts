@@ -203,6 +203,24 @@ export function confirmDeletePost(onConfirm: () => void) {
   confirmDelete("Post", onConfirm);
 }
 
+export function confirmDeleteAccount(onConfirm: () => void) {
+  const title = "Permanently delete your account?";
+  const message =
+    "This cannot be undone. Your profile, posts, stories, messages you sent, and login will be removed.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Keep account", style: "cancel" },
+    { text: "Delete account", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 export function confirmDeleteStory(onConfirm: () => void) {
   const title = "Delete this story?";
   const message = "This story will be permanently removed.";

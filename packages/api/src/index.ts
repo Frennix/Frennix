@@ -2,6 +2,7 @@ export * from "./supabase";
 export * from "./profile-utils";
 export * from "./media-utils";
 export * from "./auth";
+export * from "./account-deletion";
 export * from "./profiles";
 export * from "./profile-normalize";
 export * from "./posts";
