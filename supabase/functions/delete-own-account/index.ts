@@ -10,36 +10,70 @@ const BUCKETS = [
   "feedback-attachments",
 ] as const;
 
-function jsonResponse(payload: unknown, status: number) {
+const CORS_ALLOW_HEADERS =
+  "authorization, content-type, apikey, x-client-info, x-supabase-api-version";
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+  if (origin) {
+    headers["Access-Control-Allow-Credentials"] = "true";
+  }
+  return headers;
+}
+
+function jsonResponse(req: Request, payload: unknown, status: number) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders(req),
+    },
   });
 }
 
+async function callerUserId(req: Request, url: string, anon: string): Promise<string | null> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!/^Bearer\s+\S+/.test(authHeader)) return null;
+  const userClient = createClient(url, anon, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data, error } = await userClient.auth.getUser();
+  if (error || !data.user?.id) return null;
+  return data.user.id;
+}
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders(req) });
+  }
+  if (req.method !== "POST") {
+    return jsonResponse(req, { ok: false, account_deleted: false }, 405);
+  }
+
   try {
     const url = Deno.env.get("SUPABASE_URL") ?? "";
     const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const userClient = createClient(url, anon, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData.user) {
-      return jsonResponse({ ok: false, account_deleted: false }, 401);
+    const userId = await callerUserId(req, url, anon);
+    if (!userId) {
+      return jsonResponse(req, { ok: false, account_deleted: false }, 401);
     }
 
     const admin = createClient(url, service);
     const body = await req.json().catch(() => ({}));
-    const userId = userData.user.id;
     const result = body?.retry
       ? await retryCleanup(admin, userId)
       : await runDeletion(admin, userId);
-    return jsonResponse(result, result.account_deleted ? 200 : 400);
+    return jsonResponse(req, result, result.account_deleted ? 200 : 400);
   } catch (error) {
-    return jsonResponse({ ok: false, error: String(error) }, 500);
+    return jsonResponse(req, { ok: false, error: String(error) }, 500);
   }
 });
 
