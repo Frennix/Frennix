@@ -18,6 +18,7 @@ import {
   FEED_FALLBACK_BUCKET,
   FEED_PORTRAIT_FRAME_RATIO,
   feedBucketAspectRatio,
+  feedFillParentStyle,
   resolveFeedCarouselFrameSizing,
   type FeedMediaBucket,
 } from "./mediaLayout";
@@ -78,7 +79,7 @@ function renderCarouselSlide({
       uri={item.url}
       postType={item.kind === "video" ? "video" : "photo"}
       thumbnailUrl={item.thumbnailUrl}
-      style={styles.media}
+      style={fillParent ? [styles.media, feedFillParentStyle()] : styles.media}
       layout="feed"
       pressDelayMs={200}
       slideActive={itemIndex === activeIndex}

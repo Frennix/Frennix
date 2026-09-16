@@ -11,7 +11,7 @@ import { CachedImage } from "./CachedImage";
 import { MediaLoadError } from "./MediaLoadError";
 import { Skeleton } from "./Skeleton";
 import { WebNativeImage } from "./WebNativeImage";
-import { isDecodedDomImage } from "./progressiveImageReveal";
+import { shouldRevealCachedDomImage } from "./progressiveImageReveal";
 import { colors } from "./theme";
 
 type ProgressiveImageProps = {
@@ -64,16 +64,18 @@ export function ProgressiveImage({
   };
 
   useLayoutEffect(() => {
-    setLoaded(false);
     setFailed(false);
     setUseNativeWebFallback(Platform.OS === "web");
+
+    if (Platform.OS === "web" && shouldRevealCachedDomImage(webImgRef.current)) {
+      reveal();
+      return;
+    }
+
     revealedRef.current = false;
     opacity.setValue(0);
-
-    if (Platform.OS === "web" && useNativeWebFallback && isDecodedDomImage(webImgRef.current)) {
-      reveal();
-    }
-  }, [uri, retryKey, opacity, useNativeWebFallback]);
+    setLoaded(false);
+  }, [uri, retryKey, opacity]);
 
   const handleRetry = () => {
     setFailed(false);
@@ -110,11 +112,10 @@ export function ProgressiveImage({
         ) : null}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
           <WebNativeImage
-            key={retryKey}
+            key={`${uri}-${retryKey}`}
             ref={webImgRef}
             uri={uri}
             contentFit={contentFit}
-            style={StyleSheet.absoluteFill}
             accessibilityLabel={accessibilityLabel}
             onLoad={reveal}
             onError={handleExpoImageError}
@@ -157,6 +158,7 @@ export function ProgressiveImage({
 
 const styles = StyleSheet.create({
   wrap: {
+    position: "relative",
     overflow: "hidden",
     backgroundColor: colors.background,
     width: "100%",
