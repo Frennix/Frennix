@@ -67,6 +67,9 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("fillParent: true")) {
         throw new Error("Carousel slides must fill a shared feed frame");
       }
+      if (!src.includes("feedFillParentStyle")) {
+        throw new Error("Carousel slides must pass fill-parent style through photo wrappers");
+      }
       if (!src.includes("<MediaAspectFrame")) {
         throw new Error("Multi-image carousel must wrap slides in one MediaAspectFrame");
       }

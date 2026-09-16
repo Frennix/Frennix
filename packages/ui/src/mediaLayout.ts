@@ -99,6 +99,24 @@ export function resolveFeedCarouselFrameSizing(
   return { frameHeight, frameAspectRatio };
 }
 
+/**
+ * Fill a parent-locked carousel slide. Percent height only resolves when every
+ * wrapper between the pixel-sized slide and the img has a bounded height.
+ */
+export function feedFillParentStyle(): {
+  width: "100%";
+  height: "100%";
+  flex: 1;
+  alignSelf: "stretch";
+} {
+  return {
+    width: "100%",
+    height: "100%",
+    flex: 1,
+    alignSelf: "stretch",
+  };
+}
+
 /** @deprecated Use classifyFeedMediaBucket + feedMediaContentFit */
 export function isFeedPortraitCapped(
   mediaWidth: number,

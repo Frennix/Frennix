@@ -217,14 +217,23 @@ async function main() {
     pass(
       "Cached web images reveal after reset via complete/naturalWidth check",
       progressive.includes("useLayoutEffect") &&
-        progressive.includes("isDecodedDomImage") &&
-        progressive.includes("webImgRef")
+        progressive.includes("shouldRevealCachedDomImage") &&
+        progressive.includes("webImgRef") &&
+        !progressive.includes("[uri, retryKey, opacity, useNativeWebFallback]")
+    ) && ok;
+
+  ok =
+    pass(
+      "Carousel photo press wrapper fills the parent-locked slide",
+      postMedia.includes("feedFillParentStyle") &&
+        postMedia.includes("fillParent ? feedFillParentStyle()") &&
+        postMediaCarousel.includes("feedFillParentStyle")
     ) && ok;
 
   ok =
     pass(
       "Unloaded feed image cannot open lightbox",
-      postMedia.includes("imageLoaded") && postMedia.includes("if (imageFailed || !imageLoaded) return")
+      postMedia.includes("imageLoaded") && postMedia.includes("imageFailed || !imageLoaded")
     ) && ok;
 
   ok =

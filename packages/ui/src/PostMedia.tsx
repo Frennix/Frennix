@@ -18,7 +18,7 @@ import { VideoPreview } from "./VideoPreview";
 import { VideoPosterFallback } from "./VideoPosterFallback";
 import { useVideoPoster } from "./useVideoPoster";
 import { WebVideoFrame } from "./WebVideoFrame";
-import { FEED_VIDEO_FALLBACK_RATIO, type MediaLayout } from "./mediaLayout";
+import { FEED_VIDEO_FALLBACK_RATIO, feedFillParentStyle, type MediaLayout } from "./mediaLayout";
 import { feedMediaRules } from "./feed-layout/feedMediaRules";
 import { colors, radius } from "./theme";
 
@@ -339,7 +339,7 @@ function FeedImage({
             tapMoved.current = true;
           }
         }}
-        style={WEB_PHOTO_TOUCH_STYLE}
+        style={[fillParent ? feedFillParentStyle() : styles.imagePress, WEB_PHOTO_TOUCH_STYLE]}
         accessibilityRole="button"
         accessibilityLabel="View full image"
         accessibilityHint="Double tap or tap to open the full-screen photo"
@@ -357,6 +357,11 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
+    flex: 1,
+    alignSelf: "stretch",
+  },
+  imagePress: {
+    width: "100%",
   },
   imageFallback: {
     ...StyleSheet.absoluteFillObject,
