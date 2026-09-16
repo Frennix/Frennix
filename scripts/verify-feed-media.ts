@@ -129,6 +129,12 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("nestedScrollEnabled")) {
         throw new Error("PostMediaCarousel must enable nested horizontal scroll in feed");
       }
+      if (!src.includes('touchAction: "pan-x pan-y pinch-zoom"')) {
+        throw new Error("PostMediaCarousel must allow pan-y so vertical swipes scroll the feed");
+      }
+      if (src.includes('touchAction: "pan-x pinch-zoom"')) {
+        throw new Error("PostMediaCarousel must not use pan-x-only touch-action on web slides");
+      }
     },
   },
   {

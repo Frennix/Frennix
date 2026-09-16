@@ -27,7 +27,9 @@ import { colors, spacing, typography } from "./theme";
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
   Platform.OS === "web"
     ? ({
-        touchAction: "pan-x pinch-zoom",
+        // pan-x is an allowlist; without pan-y Safari keeps vertical swipes
+        // on the carousel and the Home feed does not scroll.
+        touchAction: "pan-x pan-y pinch-zoom",
       } as ViewStyle)
     : undefined;
 
