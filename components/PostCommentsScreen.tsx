@@ -45,26 +45,20 @@ export function PostCommentsScreen({
   };
 
   const headerTopInset = Math.max(insets.top, spacing.sm);
-  const { overlayTop, overlayHeight } = useRootPortalViewport(Platform.OS === "web");
+  const { overlayTop, overlayBottomInset } = useRootPortalViewport(Platform.OS === "web");
   const overlayBottomReserve = useCommentsOverlayBottomReserve(Platform.OS === "web");
   const composerHostBottomInset =
     Platform.OS === "web" ? spacing.sm : Math.max(insets.bottom, spacing.sm);
 
-  const effectiveOverlayHeight =
-    Platform.OS === "web" && overlayHeight != null
-      ? Math.max(180, overlayHeight - overlayBottomReserve)
-      : overlayHeight;
-
   const webViewportRootStyle: ViewStyle | null =
-    Platform.OS === "web" && effectiveOverlayHeight != null
+    Platform.OS === "web"
       ? {
           position: "fixed",
           top: overlayTop,
           left: 0,
           right: 0,
           width: "100%",
-          height: effectiveOverlayHeight,
-          maxHeight: effectiveOverlayHeight,
+          bottom: overlayBottomInset + overlayBottomReserve,
         }
       : null;
 

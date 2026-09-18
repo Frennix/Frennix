@@ -73,6 +73,31 @@ function main() {
         screen.includes("data-frennix-comments-route")
     ) && ok;
 
+  const viewportHook = readSource("lib/use-root-portal-viewport.ts");
+  ok =
+    pass(
+      "Photo comments remasure visual viewport instead of passing setState to the listener",
+      viewportHook.includes("setViewport(readViewportSnapshot())") &&
+        !viewportHook.includes("subscribeSafariVisualViewport(setViewport)")
+    ) && ok;
+  ok =
+    pass(
+      "Photo comments pin the route bottom to visual-viewport chrome/keyboard",
+      screen.includes("overlayBottomInset") &&
+        screen.includes("bottom: overlayBottomInset + overlayBottomReserve") &&
+        !screen.includes("effectiveOverlayHeight")
+    ) && ok;
+  ok =
+    pass(
+      "Video overlay composer portal is unchanged",
+      readSource("components/VideoOverlayWebComposerPortal.tsx").includes(
+        "computeVideoOverlayComposerBottom"
+      ) &&
+        readSource("lib/video-overlay-visual-viewport-layout.ts").includes(
+          "function computeVideoOverlayComposerBottom"
+        )
+    ) && ok;
+
   ok =
     pass(
       "C: no portal/backdrop/scroll-lock on dedicated screen",
