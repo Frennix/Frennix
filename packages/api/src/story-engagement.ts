@@ -11,7 +11,7 @@ import { sendStoryTrainInvite } from "./story-train-invites";
 import { getFollowingIds } from "./follows";
 import { getProfilesByIds } from "./profiles";
 import { subscribePostgresChanges } from "./realtime-utils";
-import { getSupabase } from "./supabase";
+import { getSupabase, getSupabaseInitUrl, isSupabaseInitialized } from "./supabase";
 import { getErrorMessage, getTechnicalErrorMessage } from "./profile-utils";
 
 export * from "./story-insights";
@@ -159,12 +159,14 @@ export async function sendDedicatedStoryReaction(
   if (!storyId) throw new Error(REACTION_SEND_ERROR);
   if (viewerId === storyOwnerId) return emoji;
 
-  console.info("[story-reaction] send", {
+  console.info("[story-reaction] request-started", {
     viewerId,
     storyOwnerId,
     storyId,
     slideId: slideId ?? null,
     emoji,
+    supabaseReady: isSupabaseInitialized(),
+    supabaseHost: getSupabaseInitUrl(),
   });
 
   const existing = await getViewerStoryReaction(viewerId, storyId);
@@ -183,7 +185,7 @@ export async function sendDedicatedStoryReaction(
     console.warn("[story-reaction] visibility check failed", getTechnicalErrorMessage(error));
   }
 
-  const { error } = await getSupabase().from("story_item_reactions").upsert(
+  const { data, error } = await getSupabase().from("story_item_reactions").upsert(
     {
       story_id: storyId,
       user_id: viewerId,
@@ -191,7 +193,17 @@ export async function sendDedicatedStoryReaction(
       reaction: emoji,
     },
     { onConflict: "story_id,user_id" }
-  );
+  ).select("story_id, user_id, slide_id, reaction");
+
+  console.info("[story-reaction] supabase-response", {
+    storyId,
+    viewerId,
+    storyOwnerId,
+    slideId: slideId ?? null,
+    emoji,
+    row: data ?? null,
+    error: error ? getTechnicalErrorMessage(error) : null,
+  });
 
   if (error) throw toReactionError(error);
 

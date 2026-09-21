@@ -38,9 +38,11 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("components/story/StoryReactionRow.tsx", "REACTION_TAP_LOCK_MS", "reactions"),
   },
   {
-    name: "reactions: isolated horizontal scroll",
-    run: () =>
-      mustInclude("components/story/StoryReactionRow.tsx", "nestedScrollEnabled", "reactions"),
+    name: "reactions: web click path is not inside a ScrollView",
+    run: () => {
+      mustInclude("components/story/StoryReactionRow.tsx", "web-click", "reactions");
+      mustNotInclude("components/story/StoryReactionRow.tsx", "ScrollView", "reactions");
+    },
   },
   {
     name: "reactions: specific error copy",

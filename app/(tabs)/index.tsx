@@ -321,9 +321,17 @@ export default function HomeScreen() {
         throw new Error("Reaction couldn’t be sent. Try again.");
       }
       try {
+        console.info("[story-reaction] home-handler-start", {
+          viewerId: userId,
+          ownerId: storyUserId,
+          storyId,
+          slideId: slideId ?? null,
+          emoji,
+        });
         await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
+        console.info("[story-reaction] home-handler-success", { storyId, emoji });
       } catch (error) {
-        console.error("[story-reaction]", getTechnicalErrorMessage(error));
+        console.error("[story-reaction] home-handler-failed", getTechnicalErrorMessage(error));
         throw error;
       }
     },

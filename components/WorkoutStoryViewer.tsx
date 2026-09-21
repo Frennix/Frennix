@@ -886,6 +886,34 @@ export function WorkoutStoryViewer({
           <View style={styles.scrimTop} pointerEvents="none" />
           <StoryFooterGradient />
 
+          <View style={styles.tapZones} pointerEvents={controlsOpen ? "none" : "box-none"}>
+            <Pressable
+              style={styles.tapZoneLeft}
+              onPress={() => tryNavigate(handleLeftTap)}
+              onPressIn={beginHold}
+              onPressOut={endHold}
+              accessibilityRole="button"
+              accessibilityLabel="Previous story slide or restart"
+              accessibilityHint="On the first slide, restarts the story from the beginning."
+            />
+            <Pressable
+              style={styles.tapZoneCenter}
+              onPressIn={beginHold}
+              onPressOut={endHold}
+              accessibilityRole="button"
+              accessibilityLabel="Pause story"
+              accessibilityHint="Press and hold to pause playback."
+            />
+            <Pressable
+              style={styles.tapZoneRight}
+              onPress={() => tryNavigate(goNext)}
+              onPressIn={beginHold}
+              onPressOut={endHold}
+              accessibilityRole="button"
+              accessibilityLabel="Next story slide"
+            />
+          </View>
+
           <View style={[styles.header, { paddingTop: headerTopPad }]}>
             <StoryProgressBars total={slides.length} activeIndex={slideIndex} progress={progress} />
 
@@ -1100,32 +1128,56 @@ export function WorkoutStoryViewer({
                   />
                 ) : null}
                 <StoryReactionRow
-                  disabled={paused}
                   selectedEmoji={confirmedReaction}
                   onReact={async (emoji) => {
-                    if (!activeStoryId) {
-                      throw new Error("Reaction couldn’t be sent. Try again.");
-                    }
-                    logStoryViewer("reaction-tap", {
+                    const slideId = slideContext?.slideId ?? null;
+                    const ownerId = story.user_id;
+                    const viewerId = session?.user.id ?? null;
+                    logStoryViewer("reaction-tap-received", {
                       emoji,
                       storyId: activeStoryId,
-                      slideId: slideContext?.slideId ?? null,
-                      ownerId: story.user_id,
+                      slideId,
+                      ownerId,
+                      viewerId,
+                    });
+                    if (!activeStoryId || !viewerId) {
+                      logStoryViewer("reaction-missing-ids", {
+                        emoji,
+                        storyId: activeStoryId,
+                        viewerId,
+                      });
+                      throw new Error("Reaction couldn’t be sent. Try again.");
+                    }
+                    if (!onReact) {
+                      logStoryViewer("reaction-handler-missing", { emoji, storyId: activeStoryId });
+                      throw new Error("Reaction couldn’t be sent. Try again.");
+                    }
+                    logStoryViewer("reaction-ids-submitted", {
+                      emoji,
+                      storyId: activeStoryId,
+                      slideId,
+                      ownerId,
+                      viewerId,
                     });
                     try {
-                      await onReact?.(
-                        story.user_id,
-                        activeStoryId,
-                        emoji,
-                        slideContext?.slideId ?? null
-                      );
+                      logStoryViewer("toast-displayed", { message: "sending" });
+                      await onReact(ownerId, activeStoryId, emoji, slideId);
                       setConfirmedReaction(emoji);
                       queryClient.setQueryData(
-                        ["story-viewer-reaction", session?.user.id, activeStoryId],
+                        ["story-viewer-reaction", viewerId, activeStoryId],
                         emoji
                       );
+                      logStoryViewer("toast-displayed", { message: "Reaction sent." });
                       showStatus("Reaction sent.");
                     } catch (error) {
+                      logStoryViewer("reaction-handler-failed", {
+                        emoji,
+                        storyId: activeStoryId,
+                        message: getErrorMessage(error, "Reaction couldn’t be sent. Try again."),
+                      });
+                      logStoryViewer("toast-displayed", {
+                        message: "Reaction couldn’t be sent. Try again.",
+                      });
                       showStatus(
                         getErrorMessage(error, "Reaction couldn’t be sent. Try again.")
                       );
@@ -1159,34 +1211,6 @@ export function WorkoutStoryViewer({
                 />
               </View>
             ) : null}
-          </View>
-
-          <View style={styles.tapZones} pointerEvents={controlsOpen ? "none" : "box-none"}>
-            <Pressable
-              style={styles.tapZoneLeft}
-              onPress={() => tryNavigate(handleLeftTap)}
-              onPressIn={beginHold}
-              onPressOut={endHold}
-              accessibilityRole="button"
-              accessibilityLabel="Previous story slide or restart"
-              accessibilityHint="On the first slide, restarts the story from the beginning."
-            />
-            <Pressable
-              style={styles.tapZoneCenter}
-              onPressIn={beginHold}
-              onPressOut={endHold}
-              accessibilityRole="button"
-              accessibilityLabel="Pause story"
-              accessibilityHint="Press and hold to pause playback."
-            />
-            <Pressable
-              style={styles.tapZoneRight}
-              onPress={() => tryNavigate(goNext)}
-              onPressIn={beginHold}
-              onPressOut={endHold}
-              accessibilityRole="button"
-              accessibilityLabel="Next story slide"
-            />
           </View>
         </Animated.View>
         {statusMessage ? (
@@ -1258,7 +1282,8 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     minWidth: 0,
     gap: spacing.sm,
-    zIndex: 6,
+    zIndex: 40,
+    pointerEvents: "auto",
   },
   mediaStage: {
     ...StyleSheet.absoluteFillObject,
@@ -1321,12 +1346,13 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: 0,
-    zIndex: 6,
+    zIndex: 30,
     gap: spacing.xs,
     width: "auto",
     maxWidth: "100%",
     minWidth: 0,
-    overflow: "hidden",
+    overflowX: "hidden",
+    overflowY: "visible",
   },
   progressRow: {
     flexDirection: "row",
@@ -1402,8 +1428,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: spacing.lg,
     right: spacing.lg,
-    bottom: 120,
+    bottom: 168,
     alignItems: "center",
+    zIndex: 80,
+    elevation: 80,
   },
   statusToastText: {
     ...typography.bodySmall,
@@ -1475,7 +1503,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 180,
+    bottom: 260,
     flexDirection: "row",
     zIndex: 3,
   },
