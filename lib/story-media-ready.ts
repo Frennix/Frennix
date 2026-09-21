@@ -34,6 +34,22 @@ export function shouldReplaceStoryWithMediaError(input: {
   return !input.mediaReady && !input.mediaFailed;
 }
 
+/** Reset readiness only when the slide identity actually changes. */
+export function shouldResetStoryMediaReady(
+  previousKey: string | null | undefined,
+  nextKey: string
+): boolean {
+  return previousKey !== nextKey;
+}
+
+/** A timeout must never fail a slide that already painted or became ready. */
+export function shouldFailStoryMediaOnTimeout(input: {
+  mediaReady: boolean;
+  imagePainted: boolean;
+}): boolean {
+  return !input.mediaReady && !input.imagePainted;
+}
+
 export function retryStoryMediaReady(
   state: StoryMediaReadyState,
   needsMedia: boolean

@@ -7,15 +7,15 @@ const REACTION_TAP_LOCK_MS = 450;
 
 type StoryReactionRowProps = {
   disabled?: boolean;
+  selectedEmoji?: StoryQuickReactionEmoji | null;
   onReact: (emoji: StoryQuickReactionEmoji) => void | Promise<void>;
 };
 
-export function StoryReactionRow({ disabled, onReact }: StoryReactionRowProps) {
-  const [selectedEmoji, setSelectedEmoji] = useState<StoryQuickReactionEmoji | null>(null);
+export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: StoryReactionRowProps) {
   const [error, setError] = useState<string | null>(null);
+  const [pendingEmoji, setPendingEmoji] = useState<StoryQuickReactionEmoji | null>(null);
   const inFlightRef = useRef(false);
   const lastTapAtRef = useRef(0);
-  const selectedBeforeTapRef = useRef<StoryQuickReactionEmoji | null>(null);
 
   async function handlePress(emoji: StoryQuickReactionEmoji) {
     if (disabled || inFlightRef.current) return;
@@ -23,18 +23,22 @@ export function StoryReactionRow({ disabled, onReact }: StoryReactionRowProps) {
     if (now - lastTapAtRef.current < REACTION_TAP_LOCK_MS) return;
     lastTapAtRef.current = now;
 
-    selectedBeforeTapRef.current = selectedEmoji;
+    if (selectedEmoji === emoji) {
+      setError(null);
+      return;
+    }
+
     inFlightRef.current = true;
-    setSelectedEmoji(emoji);
+    setPendingEmoji(emoji);
     setError(null);
 
     try {
       await onReact(emoji);
     } catch {
-      setSelectedEmoji(selectedBeforeTapRef.current);
       setError("Reaction couldn’t be sent. Try again.");
     } finally {
       inFlightRef.current = false;
+      setPendingEmoji(null);
     }
   }
 
@@ -50,13 +54,14 @@ export function StoryReactionRow({ disabled, onReact }: StoryReactionRowProps) {
       >
         {STORY_QUICK_REACTIONS.map((reaction) => {
           const selected = selectedEmoji === reaction.emoji;
+          const pending = pendingEmoji === reaction.emoji;
           return (
             <Pressable
               key={reaction.emoji}
               style={({ pressed }) => [
                 styles.chip,
                 selected && styles.chipSelected,
-                pressed && styles.chipPressed,
+                (pressed || pending) && styles.chipPressed,
                 disabled && styles.chipDisabled,
               ]}
               onPress={() => void handlePress(reaction.emoji)}

@@ -13,7 +13,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FeedStory } from "@frennix/types";
-import type { StoryChallengeKey, StoryQuickReactionEmoji } from "@frennix/types";
+import {
+  STORY_QUICK_REACTIONS,
+  type StoryChallengeKey,
+  type StoryQuickReactionEmoji,
+} from "@frennix/types";
 import type { StoryInsights } from "@frennix/types";
 import {
   Avatar,
@@ -49,6 +53,7 @@ import {
   getStoryQuestionAnswersForOwner,
   shareStoryQuestionAnswer,
   getErrorMessage,
+  getViewerStoryReaction,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
@@ -58,7 +63,7 @@ import { StoryControlsSheet } from "./story/StoryControlsSheet";
 import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
 import type { FrennixStory } from "@frennix/types";
 import {
-  STORY_MEDIA_LOAD_TIMEOUT_MS,
+  shouldResetStoryMediaReady,
   storySlideNeedsMedia,
 } from "@/lib/story-media-ready";
 import {
@@ -69,6 +74,17 @@ import {
 } from "../lib/story-utils";
 
 const STORY_SLIDE_DURATION_MS = 5500;
+
+function logStoryViewer(event: string, extra: Record<string, unknown> = {}) {
+  console.info("[story-viewer]", { event, ...extra, t: Date.now() });
+}
+
+function asQuickReaction(value: string | null | undefined): StoryQuickReactionEmoji | null {
+  if (!value) return null;
+  return (
+    STORY_QUICK_REACTIONS.find((reaction) => reaction.emoji === value)?.emoji ?? null
+  );
+}
 const HOLD_THRESHOLD_MS = 220;
 const NAV_DEBOUNCE_MS = 280;
 /** Transparent side tap targets (~35–40% each); center is hold-only. */
@@ -186,8 +202,18 @@ function StorySlideContent({
       contentFit="contain"
       showPlaceholder={false}
       accessibilityLabel="Workout story photo"
-      onLoad={onMediaReady}
-      onError={onMediaError}
+      onLoad={() => {
+        logStoryViewer("image-onLoad", { url: slide.url });
+        onMediaReady();
+      }}
+      onLoadEnd={() => {
+        logStoryViewer("image-onLoadEnd", { url: slide.url });
+        onMediaReady();
+      }}
+      onError={() => {
+        logStoryViewer("image-onError", { url: slide.url });
+        onMediaError();
+      }}
     />
   );
 }
@@ -308,6 +334,7 @@ export function WorkoutStoryViewer({
   const [playbackEpoch, setPlaybackEpoch] = useState(0);
   const [mediaReady, setMediaReady] = useState(false);
   const [mediaFailed, setMediaFailed] = useState(false);
+  const [confirmedReaction, setConfirmedReaction] = useState<StoryQuickReactionEmoji | null>(null);
 
   const story = stories[storyIndex] ?? null;
   const activeStories = story?.active_stories ?? [];
@@ -419,6 +446,11 @@ export function WorkoutStoryViewer({
   }, [visible]);
 
   const goNext = useCallback(() => {
+    logStoryViewer("timer-complete", {
+      slideIndex,
+      storyIndex,
+      slideCount: slides.length,
+    });
     if (slideIndex < slides.length - 1) {
       setSlideIndex((current) => current + 1);
       return;
@@ -494,6 +526,7 @@ export function WorkoutStoryViewer({
         duration: STORY_SLIDE_DURATION_MS - fromMs,
         useNativeDriver: false,
       });
+      logStoryViewer("timer-start", { fromMs, durationMs: STORY_SLIDE_DURATION_MS - fromMs });
       timerRef.current.start(({ finished }) => {
         if (finished) goNext();
       });
@@ -508,22 +541,24 @@ export function WorkoutStoryViewer({
   }, [timerKey, progress]);
 
   const mediaReadyRef = useRef(false);
+  const mediaKeyRef = useRef<string | null>(`${timerKey}|${mediaIdentity}`);
 
   const markMediaReady = useCallback(() => {
+    logStoryViewer("media-ready", { mediaIdentity, timerKey });
     mediaReadyRef.current = true;
     setMediaFailed(false);
     setMediaReady(true);
-  }, []);
+  }, [mediaIdentity, timerKey]);
 
   const markMediaFailed = useCallback(() => {
-    // Keyboard dismiss / reply / reaction must not replace an already-visible story.
     if (mediaReadyRef.current) {
-      console.warn("[story-viewer] ignoring media error after successful load");
+      logStoryViewer("media-error-ignored", { mediaIdentity, timerKey });
       return;
     }
+    logStoryViewer("media-failed", { mediaIdentity, timerKey });
     setMediaReady(false);
     setMediaFailed(true);
-  }, []);
+  }, [mediaIdentity, timerKey]);
 
   const retryCurrentMedia = useCallback(() => {
     stopTimer();
@@ -571,19 +606,24 @@ export function WorkoutStoryViewer({
   }, [timerKey, slideOpacity]);
 
   useEffect(() => {
+    const nextKey = `${timerKey}|${mediaIdentity}`;
+    if (!shouldResetStoryMediaReady(mediaKeyRef.current, nextKey)) {
+      logStoryViewer("media-reset-skipped", {
+        nextKey,
+        mediaReady: mediaReadyRef.current,
+      });
+      return;
+    }
+    mediaKeyRef.current = nextKey;
     mediaReadyRef.current = !needsMedia;
     setMediaFailed(false);
     setMediaReady(!needsMedia);
+    logStoryViewer("media-reset", {
+      nextKey,
+      needsMedia,
+      ready: !needsMedia,
+    });
   }, [timerKey, mediaIdentity, needsMedia]);
-
-  useEffect(() => {
-    if (!visible || mediaReady || mediaFailed || !needsMedia) return;
-    const timeout = setTimeout(() => {
-      setMediaFailed(true);
-      setMediaReady(false);
-    }, STORY_MEDIA_LOAD_TIMEOUT_MS);
-    return () => clearTimeout(timeout);
-  }, [timerKey, playbackEpoch, visible, mediaReady, mediaFailed, needsMedia]);
 
   useEffect(() => {
     if (!visible || !story) {
@@ -675,8 +715,20 @@ export function WorkoutStoryViewer({
   );
 
   const pollStoryId = slideContext?.storyId ?? activeStories.at(-1)?.id ?? null;
+  const reactionStoryId = slideContext?.storyId ?? currentDedicatedStory?.id ?? null;
   const { session } = useAuth();
   const queryClient = useQueryClient();
+
+  const { data: savedReaction } = useQuery({
+    queryKey: ["story-viewer-reaction", session?.user.id, reactionStoryId],
+    queryFn: () => getViewerStoryReaction(session!.user.id, reactionStoryId!),
+    enabled: Boolean(visible && session?.user.id && reactionStoryId && !story?.is_self),
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    setConfirmedReaction(asQuickReaction(savedReaction));
+  }, [savedReaction, reactionStoryId]);
   const hasChallengeHint = Boolean(
     currentDedicatedStory?.challenge_id || currentDedicatedStory?.challenge_prompt
   );
@@ -1049,10 +1101,17 @@ export function WorkoutStoryViewer({
                 ) : null}
                 <StoryReactionRow
                   disabled={paused}
+                  selectedEmoji={confirmedReaction}
                   onReact={async (emoji) => {
                     if (!activeStoryId) {
                       throw new Error("Reaction couldn’t be sent. Try again.");
                     }
+                    logStoryViewer("reaction-tap", {
+                      emoji,
+                      storyId: activeStoryId,
+                      slideId: slideContext?.slideId ?? null,
+                      ownerId: story.user_id,
+                    });
                     try {
                       await onReact?.(
                         story.user_id,
@@ -1060,6 +1119,12 @@ export function WorkoutStoryViewer({
                         emoji,
                         slideContext?.slideId ?? null
                       );
+                      setConfirmedReaction(emoji);
+                      queryClient.setQueryData(
+                        ["story-viewer-reaction", session?.user.id, activeStoryId],
+                        emoji
+                      );
+                      showStatus("Reaction sent.");
                     } catch (error) {
                       showStatus(
                         getErrorMessage(error, "Reaction couldn’t be sent. Try again.")

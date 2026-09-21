@@ -34,16 +34,21 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!src.includes("if (mediaFailed || !mediaReady)")) {
         throw new Error("Timer must stay stopped until media is ready");
       }
-      if (!src.includes("STORY_MEDIA_LOAD_TIMEOUT_MS")) {
-        throw new Error("Load timeout required");
+      if (/setTimeout\(\(\) => \{[\s\S]*setMediaFailed\(true\)/.test(src)) {
+        throw new Error("Load timeout must not fail a visible story");
+      }
+      if (!src.includes("shouldResetStoryMediaReady")) {
+        throw new Error("Viewer must not reset media-ready on the same slide");
       }
     },
   },
   {
     name: "ProgressiveImage onLoad/onError wired",
     run: () => {
-      mustInclude("components/WorkoutStoryViewer.tsx", "onLoad={onMediaReady}", "image");
-      mustInclude("components/WorkoutStoryViewer.tsx", "onError={onMediaError}", "image");
+      mustInclude("components/WorkoutStoryViewer.tsx", "image-onLoad", "image");
+      mustInclude("components/WorkoutStoryViewer.tsx", "image-onLoadEnd", "image");
+      mustInclude("components/WorkoutStoryViewer.tsx", "onMediaReady()", "image");
+      mustInclude("components/WorkoutStoryViewer.tsx", "onMediaError()", "image");
     },
   },
   {

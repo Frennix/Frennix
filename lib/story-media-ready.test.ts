@@ -8,7 +8,9 @@ import {
   createStoryMediaReadyState,
   isAuthorizedStoryMediaUrl,
   retryStoryMediaReady,
+  shouldFailStoryMediaOnTimeout,
   shouldReplaceStoryWithMediaError,
+  shouldResetStoryMediaReady,
   shouldStartStoryProgressTimer,
   storySlideNeedsMedia,
 } from "./story-media-ready";
@@ -92,6 +94,17 @@ describe("story media timer gating", () => {
     assert.equal(next.timerKey, "0-1-true");
     assert.equal(next.ready, false);
     assert.equal(next.failed, false);
+  });
+
+  it("does not reset media-ready for the same slide key", () => {
+    assert.equal(shouldResetStoryMediaReady("0-0-true|photo:a", "0-0-true|photo:a"), false);
+    assert.equal(shouldResetStoryMediaReady("0-0-true|photo:a", "0-1-true|photo:b"), true);
+  });
+
+  it("never timeout-fails a painted or ready story", () => {
+    assert.equal(shouldFailStoryMediaOnTimeout({ mediaReady: true, imagePainted: false }), false);
+    assert.equal(shouldFailStoryMediaOnTimeout({ mediaReady: false, imagePainted: true }), false);
+    assert.equal(shouldFailStoryMediaOnTimeout({ mediaReady: false, imagePainted: false }), true);
   });
 
   it("does not replace an already-visible story with the load-error screen", () => {

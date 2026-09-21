@@ -131,6 +131,24 @@ function isStoryLinkWriteError(error: unknown): boolean {
   return /story_reply|can_reply|not allowed|schema cache|column .* does not exist/i.test(details);
 }
 
+export async function getViewerStoryReaction(
+  viewerId: string,
+  storyId: string
+): Promise<string | null> {
+  if (!viewerId || !storyId) return null;
+  const { data, error } = await getSupabase()
+    .from("story_item_reactions")
+    .select("reaction")
+    .eq("story_id", storyId)
+    .eq("user_id", viewerId)
+    .maybeSingle();
+  if (error) {
+    console.warn("[story-reaction] load failed", getTechnicalErrorMessage(error));
+    return null;
+  }
+  return (data?.reaction as string | undefined) ?? null;
+}
+
 export async function sendDedicatedStoryReaction(
   viewerId: string,
   storyOwnerId: string,
@@ -139,7 +157,21 @@ export async function sendDedicatedStoryReaction(
   slideId?: string | null
 ) {
   if (!storyId) throw new Error(REACTION_SEND_ERROR);
-  if (viewerId === storyOwnerId) return;
+  if (viewerId === storyOwnerId) return emoji;
+
+  console.info("[story-reaction] send", {
+    viewerId,
+    storyOwnerId,
+    storyId,
+    slideId: slideId ?? null,
+    emoji,
+  });
+
+  const existing = await getViewerStoryReaction(viewerId, storyId);
+  if (existing === emoji) {
+    console.info("[story-reaction] already saved", { storyId, viewerId, emoji });
+    return emoji;
+  }
 
   // Feed already authorized this viewer. Avoid reloading story+slides here —
   // getVisibleStory throws "Failed to load story", which the viewer used to
@@ -163,6 +195,27 @@ export async function sendDedicatedStoryReaction(
 
   if (error) throw toReactionError(error);
 
+  const saved = await getViewerStoryReaction(viewerId, storyId);
+  if (saved !== emoji) {
+    console.error("[story-reaction] write did not persist", {
+      storyId,
+      viewerId,
+      storyOwnerId,
+      slideId: slideId ?? null,
+      emoji,
+      saved,
+    });
+    throw new Error(REACTION_SEND_ERROR);
+  }
+
+  console.info("[story-reaction] saved", {
+    storyId,
+    viewerId,
+    storyOwnerId,
+    slideId: slideId ?? null,
+    emoji,
+  });
+
   await trackStoryEngagementEvent({
     viewerId,
     storyUserId: storyOwnerId,
@@ -180,6 +233,8 @@ export async function sendDedicatedStoryReaction(
       reaction: emoji,
     },
   }).catch(() => undefined);
+
+  return emoji;
 }
 
 /** @deprecated Use sendDedicatedStoryReaction */

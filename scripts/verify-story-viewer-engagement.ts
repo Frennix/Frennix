@@ -105,6 +105,14 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "reactions: highlight only after a confirmed write",
+    run: () => {
+      mustInclude("components/story/StoryReactionRow.tsx", "selectedEmoji", "reactions");
+      mustInclude("components/WorkoutStoryViewer.tsx", "Reaction sent.", "reactions");
+      mustInclude("packages/api/src/story-engagement.ts", "getViewerStoryReaction", "reactions");
+    },
+  },
+  {
     name: "viewer: page-level overflow-x is locked",
     run: () => {
       mustInclude("components/WorkoutStoryViewer.tsx", 'overflowX: "hidden"', "viewer");

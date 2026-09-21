@@ -21,6 +21,7 @@ type ProgressiveImageProps = {
   contentFit?: "cover" | "contain";
   accessibilityLabel?: string;
   onLoad?: () => void;
+  onLoadEnd?: () => void;
   onError?: () => void;
   recyclingKey?: string;
   fadeDuration?: number;
@@ -38,6 +39,7 @@ export function ProgressiveImage({
   contentFit = "cover",
   accessibilityLabel,
   onLoad,
+  onLoadEnd,
   onError,
   recyclingKey,
   fadeDuration = DEFAULT_FADE_MS,
@@ -50,12 +52,23 @@ export function ProgressiveImage({
   const opacity = useRef(new Animated.Value(0)).current;
   const revealedRef = useRef(false);
   const webImgRef = useRef<HTMLImageElement | null>(null);
+  const onLoadRef = useRef(onLoad);
+  const onLoadEndRef = useRef(onLoadEnd);
+  onLoadRef.current = onLoad;
+  onLoadEndRef.current = onLoadEnd;
+  const revealKey = `${uri}:${retryKey}`;
+  const revealKeyRef = useRef(revealKey);
+  if (revealKeyRef.current !== revealKey) {
+    revealKeyRef.current = revealKey;
+    revealedRef.current = false;
+  }
 
   const reveal = () => {
     if (revealedRef.current) return;
     revealedRef.current = true;
     setLoaded(true);
-    onLoad?.();
+    onLoadRef.current?.();
+    onLoadEndRef.current?.();
     Animated.timing(opacity, {
       toValue: 1,
       duration: fadeDuration,
@@ -67,12 +80,11 @@ export function ProgressiveImage({
     setFailed(false);
     setUseNativeWebFallback(Platform.OS === "web");
 
-    if (Platform.OS === "web" && shouldRevealCachedDomImage(webImgRef.current)) {
+    if (revealedRef.current || (Platform.OS === "web" && shouldRevealCachedDomImage(webImgRef.current))) {
       reveal();
       return;
     }
 
-    revealedRef.current = false;
     opacity.setValue(0);
     setLoaded(false);
   }, [uri, retryKey, opacity]);
@@ -118,6 +130,7 @@ export function ProgressiveImage({
             contentFit={contentFit}
             accessibilityLabel={accessibilityLabel}
             onLoad={reveal}
+            onLoadEnd={reveal}
             onError={handleExpoImageError}
           />
         </Animated.View>
