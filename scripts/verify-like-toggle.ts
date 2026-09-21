@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { QueryClient } from "@tanstack/react-query";
 import { applyViewerCommentLikes } from "../packages/api/src/comments.ts";
 import { isUniqueConstraintError } from "../packages/api/src/profile-utils.ts";
-import { reconcileEnrichedPost } from "../lib/feed-enrichment-merge.ts";
+import {
+  overlayCachedFeedInteractions,
+  preserveCachedPostInteractions,
+  reconcileEnrichedPost,
+} from "../lib/feed-enrichment-merge.ts";
+import { findPostInAllCaches, mapPostInAllCaches } from "../lib/post-cache.ts";
 import type { Comment, Post } from "../packages/types/src/index.ts";
 
 function post(partial: Partial<Post> & Pick<Post, "id">): Post {
@@ -74,6 +79,48 @@ function main() {
   const restored = reconcileEnrichedPost(afterLogoutPlaceholder, likedOnServer);
   assert.equal(restored.liked_by_me, true, "post liked_by_me must survive logout/login enrichment");
   assert.equal(restored.like_count, 1);
+
+  const justLikedPlaceholder = post({ id: "p-photo", liked_by_me: false, like_count: 0 });
+  const savedLike = post({ id: "p-photo", liked_by_me: true, like_count: 1 });
+  const mergedSavedLike = reconcileEnrichedPost(justLikedPlaceholder, savedLike);
+  assert.equal(mergedSavedLike.liked_by_me, true, "placeholder vs 1 like must keep the saved like");
+  assert.equal(mergedSavedLike.like_count, 1);
+
+  const optimisticAfterLike = post({
+    id: "p-keep",
+    liked_by_me: true,
+    like_count: 1,
+    comment_count: 2,
+  });
+  const refetchPlaceholder = post({ id: "p-keep", liked_by_me: false, like_count: 0 });
+  const preserved = preserveCachedPostInteractions(refetchPlaceholder, optimisticAfterLike);
+  assert.equal(preserved.liked_by_me, true);
+  assert.equal(preserved.like_count, 1);
+  assert.equal(preserved.comment_count, 2);
+
+  queryClient.setQueryData(["feed", "user-1"], {
+    pages: [{ posts: [optimisticAfterLike], nextCursor: null }],
+    pageParams: [undefined],
+  });
+  const overlaid = overlayCachedFeedInteractions(queryClient, "user-1", {
+    posts: [refetchPlaceholder],
+    nextCursor: null,
+  });
+  assert.equal(overlaid.posts[0]?.liked_by_me, true);
+  assert.equal(overlaid.posts[0]?.like_count, 1);
+
+  queryClient.setQueryData(["user-posts", "author", "user-1"], {
+    posts: [post({ id: "p-profile", liked_by_me: false, like_count: 4 })],
+    nextCursor: null,
+  });
+  mapPostInAllCaches(queryClient, "user-1", "p-profile", (current) => ({
+    ...current,
+    liked_by_me: true,
+    like_count: 5,
+  }));
+  const profilePost = findPostInAllCaches(queryClient, "user-1", "p-profile");
+  assert.equal(profilePost?.liked_by_me, true);
+  assert.equal(profilePost?.like_count, 5);
 
   const placeholderComments = [comment({ id: "c1", liked_by_me: false, like_count: 0 })];
   const restoredComments = applyViewerCommentLikes(

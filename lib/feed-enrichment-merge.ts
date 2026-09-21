@@ -36,6 +36,59 @@ export function reconcileEnrichedPost(current: Post, enriched: Post): Post {
   return enriched;
 }
 
+/** True when a feed row still has default interaction fields, not enriched stats. */
+export function isPlaceholderPostInteractions(post: Post): boolean {
+  return (
+    !post.liked_by_me &&
+    (post.like_count ?? 0) === 0 &&
+    (post.comment_count ?? 0) === 0 &&
+    !(post.preview_comments?.length) &&
+    !(post.reactions?.length)
+  );
+}
+
+/**
+ * Keep cached likes/comments when the feed query returns unenriched placeholders.
+ * Otherwise a refetch after Like flashes the unliked heart and can stick.
+ */
+export function preserveCachedPostInteractions(incoming: Post, cached?: Post): Post {
+  if (!cached || cached.id !== incoming.id) return incoming;
+  if (!isPlaceholderPostInteractions(incoming)) return incoming;
+  if (isPlaceholderPostInteractions(cached)) return incoming;
+
+  return {
+    ...incoming,
+    liked_by_me: cached.liked_by_me,
+    like_count: cached.like_count,
+    comment_count: cached.comment_count ?? incoming.comment_count,
+    saved_by_me: cached.saved_by_me ?? incoming.saved_by_me,
+    preview_comments: cached.preview_comments ?? incoming.preview_comments,
+    reactions: cached.reactions ?? incoming.reactions,
+    my_reaction: cached.my_reaction ?? incoming.my_reaction,
+  };
+}
+
+export function overlayCachedFeedInteractions(
+  queryClient: QueryClient,
+  userId: string,
+  page: FeedPage
+): FeedPage {
+  const current = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+  if (!current) return page;
+
+  const byId = new Map<string, Post>();
+  for (const existingPage of current.pages) {
+    for (const post of existingPage.posts) {
+      byId.set(post.id, post);
+    }
+  }
+
+  return {
+    ...page,
+    posts: page.posts.map((post) => preserveCachedPostInteractions(post, byId.get(post.id))),
+  };
+}
+
 /** Merge batched interaction/reaction enrichment into one feed page without replacing newer data. */
 export function mergeEnrichedFeedPage(
   queryClient: QueryClient,

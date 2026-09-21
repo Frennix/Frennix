@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Post } from "@frennix/types";
 import { getErrorMessage, sendStoryInviteToTrain } from "@frennix/api";
 import { PostInteractionSheet } from "@/components/PostInteractionSheet";
@@ -16,6 +17,7 @@ import { showAlert } from "@/lib/alerts";
 import { hapticLight } from "@/lib/haptics";
 import { pushScreen } from "@/lib/press-utils";
 import { getSharedPostTargetId } from "@frennix/ui";
+import { findPostInAllCaches } from "@/lib/post-cache";
 
 type UsePostInteractionOptions = {
   userId: string;
@@ -38,6 +40,7 @@ export function usePostInteraction({
   onViewProfile,
   onViewMedia,
 }: UsePostInteractionOptions) {
+  const queryClient = useQueryClient();
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [panel, setPanel] = useState<"primary" | "more">("primary");
@@ -47,6 +50,37 @@ export function usePostInteraction({
   useEffect(() => {
     void readLastReactionAction().then(setLastReactionId);
   }, []);
+
+  useEffect(() => {
+    if (!activePost?.id || !userId) return;
+    const postId = activePost.id;
+
+    const syncFromCache = () => {
+      const latest = findPostInAllCaches(queryClient, userId, postId);
+      if (!latest) return;
+      setActivePost((prev) => {
+        if (!prev || prev.id !== latest.id) return prev;
+        if (
+          prev.liked_by_me === latest.liked_by_me &&
+          prev.like_count === latest.like_count &&
+          prev.saved_by_me === latest.saved_by_me &&
+          prev.my_reaction === latest.my_reaction
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          liked_by_me: latest.liked_by_me,
+          like_count: latest.like_count,
+          saved_by_me: latest.saved_by_me,
+          my_reaction: latest.my_reaction,
+        };
+      });
+    };
+
+    syncFromCache();
+    return queryClient.getQueryCache().subscribe(syncFromCache);
+  }, [activePost?.id, queryClient, userId]);
 
   const openInteraction = useCallback((post: Post, index = 0) => {
     hapticLight();
@@ -75,6 +109,15 @@ export function usePostInteraction({
 
       switch (actionId) {
         case "like":
+          setActivePost((prev) => {
+            if (!prev) return prev;
+            const liked = Boolean(prev.liked_by_me);
+            return {
+              ...prev,
+              liked_by_me: !liked,
+              like_count: Math.max(0, (prev.like_count ?? 0) + (liked ? -1 : 1)),
+            };
+          });
           onLike(activePost);
           rememberReaction(actionId);
           return true;

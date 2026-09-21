@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage, getTechnicalErrorMessage, toggleLike } from "@frennix/api";
 import type { Post } from "@frennix/types";
@@ -25,14 +25,15 @@ export function useFeedLike(userId: string) {
 
   const likeMutation = useMutation({
     mutationFn: ({ postId, liked }: LikeVars) => toggleLike(postId, userId, liked),
-    onMutate: ({ postId, liked }) => {
+    onMutate: async ({ postId, liked }) => {
       if (!liked) hapticLike();
+
+      await queryClient.cancelQueries({ queryKey: ["feed", userId] });
+      await queryClient.cancelQueries({ queryKey: ["reels", userId] });
+      await queryClient.cancelQueries({ queryKey: ["post", postId] });
 
       const previous = findPostInAllCaches(queryClient, userId, postId);
       mapPostInAllCaches(queryClient, userId, postId, (post) => patchPostLike(post, liked));
-
-      void queryClient.cancelQueries({ queryKey: ["feed", userId] });
-      void queryClient.cancelQueries({ queryKey: ["reels", userId] });
 
       return { previous };
     },
@@ -49,10 +50,12 @@ export function useFeedLike(userId: string) {
       }
       showAlert("Like failed", getErrorMessage(error, "Couldn't update that like. Please try again."));
     },
-    onSettled: (_data, _error, { postId }) => {
-      void queryClient.invalidateQueries({ queryKey: ["post", postId] });
-      void queryClient.invalidateQueries({ queryKey: ["reels", userId] });
-      void queryClient.invalidateQueries({ queryKey: ["feed", userId] });
+    onSuccess: (result, { postId }) => {
+      mapPostInAllCaches(queryClient, userId, postId, (post) => ({
+        ...post,
+        liked_by_me: result.liked_by_me,
+        like_count: result.like_count,
+      }));
     },
   });
 
@@ -79,4 +82,25 @@ export function useFeedLike(userId: string) {
   }
 
   return { toggleLikePost };
+}
+
+/** Re-read like/respect fields from shared post caches so viewers stay in sync. */
+export function useLivePostEngagement(post: Post | undefined, userId: string) {
+  const queryClient = useQueryClient();
+  const [, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (!post?.id || !userId) return;
+    return queryClient.getQueryCache().subscribe(() => {
+      setVersion((value) => value + 1);
+    });
+  }, [post?.id, queryClient, userId]);
+
+  const latest = post?.id ? findPostInAllCaches(queryClient, userId, post.id) : undefined;
+  const source = latest ?? post;
+  return {
+    liked: Boolean(source?.liked_by_me),
+    likeCount: source?.like_count ?? 0,
+    myReaction: source?.my_reaction,
+  };
 }

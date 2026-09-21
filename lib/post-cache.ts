@@ -97,6 +97,19 @@ export function findPostInAllCaches(
       if (match) return match;
     }
   }
+
+  for (const [, page] of queryClient.getQueriesData<FeedPage>({ queryKey: ["user-posts"] })) {
+    const match = page?.posts.find((post) => post.id === postId);
+    if (match) return match;
+  }
+
+  for (const key of ["group-posts", "challenge-posts", "event-posts"] as const) {
+    for (const [, posts] of queryClient.getQueriesData<Post[]>({ queryKey: [key] })) {
+      const match = posts?.find((post) => post.id === postId);
+      if (match) return match;
+    }
+  }
+
   return undefined;
 }
 

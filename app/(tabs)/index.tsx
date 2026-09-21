@@ -91,7 +91,7 @@ import { useFeedNewPostsBanner } from "@/lib/useFeedNewPostsBanner";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import type { FeedListRow } from "@/lib/feed-list-rows";
 import { hydrateFeedCache, hydrateFeedCacheSync, writeFeedCache } from "@/lib/feed-cache";
-import { mergeEnrichedFeedPage } from "@/lib/feed-enrichment-merge";
+import { mergeEnrichedFeedPage, overlayCachedFeedInteractions } from "@/lib/feed-enrichment-merge";
 import {
   markFeedCacheHydrated,
   markFeedPerf,
@@ -489,10 +489,10 @@ export default function HomeScreen() {
       });
       markFeedPerf("feed_filtering_ready", { post_count: core.posts.length });
 
-      const page = {
+      const page = overlayCachedFeedInteractions(queryClient, userId, {
         posts: core.posts.map(applyDefaultPostInteractions),
         nextCursor: core.nextCursor,
-      };
+      });
       markFeedPerf("feed_data_in_react", { post_count: page.posts.length });
       markFeedPerf("feed_page_1_ready", { post_count: page.posts.length, enriched: false });
 

@@ -27,6 +27,8 @@ import { computeBaselineVideoPeekHeight } from "@/lib/video-overlay-peek-geometr
 import { getImmersiveSessionLayoutHeight } from "@/lib/immersive-session-layout";
 import { useOpenImmersiveVideoComments } from "@/lib/immersive-video-comments-context";
 import { useCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
+import { useLivePostEngagement } from "@/lib/useFeedLike";
+import { useAuth } from "@/providers/AuthProvider";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 
 const STRONG_WORK_EMOJI = "💪";
@@ -82,6 +84,7 @@ export function ImmersiveVideoViewer({
   onScrubbingChange,
 }: ImmersiveVideoViewerProps) {
   const insets = useSafeAreaInsets();
+  const { session } = useAuth();
   const videoRef = useRef<FullscreenVideoSlideHandle>(null);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [muted, setMuted] = useState(
@@ -89,14 +92,15 @@ export function ImmersiveVideoViewer({
   );
 
   const post = postActions.post;
+  const liveEngagement = useLivePostEngagement(post, session?.user.id ?? "");
   const displayPost = post.shared_post ?? post;
   const author = post.author;
   const caption = (post.content ?? displayPost.content ?? "").trim();
   const journeyCategoryLabel = getJourneyCategoryLabel(
     displayPost.journey_category ?? post.journey_category
   );
-  const liked = Boolean(post.liked_by_me);
-  const respectActive = post.my_reaction === STRONG_WORK_EMOJI;
+  const liked = liveEngagement.liked;
+  const respectActive = liveEngagement.myReaction === STRONG_WORK_EMOJI;
 
   const topInset = Math.max(insets.top, spacing.sm);
   const bottomInset = Math.max(insets.bottom, spacing.sm);
@@ -298,7 +302,7 @@ export function ImmersiveVideoViewer({
             strokeWidth={2}
             fill={liked ? colors.accent : "transparent"}
           />
-          <Text style={styles.railCount}>{formatActionCount(post.like_count)}</Text>
+          <Text style={styles.railCount}>{formatActionCount(liveEngagement.likeCount)}</Text>
         </RailAction>
 
         <RailAction

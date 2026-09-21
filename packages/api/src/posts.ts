@@ -525,14 +525,33 @@ export async function uploadPostThumbnail(userId: string, bytes: Uint8Array) {
   return data.publicUrl;
 }
 
-export async function toggleLike(postId: string, userId: string, liked: boolean) {
+export type ToggleLikeResult = {
+  liked_by_me: boolean;
+  like_count: number;
+};
+
+async function fetchPostLikeState(postId: string, userId: string): Promise<ToggleLikeResult> {
+  const [{ count }, { data: like }] = await Promise.all([
+    getSupabase().from("likes").select("*", { count: "exact", head: true }).eq("post_id", postId),
+    getSupabase().from("likes").select("id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
+  ]);
+  return { liked_by_me: !!like, like_count: count ?? 0 };
+}
+
+export async function toggleLike(
+  postId: string,
+  userId: string,
+  liked: boolean
+): Promise<ToggleLikeResult> {
   if (liked) {
     const { error } = await getSupabase().from("likes").delete().eq("post_id", postId).eq("user_id", userId);
     if (error) throw error;
   } else {
     const { error } = await getSupabase().from("likes").insert({ post_id: postId, user_id: userId });
+    // Already liked in the database — treat as success so the UI can show the saved like.
     if (error && !isUniqueConstraintError(error)) throw error;
   }
+  return fetchPostLikeState(postId, userId);
 }
 
 export async function getPost(postId: string, userId: string): Promise<Post | null> {
