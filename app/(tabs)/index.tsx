@@ -23,6 +23,7 @@ import {
   getDismissedSuggestionIds,
   peekFeedFollowingIds,
   getErrorMessage,
+  getTechnicalErrorMessage,
   getDedicatedStoryInsights,
   getDedicatedStoryAnalytics,
   getStoryViewers,
@@ -316,8 +317,15 @@ export default function HomeScreen() {
       emoji: StoryQuickReactionEmoji,
       slideId?: string | null
     ) => {
-      if (!userId) return;
-      await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
+      if (!userId || !storyId) {
+        throw new Error("Reaction couldn’t be sent. Try again.");
+      }
+      try {
+        await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
+      } catch (error) {
+        console.error("[story-reaction]", getTechnicalErrorMessage(error));
+        throw error;
+      }
     },
     [userId]
   );
@@ -336,8 +344,15 @@ export default function HomeScreen() {
 
   const handleStoryReply = useCallback(
     async (storyUserId: string, text: string, storyId?: string | null) => {
-      if (!userId || !storyId) return;
-      await sendDedicatedStoryReply(userId, storyUserId, text, storyId);
+      if (!userId || !storyId) {
+        throw new Error("Message couldn’t be sent. Try again.");
+      }
+      try {
+        await sendDedicatedStoryReply(userId, storyUserId, text, storyId);
+      } catch (error) {
+        console.error("[story-reply]", getTechnicalErrorMessage(error));
+        throw error;
+      }
     },
     [userId]
   );

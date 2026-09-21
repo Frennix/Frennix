@@ -12,6 +12,7 @@ import { getFollowingIds } from "./follows";
 import { getProfilesByIds } from "./profiles";
 import { subscribePostgresChanges } from "./realtime-utils";
 import { getSupabase } from "./supabase";
+import { getErrorMessage, getTechnicalErrorMessage } from "./profile-utils";
 
 export * from "./story-insights";
 export * from "./story-train-invites";
@@ -108,6 +109,28 @@ export async function markStoryViewed(
   }
 }
 
+const REACTION_SEND_ERROR = "Reaction couldn’t be sent. Try again.";
+const MESSAGE_SEND_ERROR = "Message couldn’t be sent. Try again.";
+
+function toReactionError(error: unknown): Error {
+  console.error("[story-reaction]", getTechnicalErrorMessage(error));
+  return new Error(REACTION_SEND_ERROR);
+}
+
+function toReplyError(error: unknown): Error {
+  const friendly = getErrorMessage(error, MESSAGE_SEND_ERROR);
+  if (/commenting is turned off/i.test(friendly)) {
+    return new Error(friendly);
+  }
+  console.error("[story-reply]", getTechnicalErrorMessage(error));
+  return new Error(MESSAGE_SEND_ERROR);
+}
+
+function isStoryLinkWriteError(error: unknown): boolean {
+  const details = getTechnicalErrorMessage(error);
+  return /story_reply|can_reply|not allowed|schema cache|column .* does not exist/i.test(details);
+}
+
 export async function sendDedicatedStoryReaction(
   viewerId: string,
   storyOwnerId: string,
@@ -115,9 +138,18 @@ export async function sendDedicatedStoryReaction(
   emoji: StoryQuickReactionEmoji,
   slideId?: string | null
 ) {
+  if (!storyId) throw new Error(REACTION_SEND_ERROR);
   if (viewerId === storyOwnerId) return;
-  const { assertCanViewStory } = await import("./story-controls");
-  await assertCanViewStory(storyId);
+
+  // Feed already authorized this viewer. Avoid reloading story+slides here —
+  // getVisibleStory throws "Failed to load story", which the viewer used to
+  // treat like a media-load failure. RLS still enforces the write.
+  try {
+    const { assertCanViewStory } = await import("./story-controls");
+    await assertCanViewStory(storyId);
+  } catch (error) {
+    console.warn("[story-reaction] visibility check failed", getTechnicalErrorMessage(error));
+  }
 
   const { error } = await getSupabase().from("story_item_reactions").upsert(
     {
@@ -129,7 +161,7 @@ export async function sendDedicatedStoryReaction(
     { onConflict: "story_id,user_id" }
   );
 
-  if (error) throw error;
+  if (error) throw toReactionError(error);
 
   await trackStoryEngagementEvent({
     viewerId,
@@ -202,11 +234,43 @@ export async function sendDedicatedStoryReply(
   const trimmed = replyText.trim();
   if (!trimmed) throw new Error("Reply cannot be empty");
   if (viewerId === storyOwnerId) throw new Error("You cannot reply to your own story");
-  const { assertCanReplyToStory } = await import("./story-controls");
-  await assertCanReplyToStory(storyId);
+  if (!storyId) throw new Error(MESSAGE_SEND_ERROR);
 
-  const conversationId = await getOrCreateConversation(viewerId, storyOwnerId);
-  const message = await sendMessage(conversationId, viewerId, trimmed, null, null, null, storyId);
+  try {
+    const { assertCanReplyToStory } = await import("./story-controls");
+    await assertCanReplyToStory(storyId);
+  } catch (error) {
+    const friendly = getErrorMessage(error, MESSAGE_SEND_ERROR);
+    if (/commenting is turned off/i.test(friendly)) {
+      throw new Error(friendly);
+    }
+    // Keep the already-loaded story visible. A visibility reload error must
+    // not block the DM if the viewer can already see this story.
+    console.warn("[story-reply] visibility check failed", getTechnicalErrorMessage(error));
+  }
+
+  let conversationId: string;
+  try {
+    conversationId = await getOrCreateConversation(viewerId, storyOwnerId);
+  } catch (error) {
+    throw toReplyError(error);
+  }
+
+  let message;
+  try {
+    message = await sendMessage(conversationId, viewerId, trimmed, null, null, null, storyId);
+  } catch (error) {
+    if (isStoryLinkWriteError(error)) {
+      console.warn("[story-reply] retrying without story_reply_id", getTechnicalErrorMessage(error));
+      try {
+        message = await sendMessage(conversationId, viewerId, trimmed);
+      } catch (retryError) {
+        throw toReplyError(retryError);
+      }
+    } else {
+      throw toReplyError(error);
+    }
+  }
 
   await trackStoryEngagementEvent({
     viewerId,

@@ -8,6 +8,7 @@ import {
   createStoryMediaReadyState,
   isAuthorizedStoryMediaUrl,
   retryStoryMediaReady,
+  shouldReplaceStoryWithMediaError,
   shouldStartStoryProgressTimer,
   storySlideNeedsMedia,
 } from "./story-media-ready";
@@ -91,6 +92,17 @@ describe("story media timer gating", () => {
     assert.equal(next.timerKey, "0-1-true");
     assert.equal(next.ready, false);
     assert.equal(next.failed, false);
+  });
+
+  it("does not replace an already-visible story with the load-error screen", () => {
+    assert.equal(
+      shouldReplaceStoryWithMediaError({ mediaReady: true, mediaFailed: false }),
+      false
+    );
+    assert.equal(
+      shouldReplaceStoryWithMediaError({ mediaReady: false, mediaFailed: false }),
+      true
+    );
   });
 
   it("pauses timer while hold/reply/controls are open even after media is ready", () => {

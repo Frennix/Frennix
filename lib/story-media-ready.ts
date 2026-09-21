@@ -26,6 +26,14 @@ export function applyStoryMediaFailed(state: StoryMediaReadyState): StoryMediaRe
   return { ...state, ready: false, failed: true };
 }
 
+/** Once story media is on screen, later image errors must not replace the viewer. */
+export function shouldReplaceStoryWithMediaError(input: {
+  mediaReady: boolean;
+  mediaFailed: boolean;
+}): boolean {
+  return !input.mediaReady && !input.mediaFailed;
+}
+
 export function retryStoryMediaReady(
   state: StoryMediaReadyState,
   needsMedia: boolean

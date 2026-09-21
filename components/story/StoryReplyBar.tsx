@@ -10,6 +10,8 @@ interface StoryReplyBarProps {
   onCancel?: () => void;
 }
 
+const MESSAGE_SEND_ERROR = "Message couldn’t be sent. Try again.";
+
 export function StoryReplyBar({
   disabled,
   compact,
@@ -19,71 +21,90 @@ export function StoryReplyBar({
 }: StoryReplyBarProps) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSend() {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     setSending(true);
+    setError(null);
     try {
       await onSend(trimmed);
       setText("");
+    } catch {
+      setError(MESSAGE_SEND_ERROR);
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <View style={[styles.wrap, compact && styles.wrapCompact]}>
-      {onCancel ? (
+    <View style={styles.block}>
+      <View style={[styles.wrap, compact && styles.wrapCompact]}>
+        {onCancel ? (
+          <Pressable
+            style={styles.cancelButton}
+            onPress={onCancel}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close reply"
+          >
+            <Text style={styles.cancelText}>✕</Text>
+          </Pressable>
+        ) : null}
+        <TextInput
+          value={text}
+          onChangeText={(value) => {
+            setText(value);
+            if (error) setError(null);
+          }}
+          placeholder="Reply privately…"
+          placeholderTextColor={overlays.whiteDim}
+          style={[styles.input, compact && styles.inputCompact]}
+          editable={!disabled && !sending}
+          returnKeyType="send"
+          onSubmitEditing={() => void handleSend()}
+          onFocus={() => onFocusChange?.(true)}
+          onBlur={() => onFocusChange?.(false)}
+          accessibilityLabel="Story reply"
+        />
         <Pressable
-          style={styles.cancelButton}
-          onPress={onCancel}
-          hitSlop={8}
+          style={[
+            styles.sendButton,
+            compact && styles.sendButtonCompact,
+            (!text.trim() || disabled || sending) && styles.sendDisabled,
+          ]}
+          disabled={!text.trim() || disabled || sending}
+          onPress={() => void handleSend()}
           accessibilityRole="button"
-          accessibilityLabel="Close reply"
+          accessibilityLabel="Send story reply"
         >
-          <Text style={styles.cancelText}>✕</Text>
+          {sending ? (
+            <ActivityIndicator color={colors.black} size="small" />
+          ) : (
+            <Text style={styles.sendText}>{compact ? "↑" : "Send"}</Text>
+          )}
         </Pressable>
-      ) : null}
-      <TextInput
-        value={text}
-        onChangeText={setText}
-        placeholder="Reply privately…"
-        placeholderTextColor={overlays.whiteDim}
-        style={[styles.input, compact && styles.inputCompact]}
-        editable={!disabled && !sending}
-        returnKeyType="send"
-        onSubmitEditing={() => void handleSend()}
-        onFocus={() => onFocusChange?.(true)}
-        onBlur={() => onFocusChange?.(false)}
-        accessibilityLabel="Story reply"
-      />
-      <Pressable
-        style={[
-          styles.sendButton,
-          compact && styles.sendButtonCompact,
-          (!text.trim() || disabled || sending) && styles.sendDisabled,
-        ]}
-        disabled={!text.trim() || disabled || sending}
-        onPress={() => void handleSend()}
-        accessibilityRole="button"
-        accessibilityLabel="Send story reply"
-      >
-        {sending ? (
-          <ActivityIndicator color={colors.black} size="small" />
-        ) : (
-          <Text style={styles.sendText}>{compact ? "↑" : "Send"}</Text>
-        )}
-      </Pressable>
+      </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  block: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    gap: spacing.xs,
+  },
   wrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
   },
   wrapCompact: {
     gap: spacing.xs,
@@ -110,6 +131,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     minHeight: 42,
     borderRadius: 999,
     paddingHorizontal: spacing.md,
@@ -133,6 +155,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.accent,
     paddingHorizontal: spacing.md,
+    flexShrink: 0,
   },
   sendButtonCompact: {
     minWidth: touchTarget,
@@ -148,5 +171,10 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.black,
     fontWeight: "800",
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.danger,
+    fontWeight: "700",
   },
 });

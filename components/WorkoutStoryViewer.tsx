@@ -48,6 +48,7 @@ import {
   answerStoryQuestion,
   getStoryQuestionAnswersForOwner,
   shareStoryQuestionAnswer,
+  getErrorMessage,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
@@ -199,10 +200,21 @@ const STORY_ROOT_STYLE = Platform.select({
     right: 0,
     bottom: 0,
     width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     height: "100%",
+    overflowX: "hidden",
+    overflowY: "hidden",
+    boxSizing: "border-box",
+    overscrollBehaviorX: "none",
+    touchAction: "pan-y",
     zIndex: 9999,
+  } as object,
+  default: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
   },
-  default: {},
 });
 
 export interface WorkoutStoryViewerProps {
@@ -376,16 +388,32 @@ export function WorkoutStoryViewer({
 
     if (!visible) {
       document.body.style.removeProperty("overflow");
+      document.body.style.removeProperty("overflow-x");
+      document.documentElement.style.removeProperty("overflow-x");
       return;
     }
 
     const previousOverflow = document.body.style.overflow;
+    const previousBodyOverflowX = document.body.style.overflowX;
+    const previousHtmlOverflowX = document.documentElement.style.overflowX;
     document.body.style.overflow = "hidden";
+    document.body.style.overflowX = "hidden";
+    document.documentElement.style.overflowX = "hidden";
     return () => {
       if (previousOverflow) {
         document.body.style.overflow = previousOverflow;
       } else {
         document.body.style.removeProperty("overflow");
+      }
+      if (previousBodyOverflowX) {
+        document.body.style.overflowX = previousBodyOverflowX;
+      } else {
+        document.body.style.removeProperty("overflow-x");
+      }
+      if (previousHtmlOverflowX) {
+        document.documentElement.style.overflowX = previousHtmlOverflowX;
+      } else {
+        document.documentElement.style.removeProperty("overflow-x");
       }
     };
   }, [visible]);
@@ -479,12 +507,20 @@ export function WorkoutStoryViewer({
     setPlaybackEpoch(0);
   }, [timerKey, progress]);
 
+  const mediaReadyRef = useRef(false);
+
   const markMediaReady = useCallback(() => {
+    mediaReadyRef.current = true;
     setMediaFailed(false);
     setMediaReady(true);
   }, []);
 
   const markMediaFailed = useCallback(() => {
+    // Keyboard dismiss / reply / reaction must not replace an already-visible story.
+    if (mediaReadyRef.current) {
+      console.warn("[story-viewer] ignoring media error after successful load");
+      return;
+    }
     setMediaReady(false);
     setMediaFailed(true);
   }, []);
@@ -493,6 +529,7 @@ export function WorkoutStoryViewer({
     stopTimer();
     elapsedMsRef.current = 0;
     progress.setValue(0);
+    mediaReadyRef.current = !needsMedia;
     setMediaFailed(false);
     setMediaReady(!needsMedia);
     setPlaybackEpoch((epoch) => epoch + 1);
@@ -534,6 +571,7 @@ export function WorkoutStoryViewer({
   }, [timerKey, slideOpacity]);
 
   useEffect(() => {
+    mediaReadyRef.current = !needsMedia;
     setMediaFailed(false);
     setMediaReady(!needsMedia);
   }, [timerKey, mediaIdentity, needsMedia]);
@@ -858,7 +896,17 @@ export function WorkoutStoryViewer({
             ) : null}
           </View>
 
-          <View style={[styles.footer, { paddingBottom: footerBottomPad }]} pointerEvents="box-none">
+          <View
+            style={[
+              styles.footer,
+              {
+                paddingBottom: footerBottomPad,
+                left: Math.max(insets.left, spacing.md),
+                right: Math.max(insets.right, spacing.md),
+              },
+            ]}
+            pointerEvents="box-none"
+          >
             {workoutSlide?.kind === "workout" ? (
               <View style={styles.compactWorkoutMeta} pointerEvents="none">
                 <WorkoutTypeChips
@@ -905,13 +953,19 @@ export function WorkoutStoryViewer({
             ) : null}
 
             {currentDedicatedStory?.workout_tag ? (
-              <Pressable onPress={() => onDiscoverTag?.(currentDedicatedStory.workout_tag!)}>
+              <Pressable
+                style={styles.metaPressable}
+                onPress={() => onDiscoverTag?.(currentDedicatedStory.workout_tag!)}
+              >
                 <Text style={styles.workoutTag}>#{currentDedicatedStory.workout_tag}</Text>
               </Pressable>
             ) : null}
 
             {currentDedicatedStory?.location_name ? (
-              <Pressable onPress={() => onDiscoverLocation?.(currentDedicatedStory.location_name!)}>
+              <Pressable
+                style={styles.metaPressable}
+                onPress={() => onDiscoverLocation?.(currentDedicatedStory.location_name!)}
+              >
                 <Text style={styles.locationTag}>📍 {currentDedicatedStory.location_name}</Text>
               </Pressable>
             ) : null}
@@ -977,16 +1031,42 @@ export function WorkoutStoryViewer({
                     onCancel={() => setShowReply(false)}
                     onFocusChange={setInteractionLocked}
                     onSend={async (text) => {
-                      await onReply?.(story.user_id, text, activeStoryId);
-                      setShowReply(false);
+                      if (!activeStoryId) {
+                        throw new Error("Message couldn’t be sent. Try again.");
+                      }
+                      try {
+                        await onReply?.(story.user_id, text, activeStoryId);
+                        showStatus("Message sent.");
+                        setShowReply(false);
+                      } catch (error) {
+                        showStatus(
+                          getErrorMessage(error, "Message couldn’t be sent. Try again.")
+                        );
+                        throw error;
+                      }
                     }}
                   />
                 ) : null}
                 <StoryReactionRow
                   disabled={paused}
-                  onReact={(emoji) =>
-                    onReact?.(story.user_id, activeStoryId!, emoji, slideContext?.slideId ?? null)
-                  }
+                  onReact={async (emoji) => {
+                    if (!activeStoryId) {
+                      throw new Error("Reaction couldn’t be sent. Try again.");
+                    }
+                    try {
+                      await onReact?.(
+                        story.user_id,
+                        activeStoryId,
+                        emoji,
+                        slideContext?.slideId ?? null
+                      );
+                    } catch (error) {
+                      showStatus(
+                        getErrorMessage(error, "Reaction couldn’t be sent. Try again.")
+                      );
+                      throw error;
+                    }
+                  }}
                 />
                 <StoryQuickActionsBar
                   disabled={paused || showReply}
@@ -1094,15 +1174,26 @@ export function WorkoutStoryViewer({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     backgroundColor: colors.black,
+    overflow: "hidden",
   },
   stage: {
     flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     backgroundColor: colors.black,
     overflow: "hidden",
   },
   engageStack: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     gap: spacing.sm,
+    zIndex: 6,
   },
   mediaStage: {
     ...StyleSheet.absoluteFillObject,
@@ -1165,8 +1256,12 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: 0,
-    zIndex: 4,
+    zIndex: 6,
     gap: spacing.xs,
+    width: "auto",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   progressRow: {
     flexDirection: "row",
@@ -1267,6 +1362,8 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     lineHeight: 22,
+    flexShrink: 1,
+    minWidth: 0,
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -1274,6 +1371,14 @@ const styles = StyleSheet.create({
   captionBlock: {
     gap: 2,
     marginBottom: spacing.xs,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  metaPressable: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
   },
   captionMore: {
     ...typography.caption,
@@ -1396,11 +1501,15 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.accent,
     fontWeight: "700",
+    flexShrink: 1,
+    minWidth: 0,
   },
   locationTag: {
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: "600",
+    flexShrink: 1,
+    minWidth: 0,
   },
   challengeCta: {
     alignSelf: "flex-start",
