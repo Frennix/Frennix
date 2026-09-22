@@ -1,3 +1,5 @@
+import { canonicalizeStoryReaction } from "./workout-story";
+
 export const STORY_REACTION_MESSAGE_PATTERN = /^Reacted (.+) to your story$/;
 
 export function storyReactionIdempotencyKey(
@@ -8,14 +10,16 @@ export function storyReactionIdempotencyKey(
   return `${viewerId}:${storyId}:${slideId ?? "story"}`;
 }
 
-export function formatStoryReactionMessageContent(emoji: string) {
-  return `Reacted ${emoji} to your story`;
+export function formatStoryReactionMessageContent(emojiOrKey: string) {
+  const canonical = canonicalizeStoryReaction(emojiOrKey);
+  return `Reacted ${canonical?.emoji ?? emojiOrKey} to your story`;
 }
 
 export function parseStoryReactionMessage(content: string | null | undefined) {
   const match = content?.trim().match(STORY_REACTION_MESSAGE_PATTERN);
   if (!match?.[1]) return null;
-  return { emoji: match[1] };
+  const canonical = canonicalizeStoryReaction(match[1]);
+  return { emoji: canonical?.emoji ?? match[1], key: canonical?.key ?? null };
 }
 
 function possessiveName(name: string) {

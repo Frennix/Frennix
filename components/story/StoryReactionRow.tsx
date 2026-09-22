@@ -1,6 +1,10 @@
 import { createElement, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { STORY_QUICK_REACTIONS, type StoryQuickReactionEmoji } from "@frennix/types";
+import {
+  canonicalizeStoryReaction,
+  STORY_QUICK_REACTIONS,
+  type StoryQuickReactionEmoji,
+} from "@frennix/types";
 import { colors, overlays, radius, spacing, typography } from "@frennix/ui";
 
 const REACTION_TAP_LOCK_MS = 450;
@@ -24,33 +28,50 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
   const lastTapAtRef = useRef(0);
 
   async function handlePress(emoji: StoryQuickReactionEmoji) {
-    logReactionUi("tap-received", { emoji, disabled: Boolean(disabled), selectedEmoji });
+    const canonical = canonicalizeStoryReaction(emoji);
+    logReactionUi("tap-received", {
+      emoji,
+      reactionKey: canonical?.key ?? null,
+      disabled: Boolean(disabled),
+      selectedEmoji,
+    });
+    if (!canonical) {
+      setError(REACTION_DELIVER_ERROR);
+      setStatus(null);
+      logReactionUi("unsupported-emoji", { emoji });
+      return;
+    }
     if (disabled || inFlightRef.current) {
-      logReactionUi("tap-blocked", { emoji, disabled: Boolean(disabled), inFlight: inFlightRef.current });
+      logReactionUi("tap-blocked", {
+        emoji,
+        reactionKey: canonical.key,
+        disabled: Boolean(disabled),
+        inFlight: inFlightRef.current,
+      });
       return;
     }
     const now = Date.now();
     if (now - lastTapAtRef.current < REACTION_TAP_LOCK_MS) {
-      logReactionUi("tap-debounced", { emoji });
+      logReactionUi("tap-debounced", { emoji, reactionKey: canonical.key });
       return;
     }
     lastTapAtRef.current = now;
 
     inFlightRef.current = true;
-    setPendingEmoji(emoji);
+    setPendingEmoji(canonical.emoji);
     setError(null);
     setStatus(null);
-    logReactionUi("request-started", { emoji });
+    logReactionUi("request-started", { emoji: canonical.emoji, reactionKey: canonical.key });
 
     try {
-      await onReact(emoji);
+      await onReact(canonical.emoji);
       setStatus("Reaction sent.");
-      logReactionUi("request-succeeded", { emoji });
+      logReactionUi("request-succeeded", { emoji: canonical.emoji, reactionKey: canonical.key });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : REACTION_DELIVER_ERROR;
       setError(REACTION_DELIVER_ERROR);
       setStatus(null);
-      logReactionUi("request-failed", { emoji, message });
+      logReactionUi("request-failed", { emoji: canonical.emoji, reactionKey: canonical.key, message });
     } finally {
       inFlightRef.current = false;
       setPendingEmoji(null);
@@ -61,7 +82,7 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
     <View style={styles.wrap} pointerEvents="auto" collapsable={false}>
       <View style={styles.row} pointerEvents="auto">
         {STORY_QUICK_REACTIONS.map((reaction) => {
-          const selected = selectedEmoji === reaction.emoji;
+          const selected = selectedEmoji === reaction.emoji || pendingEmoji === reaction.emoji;
           const pending = pendingEmoji === reaction.emoji;
           const chipStyle = [
             styles.chip,
@@ -82,14 +103,15 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
                 onClick: (event: { stopPropagation?: () => void; preventDefault?: () => void }) => {
                   event.preventDefault?.();
                   event.stopPropagation?.();
-                  logReactionUi("web-click", { emoji: reaction.emoji });
+                  logReactionUi("web-click", { emoji: reaction.emoji, reactionKey: reaction.key });
                   void handlePress(reaction.emoji);
                 },
                 style: {
-                  minWidth: 44,
-                  minHeight: 40,
-                  paddingLeft: 10,
-                  paddingRight: 10,
+                  width: "22%",
+                  minWidth: 48,
+                  minHeight: 48,
+                  paddingLeft: 8,
+                  paddingRight: 8,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -98,6 +120,7 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
                   borderWidth: 1,
                   borderStyle: "solid",
                   borderColor: selected ? colors.accent : "rgba(255,255,255,0.18)",
+                  flexGrow: 0,
                   flexShrink: 0,
                   cursor: disabled ? "default" : "pointer",
                   touchAction: "manipulation",
@@ -105,6 +128,8 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
                   userSelect: "none",
                   opacity: disabled ? 0.55 : pending ? 0.82 : 1,
                   pointerEvents: "auto",
+                  position: "relative",
+                  zIndex: 50,
                 },
               },
               createElement(Text, { style: styles.emoji }, reaction.emoji)
@@ -151,9 +176,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   chip: {
-    minWidth: 44,
-    minHeight: 40,
-    paddingHorizontal: 10,
+    width: "22%",
+    minWidth: 48,
+    minHeight: 48,
+    paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.md,
@@ -162,6 +188,7 @@ const styles = StyleSheet.create({
     borderColor: overlays.glassBorder,
     flexGrow: 0,
     flexShrink: 0,
+    zIndex: 50,
   },
   chipSelected: {
     borderColor: colors.accent,

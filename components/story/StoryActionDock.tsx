@@ -43,9 +43,9 @@ type PrimaryAction = {
 
 const DEFAULT_REACTION_SLOT: PrimaryAction = {
   id: "strong_work",
-  emoji: "💪",
+  emoji: "💪🏾",
   label: "Strong Work",
-  reactionEmoji: "💪",
+  reactionEmoji: "💪🏾",
 };
 
 function buildPrimaryActions(lastReaction: StoryQuickReactionEmoji | null): PrimaryAction[] {
@@ -73,7 +73,7 @@ function buildPrimaryActions(lastReaction: StoryQuickReactionEmoji | null): Prim
       label: "Nice Work",
       reactionEmoji: "👏",
     };
-  } else if (lastReaction === "💪") {
+  } else if (lastReaction === "💪🏾" || lastReaction === "💪") {
     reactionSlot = DEFAULT_REACTION_SLOT;
   }
 
@@ -81,7 +81,7 @@ function buildPrimaryActions(lastReaction: StoryQuickReactionEmoji | null): Prim
 }
 
 const MORE_REACTIONS = STORY_QUICK_REACTIONS.filter(
-  (reaction) => reaction.emoji !== "❤️" && reaction.emoji !== "💪" && reaction.emoji !== "😂"
+  (reaction) => reaction.key !== "love" && reaction.key !== "strong" && reaction.key !== "laugh"
 );
 
 interface StoryActionDockProps {

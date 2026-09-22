@@ -54,6 +54,25 @@ const checks: Array<{ name: string; run: () => void }> = [
       ),
   },
   {
+    name: "reactions: all seven displayed options are canonicalized",
+    run: () => {
+      mustInclude("packages/types/src/workout-story.ts", 'key: "strong"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", 'key: "fire"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", 'key: "applause"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", 'key: "love"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", 'key: "eyes"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", 'key: "laugh"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", 'key: "support"', "reactions");
+      mustInclude("packages/types/src/workout-story.ts", "canonicalizeStoryReaction", "reactions");
+      mustInclude("packages/api/src/story-engagement.ts", "canonical.key", "reactions");
+      mustInclude(
+        "supabase/migrations/20260922010000_story_item_reaction_keys.sql",
+        "story_item_reactions_reaction_check",
+        "reactions"
+      );
+    },
+  },
+  {
     name: "api: reaction also delivers a conversation message",
     run: () => {
       mustInclude("packages/api/src/story-engagement.ts", "deliverStoryReactionMessage", "api");

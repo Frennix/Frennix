@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FeedStory } from "@frennix/types";
 import {
-  STORY_QUICK_REACTIONS,
+  canonicalizeStoryReaction,
   type StoryChallengeKey,
   type StoryQuickReactionEmoji,
 } from "@frennix/types";
@@ -80,10 +80,7 @@ function logStoryViewer(event: string, extra: Record<string, unknown> = {}) {
 }
 
 function asQuickReaction(value: string | null | undefined): StoryQuickReactionEmoji | null {
-  if (!value) return null;
-  return (
-    STORY_QUICK_REACTIONS.find((reaction) => reaction.emoji === value)?.emoji ?? null
-  );
+  return canonicalizeStoryReaction(value)?.emoji ?? null;
 }
 const HOLD_THRESHOLD_MS = 220;
 const NAV_DEBOUNCE_MS = 280;
@@ -886,7 +883,10 @@ export function WorkoutStoryViewer({
           <View style={styles.scrimTop} pointerEvents="none" />
           <StoryFooterGradient />
 
-          <View style={styles.tapZones} pointerEvents={controlsOpen ? "none" : "box-none"}>
+          <View
+            style={[styles.tapZones, { bottom: Math.max(400, footerBottomPad + 300) }]}
+            pointerEvents={controlsOpen ? "none" : "box-none"}
+          >
             <Pressable
               style={styles.tapZoneLeft}
               onPress={() => tryNavigate(handleLeftTap)}
@@ -985,7 +985,7 @@ export function WorkoutStoryViewer({
                 right: Math.max(insets.right, spacing.md),
               },
             ]}
-            pointerEvents="box-none"
+            pointerEvents="auto"
           >
             {workoutSlide?.kind === "workout" ? (
               <View style={styles.compactWorkoutMeta} pointerEvents="none">

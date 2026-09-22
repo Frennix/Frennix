@@ -6,6 +6,7 @@ import type {
   StoryViewerRecord,
 } from "@frennix/types";
 import {
+  canonicalizeStoryReaction,
   formatStoryReactionMessageContent,
   parseStoryReactionMessage,
   storyReactionIdempotencyKey,
@@ -230,7 +231,9 @@ async function deliverStoryReactionMessage(input: {
   slideId?: string | null;
   emoji: StoryQuickReactionEmoji;
 }): Promise<Message> {
-  const content = formatStoryReactionMessageContent(input.emoji);
+  const content = formatStoryReactionMessageContent(
+    canonicalizeStoryReaction(input.emoji)?.emoji ?? input.emoji
+  );
   const previewUrl = await getStoryReactionPreviewUrl(input.storyId, input.slideId);
 
   let conversationId: string;
@@ -351,24 +354,32 @@ export async function sendDedicatedStoryReaction(
   if (!storyId) throw new Error(REACTION_DELIVER_ERROR);
   if (viewerId === storyOwnerId) return emoji;
 
+  const canonical = canonicalizeStoryReaction(emoji);
+  if (!canonical) {
+    console.error("[story-reaction] unsupported-emoji", { emoji });
+    throw new Error(REACTION_DELIVER_ERROR);
+  }
+
   console.info("[story-reaction] request-started", {
     viewerId,
     storyOwnerId,
     storyId,
     slideId: slideId ?? null,
-    emoji,
+    emoji: canonical.emoji,
+    reactionKey: canonical.key,
     supabaseReady: isSupabaseInitialized(),
     supabaseHost: getSupabaseInitUrl(),
   });
 
   const deliveryKey = storyReactionIdempotencyKey(viewerId, storyId, slideId);
   await runStoryReactionDelivery(deliveryKey, async () => {
-    const existing = await getViewerStoryReaction(viewerId, storyId);
-    if (existing === emoji) {
+    const existing = canonicalizeStoryReaction(await getViewerStoryReaction(viewerId, storyId));
+    if (existing?.key === canonical.key) {
       console.info("[story-reaction] already saved, ensuring message", {
         storyId,
         viewerId,
-        emoji,
+        emoji: canonical.emoji,
+        reactionKey: canonical.key,
         deliveryKey,
       });
     } else {
@@ -387,7 +398,7 @@ export async function sendDedicatedStoryReaction(
           story_id: storyId,
           user_id: viewerId,
           slide_id: slideId ?? null,
-          reaction: emoji,
+          reaction: canonical.key,
         },
         { onConflict: "story_id,user_id" }
       ).select("story_id, user_id, slide_id, reaction");
@@ -397,7 +408,8 @@ export async function sendDedicatedStoryReaction(
         viewerId,
         storyOwnerId,
         slideId: slideId ?? null,
-        emoji,
+        emoji: canonical.emoji,
+        reactionKey: canonical.key,
         deliveryKey,
         row: data ?? null,
         error: error ? getTechnicalErrorMessage(error) : null,
@@ -405,14 +417,15 @@ export async function sendDedicatedStoryReaction(
 
       if (error) throw toReactionError(error);
 
-      const saved = await getViewerStoryReaction(viewerId, storyId);
-      if (saved !== emoji) {
+      const saved = canonicalizeStoryReaction(await getViewerStoryReaction(viewerId, storyId));
+      if (saved?.key !== canonical.key) {
         console.error("[story-reaction] write did not persist", {
           storyId,
           viewerId,
           storyOwnerId,
           slideId: slideId ?? null,
-          emoji,
+          emoji: canonical.emoji,
+          reactionKey: canonical.key,
           saved,
         });
         throw new Error(REACTION_SEND_ERROR);
@@ -423,7 +436,8 @@ export async function sendDedicatedStoryReaction(
         viewerId,
         storyOwnerId,
         slideId: slideId ?? null,
-        emoji,
+        emoji: canonical.emoji,
+        reactionKey: canonical.key,
         deliveryKey,
       });
 
@@ -432,7 +446,7 @@ export async function sendDedicatedStoryReaction(
         storyUserId: storyOwnerId,
         storyId,
         eventType: "reaction",
-        metadata: { emoji },
+        metadata: { emoji: canonical.emoji, reaction_key: canonical.key },
       }).catch(() => undefined);
     }
 
@@ -441,7 +455,7 @@ export async function sendDedicatedStoryReaction(
       storyOwnerId,
       storyId,
       slideId,
-      emoji,
+      emoji: canonical.emoji,
     });
 
     console.info("[story-reaction] delivered", {
@@ -449,14 +463,15 @@ export async function sendDedicatedStoryReaction(
       viewerId,
       storyOwnerId,
       slideId: slideId ?? null,
-      emoji,
+      emoji: canonical.emoji,
+      reactionKey: canonical.key,
       deliveryKey,
       messageId: message.id,
       conversationId: message.conversation_id,
     });
   });
 
-  return emoji;
+  return canonical.emoji;
 }
 
 /** @deprecated Use sendDedicatedStoryReaction */

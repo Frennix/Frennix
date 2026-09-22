@@ -53,18 +53,79 @@ export interface WorkoutStorySlideMeta {
   aiSummary?: string | null;
 }
 
-/** Story reactions — never open chat unless the viewer chooses Reply. */
+const SKIN_TONES = ["🏻", "🏼", "🏽", "🏾", "🏿"] as const;
+
+function withSkinTones(base: string): string[] {
+  return [base, ...SKIN_TONES.map((tone) => `${base}${tone}`)];
+}
+
+/** Displayed story reactions. Storage uses `key`; UI always shows `emoji`. */
 export const STORY_QUICK_REACTIONS = [
-  { emoji: "💪", label: "Strong" },
-  { emoji: "🔥", label: "Fire" },
-  { emoji: "👏", label: "Clap" },
-  { emoji: "❤️", label: "Love" },
-  { emoji: "👀", label: "Watching" },
-  { emoji: "😂", label: "Laugh" },
-  { emoji: "🤝", label: "Train together" },
+  {
+    key: "strong",
+    emoji: "💪🏾",
+    label: "Strong",
+    aliases: ["strong", ...withSkinTones("💪")],
+  },
+  { key: "fire", emoji: "🔥", label: "Fire", aliases: ["fire", "🔥"] },
+  {
+    key: "applause",
+    emoji: "👏",
+    label: "Clap",
+    aliases: ["applause", ...withSkinTones("👏")],
+  },
+  { key: "love", emoji: "❤️", label: "Love", aliases: ["love", "❤️", "❤", "♥️"] },
+  { key: "eyes", emoji: "👀", label: "Watching", aliases: ["eyes", "👀"] },
+  { key: "laugh", emoji: "😂", label: "Laugh", aliases: ["laugh", "😂"] },
+  {
+    key: "support",
+    emoji: "🤝",
+    label: "Support",
+    aliases: ["support", ...withSkinTones("🤝")],
+  },
 ] as const;
 
+export type StoryQuickReactionKey = (typeof STORY_QUICK_REACTIONS)[number]["key"];
 export type StoryQuickReactionEmoji = (typeof STORY_QUICK_REACTIONS)[number]["emoji"];
+
+const STORY_REACTION_BY_KEY = new Map(
+  STORY_QUICK_REACTIONS.map((reaction) => [reaction.key, reaction])
+);
+
+const STORY_REACTION_ALIAS_TO_KEY = new Map<string, StoryQuickReactionKey>();
+for (const reaction of STORY_QUICK_REACTIONS) {
+  STORY_REACTION_ALIAS_TO_KEY.set(reaction.key, reaction.key);
+  STORY_REACTION_ALIAS_TO_KEY.set(reaction.emoji, reaction.key);
+  for (const alias of reaction.aliases) {
+    STORY_REACTION_ALIAS_TO_KEY.set(alias, reaction.key);
+  }
+}
+
+function stripVariationSelector(value: string) {
+  return value.replace(/\uFE0F/g, "");
+}
+
+/** Map any displayed glyph, skin-tone variant, or stored key to the canonical reaction. */
+export function canonicalizeStoryReaction(input: string | null | undefined): {
+  key: StoryQuickReactionKey;
+  emoji: StoryQuickReactionEmoji;
+  label: string;
+} | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const key =
+    STORY_REACTION_ALIAS_TO_KEY.get(trimmed) ??
+    STORY_REACTION_ALIAS_TO_KEY.get(stripVariationSelector(trimmed));
+  if (!key) return null;
+  const reaction = STORY_REACTION_BY_KEY.get(key);
+  if (!reaction) return null;
+  return { key: reaction.key, emoji: reaction.emoji, label: reaction.label };
+}
+
+export function isStoryQuickReactionEmoji(value: string | null | undefined): value is StoryQuickReactionEmoji {
+  return canonicalizeStoryReaction(value) !== null;
+}
 
 export const STORY_CHALLENGE_RESPONSES = [
   { key: "accepted", label: "Challenge Accepted", message: "Challenge Accepted! Let's go 🔥" },
