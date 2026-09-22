@@ -71,8 +71,8 @@ export function StoryQuickActionsBar({
 }: StoryQuickActionsBarProps) {
   const actions: QuickAction[] = [
     ...(showMessage ? [{ key: "message", emoji: "💬", label: "Message", onPress: onMessage }] : []),
-    { key: "workout", emoji: "🤝", label: "Invite to Workout", onPress: onInviteWorkout, loading: inviteLoading },
-    { key: "event", emoji: "📅", label: "Invite to Event", onPress: onInviteEvent },
+    { key: "workout", emoji: "🤝", label: "Invite to Workout", onPress: onInviteWorkout },
+    { key: "event", emoji: "📅", label: "Invite to Event", onPress: onInviteEvent, loading: inviteLoading },
     ...(hasChallenge && onJoinChallenge
       ? [{ key: "challenge", emoji: "🎯", label: "I'm In", onPress: onJoinChallenge }]
       : []),

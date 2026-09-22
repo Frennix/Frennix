@@ -66,6 +66,15 @@ import {
   shouldResetStoryMediaReady,
   storySlideNeedsMedia,
 } from "@/lib/story-media-ready";
+import { runMountedStoryReaction } from "@/lib/run-mounted-story-reaction";
+import {
+  applyStoryReactionTraceStage,
+  createStoryReactionTrace,
+  formatStoryReactionTrace,
+  publishStoryReactionTrace,
+  subscribeStoryReactionTrace,
+  type StoryReactionTraceSnapshot,
+} from "@/lib/story-reaction-trace";
 import {
   buildDedicatedStorySlides,
   prefetchAuthorizedViewerMedia,
@@ -331,6 +340,8 @@ export function WorkoutStoryViewer({
   const lastNavAtRef = useRef(0);
   const [playbackEpoch, setPlaybackEpoch] = useState(0);
   const [mediaReady, setMediaReady] = useState(false);
+  const [reactionTrace, setReactionTrace] = useState<StoryReactionTraceSnapshot | null>(null);
+  const mediaStageRef = useRef<View>(null);
   const [mediaFailed, setMediaFailed] = useState(false);
   const [confirmedReaction, setConfirmedReaction] = useState<StoryQuickReactionEmoji | null>(null);
 
@@ -547,6 +558,42 @@ export function WorkoutStoryViewer({
     setMediaFailed(false);
     setMediaReady(true);
   }, [mediaIdentity, timerKey]);
+
+  useEffect(() => {
+    return subscribeStoryReactionTrace((requestId, emoji, stage, status, detail) => {
+      setReactionTrace((current) => {
+        const base = current?.requestId === requestId
+          ? current
+          : createStoryReactionTrace(requestId, emoji ?? current?.emoji ?? "");
+        return applyStoryReactionTraceStage(base, stage, status, detail);
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!needsMedia || mediaReady || mediaFailed || Platform.OS !== "web") return;
+    const findPainted = () => {
+      const root =
+        (mediaStageRef.current as unknown as { querySelectorAll?: (sel: string) => NodeListOf<HTMLImageElement> }) ??
+        null;
+      const imgs = root?.querySelectorAll?.("img") ??
+        (typeof document !== "undefined"
+          ? document.querySelectorAll("#story-media-stage img, [data-story-media-stage] img")
+          : []);
+      for (const img of Array.from(imgs)) {
+        if (img.complete && img.naturalWidth > 0) return true;
+      }
+      return false;
+    };
+    if (findPainted()) {
+      markMediaReady();
+      return;
+    }
+    const timer = setInterval(() => {
+      if (findPainted()) markMediaReady();
+    }, 120);
+    return () => clearInterval(timer);
+  }, [needsMedia, mediaReady, mediaFailed, markMediaReady, timerKey, mediaIdentity]);
 
   const markMediaFailed = useCallback(() => {
     if (mediaReadyRef.current) {
@@ -848,8 +895,11 @@ export function WorkoutStoryViewer({
           {...panResponder.panHandlers}
         >
           <Animated.View
+            ref={mediaStageRef}
+            nativeID="story-media-stage"
             style={[styles.mediaStage, { opacity: slideOpacity }]}
             pointerEvents={mediaFailed ? "auto" : "none"}
+            {...(Platform.OS === "web" ? { "data-story-media-stage": "1" } : null)}
           >
             <StorySlideContent
               key={`${timerKey}-${playbackEpoch}`}
@@ -1131,6 +1181,9 @@ export function WorkoutStoryViewer({
                 <StoryReactionRow
                   key={reactionStoryId ?? "reaction-row"}
                   selectedEmoji={confirmedReaction}
+                  onTrace={(stage, requestId, emoji) => {
+                    publishStoryReactionTrace(requestId, emoji, stage, "ok");
+                  }}
                   onReact={async (emoji, requestId) => {
                     const slideId = slideContext?.slideId ?? null;
                     const ownerId = story.user_id;
@@ -1143,32 +1196,18 @@ export function WorkoutStoryViewer({
                       ownerId,
                       viewerId,
                     });
-                    if (!activeStoryId || !viewerId) {
-                      logStoryViewer("reaction-missing-ids", {
-                        requestId,
-                        emoji,
-                        storyId: activeStoryId,
-                        viewerId,
-                      });
-                      throw new Error("Reaction couldn’t be delivered. Try again.");
-                    }
-                    if (!onReact) {
-                      logStoryViewer("reaction-handler-missing", {
-                        requestId,
-                        emoji,
-                        storyId: activeStoryId,
-                      });
-                      throw new Error("Reaction couldn’t be delivered. Try again.");
-                    }
-                    logStoryViewer("reaction-ids-submitted", {
-                      requestId,
+                    await runMountedStoryReaction({
                       emoji,
+                      requestId,
                       storyId: activeStoryId,
-                      slideId,
-                      ownerId,
                       viewerId,
+                      ownerId,
+                      slideId,
+                      pageOnReact: onReact,
+                      onStage: (stage, status, detail) => {
+                        publishStoryReactionTrace(requestId, emoji, stage, status, detail);
+                      },
                     });
-                    await onReact(ownerId, activeStoryId, emoji, slideId, requestId);
                   }}
                   onConfirmed={(emoji, requestId) => {
                     setConfirmedReaction(emoji);
@@ -1183,6 +1222,7 @@ export function WorkoutStoryViewer({
                       message: "Reaction sent.",
                       emoji,
                     });
+                    publishStoryReactionTrace(requestId, emoji, "confirmed", "ok", "Reaction sent.");
                     showStatus("Reaction sent.");
                   }}
                   onFailed={(message, requestId) => {
@@ -1190,6 +1230,7 @@ export function WorkoutStoryViewer({
                       requestId,
                       message,
                     });
+                    publishStoryReactionTrace(requestId, null, "confirmed", "fail", message);
                     showStatus(message);
                   }}
                 />
@@ -1221,6 +1262,12 @@ export function WorkoutStoryViewer({
             ) : null}
           </View>
         </Animated.View>
+        {reactionTrace ? (
+          <View style={styles.diagPanel} pointerEvents="none">
+            <Text style={styles.diagTitle}>Reaction diagnostic</Text>
+            <Text style={styles.diagBody}>{formatStoryReactionTrace(reactionTrace)}</Text>
+          </View>
+        ) : null}
         {statusMessage ? (
           <View style={styles.statusToast} pointerEvents="none">
             <Text style={styles.statusToastText}>{statusMessage}</Text>
@@ -1431,6 +1478,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: "800",
+  },
+  diagPanel: {
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    top: 88,
+    zIndex: 90,
+    elevation: 90,
+    backgroundColor: "rgba(10, 10, 11, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  diagTitle: {
+    ...typography.caption,
+    color: colors.accent,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  diagBody: {
+    ...typography.caption,
+    color: colors.text,
+    fontVariant: ["tabular-nums"],
+    lineHeight: 16,
   },
   statusToast: {
     position: "absolute",

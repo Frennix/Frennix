@@ -18,6 +18,7 @@ type StoryReactionRowProps = {
   onReact: (emoji: StoryQuickReactionEmoji, requestId: number) => void | Promise<void>;
   onConfirmed?: (emoji: StoryQuickReactionEmoji, requestId: number) => void;
   onFailed?: (message: string, requestId: number) => void;
+  onTrace?: (stage: string, requestId: number, emoji: StoryQuickReactionEmoji) => void;
 };
 
 function logReactionUi(event: string, extra: Record<string, unknown> = {}) {
@@ -42,6 +43,7 @@ export function StoryReactionRow({
   onReact,
   onConfirmed,
   onFailed,
+  onTrace,
 }: StoryReactionRowProps) {
   const [state, dispatch] = useReducer(
     reduceSelection,
@@ -71,6 +73,7 @@ export function StoryReactionRow({
       shouldSend: next.shouldSend,
       disabled: Boolean(disabled),
     });
+    onTrace?.("tap received", next.requestId, next.state.selected ?? emoji);
 
     if (!next.shouldSend) {
       logReactionUi(

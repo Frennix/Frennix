@@ -308,7 +308,8 @@ export async function sendDedicatedStoryReaction(
   storyId: string,
   emoji: StoryQuickReactionEmoji,
   slideId?: string | null,
-  requestId: number = Date.now()
+  requestId: number = Date.now(),
+  onStage?: (stage: string, status: "pending" | "ok" | "fail", detail?: string) => void
 ) {
   if (!storyId) throw new Error(REACTION_DELIVER_ERROR);
   if (viewerId === storyOwnerId) {
@@ -333,6 +334,9 @@ export async function sendDedicatedStoryReaction(
   });
 
   const deliveryKey = storyReactionIdempotencyKey(viewerId, storyId);
+  onStage?.("reaction write", "pending");
+  onStage?.("conversation", "pending");
+  onStage?.("message write", "pending");
   const result = await runStoryReactionDelivery(deliveryKey, async () =>
     executeStoryReactionDelivery(
       {
@@ -399,7 +403,22 @@ export async function sendDedicatedStoryReaction(
         },
         getPreviewUrl: getStoryReactionPreviewUrl,
         isStoryLinkWriteError,
-        log: (event, extra) => logStoryReaction(event, extra),
+        log: (event, extra) => {
+          logStoryReaction(event, extra);
+          if (event === "reaction-upsert-started") onStage?.("reaction write", "pending");
+          if (event === "reaction-upserted") onStage?.("reaction write", "ok", extra.upserted === false ? "already saved" : "upserted");
+          if (event === "reaction-upsert-failed" || event === "reaction-upsert-supabase-error") {
+            onStage?.("reaction write", "fail", String(extra.error ?? "upsert failed"));
+          }
+          if (event === "conversation-ready") onStage?.("conversation", "ok");
+          if (event === "conversation-failed") onStage?.("conversation", "fail", String(extra.error ?? "conversation failed"));
+          if (event === "message-inserted" || event === "message-updated" || event === "message-reused") {
+            onStage?.("message write", "ok", event.replace("message-", ""));
+          }
+          if (event === "message-insert-failed") {
+            onStage?.("message write", "fail", String(extra.error ?? "message insert failed"));
+          }
+        },
       }
     )
   );

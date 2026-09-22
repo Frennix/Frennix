@@ -80,6 +80,7 @@ import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
+import { publishStoryReactionTrace } from "@/lib/story-reaction-trace";
 import { buildDedicatedStorySlides, prefetchAuthorizedViewerMedia } from "@/lib/story-utils";
 import { usePostInteraction } from "@/lib/usePostInteraction";
 import { useFeedCommentsSheet } from "@/lib/useFeedCommentsSheet";
@@ -322,6 +323,7 @@ export default function HomeScreen() {
         throw new Error("Reaction couldn’t be delivered. Try again.");
       }
       const reactionRequestId = requestId ?? Date.now();
+      publishStoryReactionTrace(reactionRequestId, emoji, "page callback", "pending", "Home handleStoryReact entered");
       try {
         console.info("[story-reaction] home-handler-start", {
           requestId: reactionRequestId,
@@ -337,7 +339,16 @@ export default function HomeScreen() {
           storyId,
           emoji,
           slideId,
-          reactionRequestId
+          reactionRequestId,
+          (stage, status, detail) => {
+            console.info("[story-reaction] home-stage", {
+              requestId: reactionRequestId,
+              stage,
+              status,
+              detail: detail ?? null,
+            });
+            publishStoryReactionTrace(reactionRequestId, emoji, stage, status, detail);
+          }
         );
         console.info("[story-reaction] home-handler-success", {
           requestId: reactionRequestId,
@@ -456,6 +467,7 @@ export default function HomeScreen() {
     (storyUserId: string, _postId: string | null) => {
       const feedStory = stories.find((item) => item.user_id === storyUserId);
       const dedicatedStory = feedStory?.active_stories.at(-1) ?? null;
+      setActiveStoryIndex(null);
       openStoryWorkoutInvite({
         partnerId: storyUserId,
         partnerUsername: feedStory?.profile.username,
