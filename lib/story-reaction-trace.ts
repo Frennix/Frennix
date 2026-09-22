@@ -5,6 +5,7 @@ export const STORY_REACTION_TRACE_STAGES = [
   "reaction write",
   "conversation",
   "message write",
+  "owner notify",
   "confirmed",
 ] as const;
 

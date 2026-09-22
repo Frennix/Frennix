@@ -188,6 +188,32 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "api: reaction notifies the story owner with a stable dedupe key",
+    run: () => {
+      mustInclude("packages/api/src/notifications.ts", "storyReactionNotificationDedupeKey", "notify");
+      mustInclude("packages/api/src/notifications.ts", "upsertStoryReactionOwnerNotification", "notify");
+      mustInclude("packages/api/src/notifications.ts", "planStoryReactionOwnerNotification", "notify");
+      mustInclude("packages/api/src/story-engagement.ts", "upsertStoryReactionOwnerNotification", "notify");
+      mustInclude("packages/api/src/story-reaction-delivery.ts", "notifyOwner", "notify");
+      mustInclude("lib/story-reaction-trace.ts", "owner notify", "notify");
+      mustInclude(
+        "lib/story-reaction-notification.test.ts",
+        "creates a story_reaction notification for the owner after first delivery",
+        "notify"
+      );
+      mustInclude(
+        "lib/story-reaction-notification.test.ts",
+        "does not create a second notification when the same emoji is repeated",
+        "notify"
+      );
+      mustInclude(
+        "lib/story-reaction-notification.test.ts",
+        "updates the existing notification when the emoji changes",
+        "notify"
+      );
+    },
+  },
+  {
     name: "viewer: page-level overflow-x is locked",
     run: () => {
       mustInclude("components/WorkoutStoryViewer.tsx", 'overflowX: "hidden"', "viewer");

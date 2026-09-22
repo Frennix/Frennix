@@ -3,6 +3,7 @@ import {
   buildDeepLink,
   buildNotificationCopy,
   notificationTypesForCategory,
+  storyReactionDedupeKey,
   type NotificationCategory,
 } from "@frennix/notifications";
 import { getBlockedIds } from "./moderation";
@@ -459,6 +460,152 @@ export async function dismissNotification(id: string, userId: string) {
   }
 }
 
+
+export function storyReactionNotificationDedupeKey(storyId: string, actorId: string): string {
+  return storyReactionDedupeKey(storyId, actorId);
+}
+
+export function buildStoryReactionNotificationPayload(input: {
+  storyId: string;
+  slideId?: string | null;
+  reactorId: string;
+  emoji: string;
+  conversationId: string;
+  messageId: string;
+}): Record<string, unknown> {
+  return {
+    story_id: input.storyId,
+    story_item_id: input.slideId ?? null,
+    reactor_id: input.reactorId,
+    reaction: input.emoji,
+    conversation_id: input.conversationId,
+    message_id: input.messageId,
+  };
+}
+
+export type StoryReactionNotificationAction = "create" | "reuse" | "update";
+
+export type StoryReactionNotificationWrite = {
+  ownerId: string;
+  actorId: string;
+  dedupeKey: string;
+  payload: Record<string, unknown>;
+};
+
+export type StoryReactionNotificationPlan = {
+  action: StoryReactionNotificationAction;
+  write: StoryReactionNotificationWrite;
+};
+
+export function planStoryReactionOwnerNotification(input: {
+  ownerId: string;
+  actorId: string;
+  storyId: string;
+  slideId?: string | null;
+  emoji: string;
+  previousEmoji?: string | null;
+  conversationId: string;
+  messageId: string;
+}): StoryReactionNotificationPlan {
+  const write: StoryReactionNotificationWrite = {
+    ownerId: input.ownerId,
+    actorId: input.actorId,
+    dedupeKey: storyReactionNotificationDedupeKey(input.storyId, input.actorId),
+    payload: buildStoryReactionNotificationPayload({
+      storyId: input.storyId,
+      slideId: input.slideId,
+      reactorId: input.actorId,
+      emoji: input.emoji,
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+    }),
+  };
+  if (input.previousEmoji && input.previousEmoji === input.emoji) {
+    return { action: "reuse", write };
+  }
+  if (input.previousEmoji) {
+    return { action: "update", write };
+  }
+  return { action: "create", write };
+}
+
+export async function applyStoryReactionNotificationWrite(
+  plan: StoryReactionNotificationPlan,
+  ports: {
+    create: (write: StoryReactionNotificationWrite) => Promise<string | null>;
+    refresh: (write: StoryReactionNotificationWrite) => Promise<string | null>;
+  }
+): Promise<{ action: "created" | "reused" | "updated"; notificationId: string | null }> {
+  const createdId = await ports.create(plan.write);
+  if (plan.action === "update") {
+    const refreshedId = await ports.refresh(plan.write);
+    return { action: "updated", notificationId: refreshedId ?? createdId };
+  }
+  if (createdId) {
+    return { action: "created", notificationId: createdId };
+  }
+  return { action: "reused", notificationId: createdId };
+}
+
+async function refreshStoryReactionNotificationRow(write: StoryReactionNotificationWrite) {
+  const actorName = "Someone";
+  let resolvedName = actorName;
+  const profiles = await getProfilesByIds([write.actorId]);
+  if (profiles[0]?.display_name) {
+    resolvedName = profiles[0].display_name;
+  }
+  const copy = buildNotificationCopy({
+    type: "story_reaction",
+    actorName: resolvedName,
+    payload: write.payload,
+  });
+  const { data, error } = await getSupabase()
+    .from("notifications")
+    .update({
+      title: copy.title,
+      body: copy.body,
+      payload: write.payload,
+      read_at: null,
+    })
+    .eq("user_id", write.ownerId)
+    .eq("dedupe_key", write.dedupeKey)
+    .eq("actor_id", write.actorId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.id as string | undefined) ?? null;
+}
+
+export async function upsertStoryReactionOwnerNotification(input: {
+  ownerId: string;
+  actorId: string;
+  storyId: string;
+  slideId?: string | null;
+  emoji: string;
+  previousEmoji?: string | null;
+  conversationId: string;
+  messageId: string;
+}) {
+  const plan = planStoryReactionOwnerNotification(input);
+  return applyStoryReactionNotificationWrite(plan, {
+    create: async (write) =>
+      createNotification({
+        user_id: write.ownerId,
+        type: "story_reaction",
+        actor_id: write.actorId,
+        payload: write.payload,
+      }),
+    refresh: async (write) => {
+      try {
+        return await refreshStoryReactionNotificationRow(write);
+      } catch {
+        return null;
+      }
+    },
+  });
+}
+
 export async function createNotification(input: {
   user_id: string;
   type: NotificationType;
@@ -503,7 +650,7 @@ export async function createNotification(input: {
 
   let dedupeKey: string | null = null;
   if (input.type === "story_reaction" && typeof input.payload.story_id === "string") {
-    dedupeKey = `story_reaction:${input.payload.story_id}:${actorId}:${String(input.payload.reaction ?? "❤️")}`;
+    dedupeKey = storyReactionNotificationDedupeKey(input.payload.story_id, actorId);
   } else if (input.type === "story_reply" && typeof input.payload.story_id === "string") {
     dedupeKey = `story_reply:${input.payload.story_id}:${actorId}:${input.user_id}`;
   } else if (input.type === "story_mention" && typeof input.payload.story_id === "string") {

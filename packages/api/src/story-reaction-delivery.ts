@@ -69,6 +69,17 @@ export type StoryReactionDeliveryPorts = {
   sendMessage: (input: StoryReactionMessageWrite) => Promise<StoryReactionDeliveredMessage>;
   getPreviewUrl?: (storyId: string, slideId?: string | null) => Promise<string | null>;
   isStoryLinkWriteError?: (error: unknown) => boolean;
+  notifyOwner?: (input: {
+    ownerId: string;
+    actorId: string;
+    storyId: string;
+    slideId?: string | null;
+    emoji: StoryQuickReactionEmoji;
+    previousEmoji: string | null;
+    conversationId: string;
+    messageId: string;
+    messageAction: StoryReactionDeliveryResult["messageAction"];
+  }) => Promise<{ action: "created" | "reused" | "updated"; notificationId: string | null }>;
   log: (event: string, extra: Record<string, unknown>) => void;
 };
 
@@ -79,6 +90,8 @@ export type StoryReactionDeliveryResult = {
   messageId: string;
   upserted: boolean;
   messageAction: "reused" | "updated" | "inserted";
+  notifyAction: "created" | "reused" | "updated" | "skipped" | "failed";
+  notificationId: string | null;
 };
 
 function reactionWriteError(step: "save" | "conversation" | "message", error: unknown) {
@@ -351,6 +364,40 @@ export async function executeStoryReactionDelivery(
     messageAction,
   });
 
+  let notifyAction: StoryReactionDeliveryResult["notifyAction"] = "skipped";
+  let notificationId: string | null = null;
+  if (ports.notifyOwner) {
+    try {
+      const notified = await ports.notifyOwner({
+        ownerId: input.storyOwnerId,
+        actorId: input.viewerId,
+        storyId: input.storyId,
+        slideId: input.slideId,
+        emoji,
+        previousEmoji: existing?.emoji ?? null,
+        conversationId: message.conversation_id,
+        messageId: message.id,
+        messageAction,
+      });
+      notifyAction = notified.action;
+      notificationId = notified.notificationId;
+      ports.log("owner-notified", {
+        requestId,
+        storyId: input.storyId,
+        emoji,
+        notifyAction,
+        notificationId,
+      });
+    } catch (error) {
+      notifyAction = "failed";
+      ports.log("owner-notify-failed", {
+        requestId,
+        storyId: input.storyId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return {
     requestId,
     emoji,
@@ -358,5 +405,7 @@ export async function executeStoryReactionDelivery(
     messageId: message.id,
     upserted,
     messageAction,
+    notifyAction,
+    notificationId,
   };
 }

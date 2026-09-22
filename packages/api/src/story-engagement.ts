@@ -10,7 +10,7 @@ import {
   parseStoryReactionMessage,
   storyReactionIdempotencyKey,
 } from "@frennix/types";
-import { createNotification } from "./notifications";
+import { createNotification, upsertStoryReactionOwnerNotification } from "./notifications";
 import { getOrCreateConversation, sendMessage } from "./messaging";
 import { trackStoryEngagementEvent } from "./story-insights";
 import { sendStoryTrainInvite } from "./story-train-invites";
@@ -337,6 +337,7 @@ export async function sendDedicatedStoryReaction(
   onStage?.("reaction write", "pending");
   onStage?.("conversation", "pending");
   onStage?.("message write", "pending");
+  onStage?.("owner notify", "pending");
   const result = await runStoryReactionDelivery(deliveryKey, async () =>
     executeStoryReactionDelivery(
       {
@@ -403,6 +404,19 @@ export async function sendDedicatedStoryReaction(
         },
         getPreviewUrl: getStoryReactionPreviewUrl,
         isStoryLinkWriteError,
+        notifyOwner: async (input) => {
+          onStage?.("owner notify", "pending");
+          return upsertStoryReactionOwnerNotification({
+            ownerId: input.ownerId,
+            actorId: input.actorId,
+            storyId: input.storyId,
+            slideId: input.slideId,
+            emoji: input.emoji,
+            previousEmoji: input.previousEmoji,
+            conversationId: input.conversationId,
+            messageId: input.messageId,
+          });
+        },
         log: (event, extra) => {
           logStoryReaction(event, extra);
           if (event === "reaction-upsert-started") onStage?.("reaction write", "pending");
@@ -418,6 +432,12 @@ export async function sendDedicatedStoryReaction(
           if (event === "message-insert-failed") {
             onStage?.("message write", "fail", String(extra.error ?? "message insert failed"));
           }
+          if (event === "owner-notified") {
+            onStage?.("owner notify", "ok", String(extra.notifyAction ?? "notified"));
+          }
+          if (event === "owner-notify-failed") {
+            onStage?.("owner notify", "fail", String(extra.error ?? "owner notify failed"));
+          }
         },
       }
     )
@@ -431,6 +451,8 @@ export async function sendDedicatedStoryReaction(
     emoji: result.emoji,
     upserted: result.upserted,
     messageAction: result.messageAction,
+    notifyAction: result.notifyAction,
+    notificationId: result.notificationId,
   });
 
   return result.emoji;

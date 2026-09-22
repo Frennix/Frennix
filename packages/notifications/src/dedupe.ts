@@ -15,6 +15,11 @@ export function reactionDedupeKey(postId: string, actorId: string, emoji: string
   return `reaction:${postId}:${actorId}:${emoji}`;
 }
 
+/** One visible story-reaction row per viewer + story, even when the emoji changes. */
+export function storyReactionDedupeKey(storyId: string, actorId: string): string {
+  return `story_reaction:${storyId}:${actorId}`;
+}
+
 export function commentDedupeKey(commentId: string, recipientId: string): string {
   return `comment:${commentId}:${recipientId}`;
 }
