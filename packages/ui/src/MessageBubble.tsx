@@ -15,6 +15,7 @@ interface MessageBubbleProps {
   mediaUrl?: string | null;
   sharedPost?: (Post & { author?: Profile }) | null;
   storyReply?: boolean;
+  storyReaction?: boolean;
   replyTo?: {
     content: string;
     senderName?: string;
@@ -37,6 +38,7 @@ export function MessageBubble({
   mediaUrl,
   sharedPost,
   storyReply,
+  storyReaction,
   replyTo,
   reactions,
   onMediaPress,
@@ -70,7 +72,13 @@ export function MessageBubble({
           delayLongPress={350}
         >
           <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
-            {storyReply ? (
+            {storyReaction ? (
+              <View style={[styles.replyQuote, isOwn && styles.replyQuoteOwn]}>
+                <Text style={[styles.replyQuoteLabel, isOwn && styles.replyQuoteLabelOwn]} numberOfLines={1}>
+                  Story reaction
+                </Text>
+              </View>
+            ) : storyReply ? (
               <View style={[styles.replyQuote, isOwn && styles.replyQuoteOwn]}>
                 <Text style={[styles.replyQuoteLabel, isOwn && styles.replyQuoteLabelOwn]} numberOfLines={1}>
                   Replied to your story
@@ -95,10 +103,15 @@ export function MessageBubble({
                 onPress={onMediaPress}
                 disabled={!onMediaPress}
                 accessibilityRole="button"
-                accessibilityLabel="View image full screen"
+                accessibilityLabel={storyReaction ? "Open story preview" : "View image full screen"}
                 style={({ pressed }) => [pressed && onMediaPress ? styles.mediaPressed : null]}
               >
-                <CachedImage uri={mediaUrl} style={styles.media} contentFit="cover" recyclingKey={`msg-${mediaUrl}`} />
+                <CachedImage
+                  uri={mediaUrl}
+                  style={storyReaction ? styles.storyThumb : styles.media}
+                  contentFit="cover"
+                  recyclingKey={`msg-${mediaUrl}`}
+                />
               </Pressable>
             ) : null}
             {showText ? (
@@ -191,6 +204,7 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.55)",
   },
   media: { width: 200, height: 200, borderRadius: radius.md },
+  storyThumb: { width: 72, height: 96, borderRadius: radius.md },
   mediaPressed: { opacity: 0.85 },
   time: { ...typography.caption, marginTop: 2 },
 });

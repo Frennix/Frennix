@@ -1,8 +1,14 @@
 import type {
+  Message,
   StoryAnalytics,
   StoryQuickReactionEmoji,
   StoryReactionRecord,
   StoryViewerRecord,
+} from "@frennix/types";
+import {
+  formatStoryReactionMessageContent,
+  parseStoryReactionMessage,
+  storyReactionIdempotencyKey,
 } from "@frennix/types";
 import { createNotification } from "./notifications";
 import { getOrCreateConversation, sendMessage } from "./messaging";
@@ -110,11 +116,197 @@ export async function markStoryViewed(
 }
 
 const REACTION_SEND_ERROR = "Reaction couldn’t be sent. Try again.";
+const REACTION_DELIVER_ERROR = "Reaction couldn’t be delivered. Try again.";
 const MESSAGE_SEND_ERROR = "Message couldn’t be sent. Try again.";
+
+const storyReactionDeliveries = new Map<string, Promise<void>>();
 
 function toReactionError(error: unknown): Error {
   console.error("[story-reaction]", getTechnicalErrorMessage(error));
   return new Error(REACTION_SEND_ERROR);
+}
+
+function toDeliverError(error: unknown): Error {
+  console.error("[story-reaction] message-delivery-failed", getTechnicalErrorMessage(error));
+  return new Error(REACTION_DELIVER_ERROR);
+}
+
+async function runStoryReactionDelivery(key: string, work: () => Promise<void>) {
+  while (storyReactionDeliveries.has(key)) {
+    await storyReactionDeliveries.get(key);
+  }
+  const run = work().finally(() => {
+    if (storyReactionDeliveries.get(key) === run) {
+      storyReactionDeliveries.delete(key);
+    }
+  });
+  storyReactionDeliveries.set(key, run);
+  await run;
+}
+
+async function getStoryReactionPreviewUrl(
+  storyId: string,
+  slideId?: string | null
+): Promise<string | null> {
+  if (slideId) {
+    const { data, error } = await getSupabase()
+      .from("story_slides")
+      .select("media_url")
+      .eq("id", slideId)
+      .maybeSingle();
+    if (error) {
+      console.warn("[story-reaction] preview lookup failed", getTechnicalErrorMessage(error));
+      return null;
+    }
+    return (data?.media_url as string | null | undefined) ?? null;
+  }
+
+  const { data, error } = await getSupabase()
+    .from("story_slides")
+    .select("media_url")
+    .eq("story_id", storyId)
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.warn("[story-reaction] preview lookup failed", getTechnicalErrorMessage(error));
+    return null;
+  }
+  return (data?.media_url as string | null | undefined) ?? null;
+}
+
+type StoryReactionMessageRow = Pick<
+  Message,
+  "id" | "conversation_id" | "content" | "media_url" | "story_reply_id" | "created_at"
+>;
+
+async function findStoryReactionMessage(
+  conversationId: string,
+  viewerId: string,
+  storyId: string
+): Promise<StoryReactionMessageRow | null> {
+  const { data, error } = await getSupabase()
+    .from("messages")
+    .select("id, conversation_id, content, media_url, story_reply_id, created_at")
+    .eq("conversation_id", conversationId)
+    .eq("sender_id", viewerId)
+    .is("deleted_for_everyone_at", null)
+    .like("content", "Reacted % to your story")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  const rows = ((data ?? []) as StoryReactionMessageRow[]).filter((row) =>
+    Boolean(parseStoryReactionMessage(row.content))
+  );
+  return (
+    rows.find((row) => row.story_reply_id === storyId) ??
+    rows.find((row) => !row.story_reply_id) ??
+    null
+  );
+}
+
+async function bumpConversation(conversationId: string, senderId: string) {
+  await getSupabase()
+    .from("conversations")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  const { error } = await getSupabase()
+    .from("conversation_user_hides")
+    .delete()
+    .eq("conversation_id", conversationId)
+    .eq("user_id", senderId);
+  if (error) {
+    console.warn("[story-reaction] inbox unhide failed", getTechnicalErrorMessage(error));
+  }
+}
+
+async function deliverStoryReactionMessage(input: {
+  viewerId: string;
+  storyOwnerId: string;
+  storyId: string;
+  slideId?: string | null;
+  emoji: StoryQuickReactionEmoji;
+}): Promise<Message> {
+  const content = formatStoryReactionMessageContent(input.emoji);
+  const previewUrl = await getStoryReactionPreviewUrl(input.storyId, input.slideId);
+
+  let conversationId: string;
+  try {
+    conversationId = await getOrCreateConversation(input.viewerId, input.storyOwnerId);
+  } catch (error) {
+    throw toDeliverError(error);
+  }
+
+  let existing: StoryReactionMessageRow | null = null;
+  try {
+    existing = await findStoryReactionMessage(conversationId, input.viewerId, input.storyId);
+  } catch (error) {
+    throw toDeliverError(error);
+  }
+
+  if (existing) {
+    const sameEmoji = existing.content === content;
+    const samePreview = (existing.media_url ?? null) === (previewUrl ?? existing.media_url ?? null);
+    const sameStoryLink = existing.story_reply_id === input.storyId;
+    if (sameEmoji && samePreview && sameStoryLink) {
+      console.info("[story-reaction] message already delivered", {
+        messageId: existing.id,
+        storyId: input.storyId,
+        emoji: input.emoji,
+      });
+      return existing as Message;
+    }
+
+    const { data, error } = await getSupabase()
+      .from("messages")
+      .update({
+        content,
+        media_url: previewUrl ?? existing.media_url ?? null,
+        story_reply_id: input.storyId,
+        read_at: null,
+      })
+      .eq("id", existing.id)
+      .eq("sender_id", input.viewerId)
+      .select()
+      .single();
+
+    if (error) throw toDeliverError(error);
+    await bumpConversation(conversationId, input.viewerId);
+    console.info("[story-reaction] message replaced", {
+      messageId: existing.id,
+      storyId: input.storyId,
+      emoji: input.emoji,
+    });
+    return data as Message;
+  }
+
+  try {
+    return await sendMessage(
+      conversationId,
+      input.viewerId,
+      content,
+      previewUrl,
+      null,
+      null,
+      input.storyId
+    );
+  } catch (error) {
+    if (isStoryLinkWriteError(error)) {
+      console.warn(
+        "[story-reaction] retrying message without story_reply_id",
+        getTechnicalErrorMessage(error)
+      );
+      try {
+        return await sendMessage(conversationId, input.viewerId, content, previewUrl);
+      } catch (retryError) {
+        throw toDeliverError(retryError);
+      }
+    }
+    throw toDeliverError(error);
+  }
 }
 
 function toReplyError(error: unknown): Error {
@@ -156,7 +348,7 @@ export async function sendDedicatedStoryReaction(
   emoji: StoryQuickReactionEmoji,
   slideId?: string | null
 ) {
-  if (!storyId) throw new Error(REACTION_SEND_ERROR);
+  if (!storyId) throw new Error(REACTION_DELIVER_ERROR);
   if (viewerId === storyOwnerId) return emoji;
 
   console.info("[story-reaction] request-started", {
@@ -169,82 +361,100 @@ export async function sendDedicatedStoryReaction(
     supabaseHost: getSupabaseInitUrl(),
   });
 
-  const existing = await getViewerStoryReaction(viewerId, storyId);
-  if (existing === emoji) {
-    console.info("[story-reaction] already saved", { storyId, viewerId, emoji });
-    return emoji;
-  }
+  const deliveryKey = storyReactionIdempotencyKey(viewerId, storyId, slideId);
+  await runStoryReactionDelivery(deliveryKey, async () => {
+    const existing = await getViewerStoryReaction(viewerId, storyId);
+    if (existing === emoji) {
+      console.info("[story-reaction] already saved, ensuring message", {
+        storyId,
+        viewerId,
+        emoji,
+        deliveryKey,
+      });
+    } else {
+      // Feed already authorized this viewer. Avoid reloading story+slides here —
+      // getVisibleStory throws "Failed to load story", which the viewer used to
+      // treat like a media-load failure. RLS still enforces the write.
+      try {
+        const { assertCanViewStory } = await import("./story-controls");
+        await assertCanViewStory(storyId);
+      } catch (error) {
+        console.warn("[story-reaction] visibility check failed", getTechnicalErrorMessage(error));
+      }
 
-  // Feed already authorized this viewer. Avoid reloading story+slides here —
-  // getVisibleStory throws "Failed to load story", which the viewer used to
-  // treat like a media-load failure. RLS still enforces the write.
-  try {
-    const { assertCanViewStory } = await import("./story-controls");
-    await assertCanViewStory(storyId);
-  } catch (error) {
-    console.warn("[story-reaction] visibility check failed", getTechnicalErrorMessage(error));
-  }
+      const { data, error } = await getSupabase().from("story_item_reactions").upsert(
+        {
+          story_id: storyId,
+          user_id: viewerId,
+          slide_id: slideId ?? null,
+          reaction: emoji,
+        },
+        { onConflict: "story_id,user_id" }
+      ).select("story_id, user_id, slide_id, reaction");
 
-  const { data, error } = await getSupabase().from("story_item_reactions").upsert(
-    {
-      story_id: storyId,
-      user_id: viewerId,
-      slide_id: slideId ?? null,
-      reaction: emoji,
-    },
-    { onConflict: "story_id,user_id" }
-  ).select("story_id, user_id, slide_id, reaction");
+      console.info("[story-reaction] supabase-response", {
+        storyId,
+        viewerId,
+        storyOwnerId,
+        slideId: slideId ?? null,
+        emoji,
+        deliveryKey,
+        row: data ?? null,
+        error: error ? getTechnicalErrorMessage(error) : null,
+      });
 
-  console.info("[story-reaction] supabase-response", {
-    storyId,
-    viewerId,
-    storyOwnerId,
-    slideId: slideId ?? null,
-    emoji,
-    row: data ?? null,
-    error: error ? getTechnicalErrorMessage(error) : null,
-  });
+      if (error) throw toReactionError(error);
 
-  if (error) throw toReactionError(error);
+      const saved = await getViewerStoryReaction(viewerId, storyId);
+      if (saved !== emoji) {
+        console.error("[story-reaction] write did not persist", {
+          storyId,
+          viewerId,
+          storyOwnerId,
+          slideId: slideId ?? null,
+          emoji,
+          saved,
+        });
+        throw new Error(REACTION_SEND_ERROR);
+      }
 
-  const saved = await getViewerStoryReaction(viewerId, storyId);
-  if (saved !== emoji) {
-    console.error("[story-reaction] write did not persist", {
+      console.info("[story-reaction] saved", {
+        storyId,
+        viewerId,
+        storyOwnerId,
+        slideId: slideId ?? null,
+        emoji,
+        deliveryKey,
+      });
+
+      await trackStoryEngagementEvent({
+        viewerId,
+        storyUserId: storyOwnerId,
+        storyId,
+        eventType: "reaction",
+        metadata: { emoji },
+      }).catch(() => undefined);
+    }
+
+    const message = await deliverStoryReactionMessage({
+      viewerId,
+      storyOwnerId,
+      storyId,
+      slideId,
+      emoji,
+    });
+
+    console.info("[story-reaction] delivered", {
       storyId,
       viewerId,
       storyOwnerId,
       slideId: slideId ?? null,
       emoji,
-      saved,
+      deliveryKey,
+      messageId: message.id,
+      conversationId: message.conversation_id,
     });
-    throw new Error(REACTION_SEND_ERROR);
-  }
-
-  console.info("[story-reaction] saved", {
-    storyId,
-    viewerId,
-    storyOwnerId,
-    slideId: slideId ?? null,
-    emoji,
   });
-
-  await trackStoryEngagementEvent({
-    viewerId,
-    storyUserId: storyOwnerId,
-    storyId,
-    eventType: "reaction",
-    metadata: { emoji },
-  }).catch(() => undefined);
-
-  await createNotification({
-    user_id: storyOwnerId,
-    type: "story_reaction",
-    payload: {
-      story_id: storyId,
-      reactor_id: viewerId,
-      reaction: emoji,
-    },
-  }).catch(() => undefined);
 
   return emoji;
 }

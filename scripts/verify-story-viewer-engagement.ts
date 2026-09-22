@@ -49,9 +49,32 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () =>
       mustInclude(
         "components/story/StoryReactionRow.tsx",
-        "Reaction couldn’t be sent. Try again.",
+        "Reaction couldn’t be delivered. Try again.",
         "reactions"
       ),
+  },
+  {
+    name: "api: reaction also delivers a conversation message",
+    run: () => {
+      mustInclude("packages/api/src/story-engagement.ts", "deliverStoryReactionMessage", "api");
+      mustInclude("packages/api/src/story-engagement.ts", "getOrCreateConversation", "api");
+      mustInclude("packages/api/src/story-engagement.ts", "Reacted ", "api");
+      mustInclude("packages/api/src/story-engagement.ts", "storyReactionIdempotencyKey", "api");
+      mustInclude(
+        "packages/api/src/story-engagement.ts",
+        "Reaction couldn’t be delivered. Try again.",
+        "api"
+      );
+    },
+  },
+  {
+    name: "messages: story reaction is rendered as a labeled message",
+    run: () => {
+      mustInclude("packages/ui/src/MessageBubble.tsx", "Story reaction", "messages");
+      mustInclude("packages/ui/src/MessageBubble.tsx", "storyThumb", "messages");
+      mustInclude("components/ChatMessageRow.tsx", "formatStoryReactionDisplay", "messages");
+      mustInclude("components/ChatMessageRow.tsx", "Story expired", "messages");
+    },
   },
   {
     name: "reply: keep draft on failure",
@@ -112,6 +135,7 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("components/story/StoryReactionRow.tsx", "selectedEmoji", "reactions");
       mustInclude("components/WorkoutStoryViewer.tsx", "Reaction sent.", "reactions");
       mustInclude("packages/api/src/story-engagement.ts", "getViewerStoryReaction", "reactions");
+      mustInclude("packages/api/src/story-engagement.ts", "ensuring message", "reactions");
     },
   },
   {

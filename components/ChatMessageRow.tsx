@@ -1,7 +1,13 @@
 import { router } from "expo-router";
-import { memo, useCallback, useMemo } from "react";
-import { Platform, Pressable, StyleSheet } from "react-native";
-import type { Message, Profile } from "@frennix/types";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Platform, Pressable, StyleSheet } from "react-native";
+import { getVisibleStory, isPrivateStoryMediaUrl, resolveStoryMediaUrl } from "@frennix/api";
+import {
+  formatStoryReactionDisplay,
+  parseStoryReactionMessage,
+  type Message,
+  type Profile,
+} from "@frennix/types";
 import { AnimatedDismissRow } from "@/components/AnimatedDismissRow";
 import { MessageActionsMenu } from "@/components/MessageActionsMenu";
 import { SwipeToDeleteRow } from "@/components/SwipeToDeleteRow";
@@ -69,6 +75,42 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   );
   const sharedPostId = message.shared_post?.id ?? message.post_id;
 
+  const storyReaction = useMemo(
+    () => (deletedForEveryone ? null : parseStoryReactionMessage(message.content)),
+    [deletedForEveryone, message.content]
+  );
+  const ownerName = useMemo(() => {
+    const other = Object.entries(participantProfiles ?? {}).find(([id]) => id !== userId);
+    return other?.[1]?.display_name ?? null;
+  }, [participantProfiles, userId]);
+  const displayContent = storyReaction
+    ? formatStoryReactionDisplay({
+        emoji: storyReaction.emoji,
+        isOwn,
+        senderName: sender?.display_name ?? myProfile?.display_name,
+        ownerName,
+      })
+    : message.content;
+  const [storyPreviewUrl, setStoryPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!storyReaction || !message.media_url) {
+      setStoryPreviewUrl(null);
+      return;
+    }
+    if (!isPrivateStoryMediaUrl(message.media_url)) {
+      setStoryPreviewUrl(message.media_url);
+      return;
+    }
+    let cancelled = false;
+    void resolveStoryMediaUrl(message.media_url).then((url) => {
+      if (!cancelled) setStoryPreviewUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [message.media_url, storyReaction]);
+
   const handleSharedPostPress = useCallback(() => {
     if (sharedPostId) router.push(`/post/${sharedPostId}`);
   }, [sharedPostId]);
@@ -76,6 +118,26 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   const handleMediaPress = useCallback(() => {
     if (message.media_url) onMediaPress(message.media_url);
   }, [message.media_url, onMediaPress]);
+
+  const handleStoryPreviewPress = useCallback(async () => {
+    const storyId = message.story_reply_id;
+    if (storyId) {
+      try {
+        const story = await getVisibleStory(storyId);
+        if (!story || new Date(story.expires_at).getTime() <= Date.now()) {
+          Alert.alert("Story expired");
+          return;
+        }
+      } catch {
+        Alert.alert("Story expired");
+        return;
+      }
+    } else if (!storyPreviewUrl) {
+      Alert.alert("Story expired");
+      return;
+    }
+    if (storyPreviewUrl) onMediaPress(storyPreviewUrl);
+  }, [message.story_reply_id, onMediaPress, storyPreviewUrl]);
 
   const handleReaction = useCallback(
     (emoji: string) => onReaction(message.id, emoji, message.my_reaction),
@@ -123,16 +185,23 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     >
       {isOwn || isWeb ? <MessageActionsMenu onPress={handleLongPressMenu} /> : null}
       <MessageBubble
-        content={message.content}
+        content={displayContent}
         isOwn={isOwn}
         timestamp={time}
-        mediaUrl={message.media_url}
+        mediaUrl={storyReaction ? storyPreviewUrl : message.media_url}
         sharedPost={message.shared_post}
-        storyReply={Boolean(message.story_reply_id)}
+        storyReply={!storyReaction && Boolean(message.story_reply_id)}
+        storyReaction={Boolean(storyReaction)}
         replyTo={replyToPreview}
         deletedForEveryone={deletedForEveryone}
         onSharedPostPress={sharedPostId ? handleSharedPostPress : undefined}
-        onMediaPress={message.media_url ? handleMediaPress : undefined}
+        onMediaPress={
+          storyReaction
+            ? handleStoryPreviewPress
+            : message.media_url
+              ? handleMediaPress
+              : undefined
+        }
         reactions={message.reactions}
         onReaction={handleReaction}
         onLongPressMenu={handleLongPressMenu}

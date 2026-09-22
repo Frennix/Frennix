@@ -1146,11 +1146,11 @@ export function WorkoutStoryViewer({
                         storyId: activeStoryId,
                         viewerId,
                       });
-                      throw new Error("Reaction couldn’t be sent. Try again.");
+                      throw new Error("Reaction couldn’t be delivered. Try again.");
                     }
                     if (!onReact) {
                       logStoryViewer("reaction-handler-missing", { emoji, storyId: activeStoryId });
-                      throw new Error("Reaction couldn’t be sent. Try again.");
+                      throw new Error("Reaction couldn’t be delivered. Try again.");
                     }
                     logStoryViewer("reaction-ids-submitted", {
                       emoji,
@@ -1173,13 +1173,13 @@ export function WorkoutStoryViewer({
                       logStoryViewer("reaction-handler-failed", {
                         emoji,
                         storyId: activeStoryId,
-                        message: getErrorMessage(error, "Reaction couldn’t be sent. Try again."),
+                        message: getErrorMessage(error, "Reaction couldn’t be delivered. Try again."),
                       });
                       logStoryViewer("toast-displayed", {
-                        message: "Reaction couldn’t be sent. Try again.",
+                        message: "Reaction couldn’t be delivered. Try again.",
                       });
                       showStatus(
-                        getErrorMessage(error, "Reaction couldn’t be sent. Try again.")
+                        getErrorMessage(error, "Reaction couldn’t be delivered. Try again.")
                       );
                       throw error;
                     }

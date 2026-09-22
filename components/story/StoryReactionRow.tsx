@@ -4,6 +4,7 @@ import { STORY_QUICK_REACTIONS, type StoryQuickReactionEmoji } from "@frennix/ty
 import { colors, overlays, radius, spacing, typography } from "@frennix/ui";
 
 const REACTION_TAP_LOCK_MS = 450;
+const REACTION_DELIVER_ERROR = "Reaction couldn’t be delivered. Try again.";
 
 type StoryReactionRowProps = {
   disabled?: boolean;
@@ -35,13 +36,6 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
     }
     lastTapAtRef.current = now;
 
-    if (selectedEmoji === emoji) {
-      setError(null);
-      setStatus("Reaction sent.");
-      logReactionUi("already-selected", { emoji });
-      return;
-    }
-
     inFlightRef.current = true;
     setPendingEmoji(emoji);
     setError(null);
@@ -53,8 +47,8 @@ export function StoryReactionRow({ disabled, selectedEmoji = null, onReact }: St
       setStatus("Reaction sent.");
       logReactionUi("request-succeeded", { emoji });
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Reaction couldn’t be sent. Try again.";
-      setError("Reaction couldn’t be sent. Try again.");
+      const message = caught instanceof Error ? caught.message : REACTION_DELIVER_ERROR;
+      setError(REACTION_DELIVER_ERROR);
       setStatus(null);
       logReactionUi("request-failed", { emoji, message });
     } finally {

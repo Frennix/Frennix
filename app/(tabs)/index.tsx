@@ -318,7 +318,7 @@ export default function HomeScreen() {
       slideId?: string | null
     ) => {
       if (!userId || !storyId) {
-        throw new Error("Reaction couldn’t be sent. Try again.");
+        throw new Error("Reaction couldn’t be delivered. Try again.");
       }
       try {
         console.info("[story-reaction] home-handler-start", {
