@@ -163,7 +163,9 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "reactions: highlight only after a confirmed write",
     run: () => {
       mustInclude("components/story/StoryReactionRow.tsx", "selectedEmoji", "reactions");
-      mustInclude("components/WorkoutStoryViewer.tsx", "Reaction sent.", "reactions");
+      mustInclude("components/WorkoutStoryViewer.tsx", "REACTION_SENT_MESSAGE", "reactions");
+      mustInclude("lib/story-reaction-confirmation.ts", "Reaction sent.", "reactions");
+      mustInclude("components/story/StoryReactionRow.tsx", "Reaction sent.", "reactions");
       mustInclude("packages/api/src/story-engagement.ts", "getViewerStoryReaction", "reactions");
       mustInclude("packages/api/src/story-reaction-delivery.ts", "handler-invoked", "reactions");
       mustInclude("components/story/StoryReactionRow.tsx", "handler-invoked", "reactions");
@@ -211,6 +213,18 @@ const checks: Array<{ name: string; run: () => void }> = [
         "updates the existing notification when the emoji changes",
         "notify"
       );
+      mustInclude(
+        "lib/story-reaction-notification.test.ts",
+        "changes the rendered Notifications Center copy when the emoji changes",
+        "notify"
+      );
+      mustInclude(
+        "lib/story-reaction-confirmation.test.ts",
+        "keeps Reaction sent visible after a stale previous-emoji sync",
+        "notify"
+      );
+      mustInclude("components/WorkoutStoryViewer.tsx", "REACTION_CONFIRMATION_VISIBLE_MS", "notify");
+      mustInclude("packages/api/src/notifications.ts", "overlayStoryReactionNotifications", "notify");
     },
   },
   {

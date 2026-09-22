@@ -37,6 +37,11 @@ import { StoryWorkoutSlideCard } from "./story/StoryWorkoutSlideCard";
 import { StoryQuickActionsBar } from "./story/StoryQuickActionsBar";
 import { StoryReplyBar } from "./story/StoryReplyBar";
 import { StoryReactionRow } from "./story/StoryReactionRow";
+import {
+  REACTION_CONFIRMATION_VISIBLE_MS,
+  REACTION_SENT_MESSAGE,
+  shouldAcceptReactionConfirmation,
+} from "@/lib/story-reaction-confirmation";
 import { StoryPollVoteCard } from "./story/StoryPollVoteCard";
 import { StoryCountdownCard } from "./story/StoryCountdownCard";
 import { StoryQuestionCard } from "./story/StoryQuestionCard";
@@ -376,7 +381,6 @@ export function WorkoutStoryViewer({
     setCaptionExpanded(false);
     setShowReply(false);
     setControlsOpen(false);
-    setStatusMessage("");
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
@@ -472,10 +476,27 @@ export function WorkoutStoryViewer({
     onClose();
   }, [onClose, slideIndex, slides.length, stories.length, storyIndex]);
 
-  const showStatus = useCallback((message: string) => {
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusRequestIdRef = useRef(0);
+  const localConfirmRequestIdRef = useRef(0);
+
+  const showStatus = useCallback((message: string, requestId: number = Date.now()) => {
+    if (!shouldAcceptReactionConfirmation(statusRequestIdRef.current, requestId)) return;
+    statusRequestIdRef.current = requestId;
     setStatusMessage(message);
-    setTimeout(() => setStatusMessage(""), 2200);
+    if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+    statusTimeoutRef.current = setTimeout(() => {
+      if (statusRequestIdRef.current === requestId) setStatusMessage("");
+    }, REACTION_CONFIRMATION_VISIBLE_MS);
   }, []);
+
+  useEffect(() => {
+    if (visible) return;
+    if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+    statusRequestIdRef.current = 0;
+    localConfirmRequestIdRef.current = 0;
+    setStatusMessage("");
+  }, [visible]);
 
   const handleControlsUpdated = useCallback(
     (updated: FrennixStory) => {
@@ -772,8 +793,19 @@ export function WorkoutStoryViewer({
   });
 
   useEffect(() => {
+    localConfirmRequestIdRef.current = 0;
     setConfirmedReaction(asQuickReaction(savedReaction));
-  }, [savedReaction, reactionStoryId]);
+  }, [reactionStoryId]);
+
+  useEffect(() => {
+    setConfirmedReaction((current) => {
+      const incoming = asQuickReaction(savedReaction);
+      if (localConfirmRequestIdRef.current > 0 && current && incoming !== current) {
+        return current;
+      }
+      return incoming;
+    });
+  }, [savedReaction]);
   const hasChallengeHint = Boolean(
     currentDedicatedStory?.challenge_id || currentDedicatedStory?.challenge_prompt
   );
@@ -1210,6 +1242,7 @@ export function WorkoutStoryViewer({
                     });
                   }}
                   onConfirmed={(emoji, requestId) => {
+                    localConfirmRequestIdRef.current = requestId;
                     setConfirmedReaction(emoji);
                     if (session?.user.id && activeStoryId) {
                       queryClient.setQueryData(
@@ -1219,11 +1252,11 @@ export function WorkoutStoryViewer({
                     }
                     logStoryViewer("toast-displayed", {
                       requestId,
-                      message: "Reaction sent.",
+                      message: REACTION_SENT_MESSAGE,
                       emoji,
                     });
-                    publishStoryReactionTrace(requestId, emoji, "confirmed", "ok", "Reaction sent.");
-                    showStatus("Reaction sent.");
+                    publishStoryReactionTrace(requestId, emoji, "confirmed", "ok", REACTION_SENT_MESSAGE);
+                    showStatus(REACTION_SENT_MESSAGE, requestId);
                   }}
                   onFailed={(message, requestId) => {
                     logStoryViewer("toast-displayed", {
@@ -1231,7 +1264,7 @@ export function WorkoutStoryViewer({
                       message,
                     });
                     publishStoryReactionTrace(requestId, null, "confirmed", "fail", message);
-                    showStatus(message);
+                    showStatus(message, requestId);
                   }}
                 />
                 <StoryQuickActionsBar
@@ -1511,8 +1544,8 @@ const styles = StyleSheet.create({
     right: spacing.lg,
     bottom: 168,
     alignItems: "center",
-    zIndex: 80,
-    elevation: 80,
+    zIndex: 120,
+    elevation: 120,
   },
   statusToastText: {
     ...typography.bodySmall,

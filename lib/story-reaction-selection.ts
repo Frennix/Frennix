@@ -116,8 +116,11 @@ export function applyStoryReactionConfirmedFromServer(
 ): StoryReactionSelectionState {
   if (state.status === "pending") return state;
   const normalized = canonicalizeStoryReaction(value)?.emoji ?? null;
-  if (normalized && normalized === state.confirmed && state.status === "sent") {
-    return { ...state, selected: normalized };
+  if (state.status === "sent") {
+    if (!normalized || normalized === state.confirmed) {
+      return { ...state, selected: state.confirmed ?? normalized };
+    }
+    return state;
   }
   return {
     ...state,

@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { buildNotificationDisplay } from "../packages/api/src/notifications";
 import {
+  applyRenderedStoryReactionEmoji,
   applyStoryReactionNotificationWrite,
   buildStoryReactionNotificationPayload,
+  overlayStoryReactionNotifications,
   planStoryReactionOwnerNotification,
   storyReactionNotificationDedupeKey,
 } from "../packages/api/src/notifications";
@@ -220,6 +223,48 @@ describe("story reaction owner notification", () => {
     assert.equal(
       storyReactionNotificationDedupeKey("story-1", "viewer-1"),
       storyReactionNotificationDedupeKey("story-1", "viewer-1")
+    );
+  });
+
+  it("changes the rendered Notifications Center copy when the emoji changes", () => {
+    const original = applyRenderedStoryReactionEmoji(
+      {
+        id: "notif-1",
+        user_id: "owner-1",
+        type: "story_reaction",
+        payload: {
+          story_id: "story-1",
+          reactor_id: "viewer-1",
+          reaction: "🔥",
+        },
+        read_at: null,
+        created_at: "2026-09-22T00:00:00.000Z",
+        actor_id: "viewer-1",
+      },
+      "🔥",
+      "Founder"
+    );
+    const originalDisplay = buildNotificationDisplay(original, "Founder");
+    assert.equal(originalDisplay.headline, "Story reaction");
+    assert.equal(originalDisplay.detail, "Founder reacted 🔥 to your Story.");
+
+    const updated = applyRenderedStoryReactionEmoji(original, "❤️", "Founder");
+    const updatedDisplay = buildNotificationDisplay(updated, "Founder");
+    assert.equal(updated.payload.reaction, "❤️");
+    assert.equal(updated.title, "Story reaction");
+    assert.equal(updated.body, "Founder reacted ❤️ to your Story.");
+    assert.equal(updatedDisplay.detail, "Founder reacted ❤️ to your Story.");
+    assert.equal(updatedDisplay.detail.includes("🔥"), false);
+
+    const overlaid = overlayStoryReactionNotifications(
+      [original],
+      [{ story_id: "story-1", user_id: "viewer-1", reaction: "❤️" }]
+    );
+    assert.equal(overlaid.length, 1);
+    assert.equal(overlaid[0]?.payload.reaction, "❤️");
+    assert.equal(
+      buildNotificationDisplay(overlaid[0]!, "Founder").detail,
+      "Founder reacted ❤️ to your Story."
     );
   });
 });

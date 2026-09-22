@@ -40,6 +40,78 @@ function decodeNotificationCursor(cursor: string): { createdAt: string; id: stri
   return { createdAt, id };
 }
 
+
+export function applyRenderedStoryReactionEmoji(
+  notification: Notification,
+  emoji: string,
+  actorName = "Someone"
+): Notification {
+  const payload = {
+    ...safeNotificationPayload(notification.payload),
+    reaction: emoji,
+  };
+  const next = { ...notification, payload };
+  const display = buildNotificationDisplay(next, actorName);
+  return {
+    ...next,
+    title: display.headline,
+    body: display.detail,
+  };
+}
+
+export function overlayStoryReactionNotifications(
+  notifications: Notification[],
+  latestReactions: Array<{ story_id: string; user_id: string; reaction: string }>
+): Notification[] {
+  if (!notifications.length || !latestReactions.length) return notifications;
+  const latest = new Map(
+    latestReactions.map((row) => [`${row.story_id}:${row.user_id}`, row.reaction])
+  );
+  return notifications.map((notification) => {
+    if (notification.type !== "story_reaction") return notification;
+    const payload = safeNotificationPayload(notification.payload);
+    const storyId = typeof payload.story_id === "string" ? payload.story_id : null;
+    const actorId =
+      notification.actor_id ??
+      (typeof payload.reactor_id === "string" ? payload.reactor_id : null);
+    if (!storyId || !actorId) return notification;
+    const reaction = latest.get(`${storyId}:${actorId}`);
+    if (!reaction || reaction === payload.reaction) return notification;
+    return applyRenderedStoryReactionEmoji(
+      notification,
+      reaction,
+      notification.actor?.display_name ?? "Someone"
+    );
+  });
+}
+
+async function overlayLatestStoryReactionContent(
+  notifications: Notification[]
+): Promise<Notification[]> {
+  const storyIds = [
+    ...new Set(
+      notifications
+        .filter((notification) => notification.type === "story_reaction")
+        .map((notification) => {
+          const storyId = safeNotificationPayload(notification.payload).story_id;
+          return typeof storyId === "string" ? storyId : null;
+        })
+        .filter((storyId): storyId is string => Boolean(storyId))
+    ),
+  ];
+  if (!storyIds.length) return notifications;
+
+  const { data, error } = await getSupabase()
+    .from("story_item_reactions")
+    .select("story_id, user_id, reaction")
+    .in("story_id", storyIds);
+  if (error || !data?.length) return notifications;
+  return overlayStoryReactionNotifications(
+    notifications,
+    data as Array<{ story_id: string; user_id: string; reaction: string }>
+  );
+}
+
 async function filterAndEnrichNotifications(
   userId: string,
   rows: Notification[]
@@ -52,7 +124,8 @@ async function filterAndEnrichNotifications(
     return !actorId || !blockedIds.has(actorId);
   });
 
-  return enrichNotifications(filtered);
+  const enriched = await enrichNotifications(filtered);
+  return overlayLatestStoryReactionContent(enriched);
 }
 
 export function safeNotificationPayload(payload: unknown): Record<string, unknown> {
@@ -554,17 +627,25 @@ async function refreshStoryReactionNotificationRow(write: StoryReactionNotificat
   if (profiles[0]?.display_name) {
     resolvedName = profiles[0].display_name;
   }
-  const copy = buildNotificationCopy({
-    type: "story_reaction",
-    actorName: resolvedName,
-    payload: write.payload,
-  });
+  const rendered = applyRenderedStoryReactionEmoji(
+    {
+      id: write.dedupeKey,
+      user_id: write.ownerId,
+      type: "story_reaction",
+      payload: write.payload,
+      read_at: null,
+      created_at: new Date(0).toISOString(),
+      actor_id: write.actorId,
+    },
+    String(write.payload.reaction ?? ""),
+    resolvedName
+  );
   const { data, error } = await getSupabase()
     .from("notifications")
     .update({
-      title: copy.title,
-      body: copy.body,
-      payload: write.payload,
+      title: rendered.title,
+      body: rendered.body,
+      payload: rendered.payload,
       read_at: null,
     })
     .eq("user_id", write.ownerId)
