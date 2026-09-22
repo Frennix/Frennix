@@ -18,20 +18,20 @@ export async function runMountedStoryReaction(input: {
   ownerId: string;
   slideId: string | null;
   pageOnReact?: MountedStoryReactionPageHandler;
-  onStage: (stage: string, status: StoryReactionTraceStatus, detail?: string) => void;
+  onStage?: (stage: string, status: StoryReactionTraceStatus, detail?: string) => void;
 }) {
-  input.onStage("viewer handler", "pending");
+  input.onStage?.("viewer handler", "pending");
   if (!input.storyId || !input.viewerId) {
-    input.onStage("viewer handler", "fail", "missing storyId or viewerId");
+    input.onStage?.("viewer handler", "fail", "missing storyId or viewerId");
     throw new Error("Reaction couldn’t be delivered. Try again.");
   }
   if (!input.pageOnReact) {
-    input.onStage("page callback", "fail", "page onReact was not provided");
+    input.onStage?.("page callback", "fail", "page onReact was not provided");
     throw new Error("Reaction couldn’t be delivered. Try again.");
   }
 
-  input.onStage("viewer handler", "ok", "StoryReactionRow reached WorkoutStoryViewer");
-  input.onStage("page callback", "pending");
+  input.onStage?.("viewer handler", "ok", "StoryReactionRow reached WorkoutStoryViewer");
+  input.onStage?.("page callback", "pending");
   try {
     await input.pageOnReact(
       input.ownerId,
@@ -40,10 +40,10 @@ export async function runMountedStoryReaction(input: {
       input.slideId,
       input.requestId
     );
-    input.onStage("page callback", "ok", "Home handleStoryReact awaited");
+    input.onStage?.("page callback", "ok", "Home handleStoryReact awaited");
   } catch (error) {
     const detail = error instanceof Error ? error.message : "page callback failed";
-    input.onStage("page callback", "fail", detail);
+    input.onStage?.("page callback", "fail", detail);
     throw error;
   }
 }

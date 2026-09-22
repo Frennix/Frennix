@@ -14,12 +14,8 @@ import { getSupabase } from "./supabase";
 
 export {
   applyMountedStoryReactionFromReadableSource,
-  attachStoryReactionNotificationDiagnostic,
   extractMountedStoryReactionRefs,
-  formatStoryReactionNotificationDiagnostic,
-  getStoryReactionNotificationDiagnostic,
   overlayMountedStoryReactionNotifications,
-  STORY_REACTION_NOTIFICATION_DIAG_KEY,
 } from "./story-reaction-notification-display";
 
 const NOTIFICATIONS_LIMIT = 50;

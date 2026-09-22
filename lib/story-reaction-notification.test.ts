@@ -13,8 +13,6 @@ import {
 import {
   applyMountedStoryReactionFromReadableSource,
   extractMountedStoryReactionRefs,
-  formatStoryReactionNotificationDiagnostic,
-  getStoryReactionNotificationDiagnostic,
 } from "../packages/api/src/story-reaction-notification-display";
 import { executeStoryReactionDelivery, type StoryReactionDeliveryPorts } from "../packages/api/src/story-reaction-delivery";
 
@@ -372,8 +370,6 @@ describe("story reaction owner notification", () => {
 
     const resolved = applyMountedStoryReactionFromReadableSource({
       notification: stored,
-      tableStatus: "denied",
-      tableError: "permission denied for table story_item_reactions",
       dmRow: {
         id: "msg-1",
         conversation_id: "conv-1",
@@ -381,43 +377,22 @@ describe("story reaction owner notification", () => {
         content: "Reacted ❤️ to your story",
         story_reply_id: "story-1",
       },
-      dmStatus: "succeeded",
     });
 
     const mountedDisplay = buildNotificationDisplay(
-      resolved.notification,
-      resolved.notification.actor?.display_name ?? "Someone"
+      resolved,
+      resolved.actor?.display_name ?? "Someone"
     );
-    assert.equal(resolved.notification.payload.reaction, "❤️");
+    assert.equal(resolved.id, stored.id);
+    assert.equal(resolved.payload.reaction, "❤️");
     assert.equal(mountedDisplay.detail, "Founder reacted ❤️ to your Story.");
     assert.equal(mountedDisplay.detail.includes("🔥"), false);
-    assert.equal(resolved.diagnostic.storedPayloadReaction, "🔥");
-    assert.equal(resolved.diagnostic.displayReaction, "❤️");
-    assert.equal(resolved.diagnostic.displaySource, "reaction_dm");
-    assert.equal(resolved.diagnostic.tableLookup, "denied");
-    assert.equal(resolved.diagnostic.dmLookup, "succeeded");
-    assert.equal(resolved.diagnostic.dmReaction, "❤️");
-    assert.equal(resolved.diagnostic.storyId, "story-1");
-    assert.equal(resolved.diagnostic.storyItemId, "slide-1");
-    assert.equal(resolved.diagnostic.actorId, "viewer-1");
-    assert.equal(resolved.diagnostic.dedupeKey, "story_reaction:story-1:viewer-1");
-
-    const attached = getStoryReactionNotificationDiagnostic(resolved.notification);
-    assert.equal(attached?.displayReaction, "❤️");
-    assert.match(formatStoryReactionNotificationDiagnostic(resolved.diagnostic), /dm succeeded ❤️/);
   });
 
-  it("records table no_row and key mismatches without creating a second notification", () => {
+  it("keeps one notification when the readable DM supplies the updated emoji", () => {
     const stored = mountedNotificationsCenterRow();
     const resolved = applyMountedStoryReactionFromReadableSource({
       notification: stored,
-      tableRow: {
-        story_id: "other-story",
-        user_id: "other-viewer",
-        slide_id: "other-slide",
-        reaction: "❤️",
-      },
-      tableStatus: "mismatch",
       dmRow: {
         id: "msg-1",
         conversation_id: "conv-1",
@@ -425,19 +400,11 @@ describe("story reaction owner notification", () => {
         content: "Reacted ❤️ to your story",
         story_reply_id: "story-1",
       },
-      dmStatus: "succeeded",
     });
 
-    assert.equal(resolved.notification.id, stored.id);
-    assert.equal(resolved.diagnostic.tableLookup, "mismatch");
-    assert.ok(
-      resolved.diagnostic.mismatches.some((item) => item.includes("table.story_id"))
-    );
-    assert.ok(
-      resolved.diagnostic.mismatches.some((item) => item.includes("table.user_id"))
-    );
+    assert.equal(resolved.id, stored.id);
     assert.equal(
-      buildNotificationDisplay(resolved.notification, "Founder").detail,
+      buildNotificationDisplay(resolved, "Founder").detail,
       "Founder reacted ❤️ to your Story."
     );
   });
@@ -446,14 +413,10 @@ describe("story reaction owner notification", () => {
     const stored = mountedNotificationsCenterRow();
     const resolved = applyMountedStoryReactionFromReadableSource({
       notification: stored,
-      tableStatus: "no_row",
-      dmStatus: "no_row",
     });
-    assert.equal(resolved.notification.payload.reaction, "🔥");
-    assert.equal(resolved.diagnostic.displaySource, "stored_payload");
-    assert.equal(resolved.diagnostic.dmLookup, "no_row");
+    assert.equal(resolved.payload.reaction, "🔥");
     assert.equal(
-      buildNotificationDisplay(resolved.notification, "Founder").detail,
+      buildNotificationDisplay(resolved, "Founder").detail,
       "Founder reacted 🔥 to your Story."
     );
   });

@@ -80,7 +80,6 @@ import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
-import { publishStoryReactionTrace } from "@/lib/story-reaction-trace";
 import { buildDedicatedStorySlides, prefetchAuthorizedViewerMedia } from "@/lib/story-utils";
 import { usePostInteraction } from "@/lib/usePostInteraction";
 import { useFeedCommentsSheet } from "@/lib/useFeedCommentsSheet";
@@ -323,45 +322,14 @@ export default function HomeScreen() {
         throw new Error("Reaction couldn’t be delivered. Try again.");
       }
       const reactionRequestId = requestId ?? Date.now();
-      publishStoryReactionTrace(reactionRequestId, emoji, "page callback", "pending", "Home handleStoryReact entered");
-      try {
-        console.info("[story-reaction] home-handler-start", {
-          requestId: reactionRequestId,
-          viewerId: userId,
-          ownerId: storyUserId,
-          storyId,
-          slideId: slideId ?? null,
-          emoji,
-        });
-        await sendDedicatedStoryReaction(
-          userId,
-          storyUserId,
-          storyId,
-          emoji,
-          slideId,
-          reactionRequestId,
-          (stage, status, detail) => {
-            console.info("[story-reaction] home-stage", {
-              requestId: reactionRequestId,
-              stage,
-              status,
-              detail: detail ?? null,
-            });
-            publishStoryReactionTrace(reactionRequestId, emoji, stage, status, detail);
-          }
-        );
-        console.info("[story-reaction] home-handler-success", {
-          requestId: reactionRequestId,
-          storyId,
-          emoji,
-        });
-      } catch (error) {
-        console.error("[story-reaction] home-handler-failed", {
-          requestId: reactionRequestId,
-          error: getTechnicalErrorMessage(error),
-        });
-        throw error;
-      }
+      await sendDedicatedStoryReaction(
+        userId,
+        storyUserId,
+        storyId,
+        emoji,
+        slideId,
+        reactionRequestId
+      );
     },
     [userId]
   );

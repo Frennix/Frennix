@@ -73,14 +73,6 @@ import {
 } from "@/lib/story-media-ready";
 import { runMountedStoryReaction } from "@/lib/run-mounted-story-reaction";
 import {
-  applyStoryReactionTraceStage,
-  createStoryReactionTrace,
-  formatStoryReactionTrace,
-  publishStoryReactionTrace,
-  subscribeStoryReactionTrace,
-  type StoryReactionTraceSnapshot,
-} from "@/lib/story-reaction-trace";
-import {
   buildDedicatedStorySlides,
   prefetchAuthorizedViewerMedia,
   resolveSlideContext,
@@ -345,7 +337,6 @@ export function WorkoutStoryViewer({
   const lastNavAtRef = useRef(0);
   const [playbackEpoch, setPlaybackEpoch] = useState(0);
   const [mediaReady, setMediaReady] = useState(false);
-  const [reactionTrace, setReactionTrace] = useState<StoryReactionTraceSnapshot | null>(null);
   const mediaStageRef = useRef<View>(null);
   const [mediaFailed, setMediaFailed] = useState(false);
   const [confirmedReaction, setConfirmedReaction] = useState<StoryQuickReactionEmoji | null>(null);
@@ -579,17 +570,6 @@ export function WorkoutStoryViewer({
     setMediaFailed(false);
     setMediaReady(true);
   }, [mediaIdentity, timerKey]);
-
-  useEffect(() => {
-    return subscribeStoryReactionTrace((requestId, emoji, stage, status, detail) => {
-      setReactionTrace((current) => {
-        const base = current?.requestId === requestId
-          ? current
-          : createStoryReactionTrace(requestId, emoji ?? current?.emoji ?? "");
-        return applyStoryReactionTraceStage(base, stage, status, detail);
-      });
-    });
-  }, []);
 
   useEffect(() => {
     if (!needsMedia || mediaReady || mediaFailed || Platform.OS !== "web") return;
@@ -1213,21 +1193,10 @@ export function WorkoutStoryViewer({
                 <StoryReactionRow
                   key={reactionStoryId ?? "reaction-row"}
                   selectedEmoji={confirmedReaction}
-                  onTrace={(stage, requestId, emoji) => {
-                    publishStoryReactionTrace(requestId, emoji, stage, "ok");
-                  }}
                   onReact={async (emoji, requestId) => {
                     const slideId = slideContext?.slideId ?? null;
                     const ownerId = story.user_id;
                     const viewerId = session?.user.id ?? null;
-                    logStoryViewer("reaction-tap-received", {
-                      requestId,
-                      emoji,
-                      storyId: activeStoryId,
-                      slideId,
-                      ownerId,
-                      viewerId,
-                    });
                     await runMountedStoryReaction({
                       emoji,
                       requestId,
@@ -1236,9 +1205,6 @@ export function WorkoutStoryViewer({
                       ownerId,
                       slideId,
                       pageOnReact: onReact,
-                      onStage: (stage, status, detail) => {
-                        publishStoryReactionTrace(requestId, emoji, stage, status, detail);
-                      },
                     });
                   }}
                   onConfirmed={(emoji, requestId) => {
@@ -1250,20 +1216,9 @@ export function WorkoutStoryViewer({
                         emoji
                       );
                     }
-                    logStoryViewer("toast-displayed", {
-                      requestId,
-                      message: REACTION_SENT_MESSAGE,
-                      emoji,
-                    });
-                    publishStoryReactionTrace(requestId, emoji, "confirmed", "ok", REACTION_SENT_MESSAGE);
                     showStatus(REACTION_SENT_MESSAGE, requestId);
                   }}
                   onFailed={(message, requestId) => {
-                    logStoryViewer("toast-displayed", {
-                      requestId,
-                      message,
-                    });
-                    publishStoryReactionTrace(requestId, null, "confirmed", "fail", message);
                     showStatus(message, requestId);
                   }}
                 />
@@ -1295,12 +1250,6 @@ export function WorkoutStoryViewer({
             ) : null}
           </View>
         </Animated.View>
-        {reactionTrace ? (
-          <View style={styles.diagPanel} pointerEvents="none">
-            <Text style={styles.diagTitle}>Reaction diagnostic</Text>
-            <Text style={styles.diagBody}>{formatStoryReactionTrace(reactionTrace)}</Text>
-          </View>
-        ) : null}
         {statusMessage ? (
           <View style={styles.statusToast} pointerEvents="none">
             <Text style={styles.statusToastText}>{statusMessage}</Text>
@@ -1511,32 +1460,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: "800",
-  },
-  diagPanel: {
-    position: "absolute",
-    left: spacing.md,
-    right: spacing.md,
-    top: 88,
-    zIndex: 90,
-    elevation: 90,
-    backgroundColor: "rgba(10, 10, 11, 0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.28)",
-    borderRadius: 12,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  diagTitle: {
-    ...typography.caption,
-    color: colors.accent,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  diagBody: {
-    ...typography.caption,
-    color: colors.text,
-    fontVariant: ["tabular-nums"],
-    lineHeight: 16,
   },
   statusToast: {
     position: "absolute",
