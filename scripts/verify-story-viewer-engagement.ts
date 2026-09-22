@@ -225,6 +225,34 @@ const checks: Array<{ name: string; run: () => void }> = [
       );
       mustInclude("components/WorkoutStoryViewer.tsx", "REACTION_CONFIRMATION_VISIBLE_MS", "notify");
       mustInclude("packages/api/src/notifications.ts", "overlayStoryReactionNotifications", "notify");
+      mustInclude(
+        "packages/api/src/notifications.ts",
+        "overlayMountedStoryReactionNotifications",
+        "notify"
+      );
+      mustInclude(
+        "packages/api/src/story-reaction-notification-display.ts",
+        "displaySource",
+        "notify"
+      );
+      mustInclude("app/notifications.tsx", "getNotificationsPage", "notify");
+      mustInclude("app/notifications.tsx", "Notifications Center preview", "notify");
+      mustInclude("components/FrennixNotificationRow.tsx", "buildNotificationDisplay", "notify");
+      mustInclude(
+        "components/FrennixNotificationRow.tsx",
+        "getStoryReactionNotificationDiagnostic",
+        "notify"
+      );
+      mustInclude(
+        "lib/story-reaction-notification.test.ts",
+        "mounted Notifications Center select(*) payload keys",
+        "notify"
+      );
+      mustInclude(
+        "lib/story-reaction-notification.test.ts",
+        "readable reaction DM, not the stale payload",
+        "notify"
+      );
     },
   },
   {

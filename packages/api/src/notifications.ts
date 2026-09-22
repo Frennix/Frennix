@@ -9,7 +9,18 @@ import {
 import { getBlockedIds } from "./moderation";
 import { getProfilesByIds } from "./profiles";
 import { getSupabaseErrorDetails } from "./profile-utils";
+import { overlayMountedStoryReactionNotifications } from "./story-reaction-notification-display";
 import { getSupabase } from "./supabase";
+
+export {
+  applyMountedStoryReactionFromReadableSource,
+  attachStoryReactionNotificationDiagnostic,
+  extractMountedStoryReactionRefs,
+  formatStoryReactionNotificationDiagnostic,
+  getStoryReactionNotificationDiagnostic,
+  overlayMountedStoryReactionNotifications,
+  STORY_REACTION_NOTIFICATION_DIAG_KEY,
+} from "./story-reaction-notification-display";
 
 const NOTIFICATIONS_LIMIT = 50;
 const NOTIFICATIONS_PAGE_SIZE = 30;
@@ -88,28 +99,7 @@ export function overlayStoryReactionNotifications(
 async function overlayLatestStoryReactionContent(
   notifications: Notification[]
 ): Promise<Notification[]> {
-  const storyIds = [
-    ...new Set(
-      notifications
-        .filter((notification) => notification.type === "story_reaction")
-        .map((notification) => {
-          const storyId = safeNotificationPayload(notification.payload).story_id;
-          return typeof storyId === "string" ? storyId : null;
-        })
-        .filter((storyId): storyId is string => Boolean(storyId))
-    ),
-  ];
-  if (!storyIds.length) return notifications;
-
-  const { data, error } = await getSupabase()
-    .from("story_item_reactions")
-    .select("story_id, user_id, reaction")
-    .in("story_id", storyIds);
-  if (error || !data?.length) return notifications;
-  return overlayStoryReactionNotifications(
-    notifications,
-    data as Array<{ story_id: string; user_id: string; reaction: string }>
-  );
+  return overlayMountedStoryReactionNotifications(notifications);
 }
 
 async function filterAndEnrichNotifications(

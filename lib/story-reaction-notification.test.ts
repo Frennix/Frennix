@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildNotificationDisplay } from "../packages/api/src/notifications";
+import type { Notification } from "../packages/types/src";
 import {
   applyRenderedStoryReactionEmoji,
   applyStoryReactionNotificationWrite,
@@ -9,7 +10,55 @@ import {
   planStoryReactionOwnerNotification,
   storyReactionNotificationDedupeKey,
 } from "../packages/api/src/notifications";
+import {
+  applyMountedStoryReactionFromReadableSource,
+  extractMountedStoryReactionRefs,
+  formatStoryReactionNotificationDiagnostic,
+  getStoryReactionNotificationDiagnostic,
+} from "../packages/api/src/story-reaction-notification-display";
 import { executeStoryReactionDelivery, type StoryReactionDeliveryPorts } from "../packages/api/src/story-reaction-delivery";
+
+/** Exact select("*") + enrich shape consumed by app/notifications.tsx → FrennixNotificationRow. */
+function mountedNotificationsCenterRow(
+  overrides: Partial<Notification> = {},
+  payloadOverrides: Record<string, unknown> = {}
+): Notification {
+  return {
+    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    user_id: "owner-1",
+    type: "story_reaction",
+    payload: {
+      story_id: "story-1",
+      story_item_id: "slide-1",
+      reactor_id: "viewer-1",
+      reaction: "🔥",
+      conversation_id: "conv-1",
+      message_id: "msg-1",
+      ...payloadOverrides,
+    },
+    read_at: null,
+    created_at: "2026-09-22T07:00:00.000Z",
+    deleted_at: null,
+    actor_id: "viewer-1",
+    entity_type: "story",
+    entity_id: "story-1",
+    title: "Story reaction",
+    body: "Founder reacted 🔥 to your story",
+    deep_link: "/notifications",
+    category: "social",
+    dedupe_key: "story_reaction:story-1:viewer-1",
+    delivered_at: null,
+    expires_at: null,
+    metadata: {},
+    actor: {
+      id: "viewer-1",
+      username: "founder",
+      display_name: "Founder",
+      avatar_url: null,
+    } as Notification["actor"],
+    ...overrides,
+  };
+}
 
 describe("story reaction owner notification", () => {
   it("uses a stable dedupe key that does not include the emoji", () => {
@@ -265,6 +314,147 @@ describe("story reaction owner notification", () => {
     assert.equal(
       buildNotificationDisplay(overlaid[0]!, "Founder").detail,
       "Founder reacted ❤️ to your Story."
+    );
+  });
+
+  it("reads the mounted Notifications Center select(*) payload keys", () => {
+    const row = mountedNotificationsCenterRow();
+    const refs = extractMountedStoryReactionRefs(row);
+    assert.equal(refs.storyId, "story-1");
+    assert.equal(refs.storyItemId, "slide-1");
+    assert.equal(refs.actorId, "viewer-1");
+    assert.equal(refs.storedReaction, "🔥");
+    assert.equal(refs.conversationId, "conv-1");
+    assert.equal(refs.messageId, "msg-1");
+    assert.equal(refs.dedupeKey, "story_reaction:story-1:viewer-1");
+    assert.deepEqual(refs.payloadKeys, [
+      "conversation_id",
+      "message_id",
+      "reaction",
+      "reactor_id",
+      "story_id",
+      "story_item_id",
+    ]);
+  });
+
+  it("maps camelCase and emoji aliases from the same mounted payload shape", () => {
+    const row = mountedNotificationsCenterRow(
+      { actor_id: null, dedupe_key: null },
+      {
+        story_id: undefined,
+        story_item_id: undefined,
+        reactor_id: undefined,
+        reaction: undefined,
+        conversation_id: undefined,
+        message_id: undefined,
+        storyId: "story-alias",
+        slideId: "slide-alias",
+        viewer_id: "viewer-alias",
+        emoji: "😂",
+        conversationId: "conv-alias",
+        messageId: "msg-alias",
+      }
+    );
+    const refs = extractMountedStoryReactionRefs(row);
+    assert.equal(refs.storyId, "story-alias");
+    assert.equal(refs.storyItemId, "slide-alias");
+    assert.equal(refs.actorId, "viewer-alias");
+    assert.equal(refs.storedReaction, "😂");
+    assert.equal(refs.conversationId, "conv-alias");
+    assert.equal(refs.messageId, "msg-alias");
+    assert.equal(refs.computedDedupeKey, "story_reaction:story-alias:viewer-alias");
+  });
+
+  it("renders the owner Notifications Center from the readable reaction DM, not the stale payload", () => {
+    const stored = mountedNotificationsCenterRow();
+    const storedDisplay = buildNotificationDisplay(stored, stored.actor?.display_name ?? "Someone");
+    assert.equal(storedDisplay.detail, "Founder reacted 🔥 to your Story.");
+
+    const resolved = applyMountedStoryReactionFromReadableSource({
+      notification: stored,
+      tableStatus: "denied",
+      tableError: "permission denied for table story_item_reactions",
+      dmRow: {
+        id: "msg-1",
+        conversation_id: "conv-1",
+        sender_id: "viewer-1",
+        content: "Reacted ❤️ to your story",
+        story_reply_id: "story-1",
+      },
+      dmStatus: "succeeded",
+    });
+
+    const mountedDisplay = buildNotificationDisplay(
+      resolved.notification,
+      resolved.notification.actor?.display_name ?? "Someone"
+    );
+    assert.equal(resolved.notification.payload.reaction, "❤️");
+    assert.equal(mountedDisplay.detail, "Founder reacted ❤️ to your Story.");
+    assert.equal(mountedDisplay.detail.includes("🔥"), false);
+    assert.equal(resolved.diagnostic.storedPayloadReaction, "🔥");
+    assert.equal(resolved.diagnostic.displayReaction, "❤️");
+    assert.equal(resolved.diagnostic.displaySource, "reaction_dm");
+    assert.equal(resolved.diagnostic.tableLookup, "denied");
+    assert.equal(resolved.diagnostic.dmLookup, "succeeded");
+    assert.equal(resolved.diagnostic.dmReaction, "❤️");
+    assert.equal(resolved.diagnostic.storyId, "story-1");
+    assert.equal(resolved.diagnostic.storyItemId, "slide-1");
+    assert.equal(resolved.diagnostic.actorId, "viewer-1");
+    assert.equal(resolved.diagnostic.dedupeKey, "story_reaction:story-1:viewer-1");
+
+    const attached = getStoryReactionNotificationDiagnostic(resolved.notification);
+    assert.equal(attached?.displayReaction, "❤️");
+    assert.match(formatStoryReactionNotificationDiagnostic(resolved.diagnostic), /dm succeeded ❤️/);
+  });
+
+  it("records table no_row and key mismatches without creating a second notification", () => {
+    const stored = mountedNotificationsCenterRow();
+    const resolved = applyMountedStoryReactionFromReadableSource({
+      notification: stored,
+      tableRow: {
+        story_id: "other-story",
+        user_id: "other-viewer",
+        slide_id: "other-slide",
+        reaction: "❤️",
+      },
+      tableStatus: "mismatch",
+      dmRow: {
+        id: "msg-1",
+        conversation_id: "conv-1",
+        sender_id: "viewer-1",
+        content: "Reacted ❤️ to your story",
+        story_reply_id: "story-1",
+      },
+      dmStatus: "succeeded",
+    });
+
+    assert.equal(resolved.notification.id, stored.id);
+    assert.equal(resolved.diagnostic.tableLookup, "mismatch");
+    assert.ok(
+      resolved.diagnostic.mismatches.some((item) => item.includes("table.story_id"))
+    );
+    assert.ok(
+      resolved.diagnostic.mismatches.some((item) => item.includes("table.user_id"))
+    );
+    assert.equal(
+      buildNotificationDisplay(resolved.notification, "Founder").detail,
+      "Founder reacted ❤️ to your Story."
+    );
+  });
+
+  it("keeps the stored emoji when the readable DM lookup returns no row", () => {
+    const stored = mountedNotificationsCenterRow();
+    const resolved = applyMountedStoryReactionFromReadableSource({
+      notification: stored,
+      tableStatus: "no_row",
+      dmStatus: "no_row",
+    });
+    assert.equal(resolved.notification.payload.reaction, "🔥");
+    assert.equal(resolved.diagnostic.displaySource, "stored_payload");
+    assert.equal(resolved.diagnostic.dmLookup, "no_row");
+    assert.equal(
+      buildNotificationDisplay(resolved.notification, "Founder").detail,
+      "Founder reacted 🔥 to your Story."
     );
   });
 });

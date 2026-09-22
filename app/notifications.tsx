@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -41,6 +41,7 @@ import { EmptyState, QueryErrorState, ScreenSpinner, colors, spacing, typography
 import { FrennixLogo } from "@/components/FrennixLogo";
 import { FrennixNotificationRow } from "@/components/FrennixNotificationRow";
 import { groupNotificationsByDate } from "@/lib/notification-groups";
+import { formatBuildVersionLine } from "@/lib/build-version";
 import {
   clearNotificationPages,
   flattenNotificationPages,
@@ -177,6 +178,29 @@ export default function NotificationsScreen() {
   });
 
   const notifications = useMemo(() => flattenNotificationPages(data), [data]);
+  const buildVersionLine = formatBuildVersionLine();
+  const storyReactionDiagnostics = useMemo(
+    () =>
+      notifications
+        .filter((item) => item.type === "story_reaction")
+        .map((item) => ({
+          id: item.id,
+          type: item.type,
+          payloadReaction:
+            item.payload && typeof item.payload === "object"
+              ? (item.payload as { reaction?: unknown }).reaction
+              : null,
+        })),
+    [notifications]
+  );
+
+  useEffect(() => {
+    console.info("[notifications-center] mounted fetch", {
+      build: buildVersionLine,
+      count: notifications.length,
+      storyReactions: storyReactionDiagnostics,
+    });
+  }, [buildVersionLine, notifications.length, storyReactionDiagnostics]);
 
   const notificationSections = useMemo(
     () => groupNotificationsByDate(notifications),
@@ -445,6 +469,22 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <FrennixLogo variant="icon" height={28} style={styles.brandMark} />
+      <View style={styles.buildBanner}>
+        <Text style={styles.buildBannerTitle}>Notifications Center preview</Text>
+        <Text style={styles.buildBannerBody} selectable>
+          {buildVersionLine}
+        </Text>
+        {storyReactionDiagnostics.length ? (
+          <Text style={styles.buildBannerBody} selectable>
+            {storyReactionDiagnostics
+              .map(
+                (item) =>
+                  `${item.id.slice(0, 8)} ${item.type} payload.reaction=${String(item.payloadReaction ?? "none")}`
+              )
+              .join("\n")}
+          </Text>
+        ) : null}
+      </View>
       <View style={styles.summary}>
         <Text style={styles.summaryTitle}>Stay on top of your training network</Text>
         <Text style={styles.summaryBody}>
@@ -567,6 +607,18 @@ const styles = StyleSheet.create({
   summaryTitle: { ...typography.body, fontWeight: "700", color: colors.text },
   summaryBody: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   brandMark: { marginLeft: spacing.md, marginTop: spacing.sm, marginBottom: spacing.xs },
+  buildBanner: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  buildBannerTitle: { ...typography.caption, fontWeight: "800", color: colors.text },
+  buildBannerBody: { ...typography.caption, color: colors.textMuted, lineHeight: 16 },
   header: {
     flexDirection: "row",
     alignItems: "center",

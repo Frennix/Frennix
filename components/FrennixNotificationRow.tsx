@@ -1,7 +1,11 @@
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Notification } from "@frennix/types";
-import { buildNotificationDisplay } from "@frennix/api";
+import {
+  buildNotificationDisplay,
+  formatStoryReactionNotificationDiagnostic,
+  getStoryReactionNotificationDiagnostic,
+} from "@frennix/api";
 import { DismissTrashButton } from "@/components/DismissTrashButton";
 import { Avatar, formatRelativeTime, colors, spacing, typography } from "@frennix/ui";
 
@@ -25,6 +29,25 @@ export const FrennixNotificationRow = memo(function FrennixNotificationRow({
     notification,
     actor?.display_name ?? "Someone"
   );
+  const storyReactionDiag =
+    notification.type === "story_reaction"
+      ? getStoryReactionNotificationDiagnostic(notification)
+      : null;
+  if (storyReactionDiag) {
+    console.info("[notifications-center] mounted row", {
+      notificationId: storyReactionDiag.notificationId,
+      type: storyReactionDiag.type,
+      dedupeKey: storyReactionDiag.dedupeKey,
+      storedPayloadReaction: storyReactionDiag.storedPayloadReaction,
+      storyId: storyReactionDiag.storyId,
+      storyItemId: storyReactionDiag.storyItemId,
+      actorId: storyReactionDiag.actorId,
+      displayReaction: storyReactionDiag.displayReaction,
+      tableLookup: storyReactionDiag.tableLookup,
+      dmLookup: storyReactionDiag.dmLookup,
+      renderedDetail: display.detail,
+    });
+  }
 
   return (
     <View style={[styles.row, isUnread && styles.unreadRow]}>
@@ -51,6 +74,11 @@ export const FrennixNotificationRow = memo(function FrennixNotificationRow({
           <Text style={[styles.detail, isUnread && styles.unreadDetail]} numberOfLines={2}>
             {display.detail}
           </Text>
+          {storyReactionDiag ? (
+            <Text style={styles.diag} selectable>
+              {formatStoryReactionNotificationDiagnostic(storyReactionDiag)}
+            </Text>
+          ) : null}
           <View style={styles.metaRow}>
             <Text style={styles.time}>{formatRelativeTime(createdAt)}</Text>
             <Text style={[styles.status, isUnread ? styles.statusUnread : styles.statusRead]}>
@@ -111,6 +139,12 @@ const styles = StyleSheet.create({
   unreadHeadline: { color: colors.text },
   detail: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },
   unreadDetail: { color: colors.text, fontWeight: "600" },
+  diag: {
+    ...typography.caption,
+    color: colors.textMuted,
+    lineHeight: 16,
+    marginTop: 4,
+  },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
