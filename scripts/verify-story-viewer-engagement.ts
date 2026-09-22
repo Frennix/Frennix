@@ -33,9 +33,13 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("components/story/StoryReactionRow.tsx", "chipSelected", "reactions"),
   },
   {
-    name: "reactions: rapid-tap lock",
-    run: () =>
-      mustInclude("components/story/StoryReactionRow.tsx", "REACTION_TAP_LOCK_MS", "reactions"),
+    name: "reactions: latest-tap-wins selection",
+    run: () => {
+      mustInclude("lib/story-reaction-selection.ts", "applyStoryReactionTap", "reactions");
+      mustInclude("lib/story-reaction-selection.ts", "latestRequestId", "reactions");
+      mustInclude("components/story/StoryReactionRow.tsx", "stale-success-ignored", "reactions");
+      mustNotInclude("components/story/StoryReactionRow.tsx", "REACTION_TAP_LOCK_MS", "reactions");
+    },
   },
   {
     name: "reactions: web click path is not inside a ScrollView",
@@ -48,7 +52,7 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "reactions: specific error copy",
     run: () =>
       mustInclude(
-        "components/story/StoryReactionRow.tsx",
+        "lib/story-reaction-selection.ts",
         "Reaction couldn’t be delivered. Try again.",
         "reactions"
       ),
@@ -161,6 +165,19 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("components/WorkoutStoryViewer.tsx", "Reaction sent.", "reactions");
       mustInclude("packages/api/src/story-engagement.ts", "getViewerStoryReaction", "reactions");
       mustInclude("packages/api/src/story-engagement.ts", "ensuring message", "reactions");
+      mustInclude("lib/story-reaction-selection.test.ts", "ignores an older success", "reactions");
+      mustInclude("lib/story-reaction-selection.test.ts", "stale failure", "reactions");
+      mustInclude("lib/story-reaction-selection.test.ts", "every displayed emoji", "reactions");
+      mustInclude(
+        "lib/story-reaction-selection.test.ts",
+        "never highlights more than one emoji",
+        "reactions"
+      );
+      mustInclude(
+        "lib/story-reaction-message.test.ts",
+        "does not create a second message body",
+        "reactions"
+      );
     },
   },
   {

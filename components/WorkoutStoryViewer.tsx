@@ -1128,6 +1128,7 @@ export function WorkoutStoryViewer({
                   />
                 ) : null}
                 <StoryReactionRow
+                  key={reactionStoryId ?? "reaction-row"}
                   selectedEmoji={confirmedReaction}
                   onReact={async (emoji) => {
                     const slideId = slideContext?.slideId ?? null;
@@ -1159,30 +1160,24 @@ export function WorkoutStoryViewer({
                       ownerId,
                       viewerId,
                     });
-                    try {
-                      logStoryViewer("toast-displayed", { message: "sending" });
-                      await onReact(ownerId, activeStoryId, emoji, slideId);
-                      setConfirmedReaction(emoji);
+                    await onReact(ownerId, activeStoryId, emoji, slideId);
+                  }}
+                  onConfirmed={(emoji) => {
+                    setConfirmedReaction(emoji);
+                    if (session?.user.id && activeStoryId) {
                       queryClient.setQueryData(
-                        ["story-viewer-reaction", viewerId, activeStoryId],
+                        ["story-viewer-reaction", session.user.id, activeStoryId],
                         emoji
                       );
-                      logStoryViewer("toast-displayed", { message: "Reaction sent." });
-                      showStatus("Reaction sent.");
-                    } catch (error) {
-                      logStoryViewer("reaction-handler-failed", {
-                        emoji,
-                        storyId: activeStoryId,
-                        message: getErrorMessage(error, "Reaction couldn’t be delivered. Try again."),
-                      });
-                      logStoryViewer("toast-displayed", {
-                        message: "Reaction couldn’t be delivered. Try again.",
-                      });
-                      showStatus(
-                        getErrorMessage(error, "Reaction couldn’t be delivered. Try again.")
-                      );
-                      throw error;
                     }
+                    logStoryViewer("toast-displayed", { message: "Reaction sent." });
+                    showStatus("Reaction sent.");
+                  }}
+                  onFailed={() => {
+                    logStoryViewer("toast-displayed", {
+                      message: "Reaction couldn’t be delivered. Try again.",
+                    });
+                    showStatus("Reaction couldn’t be delivered. Try again.");
                   }}
                 />
                 <StoryQuickActionsBar

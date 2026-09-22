@@ -78,4 +78,21 @@ describe("canonical story reactions", () => {
       });
     }
   });
+
+  it("does not create a second message body for a repeat tap of the same emoji", () => {
+    const first = formatStoryReactionMessageContent("❤️");
+    const repeat = formatStoryReactionMessageContent("❤️");
+    assert.equal(first, "Reacted ❤️ to your story");
+    assert.equal(repeat, first);
+  });
+
+  it("changes emoji by rewriting the same story-reaction sentence", () => {
+    const first = formatStoryReactionMessageContent("🔥");
+    const updated = formatStoryReactionMessageContent("😂");
+    assert.equal(first, "Reacted 🔥 to your story");
+    assert.equal(updated, "Reacted 😂 to your story");
+    assert.notEqual(first, updated);
+    assert.match(first, /^Reacted .+ to your story$/);
+    assert.match(updated, /^Reacted .+ to your story$/);
+  });
 });

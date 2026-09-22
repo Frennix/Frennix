@@ -133,16 +133,15 @@ function toDeliverError(error: unknown): Error {
 }
 
 async function runStoryReactionDelivery(key: string, work: () => Promise<void>) {
-  while (storyReactionDeliveries.has(key)) {
-    await storyReactionDeliveries.get(key);
-  }
-  const run = work().finally(() => {
-    if (storyReactionDeliveries.get(key) === run) {
+  const previous = storyReactionDeliveries.get(key) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(() => work());
+  const wrapped = run.finally(() => {
+    if (storyReactionDeliveries.get(key) === wrapped) {
       storyReactionDeliveries.delete(key);
     }
   });
-  storyReactionDeliveries.set(key, run);
-  await run;
+  storyReactionDeliveries.set(key, wrapped);
+  await wrapped;
 }
 
 async function getStoryReactionPreviewUrl(

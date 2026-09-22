@@ -59,7 +59,7 @@ function withSkinTones(base: string): string[] {
   return [base, ...SKIN_TONES.map((tone) => `${base}${tone}`)];
 }
 
-/** Displayed story reactions. Storage uses `key`; UI always shows `emoji`. */
+/** Displayed story reactions. UI, writes, and Messages all use `emoji`. */
 export const STORY_QUICK_REACTIONS = [
   {
     key: "strong",
