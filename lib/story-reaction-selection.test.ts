@@ -139,6 +139,18 @@ describe("story reaction latest-tap-wins", () => {
     assert.equal(state.confirmed, "❤️");
   });
 
+  it("does not stale the only in-flight request when the same emoji is tapped again", () => {
+    let state = createStoryReactionSelection(null);
+    const first = applyStoryReactionTap(state, "🔥");
+    state = first.state;
+    const second = applyStoryReactionTap(state, "🔥");
+    assert.equal(second.shouldSend, false);
+    assert.equal(second.requestId, first.requestId);
+    state = applyStoryReactionSuccess(second.state, first.requestId, "🔥");
+    assert.equal(state.status, "sent");
+    assert.deepEqual(selectedStoryReactions(state), ["🔥"]);
+  });
+
   it("never highlights more than one emoji across out-of-order responses", () => {
     let state = createStoryReactionSelection("❤️");
     const first = applyStoryReactionTap(state, "🔥");

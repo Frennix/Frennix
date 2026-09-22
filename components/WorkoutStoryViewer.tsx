@@ -252,7 +252,8 @@ export interface WorkoutStoryViewerProps {
     storyUserId: string,
     storyId: string,
     emoji: StoryQuickReactionEmoji,
-    slideId?: string | null
+    slideId?: string | null,
+    requestId?: number
   ) => void | Promise<void>;
   onChallenge?: (storyUserId: string, key: StoryChallengeKey) => void | Promise<void>;
   onReply?: (storyUserId: string, text: string, storyId?: string | null) => void | Promise<void>;
@@ -1130,11 +1131,12 @@ export function WorkoutStoryViewer({
                 <StoryReactionRow
                   key={reactionStoryId ?? "reaction-row"}
                   selectedEmoji={confirmedReaction}
-                  onReact={async (emoji) => {
+                  onReact={async (emoji, requestId) => {
                     const slideId = slideContext?.slideId ?? null;
                     const ownerId = story.user_id;
                     const viewerId = session?.user.id ?? null;
                     logStoryViewer("reaction-tap-received", {
+                      requestId,
                       emoji,
                       storyId: activeStoryId,
                       slideId,
@@ -1143,6 +1145,7 @@ export function WorkoutStoryViewer({
                     });
                     if (!activeStoryId || !viewerId) {
                       logStoryViewer("reaction-missing-ids", {
+                        requestId,
                         emoji,
                         storyId: activeStoryId,
                         viewerId,
@@ -1150,19 +1153,24 @@ export function WorkoutStoryViewer({
                       throw new Error("Reaction couldn’t be delivered. Try again.");
                     }
                     if (!onReact) {
-                      logStoryViewer("reaction-handler-missing", { emoji, storyId: activeStoryId });
+                      logStoryViewer("reaction-handler-missing", {
+                        requestId,
+                        emoji,
+                        storyId: activeStoryId,
+                      });
                       throw new Error("Reaction couldn’t be delivered. Try again.");
                     }
                     logStoryViewer("reaction-ids-submitted", {
+                      requestId,
                       emoji,
                       storyId: activeStoryId,
                       slideId,
                       ownerId,
                       viewerId,
                     });
-                    await onReact(ownerId, activeStoryId, emoji, slideId);
+                    await onReact(ownerId, activeStoryId, emoji, slideId, requestId);
                   }}
-                  onConfirmed={(emoji) => {
+                  onConfirmed={(emoji, requestId) => {
                     setConfirmedReaction(emoji);
                     if (session?.user.id && activeStoryId) {
                       queryClient.setQueryData(
@@ -1170,14 +1178,19 @@ export function WorkoutStoryViewer({
                         emoji
                       );
                     }
-                    logStoryViewer("toast-displayed", { message: "Reaction sent." });
+                    logStoryViewer("toast-displayed", {
+                      requestId,
+                      message: "Reaction sent.",
+                      emoji,
+                    });
                     showStatus("Reaction sent.");
                   }}
-                  onFailed={() => {
+                  onFailed={(message, requestId) => {
                     logStoryViewer("toast-displayed", {
-                      message: "Reaction couldn’t be delivered. Try again.",
+                      requestId,
+                      message,
                     });
-                    showStatus("Reaction couldn’t be delivered. Try again.");
+                    showStatus(message);
                   }}
                 />
                 <StoryQuickActionsBar

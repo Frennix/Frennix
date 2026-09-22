@@ -315,23 +315,40 @@ export default function HomeScreen() {
       storyUserId: string,
       storyId: string,
       emoji: StoryQuickReactionEmoji,
-      slideId?: string | null
+      slideId?: string | null,
+      requestId?: number
     ) => {
       if (!userId || !storyId) {
         throw new Error("Reaction couldn’t be delivered. Try again.");
       }
+      const reactionRequestId = requestId ?? Date.now();
       try {
         console.info("[story-reaction] home-handler-start", {
+          requestId: reactionRequestId,
           viewerId: userId,
           ownerId: storyUserId,
           storyId,
           slideId: slideId ?? null,
           emoji,
         });
-        await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
-        console.info("[story-reaction] home-handler-success", { storyId, emoji });
+        await sendDedicatedStoryReaction(
+          userId,
+          storyUserId,
+          storyId,
+          emoji,
+          slideId,
+          reactionRequestId
+        );
+        console.info("[story-reaction] home-handler-success", {
+          requestId: reactionRequestId,
+          storyId,
+          emoji,
+        });
       } catch (error) {
-        console.error("[story-reaction] home-handler-failed", getTechnicalErrorMessage(error));
+        console.error("[story-reaction] home-handler-failed", {
+          requestId: reactionRequestId,
+          error: getTechnicalErrorMessage(error),
+        });
         throw error;
       }
     },

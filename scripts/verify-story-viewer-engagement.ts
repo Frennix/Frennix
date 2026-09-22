@@ -68,8 +68,8 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("packages/types/src/workout-story.ts", 'key: "laugh"', "reactions");
       mustInclude("packages/types/src/workout-story.ts", 'key: "support"', "reactions");
       mustInclude("packages/types/src/workout-story.ts", "canonicalizeStoryReaction", "reactions");
-      mustInclude("packages/api/src/story-engagement.ts", "canonical.key", "reactions");
-      mustInclude("packages/api/src/story-engagement.ts", "reaction: canonical.emoji", "reactions");
+      mustInclude("packages/api/src/story-engagement.ts", "reaction: row.reaction", "reactions");
+      mustInclude("packages/api/src/story-reaction-delivery.ts", "executeStoryReactionDelivery", "reactions");
       mustInclude(
         "supabase/migrations/20260922010000_story_item_reaction_keys.sql",
         "SUPERSEDED",
@@ -85,12 +85,13 @@ const checks: Array<{ name: string; run: () => void }> = [
   {
     name: "api: reaction also delivers a conversation message",
     run: () => {
-      mustInclude("packages/api/src/story-engagement.ts", "deliverStoryReactionMessage", "api");
+      mustInclude("packages/api/src/story-reaction-delivery.ts", "executeStoryReactionDelivery", "api");
       mustInclude("packages/api/src/story-engagement.ts", "getOrCreateConversation", "api");
-      mustInclude("packages/api/src/story-engagement.ts", "Reacted ", "api");
+      mustInclude("packages/api/src/story-reaction-delivery.ts", "formatStoryReactionMessageContent", "api");
       mustInclude("packages/api/src/story-engagement.ts", "storyReactionIdempotencyKey", "api");
+      mustInclude("packages/api/src/story-reaction-delivery.ts", "storyReplyCompatibleMessageWrite", "api");
       mustInclude(
-        "packages/api/src/story-engagement.ts",
+        "packages/api/src/story-reaction-delivery.ts",
         "Reaction couldn’t be delivered. Try again.",
         "api"
       );
@@ -164,7 +165,13 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("components/story/StoryReactionRow.tsx", "selectedEmoji", "reactions");
       mustInclude("components/WorkoutStoryViewer.tsx", "Reaction sent.", "reactions");
       mustInclude("packages/api/src/story-engagement.ts", "getViewerStoryReaction", "reactions");
-      mustInclude("packages/api/src/story-engagement.ts", "ensuring message", "reactions");
+      mustInclude("packages/api/src/story-reaction-delivery.ts", "handler-invoked", "reactions");
+      mustInclude("components/story/StoryReactionRow.tsx", "handler-invoked", "reactions");
+      mustInclude(
+        "lib/story-reaction-delivery.test.ts",
+        "one tap causes exactly one reaction write and one DM delivery",
+        "reactions"
+      );
       mustInclude("lib/story-reaction-selection.test.ts", "ignores an older success", "reactions");
       mustInclude("lib/story-reaction-selection.test.ts", "stale failure", "reactions");
       mustInclude("lib/story-reaction-selection.test.ts", "every displayed emoji", "reactions");

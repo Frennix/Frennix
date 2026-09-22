@@ -15,9 +15,9 @@ import {
 type StoryReactionRowProps = {
   disabled?: boolean;
   selectedEmoji?: StoryQuickReactionEmoji | null;
-  onReact: (emoji: StoryQuickReactionEmoji) => void | Promise<void>;
-  onConfirmed?: (emoji: StoryQuickReactionEmoji) => void;
-  onFailed?: () => void;
+  onReact: (emoji: StoryQuickReactionEmoji, requestId: number) => void | Promise<void>;
+  onConfirmed?: (emoji: StoryQuickReactionEmoji, requestId: number) => void;
+  onFailed?: (message: string, requestId: number) => void;
 };
 
 function logReactionUi(event: string, extra: Record<string, unknown> = {}) {
@@ -50,6 +50,7 @@ export function StoryReactionRow({
   );
   const stateRef = useRef(state);
   stateRef.current = state;
+  const latestRequestIdRef = useRef(state.latestRequestId);
 
   useEffect(() => {
     dispatch({ type: "sync", emoji: selectedEmoji });
@@ -60,58 +61,103 @@ export function StoryReactionRow({
     const next = applyStoryReactionTap(current, emoji);
     dispatch({ type: "replace", state: next.state });
     stateRef.current = next.state;
+    if (next.shouldSend) {
+      latestRequestIdRef.current = next.requestId;
+    }
     logReactionUi("tap-received", {
       emoji,
       requestId: next.requestId,
       selected: next.state.selected,
+      shouldSend: next.shouldSend,
       disabled: Boolean(disabled),
     });
 
     if (!next.shouldSend) {
-      logReactionUi("unsupported-emoji", { emoji });
+      logReactionUi(
+        next.state.status === "error" ? "unsupported-emoji" : "duplicate-in-flight-ignored",
+        { emoji, requestId: next.requestId }
+      );
+      if (next.state.status === "error" && next.state.error) {
+        onFailed?.(next.state.error, next.requestId);
+      }
       return;
     }
     if (disabled) {
-      const failed = applyStoryReactionFailure(stateRef.current, next.requestId);
+      const failed = applyStoryReactionFailure(
+        stateRef.current,
+        next.requestId,
+        REACTION_DELIVER_ERROR
+      );
       dispatch({ type: "replace", state: failed });
       stateRef.current = failed;
       logReactionUi("tap-blocked", { emoji, requestId: next.requestId, disabled: true });
+      onFailed?.(REACTION_DELIVER_ERROR, next.requestId);
       return;
     }
 
-    logReactionUi("request-started", {
+    logReactionUi("handler-invoked", {
       emoji: next.state.selected,
       requestId: next.requestId,
     });
 
     try {
-      await onReact(next.state.selected!);
-      const latest = applyStoryReactionSuccess(stateRef.current, next.requestId, next.state.selected!);
+      await Promise.resolve(onReact(next.state.selected!, next.requestId));
+      const stillLatest = latestRequestIdRef.current === next.requestId;
+      if (!stillLatest) {
+        logReactionUi("stale-success-ignored", {
+          emoji: next.state.selected,
+          requestId: next.requestId,
+          latestRequestId: latestRequestIdRef.current,
+        });
+        return;
+      }
+      const latest = applyStoryReactionSuccess(
+        {
+          ...stateRef.current,
+          latestRequestId: next.requestId,
+        },
+        next.requestId,
+        next.state.selected!
+      );
       dispatch({ type: "replace", state: latest });
       stateRef.current = latest;
-      if (latest.status === "sent" && latest.confirmed) {
-        onConfirmed?.(latest.confirmed);
+      if (latest.confirmed) {
+        onConfirmed?.(latest.confirmed, next.requestId);
         logReactionUi("request-succeeded", {
           emoji: latest.confirmed,
           requestId: next.requestId,
         });
-      } else {
-        logReactionUi("stale-success-ignored", {
-          emoji: next.state.selected,
-          requestId: next.requestId,
-          latestRequestId: latest.latestRequestId,
-        });
       }
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : REACTION_DELIVER_ERROR;
-      const latest = applyStoryReactionFailure(stateRef.current, next.requestId);
+      const message = caught instanceof Error && caught.message
+        ? caught.message
+        : REACTION_DELIVER_ERROR;
+      const stillLatest = latestRequestIdRef.current === next.requestId;
+      if (!stillLatest) {
+        logReactionUi("stale-failure-ignored", {
+          emoji: next.state.selected,
+          requestId: next.requestId,
+          latestRequestId: latestRequestIdRef.current,
+          message,
+        });
+        return;
+      }
+      const latest = applyStoryReactionFailure(
+        {
+          ...stateRef.current,
+          latestRequestId: next.requestId,
+        },
+        next.requestId,
+        message
+      );
       dispatch({ type: "replace", state: latest });
       stateRef.current = latest;
-      logReactionUi(
-        latest.status === "error" ? "request-failed" : "stale-failure-ignored",
-        { emoji: next.state.selected, requestId: next.requestId, message }
-      );
-      if (latest.status === "error") onFailed?.();
+      logReactionUi("request-failed", {
+        emoji: next.state.selected,
+        requestId: next.requestId,
+        message,
+      });
+      onFailed?.(message, next.requestId);
     }
   }
 

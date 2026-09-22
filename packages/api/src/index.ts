@@ -30,6 +30,7 @@ export * from "./story-privacy";
 export * from "./story-controls";
 export * from "./story-discovery";
 export * from "./story-engagement";
+export * from "./story-reaction-delivery";
 export * from "./workout-story-utils";
 export * from "./push-tokens";
 export * from "./web-push-subscriptions";

@@ -7,7 +7,6 @@ import type {
 } from "@frennix/types";
 import {
   canonicalizeStoryReaction,
-  formatStoryReactionMessageContent,
   parseStoryReactionMessage,
   storyReactionIdempotencyKey,
 } from "@frennix/types";
@@ -19,7 +18,12 @@ import { getFollowingIds } from "./follows";
 import { getProfilesByIds } from "./profiles";
 import { subscribePostgresChanges } from "./realtime-utils";
 import { getSupabase, getSupabaseInitUrl, isSupabaseInitialized } from "./supabase";
-import { getErrorMessage, getTechnicalErrorMessage } from "./profile-utils";
+import { getErrorMessage, getSupabaseErrorDetails, getTechnicalErrorMessage } from "./profile-utils";
+import {
+  executeStoryReactionDelivery,
+  REACTION_DELIVER_ERROR as SHARED_REACTION_DELIVER_ERROR,
+  REACTION_SAVE_ERROR,
+} from "./story-reaction-delivery";
 
 export * from "./story-insights";
 export * from "./story-train-invites";
@@ -116,23 +120,12 @@ export async function markStoryViewed(
   }
 }
 
-const REACTION_SEND_ERROR = "Reaction couldn’t be sent. Try again.";
-const REACTION_DELIVER_ERROR = "Reaction couldn’t be delivered. Try again.";
+const REACTION_DELIVER_ERROR = SHARED_REACTION_DELIVER_ERROR;
 const MESSAGE_SEND_ERROR = "Message couldn’t be sent. Try again.";
 
-const storyReactionDeliveries = new Map<string, Promise<void>>();
+const storyReactionDeliveries = new Map<string, Promise<unknown>>();
 
-function toReactionError(error: unknown): Error {
-  console.error("[story-reaction]", getTechnicalErrorMessage(error));
-  return new Error(REACTION_SEND_ERROR);
-}
-
-function toDeliverError(error: unknown): Error {
-  console.error("[story-reaction] message-delivery-failed", getTechnicalErrorMessage(error));
-  return new Error(REACTION_DELIVER_ERROR);
-}
-
-async function runStoryReactionDelivery(key: string, work: () => Promise<void>) {
+async function runStoryReactionDelivery<T>(key: string, work: () => Promise<T>): Promise<T> {
   const previous = storyReactionDeliveries.get(key) ?? Promise.resolve();
   const run = previous.catch(() => undefined).then(() => work());
   const wrapped = run.finally(() => {
@@ -141,7 +134,7 @@ async function runStoryReactionDelivery(key: string, work: () => Promise<void>) 
     }
   });
   storyReactionDeliveries.set(key, wrapped);
-  await wrapped;
+  return wrapped;
 }
 
 async function getStoryReactionPreviewUrl(
@@ -223,92 +216,58 @@ async function bumpConversation(conversationId: string, senderId: string) {
   }
 }
 
-async function deliverStoryReactionMessage(input: {
-  viewerId: string;
-  storyOwnerId: string;
-  storyId: string;
-  slideId?: string | null;
-  emoji: StoryQuickReactionEmoji;
-}): Promise<Message> {
-  const content = formatStoryReactionMessageContent(
-    canonicalizeStoryReaction(input.emoji)?.emoji ?? input.emoji
-  );
-  const previewUrl = await getStoryReactionPreviewUrl(input.storyId, input.slideId);
+function logStoryReaction(event: string, extra: Record<string, unknown>) {
+  console.info("[story-reaction]", { event, ...extra, t: Date.now() });
+}
 
-  let conversationId: string;
-  try {
-    conversationId = await getOrCreateConversation(input.viewerId, input.storyOwnerId);
-  } catch (error) {
-    throw toDeliverError(error);
-  }
+function isForeignKeyError(error: unknown) {
+  const { code, message } = getSupabaseErrorDetails(error);
+  return code === "23503" || /foreign key|story_slides/i.test(message);
+}
 
-  let existing: StoryReactionMessageRow | null = null;
-  try {
-    existing = await findStoryReactionMessage(conversationId, input.viewerId, input.storyId);
-  } catch (error) {
-    throw toDeliverError(error);
-  }
-
-  if (existing) {
-    const sameEmoji = existing.content === content;
-    const samePreview = (existing.media_url ?? null) === (previewUrl ?? existing.media_url ?? null);
-    const sameStoryLink = existing.story_reply_id === input.storyId;
-    if (sameEmoji && samePreview && sameStoryLink) {
-      console.info("[story-reaction] message already delivered", {
-        messageId: existing.id,
-        storyId: input.storyId,
-        emoji: input.emoji,
-      });
-      return existing as Message;
-    }
-
-    const { data, error } = await getSupabase()
-      .from("messages")
-      .update({
-        content,
-        media_url: previewUrl ?? existing.media_url ?? null,
-        story_reply_id: input.storyId,
-        read_at: null,
-      })
-      .eq("id", existing.id)
-      .eq("sender_id", input.viewerId)
-      .select()
+async function upsertStoryReactionRow(row: {
+  story_id: string;
+  user_id: string;
+  slide_id: string | null;
+  reaction: StoryQuickReactionEmoji;
+}) {
+  const write = async (slideId: string | null) =>
+    getSupabase()
+      .from("story_item_reactions")
+      .upsert(
+        {
+          story_id: row.story_id,
+          user_id: row.user_id,
+          slide_id: slideId,
+          reaction: row.reaction,
+        },
+        { onConflict: "story_id,user_id" }
+      )
+      .select("story_id, user_id, slide_id, reaction")
       .single();
 
-    if (error) throw toDeliverError(error);
-    await bumpConversation(conversationId, input.viewerId);
-    console.info("[story-reaction] message replaced", {
-      messageId: existing.id,
-      storyId: input.storyId,
-      emoji: input.emoji,
+  let { data, error } = await write(row.slide_id);
+  if (error && row.slide_id && isForeignKeyError(error)) {
+    logStoryReaction("reaction-upsert-retry-without-slide", {
+      storyId: row.story_id,
+      error: getTechnicalErrorMessage(error),
     });
-    return data as Message;
+    ({ data, error } = await write(null));
   }
 
-  try {
-    return await sendMessage(
-      conversationId,
-      input.viewerId,
-      content,
-      previewUrl,
-      null,
-      null,
-      input.storyId
-    );
-  } catch (error) {
-    if (isStoryLinkWriteError(error)) {
-      console.warn(
-        "[story-reaction] retrying message without story_reply_id",
-        getTechnicalErrorMessage(error)
-      );
-      try {
-        return await sendMessage(conversationId, input.viewerId, content, previewUrl);
-      } catch (retryError) {
-        throw toDeliverError(retryError);
-      }
-    }
-    throw toDeliverError(error);
+  if (error) {
+    const details = getTechnicalErrorMessage(error);
+    logStoryReaction("reaction-upsert-supabase-error", {
+      storyId: row.story_id,
+      emoji: row.reaction,
+      error: details,
+    });
+    throw new Error(details || REACTION_SAVE_ERROR);
   }
+  if (!data?.reaction) {
+    throw new Error(REACTION_SAVE_ERROR);
+  }
+  return { reaction: data.reaction as string };
 }
 
 function toReplyError(error: unknown): Error {
@@ -348,129 +307,114 @@ export async function sendDedicatedStoryReaction(
   storyOwnerId: string,
   storyId: string,
   emoji: StoryQuickReactionEmoji,
-  slideId?: string | null
+  slideId?: string | null,
+  requestId: number = Date.now()
 ) {
   if (!storyId) throw new Error(REACTION_DELIVER_ERROR);
-  if (viewerId === storyOwnerId) return emoji;
+  if (viewerId === storyOwnerId) {
+    throw new Error("You cannot react to your own story");
+  }
 
   const canonical = canonicalizeStoryReaction(emoji);
   if (!canonical) {
-    console.error("[story-reaction] unsupported-emoji", { emoji });
+    logStoryReaction("unsupported-emoji", { requestId, emoji });
     throw new Error(REACTION_DELIVER_ERROR);
   }
 
-  console.info("[story-reaction] request-started", {
+  logStoryReaction("request-started", {
+    requestId,
     viewerId,
     storyOwnerId,
     storyId,
     slideId: slideId ?? null,
     emoji: canonical.emoji,
-    reactionKey: canonical.key,
     supabaseReady: isSupabaseInitialized(),
     supabaseHost: getSupabaseInitUrl(),
   });
 
-  const deliveryKey = storyReactionIdempotencyKey(viewerId, storyId, slideId);
-  await runStoryReactionDelivery(deliveryKey, async () => {
-    const existing = canonicalizeStoryReaction(await getViewerStoryReaction(viewerId, storyId));
-    if (existing?.key === canonical.key) {
-      console.info("[story-reaction] already saved, ensuring message", {
-        storyId,
+  const deliveryKey = storyReactionIdempotencyKey(viewerId, storyId);
+  const result = await runStoryReactionDelivery(deliveryKey, async () =>
+    executeStoryReactionDelivery(
+      {
+        requestId,
         viewerId,
+        storyOwnerId,
+        storyId,
+        slideId,
         emoji: canonical.emoji,
-        reactionKey: canonical.key,
-        deliveryKey,
-      });
-    } else {
-      // Feed already authorized this viewer. Avoid reloading story+slides here —
-      // getVisibleStory throws "Failed to load story", which the viewer used to
-      // treat like a media-load failure. RLS still enforces the write.
-      try {
-        const { assertCanViewStory } = await import("./story-controls");
-        await assertCanViewStory(storyId);
-      } catch (error) {
-        console.warn("[story-reaction] visibility check failed", getTechnicalErrorMessage(error));
-      }
-
-      const { data, error } = await getSupabase().from("story_item_reactions").upsert(
-        {
-          story_id: storyId,
-          user_id: viewerId,
-          slide_id: slideId ?? null,
-          reaction: canonical.emoji,
+      },
+      {
+        getExistingReaction: getViewerStoryReaction,
+        upsertReaction: async (row) => {
+          try {
+            const { assertCanViewStory } = await import("./story-controls");
+            await assertCanViewStory(row.story_id);
+          } catch (error) {
+            console.warn(
+              "[story-reaction] visibility check failed",
+              { requestId, error: getTechnicalErrorMessage(error) }
+            );
+          }
+          const saved = await upsertStoryReactionRow(row);
+          await trackStoryEngagementEvent({
+            viewerId,
+            storyUserId: storyOwnerId,
+            storyId,
+            eventType: "reaction",
+            metadata: { emoji: row.reaction },
+          }).catch(() => undefined);
+          return saved;
         },
-        { onConflict: "story_id,user_id" }
-      ).select("story_id, user_id, slide_id, reaction");
-
-      console.info("[story-reaction] supabase-response", {
-        storyId,
-        viewerId,
-        storyOwnerId,
-        slideId: slideId ?? null,
-        emoji: canonical.emoji,
-        reactionKey: canonical.key,
-        deliveryKey,
-        row: data ?? null,
-        error: error ? getTechnicalErrorMessage(error) : null,
-      });
-
-      if (error) throw toReactionError(error);
-
-      const saved = canonicalizeStoryReaction(await getViewerStoryReaction(viewerId, storyId));
-      if (saved?.key !== canonical.key) {
-        console.error("[story-reaction] write did not persist", {
-          storyId,
-          viewerId,
-          storyOwnerId,
-          slideId: slideId ?? null,
-          emoji: canonical.emoji,
-          reactionKey: canonical.key,
-          saved,
-        });
-        throw new Error(REACTION_SEND_ERROR);
+        getOrCreateConversation,
+        findExistingMessage: findStoryReactionMessage,
+        updateExistingMessage: async (input) => {
+          const { data, error } = await getSupabase()
+            .from("messages")
+            .update({
+              content: input.content,
+              media_url: input.mediaUrl,
+              story_reply_id: input.storyReplyId,
+              read_at: null,
+            })
+            .eq("id", input.id)
+            .eq("sender_id", input.senderId)
+            .select("id, conversation_id")
+            .single();
+          if (error) throw new Error(getTechnicalErrorMessage(error));
+          if (!data) throw new Error(REACTION_DELIVER_ERROR);
+          await bumpConversation(data.conversation_id as string, input.senderId);
+          return { id: data.id as string, conversation_id: data.conversation_id as string };
+        },
+        sendMessage: async (input) => {
+          const message = await sendMessage(
+            input.conversationId,
+            input.senderId,
+            input.content,
+            input.mediaUrl,
+            input.postId,
+            input.replyToMessageId,
+            input.storyReplyId
+          );
+          return { id: message.id, conversation_id: message.conversation_id };
+        },
+        getPreviewUrl: getStoryReactionPreviewUrl,
+        isStoryLinkWriteError,
+        log: (event, extra) => logStoryReaction(event, extra),
       }
+    )
+  );
 
-      console.info("[story-reaction] saved", {
-        storyId,
-        viewerId,
-        storyOwnerId,
-        slideId: slideId ?? null,
-        emoji: canonical.emoji,
-        reactionKey: canonical.key,
-        deliveryKey,
-      });
-
-      await trackStoryEngagementEvent({
-        viewerId,
-        storyUserId: storyOwnerId,
-        storyId,
-        eventType: "reaction",
-        metadata: { emoji: canonical.emoji, reaction_key: canonical.key },
-      }).catch(() => undefined);
-    }
-
-    const message = await deliverStoryReactionMessage({
-      viewerId,
-      storyOwnerId,
-      storyId,
-      slideId,
-      emoji: canonical.emoji,
-    });
-
-    console.info("[story-reaction] delivered", {
-      storyId,
-      viewerId,
-      storyOwnerId,
-      slideId: slideId ?? null,
-      emoji: canonical.emoji,
-      reactionKey: canonical.key,
-      deliveryKey,
-      messageId: message.id,
-      conversationId: message.conversation_id,
-    });
+  logStoryReaction("request-succeeded", {
+    requestId: result.requestId,
+    storyId,
+    conversationId: result.conversationId,
+    messageId: result.messageId,
+    emoji: result.emoji,
+    upserted: result.upserted,
+    messageAction: result.messageAction,
   });
 
-  return canonical.emoji;
+  return result.emoji;
 }
 
 /** @deprecated Use sendDedicatedStoryReaction */

@@ -50,6 +50,14 @@ export function applyStoryReactionTap(
     };
   }
 
+  if (state.status === "pending" && state.selected === canonical.emoji && state.latestRequestId > 0) {
+    return {
+      state,
+      requestId: state.latestRequestId,
+      shouldSend: false,
+    };
+  }
+
   const requestId = state.latestRequestId + 1;
   return {
     state: {
@@ -90,14 +98,15 @@ export function applyStoryReactionSuccess(
 
 export function applyStoryReactionFailure(
   state: StoryReactionSelectionState,
-  requestId: number
+  requestId: number,
+  error: string = REACTION_DELIVER_ERROR
 ): StoryReactionSelectionState {
   if (requestId !== state.latestRequestId) return state;
   return {
     ...state,
     selected: state.confirmed,
     status: "error",
-    error: REACTION_DELIVER_ERROR,
+    error: error || REACTION_DELIVER_ERROR,
   };
 }
 
@@ -121,4 +130,33 @@ export function applyStoryReactionConfirmedFromServer(
 
 export function displayedStoryReactionValues(): StoryQuickReactionEmoji[] {
   return STORY_QUICK_REACTIONS.map((reaction) => reaction.emoji);
+}
+
+export async function runLatestStoryReactionSend(
+  state: StoryReactionSelectionState,
+  requestId: number,
+  send: () => Promise<void>
+): Promise<{
+  state: StoryReactionSelectionState;
+  invoked: boolean;
+  discardedBeforeSend: boolean;
+}> {
+  if (requestId !== state.latestRequestId) {
+    return { state, invoked: false, discardedBeforeSend: true };
+  }
+  try {
+    await send();
+    return {
+      state: applyStoryReactionSuccess(state, requestId, state.selected ?? ""),
+      invoked: true,
+      discardedBeforeSend: false,
+    };
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : REACTION_DELIVER_ERROR;
+    return {
+      state: applyStoryReactionFailure(state, requestId, message),
+      invoked: true,
+      discardedBeforeSend: false,
+    };
+  }
 }
