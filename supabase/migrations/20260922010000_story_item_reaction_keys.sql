@@ -1,23 +1,12 @@
--- Canonical story reaction keys for every displayed Story Viewer emoji.
--- Existing rows may store raw glyphs (including skin-tone variants). Remap, then
--- constrain writes to the seven keys. RLS is unchanged.
+-- SUPERSEDED — no-op. Do not recreate the key CHECK.
+--
+-- The original version of this file remapped story_item_reactions.reaction
+-- glyphs to canonical keys and added story_item_reactions_reaction_check.
+-- That is incompatible with published production 14543af, which writes raw
+-- emoji text. The live database was restored by
+-- 20260922020000_story_item_reactions_restore_emoji_compat.sql.
+--
+-- This replacement is intentionally a no-op so the filename cannot be
+-- reapplied to constrain or remap production data.
 
-UPDATE public.story_item_reactions
-SET reaction = CASE
-  WHEN reaction IN ('strong', '💪', '💪🏻', '💪🏼', '💪🏽', '💪🏾', '💪🏿') THEN 'strong'
-  WHEN reaction IN ('fire', '🔥') THEN 'fire'
-  WHEN reaction IN ('applause', '👏', '👏🏻', '👏🏼', '👏🏽', '👏🏾', '👏🏿') THEN 'applause'
-  WHEN reaction IN ('love', '❤️', '❤', '♥️') THEN 'love'
-  WHEN reaction IN ('eyes', '👀') THEN 'eyes'
-  WHEN reaction IN ('laugh', '😂') THEN 'laugh'
-  WHEN reaction IN ('support', '🤝', '🤝🏻', '🤝🏼', '🤝🏽', '🤝🏾', '🤝🏿') THEN 'support'
-  ELSE reaction
-END
-WHERE reaction IS NOT NULL;
-
-ALTER TABLE public.story_item_reactions
-  DROP CONSTRAINT IF EXISTS story_item_reactions_reaction_check;
-
-ALTER TABLE public.story_item_reactions
-  ADD CONSTRAINT story_item_reactions_reaction_check
-  CHECK (reaction IN ('strong', 'fire', 'applause', 'love', 'eyes', 'laugh', 'support'));
+SELECT 1;

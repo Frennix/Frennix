@@ -398,7 +398,7 @@ export async function sendDedicatedStoryReaction(
           story_id: storyId,
           user_id: viewerId,
           slide_id: slideId ?? null,
-          reaction: canonical.key,
+          reaction: canonical.emoji,
         },
         { onConflict: "story_id,user_id" }
       ).select("story_id, user_id, slide_id, reaction");

@@ -65,9 +65,15 @@ const checks: Array<{ name: string; run: () => void }> = [
       mustInclude("packages/types/src/workout-story.ts", 'key: "support"', "reactions");
       mustInclude("packages/types/src/workout-story.ts", "canonicalizeStoryReaction", "reactions");
       mustInclude("packages/api/src/story-engagement.ts", "canonical.key", "reactions");
+      mustInclude("packages/api/src/story-engagement.ts", "reaction: canonical.emoji", "reactions");
       mustInclude(
         "supabase/migrations/20260922010000_story_item_reaction_keys.sql",
-        "story_item_reactions_reaction_check",
+        "SUPERSEDED",
+        "reactions"
+      );
+      mustInclude(
+        "supabase/migrations/20260922020000_story_item_reactions_restore_emoji_compat.sql",
+        "DROP CONSTRAINT IF EXISTS story_item_reactions_reaction_check",
         "reactions"
       );
     },
