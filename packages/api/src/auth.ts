@@ -56,8 +56,8 @@ export async function signUpWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function signOut() {
-  const { error } = await getSupabase().auth.signOut();
+export async function signOut(options?: { scope?: "global" | "local" | "others" }) {
+  const { error } = await getSupabase().auth.signOut(options ?? { scope: "local" });
   if (error) throw error;
 }
 

@@ -1,5 +1,6 @@
 import { router, usePathname, useRouter, useSegments, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { getSession, profileNeedsOnboardingRepair } from "@frennix/api";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { useAuth } from "@/providers/AuthProvider";
@@ -9,13 +10,22 @@ import {
 } from "@/lib/auth-route-handoff-metrics";
 
 const LOGIN_HREF = "/(auth)/login" as Href;
+/** Public web path for `app/(auth)/login.tsx` — used for a full document navigation. */
+export const LOGIN_WEB_PATH = "/login";
 const TABS_HREF = "/(tabs)" as Href;
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
 const SESSION_RECOVERY_MS = 1500;
 
-/** Reset stack on web and go to login (settings/tabs stay mounted after a plain replace). */
+/**
+ * Leave authenticated screens immediately.
+ * Expo replace leaves settings/tabs mounted on web/PWA — hard-navigate instead.
+ */
 export function redirectToLogin() {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.location.replace(LOGIN_WEB_PATH);
+    return;
+  }
   if (router.canDismiss()) {
     router.dismissAll();
   }
@@ -100,10 +110,7 @@ export function AuthNavigationGuard() {
 
       if (cancelled) return;
 
-      if (navigationRouter.canDismiss()) {
-        navigationRouter.dismissAll();
-      }
-      navigationRouter.replace(LOGIN_HREF);
+      redirectToLogin();
     }
 
     void redirectIfStillSignedOut();

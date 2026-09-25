@@ -83,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileFetchRef = useRef<Promise<void> | null>(null);
   const profileFetchUserIdRef = useRef<string | null>(null);
   const hiddenAtRef = useRef<number | null>(null);
+  const explicitSignOutRef = useRef(false);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -234,21 +235,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     authEpochRef.current += 1;
+    explicitSignOutRef.current = true;
     signOutInProgressRef.current = true;
     const userId = sessionRef.current?.user?.id ?? null;
+
+    sessionRef.current = null;
+    profileRef.current = null;
+    resolvedProfileUserIdRef.current = null;
+    clearAllPersistedAuth();
+    clearCachedProfile();
+    clearAuthenticatedStartupComplete();
+    setSession(null);
+    setProfile(null);
+    setPasswordRecovery(false);
+    setProfileLoading(false);
+    setLoading(false);
+
     try {
       await stopPresenceTracking(true, "auth-signOut", userId);
       resetMessagingRealtimeState();
-      await supabaseSignOut();
+      try {
+        await supabaseSignOut({ scope: "local" });
+      } catch {
+        // Local session and storage are already cleared.
+      }
       clearAllPersistedAuth();
-      setSession(null);
-      setProfile(null);
-      resolvedProfileUserIdRef.current = null;
-      clearCachedProfile();
-      clearAuthenticatedStartupComplete();
-      setPasswordRecovery(false);
-      setProfileLoading(false);
-      setLoading(false);
     } finally {
       signOutInProgressRef.current = false;
     }
@@ -257,6 +268,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback(
     async (nextSession: Session | null) => {
       const epoch = authEpochRef.current;
+
+      if (explicitSignOutRef.current && !nextSession) {
+        clearAllPersistedAuth();
+        if (epoch !== authEpochRef.current) return;
+        setSession(null);
+        setProfile(null);
+        resolvedProfileUserIdRef.current = null;
+        sessionRef.current = null;
+        profileRef.current = null;
+        clearCachedProfile();
+        setProfileLoading(false);
+        setLoading(false);
+        return;
+      }
+
+      if (nextSession) {
+        explicitSignOutRef.current = false;
+      }
 
       if (nextSession && !sessionMatchesPersistedAuth(nextSession)) {
         try {
@@ -499,6 +528,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         passwordRecoveryRef.current = true;
         setPasswordRecovery(true);
       } else if (event === "SIGNED_IN") {
+        explicitSignOutRef.current = false;
         passwordRecoveryRef.current = false;
         setPasswordRecovery(false);
         clearWebRecoveryHash();
