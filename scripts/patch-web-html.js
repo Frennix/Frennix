@@ -129,7 +129,8 @@ html = html.replace(
   "\n"
 );
 
-html = html.replace(/<title>[^<]*<\/title>/, `<title>Frennix · ${buildSha.slice(0, 8)}</title>`);
+// Visible tab/history title is "Frennix" only. Build SHA stays in hidden meta/stamp.
+html = html.replace(/<title>[^<]*<\/title>/, "<title>Frennix</title>");
 
 const buildStampHtml = `<div id="frennix-build-stamp" style="display:none" data-sha="${buildSha}" data-bundle="${buildBundle}" data-sw="${swVersion}"></div>`;
 if (!html.includes("frennix-build-stamp")) {
