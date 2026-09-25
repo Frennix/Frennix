@@ -86,6 +86,12 @@ const checks = [
       mustInclude("components/BottomActionSheet.tsx", "useBottomActionSheetLayout", "shell");
       mustInclude("components/BottomActionSheet.tsx", "restoreWebDocumentScrollLock", "shell");
       mustInclude("components/PostInteractionSheet.tsx", "BottomActionSheet", "post sheet");
+      const sheet = read("components/BottomActionSheet.tsx");
+      const earlyReturn = sheet.indexOf('if (Platform.OS === "web" && !visible) return null');
+      const styleMemo = sheet.lastIndexOf("const sheetAnimatedStyle = useMemo", earlyReturn);
+      if (earlyReturn < 0 || styleMemo < 0 || styleMemo > earlyReturn) {
+        throw new Error("BottomActionSheet useMemo must run before the web !visible return (React #310)");
+      }
     },
   },
   {

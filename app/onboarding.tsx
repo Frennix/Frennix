@@ -114,6 +114,7 @@ function OnboardingContent() {
   const activities = watch("activities");
   const gender = watch("gender");
   const matchPreference = watch("matchPreference");
+  const displayName = watch("displayName");
 
   function toggleField(field: "goals" | "activities", value: string) {
     const current = watch(field);
@@ -292,7 +293,7 @@ function OnboardingContent() {
 
       <View style={step === 1 ? styles.stepPanel : styles.hiddenStep} pointerEvents={step === 1 ? "auto" : "none"}>
           <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
-            <Avatar uri={avatarUri} name={watch("displayName")} size={96} />
+            <Avatar uri={avatarUri} name={displayName} size={96} />
             <Text style={styles.avatarHint}>Tap to add photo</Text>
           </Pressable>
           <Controller

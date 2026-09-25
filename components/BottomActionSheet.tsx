@@ -220,8 +220,6 @@ export function BottomActionSheet({
     if (nextHeight > 0) setMeasuredHeight(nextHeight);
   }, []);
 
-  if (Platform.OS === "web" && !visible) return null;
-
   const webSheetSnapHeight = Platform.OS === "web" ? (sheetSnapHeight as string | undefined) : undefined;
   const nativeSheetSnapHeight = Platform.OS === "web" ? undefined : (sheetSnapHeight as number | undefined);
   const webSheetMaxHeight = Platform.OS === "web" ? (sheetMaxHeight as string) : undefined;
@@ -272,6 +270,9 @@ export function BottomActionSheet({
       webSheetSnapHeight,
     ]
   );
+
+  // Unmount the web portal when closed, but never skip hooks — that throws React #310.
+  if (Platform.OS === "web" && !visible) return null;
 
   const sheetInterior = (
     <>
