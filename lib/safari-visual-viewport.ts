@@ -74,14 +74,20 @@ export function isMobileWeb(): boolean {
   );
 }
 
-export function isMobileWebSafari(): boolean {
+export function isIOSWeb(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  const isIOS =
+  return (
     /iPad|iPhone|iPod/i.test(ua) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+export function isMobileWebSafari(): boolean {
+  if (!isIOSWeb() || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
   const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome|Chromium/i.test(ua);
-  return isIOS && isSafari;
+  return isSafari;
 }
 
 /** True when Safari's visual viewport is reduced by the on-screen keyboard or bottom chrome. */

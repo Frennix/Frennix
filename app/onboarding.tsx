@@ -33,7 +33,7 @@ import {
   EMPTY_LIFESTYLE_FIELDS,
 } from "@/lib/lifestyle-matching";
 import type { LifestyleProfileFields } from "@frennix/types";
-import { buildDefaultDiscoverySettings } from "@frennix/api";
+import { signupLocationPrivacy } from "@frennix/api";
 import { LocationOnboardingStep } from "@/components/LocationOnboardingStep";
 import type { GeocodedPlace } from "@/lib/location-geocode";
 import { Avatar, Button, Input, colors, spacing, typography } from "@frennix/ui";
@@ -85,6 +85,7 @@ function OnboardingContent() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [lifestyle, setLifestyle] = useState<LifestyleProfileFields>(EMPTY_LIFESTYLE_FIELDS);
   const [savedLocation, setSavedLocation] = useState<GeocodedPlace | null>(null);
+  const [devicePermissionDenied, setDevicePermissionDenied] = useState(false);
   const submittingRef = useRef(false);
   const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -155,9 +156,7 @@ function OnboardingContent() {
     submittingRef.current = true;
     setSubmitError("");
     try {
-      const hasLocation =
-        savedLocation?.latitude != null && savedLocation?.longitude != null;
-      const discoveryDefaults = buildDefaultDiscoverySettings(hasLocation);
+      const discoveryDefaults = signupLocationPrivacy(savedLocation, devicePermissionDenied);
 
       const upsertPayload = {
         id: userId,
@@ -282,11 +281,14 @@ function OnboardingContent() {
 
       <View style={step === 0 ? styles.stepPanel : styles.hiddenStep} pointerEvents={step === 0 ? "auto" : "none"}>
         <LocationOnboardingStep
+          active={step === 0}
+          onDevicePermissionDeniedChange={setDevicePermissionDenied}
           onLocationResolved={(place) => {
             setSavedLocation(place);
-            if (place) {
-              setValue("city", place.city, { shouldValidate: true });
+            if (place?.city) {
+              setValue("city", place.city, { shouldValidate: false });
             }
+            setStep((current) => (current === 0 ? 1 : current));
           }}
         />
       </View>

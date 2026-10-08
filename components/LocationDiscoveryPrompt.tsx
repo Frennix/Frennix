@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { useCenterOverlaySafeArea } from "@/components/BottomOverlayShell";
@@ -25,6 +25,8 @@ export function LocationDiscoveryPrompt() {
   const [checking, setChecking] = useState(true);
   const [enabling, setEnabling] = useState(false);
   const [manualVisible, setManualVisible] = useState(false);
+  const locationRequestRef = useRef(0);
+  const dismissedLocallyRef = useRef(false);
 
   const legacyCityLabel = formatCityState(profile?.city, profile?.state);
   const hasLegacyCity = profileHasLegacyCityOnly(profile);
@@ -35,10 +37,15 @@ export function LocationDiscoveryPrompt() {
       return;
     }
 
+    if (dismissedLocallyRef.current) {
+      setChecking(false);
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       const show = shouldShowLocationOnboardingPrompt(profile);
-      if (!cancelled && show) {
+      if (!cancelled && show && !dismissedLocallyRef.current) {
         setVisible(true);
       }
       if (!cancelled) setChecking(false);
@@ -55,20 +62,34 @@ export function LocationDiscoveryPrompt() {
   }, []);
 
   const handleNotNow = useCallback(async () => {
+    locationRequestRef.current += 1;
+    setEnabling(false);
+    dismissedLocallyRef.current = true;
+    setVisible(false);
+    setManualVisible(false);
     if (!userId) return;
-    const updated = await markLocationPromptDismissed(userId);
-    await refreshProfile(updated);
-    await finishPrompt();
-  }, [finishPrompt, refreshProfile, userId]);
+    try {
+      const updated = await markLocationPromptDismissed(userId);
+      await refreshProfile(updated);
+    } catch {
+      dismissedLocallyRef.current = false;
+      setVisible(true);
+      showAlert("Couldn't skip location", "Check your connection and try Not Now again.");
+    }
+  }, [refreshProfile, userId]);
 
   const handleEnableLocation = useCallback(async () => {
     if (!userId) return;
+    const requestId = ++locationRequestRef.current;
     setEnabling(true);
     try {
       const result = await requestApproximateDeviceLocation();
+      if (requestId !== locationRequestRef.current) return;
       if (result.status === "granted") {
         const updated = await saveUserLocation(userId, result.place);
+        if (requestId !== locationRequestRef.current) return;
         await markLocationPromptCompleted(userId);
+        if (requestId !== locationRequestRef.current) return;
         await refreshProfile(updated);
         await finishPrompt();
         return;
@@ -80,14 +101,26 @@ export function LocationDiscoveryPrompt() {
         );
         return;
       }
+      if (result.status === "timeout") {
+        showAlert("Location timed out", result.message);
+        return;
+      }
       showAlert("Location unavailable", result.message);
+    } catch {
+      if (requestId !== locationRequestRef.current) return;
+      showAlert(
+        "Location unavailable",
+        "Try again, enter your city, or continue without location."
+      );
     } finally {
-      setEnabling(false);
+      if (requestId === locationRequestRef.current) setEnabling(false);
     }
   }, [finishPrompt, refreshProfile, userId]);
 
   const handleManualSave = useCallback(
     async (place: Parameters<typeof saveUserLocation>[1]) => {
+      locationRequestRef.current += 1;
+      setEnabling(false);
       if (!userId) return;
       const updated = await saveUserLocation(userId, place);
       await markLocationPromptCompleted(userId);
@@ -155,15 +188,21 @@ export function LocationDiscoveryPrompt() {
               <Button
                 title="Enter Location Manually"
                 variant="secondary"
-                onPress={() => setManualVisible(true)}
-                disabled={enabling}
+                onPress={() => {
+                  locationRequestRef.current += 1;
+                  setEnabling(false);
+                  setManualVisible(true);
+                }}
               />
               {hasLegacyCity && legacyCityLabel ? (
                 <Button
                   title="Use Existing City"
                   variant="secondary"
-                  onPress={() => void handleUseExistingCity()}
-                  disabled={enabling}
+                  onPress={() => {
+                    locationRequestRef.current += 1;
+                    setEnabling(false);
+                    void handleUseExistingCity();
+                  }}
                 />
               ) : null}
               <Pressable onPress={() => void handleNotNow()} style={styles.laterButton}>

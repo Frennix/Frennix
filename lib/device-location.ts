@@ -1,14 +1,22 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { GeocodedPlace } from "@/lib/location-geocode";
+import * as Location from "expo-location";
 import { reverseGeocode } from "@/lib/location-geocode";
+import { withTimeout } from "@/lib/async-timeout";
+import {
+  DEVICE_LOCATION_TIMEOUT_MS,
+  isLocationTimeoutError,
+  isPermissionDeniedError,
+  LOCATION_STEP_MESSAGES,
+  nativeForegroundPermissionAction,
+  shouldAttemptDeviceLocationRead,
+  type DeviceLocationResult,
+  type LiveLocationPermission,
+} from "@/lib/signup-location-flow";
 
 const PERMISSION_DENIED_KEY = "frennix:location-permission-denied";
 
-export type DeviceLocationResult =
-  | { status: "granted"; place: GeocodedPlace }
-  | { status: "denied" }
-  | { status: "unavailable"; message: string };
+export type { DeviceLocationResult };
 
 export async function wasLocationPermissionDenied(): Promise<boolean> {
   const value = await AsyncStorage.getItem(PERMISSION_DENIED_KEY);
@@ -23,6 +31,27 @@ export async function clearLocationPermissionDenied(): Promise<void> {
   await AsyncStorage.removeItem(PERMISSION_DENIED_KEY);
 }
 
+function deniedError(): Error {
+  return Object.assign(new Error("Location permission denied"), { code: "denied" });
+}
+
+async function readWebPermission(): Promise<LiveLocationPermission> {
+  if (typeof navigator === "undefined" || !navigator.permissions?.query) return "unknown";
+  try {
+    const status = await withTimeout(
+      navigator.permissions.query({ name: "geolocation" }),
+      2_000,
+      "Location permission"
+    );
+    if (status.state === "granted" || status.state === "denied" || status.state === "prompt") {
+      return status.state;
+    }
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 function readWebGeolocation(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -30,57 +59,90 @@ function readWebGeolocation(): Promise<GeolocationPosition> {
       return;
     }
 
+    // The Geolocation timeout does not start until the permission prompt is answered,
+    // and some browsers never settle after a denial. Callers also race withTimeout.
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: false,
       maximumAge: 60_000,
-      timeout: 15_000,
+      timeout: DEVICE_LOCATION_TIMEOUT_MS,
     });
   });
 }
 
-async function readNativeGeolocation(): Promise<{ latitude: number; longitude: number }> {
-  try {
-    const Location = await import("expo-location");
-    const servicesEnabled = await Location.hasServicesEnabledAsync();
-    if (!servicesEnabled) {
-      throw new Error("Location services are turned off");
-    }
-
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== "granted") {
-      throw Object.assign(new Error("Location permission denied"), { code: "denied" });
-    }
-
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Low,
-    });
-
-    return {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-    };
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "denied") {
-      throw error;
-    }
-    throw new Error("Could not read device location");
+async function readWebCoordinates(): Promise<{ latitude: number; longitude: number }> {
+  const livePermission = await readWebPermission();
+  const rememberedDenial = await wasLocationPermissionDenied();
+  if (!shouldAttemptDeviceLocationRead({ rememberedDenial, livePermission })) {
+    throw deniedError();
   }
+
+  const position = await withTimeout(
+    readWebGeolocation(),
+    DEVICE_LOCATION_TIMEOUT_MS,
+    "Device location"
+  );
+  return {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+  };
 }
 
-/** Request device location once — never re-prompts after denial (caller checks wasLocationPermissionDenied). */
-export async function requestApproximateDeviceLocation(): Promise<DeviceLocationResult> {
-  if (await wasLocationPermissionDenied()) {
-    return { status: "denied" };
+async function readNativeCoordinates(): Promise<{ latitude: number; longitude: number }> {
+  const servicesEnabled = await withTimeout(
+    Location.hasServicesEnabledAsync(),
+    DEVICE_LOCATION_TIMEOUT_MS,
+    "Location services"
+  );
+  if (!servicesEnabled) {
+    throw new Error(
+      "Location services are turned off. Enter your city manually or continue without location."
+    );
   }
 
+  const existing = await withTimeout(
+    Location.getForegroundPermissionsAsync(),
+    DEVICE_LOCATION_TIMEOUT_MS,
+    "Location permission"
+  );
+  const action = nativeForegroundPermissionAction({
+    status: existing.status,
+    canAskAgain: existing.canAskAgain,
+  });
+
+  if (action === "blocked") {
+    throw deniedError();
+  }
+
+  if (action === "prompt") {
+    const permission = await withTimeout(
+      Location.requestForegroundPermissionsAsync(),
+      DEVICE_LOCATION_TIMEOUT_MS,
+      "Location permission"
+    );
+    if (permission.status !== "granted") {
+      throw deniedError();
+    }
+  }
+
+  const position = await withTimeout(
+    Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Low,
+    }),
+    DEVICE_LOCATION_TIMEOUT_MS,
+    "Device location"
+  );
+
+  return {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+  };
+}
+
+/** Explicit user request. Times out instead of hanging, including an unanswered permission prompt. */
+export async function requestApproximateDeviceLocation(): Promise<DeviceLocationResult> {
   try {
     const coords =
-      Platform.OS === "web"
-        ? await readWebGeolocation().then((position) => ({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          }))
-        : await readNativeGeolocation();
+      Platform.OS === "web" ? await readWebCoordinates() : await readNativeCoordinates();
 
     const place = await reverseGeocode(coords.latitude, coords.longitude);
     if (!place) {
@@ -90,42 +152,43 @@ export async function requestApproximateDeviceLocation(): Promise<DeviceLocation
     await clearLocationPermissionDenied();
     return { status: "granted", place };
   } catch (error) {
-    const denied =
-      (error instanceof GeolocationPositionError && error.code === error.PERMISSION_DENIED) ||
-      (error &&
-        typeof error === "object" &&
-        "code" in error &&
-        (error as { code?: string }).code === "denied");
-
-    if (denied) {
+    if (isPermissionDeniedError(error)) {
       await markLocationPermissionDenied();
       return { status: "denied" };
     }
 
-    const message = error instanceof Error ? error.message : "Could not read location";
+    if (isLocationTimeoutError(error)) {
+      return { status: "timeout", message: LOCATION_STEP_MESSAGES.timeout };
+    }
+
+    const message = error instanceof Error ? error.message : LOCATION_STEP_MESSAGES.unavailable;
     return { status: "unavailable", message };
   }
 }
 
-/** Non-interactive check for platforms that already granted permission. */
+/** Non-interactive check. Does not prompt when permission is still unanswered. */
 export async function tryReadSavedDeviceLocation(): Promise<DeviceLocationResult> {
   if (Platform.OS === "web") {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      return { status: "unavailable", message: "Geolocation not available" };
+    const live = await readWebPermission();
+    if (live === "denied") {
+      await markLocationPermissionDenied();
+      return { status: "denied" };
     }
-    if (navigator.permissions) {
-      try {
-        const status = await navigator.permissions.query({ name: "geolocation" });
-        if (status.state === "denied") {
-          await markLocationPermissionDenied();
-          return { status: "denied" };
-        }
-        if (status.state !== "granted") {
-          return { status: "unavailable", message: "Location permission not granted" };
-        }
-      } catch {
-        // permissions API unavailable — fall through
-      }
+    if (live !== "granted") {
+      return { status: "unavailable", message: "Location permission not granted" };
+    }
+  } else {
+    const existing = await Location.getForegroundPermissionsAsync();
+    const action = nativeForegroundPermissionAction({
+      status: existing.status,
+      canAskAgain: existing.canAskAgain,
+    });
+    if (action === "blocked") {
+      await markLocationPermissionDenied();
+      return { status: "denied" };
+    }
+    if (action !== "read") {
+      return { status: "unavailable", message: "Location permission not granted" };
     }
   }
 

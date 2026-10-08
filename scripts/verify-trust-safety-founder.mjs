@@ -81,7 +81,7 @@ function main() {
     "Mute user"
   );
 
-  mustInclude("lib/useMessageModeration.ts", "reportMessage", "muteUser");
+  mustInclude("lib/useMessageModeration.tsx", "reportUser", "blockUser");
   mustInclude("packages/api/src/posts.ts", "check_post_abuse", "filterMutedAuthors");
   mustInclude("packages/api/src/story-discovery.ts", "getMutedUserIds");
 

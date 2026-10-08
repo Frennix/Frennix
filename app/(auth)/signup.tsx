@@ -6,6 +6,8 @@ import { useAuth } from "@/providers/AuthProvider";
 import { storePendingReferralCode } from "@/lib/referral-storage";
 import { Button, Input, PasswordInput, colors, spacing, typography } from "@frennix/ui";
 import { FrennixLogo } from "@/components/FrennixLogo";
+import { StartupMountProbe } from "@/components/StartupMountProbe";
+import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 
 export default function SignupScreen() {
   const { ref } = useLocalSearchParams<{ ref?: string }>();
@@ -14,6 +16,10 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    hideFrennixBootShell();
+  }, []);
 
   useEffect(() => {
     if (ref) {
@@ -42,24 +48,27 @@ export default function SignupScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <FrennixLogo variant="full" height={56} style={styles.logo} />
-      <Text style={styles.title}>Join Frennix</Text>
-      <Text style={styles.subtitle}>Build your fitness community</Text>
+    <StartupMountProbe id="auth-signup">
+      <KeyboardAvoidingView
+        nativeID="auth-signup-screen"
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <FrennixLogo variant="full" height={56} style={styles.logo} />
+        <Text style={styles.title}>Join Frennix</Text>
+        <Text style={styles.subtitle}>Build your fitness community</Text>
 
-      <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <PasswordInput label="Password" value={password} onChangeText={setPassword} autoComplete="new-password" textContentType="newPassword" />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+        <PasswordInput label="Password" value={password} onChangeText={setPassword} autoComplete="new-password" textContentType="newPassword" />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Button title="Create account" onPress={handleSignup} loading={loading} />
+        <Button title="Create account" onPress={handleSignup} loading={loading} />
 
-      <Link href="/(auth)/login" style={styles.link}>
-        <Text style={styles.linkText}>Already have an account? Sign in</Text>
-      </Link>
-    </KeyboardAvoidingView>
+        <Link href="/(auth)/login" style={styles.link}>
+          <Text style={styles.linkText}>Already have an account? Sign in</Text>
+        </Link>
+      </KeyboardAvoidingView>
+    </StartupMountProbe>
   );
 }
 

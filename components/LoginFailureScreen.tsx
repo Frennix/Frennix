@@ -8,6 +8,7 @@ type LoginFailureScreenProps = {
   message: string;
   detail?: string;
   errorMessage?: string;
+  startupGap?: string;
   onRetry?: () => void;
 };
 
@@ -17,9 +18,10 @@ export function LoginFailureScreen({
   message,
   detail,
   errorMessage,
+  startupGap,
   onRetry,
 }: LoginFailureScreenProps) {
-  const gap = getStartupMountGap();
+  const gap = startupGap ?? getStartupMountGap();
   const traceSummary = formatStartupMountSummary(8);
 
   return (

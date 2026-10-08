@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Platform, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing } from "@frennix/ui";
+import { resolveBottomSheetWebFrame } from "@/lib/bottom-sheet-web-frame";
 import {
   measureSafariVisualViewport,
   OVERLAY_BOTTOM_SAFETY_MARGIN_PX,
   subscribeSafariVisualViewport,
-  isMobileWebSafari,
+  isIOSWeb,
 } from "@/lib/safari-visual-viewport";
 
 /** @deprecated Import from `@/lib/safari-visual-viewport` */
@@ -88,49 +89,77 @@ export function useBottomActionSheetLayout(
     return subscribeSafariVisualViewport(update);
   }, [visible]);
 
-  const useWebSafariLayout =
+  const pinToVisualViewport =
     Platform.OS === "web" &&
     visible &&
-    isMobileWebSafari() &&
+    isIOSWeb() &&
     typeof window !== "undefined" &&
     viewport != null;
+  const snapRatio = expanded ? expandedSnapRatio : primarySnapRatio;
+  const maxRatio = expanded ? expandedMaxRatio : contentSized ? contentMaxRatio : primarySnapRatio;
+  const useContentSizing = contentSized && !expanded;
+
+  const frame =
+    viewport != null
+      ? resolveBottomSheetWebFrame({
+          snapshot: viewport,
+          pinToVisualViewport,
+          contentSized: useContentSizing,
+          snapRatio: useContentSizing ? 0.42 : snapRatio,
+          maxRatio,
+        })
+      : null;
 
   const webOverlayStyle = useMemo(
     () =>
-      useWebSafariLayout && viewport
+      frame?.pinToVisualViewport
         ? ({
             position: "fixed",
-            top: viewport.overlayTop,
+            top: frame.overlayTop,
             left: 0,
             right: 0,
             width: "100%",
-            height: viewport.overlayHeight,
+            height: frame.overlayHeight,
+            minHeight: frame.overlayHeight,
+            maxHeight: frame.overlayHeight,
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-end",
             overflow: "hidden",
           } as ViewStyle)
         : null,
-    [useWebSafariLayout, viewport]
+    [frame]
   );
 
   const webSheetAnchorStyle = useMemo(
     () =>
-      useWebSafariLayout && viewport
+      frame?.pinToVisualViewport
         ? ({
             width: "100%",
-            marginBottom: viewport.sheetInset,
-            flexShrink: 0,
+            marginBottom: frame.marginBottom,
+            maxHeight: frame.maxHeightPx,
+            flexShrink: 1,
+            minHeight: 0,
           } as ViewStyle)
         : null,
-    [useWebSafariLayout, viewport]
+    [frame]
   );
 
-  const snapRatio = expanded ? expandedSnapRatio : primarySnapRatio;
-  const maxRatio = expanded ? expandedMaxRatio : contentSized ? contentMaxRatio : primarySnapRatio;
-  const useContentSizing = contentSized && !expanded;
   const overlayHeight = viewport?.overlayHeight ?? 0;
   const sheetInset = viewport?.sheetInset ?? spacing.lg;
+
+  if (Platform.OS === "web" && frame?.pinToVisualViewport) {
+    return {
+      sheetMarginBottom: frame.marginBottom,
+      contentBottomPadding: useContentSizing ? spacing.sm : spacing.lg,
+      sheetSnapHeight: useContentSizing ? undefined : frame.snapHeightPx,
+      sheetMaxHeight: frame.maxHeightPx,
+      snapRatio: useContentSizing ? 0.42 : snapRatio,
+      contentSized: useContentSizing,
+      webOverlayStyle,
+      webSheetAnchorStyle,
+    };
+  }
 
   if (Platform.OS === "web") {
     const maxPx = Math.max(Math.round(overlayHeight * maxRatio), 280);

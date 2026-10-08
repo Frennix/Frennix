@@ -16,8 +16,19 @@ import {
   useBottomActionSheetLayout,
   type BottomActionSheetLayoutOptions,
 } from "@/lib/use-bottom-action-sheet-layout";
-import { requestSafariVisualViewportRemeasure } from "@/lib/safari-visual-viewport";
+import {
+  isIOSWeb,
+  requestSafariVisualViewportRemeasure,
+  subscribeSafariVisualViewport,
+} from "@/lib/safari-visual-viewport";
+import {
+  containDocumentScrollForSheet,
+  revealFocusedSheetField,
+  SHEET_ROOT_ID,
+  SHEET_SCROLL_ID,
+} from "@/lib/sheet-keyboard-layout";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
+import { portalToDocumentBody } from "@/components/RootPortalOverlay";
 import { colors, radius, spacing, touchTarget } from "@frennix/ui";
 
 export const BOTTOM_SHEET_DISMISS_DRAG_THRESHOLD = 120;
@@ -135,6 +146,34 @@ export function BottomActionSheet({
       if (Platform.OS === "web") restoreWebDocumentScrollLock();
     };
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !visible || typeof document === "undefined") return;
+
+    const releaseScroll = containDocumentScrollForSheet();
+    const revealField = () => {
+      requestAnimationFrame(() => {
+        revealFocusedSheetField();
+        requestAnimationFrame(revealFocusedSheetField);
+      });
+    };
+    const onFocusChange = () => {
+      requestSafariVisualViewportRemeasure();
+      revealField();
+    };
+
+    document.addEventListener("focusin", onFocusChange);
+    document.addEventListener("focusout", onFocusChange);
+    const unsubscribe = subscribeSafariVisualViewport(revealField);
+    revealField();
+
+    return () => {
+      document.removeEventListener("focusin", onFocusChange);
+      document.removeEventListener("focusout", onFocusChange);
+      unsubscribe();
+      releaseScroll();
+    };
+  }, [visible]);
 
   const handleDismiss = useCallback(() => {
     if (dismissingRef.current) return;
@@ -288,6 +327,7 @@ export function BottomActionSheet({
 
       {scrollEnabled ? (
         <ScrollView
+          nativeID={SHEET_SCROLL_ID}
           style={styles.sheetScroll}
           contentContainerStyle={[styles.sheetScrollContent, scrollContentContainerStyle]}
           scrollEnabled
@@ -306,7 +346,10 @@ export function BottomActionSheet({
 
   const animatedSheet = (
     <Animated.View
-      style={sheetAnimatedStyle as unknown as ViewStyle}
+      style={[
+        sheetAnimatedStyle as unknown as ViewStyle,
+        scrollEnabled && Platform.OS === "web" ? styles.sheetScrollBounds : null,
+      ]}
       onLayout={handleSheetLayout}
       {...(scrollEnabled ? {} : sheetPanResponder.panHandlers)}
     >
@@ -317,15 +360,12 @@ export function BottomActionSheet({
   const anchorMaxHeight =
     scrollEnabled || expanded ? (webSheetMaxHeight ?? nativeSheetMaxHeight) : undefined;
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleDismiss}
-      accessibilityViewIsModal
-    >
-      <View style={[styles.root, webOverlayStyle]} pointerEvents="box-none">
+  const sheetTree = (
+      <View
+        nativeID={SHEET_ROOT_ID}
+        style={[styles.root, webOverlayStyle, webOverlayStyle ? styles.pinnedOverlay : null]}
+        pointerEvents="box-none"
+      >
         {webSheetAnchorStyle ? (
           <Pressable
             style={styles.safariBackdropTap}
@@ -372,6 +412,21 @@ export function BottomActionSheet({
           animatedSheet
         )}
       </View>
+  );
+
+  if (Platform.OS === "web" && isIOSWeb() && typeof document !== "undefined") {
+    return portalToDocumentBody(sheetTree);
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={handleDismiss}
+      accessibilityViewIsModal
+    >
+      {sheetTree}
     </Modal>
   );
 }
@@ -394,6 +449,9 @@ const WEB_BACKDROP_BLUR =
 const SHEET_TOP_RADIUS = radius.lg + 8;
 
 const styles = StyleSheet.create({
+  pinnedOverlay: {
+    backgroundColor: colors.background,
+  },
   root: {
     flex: 1,
     justifyContent: "flex-end",
@@ -438,13 +496,18 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 0,
   },
+  sheetScrollBounds: {
+    overflow: "hidden",
+  },
   sheetScroll: {
     flexGrow: 0,
     flexShrink: 1,
     ...(Platform.OS === "web"
       ? ({
           minHeight: 0,
+          maxHeight: "100%",
           overflowY: "auto",
+          overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch",
         } as object)
       : null),

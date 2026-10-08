@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import {
   deriveLocationDisplayMode,
@@ -74,6 +74,7 @@ export default function PrivacySettingsScreen() {
   const userId = session?.user.id ?? "";
   const [manualVisible, setManualVisible] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const locationRequestRef = useRef(0);
   const [savingKey, setSavingKey] = useState<PrivacyToggleKey | null>(null);
   const [profileRetrying, setProfileRetrying] = useState(false);
 
@@ -124,11 +125,19 @@ export default function PrivacySettingsScreen() {
     [runToggleSave, userId, refreshProfile]
   );
 
+  function openManualCity() {
+    locationRequestRef.current += 1;
+    setLocationLoading(false);
+    setManualVisible(true);
+  }
+
   async function handleEnableDeviceLocation() {
     if (!userId) return;
+    const requestId = ++locationRequestRef.current;
     setLocationLoading(true);
     try {
       const result = await requestApproximateDeviceLocation();
+      if (requestId !== locationRequestRef.current) return;
       if (result.status === "granted") {
         const updated = await saveUserLocation(userId, result.place);
         await refreshProfile(updated);
@@ -142,9 +151,19 @@ export default function PrivacySettingsScreen() {
         setManualVisible(true);
         return;
       }
+      if (result.status === "timeout") {
+        showAlert("Location timed out", result.message);
+        return;
+      }
       showAlert("Location unavailable", result.message);
+    } catch {
+      if (requestId !== locationRequestRef.current) return;
+      showAlert(
+        "Location unavailable",
+        "Try again, choose your city, or continue without device location."
+      );
     } finally {
-      setLocationLoading(false);
+      if (requestId === locationRequestRef.current) setLocationLoading(false);
     }
   }
 
@@ -275,12 +294,7 @@ export default function PrivacySettingsScreen() {
               onPress={() => void handleEnableDeviceLocation()}
               loading={locationLoading}
             />
-            <Button
-              title="Choose My City"
-              variant="secondary"
-              onPress={() => setManualVisible(true)}
-              disabled={locationLoading}
-            />
+            <Button title="Choose My City" variant="secondary" onPress={openManualCity} />
             {savedLocationLabel ? (
               <Button
                 title="Remove Saved Location"

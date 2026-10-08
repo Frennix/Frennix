@@ -87,6 +87,31 @@ export function buildDefaultDiscoverySettings(hasLocation: boolean): DiscoveryPr
   };
 }
 
+/**
+ * Signup discovery defaults.
+ * Device GPS permission is not a public location-sharing choice: declining it
+ * must not hide city/state or opt the user out of Frennix Match.
+ * Nearby matching follows whether a city (device or manual) was saved.
+ */
+export function signupLocationPrivacy(
+  place: { latitude?: number | null; longitude?: number | null } | null,
+  devicePermissionDenied = false
+): DiscoveryPrivacyPatch & { matching_enabled: boolean } {
+  const hasCoordinates = place?.latitude != null && place?.longitude != null;
+  const defaults = buildDefaultDiscoverySettings(hasCoordinates);
+  return {
+    ...defaults,
+    matching_enabled: true,
+    use_location_for_matching: hasCoordinates,
+    show_city_state: true,
+    show_approximate_distance: false,
+    location_display_mode: "city_state",
+    discovery_explicitly_disabled_at: devicePermissionDenied
+      ? null
+      : defaults.discovery_explicitly_disabled_at,
+  };
+}
+
 export async function saveUserLocation(userId: string, location: SavedLocation): Promise<Profile> {
   return updateProfile(userId, {
     city: location.city.trim(),
