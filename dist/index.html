@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
-    <title>Frennix · e7d557e0</title>
+    <title>Frennix</title>
     <meta name="theme-color" content="#0A0A0B" />
     <meta name="color-scheme" content="dark" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
@@ -26,9 +26,9 @@
       }
     </style>
   
-    <meta name="frennix-build-sha" content="e7d557e084eaa9bcbf84a7f8988907f507118578" />
-    <meta name="frennix-build-bundle" content="index-ac7b23c19762473f7ab39b90ee2a3f66.js" />
-    <meta name="frennix-build-at" content="2026-09-14T02:46:51.892Z" />
+    <meta name="frennix-build-sha" content="9e14e89bfebffcffed8dcfdc85cd5aa015bee1e7" />
+    <meta name="frennix-build-bundle" content="index-2892f9b75929700264fff901e53ef6aa.js" />
+    <meta name="frennix-build-at" content="2026-10-08T17:02:14.791Z" />
     <meta name="frennix-sw-version" content="20260808-pwa-fetch-safe-v1" />
       <style id="frennix-web-scroll">
   :root {
@@ -818,6 +818,7 @@
     visibility: hidden !important;
   }
   #auth-login-screen,
+  #auth-signup-screen,
   #startup-retry-screen,
   #login-failure-screen {
     min-height: 100dvh;
@@ -831,6 +832,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Frennix" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+      <meta name="frennix-vapid-public-key" content="BIveW-l6AKdTigzSsBZEnykS_noURsQIKEBxaEvaeBiuQcYNVEuxCjgBoyUkrp7sE3KRd8K3v7ZY3jNwcEF4zi4" />
       
     <link rel="preload" href="/brand/frennix-splash-logo.png" as="image" type="image/png" />
     <link rel="apple-touch-startup-image" href="/brand/frennix-splash-logo.png" />
@@ -859,10 +861,11 @@
   }
   #frennix-boot-shell .frennix-boot-shell-logo {
     display: block;
-    width: min(44vw, 200px);
+    width: min(78vw, 304px);
     height: auto;
-    max-height: 28vh;
+    max-height: 42vh;
     object-fit: contain;
+    background: transparent;
     user-select: none;
     -webkit-user-drag: none;
   }
@@ -885,7 +888,7 @@
         fetchpriority="high"
       />
     </div>
-    <div id="frennix-build-stamp" style="display:none" data-sha="e7d557e084eaa9bcbf84a7f8988907f507118578" data-bundle="index-ac7b23c19762473f7ab39b90ee2a3f66.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
+    <div id="frennix-build-stamp" style="display:none" data-sha="9e14e89bfebffcffed8dcfdc85cd5aa015bee1e7" data-bundle="index-2892f9b75929700264fff901e53ef6aa.js" data-sw="20260808-pwa-fetch-safe-v1"></div>
     <script id="frennix-pwa-early-update">
 (function () {
   var RELOAD_KEY = "frennix:pwa-update-reload";
@@ -931,7 +934,7 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-ac7b23c19762473f7ab39b90ee2a3f66.js?v=e7d557e0" defer></script>
+  <script src="/_expo/static/js/web/index-2892f9b75929700264fff901e53ef6aa.js?v=9e14e89b" defer></script>
 
     <script id="frennix-boot-shell-script">
 (function () {
@@ -982,6 +985,7 @@
     if (feedDestinationReady()) return true;
     var markers = [
       ["auth-login-screen", 200],
+      ["auth-signup-screen", 120],
       ["startup-retry-screen", 200],
       ["login-failure-screen", 120],
       ["onboarding-screen", 120],
@@ -1087,6 +1091,7 @@
 
   function signedOutReady() {
     if (markerVisible("auth-login-screen", 200)) return true;
+    if (markerVisible("auth-signup-screen", 120)) return true;
     if (markerVisible("startup-retry-screen", 200)) return true;
     if (markerVisible("login-failure-screen", 120)) return true;
     return false;
