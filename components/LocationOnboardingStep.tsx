@@ -1,54 +1,98 @@
-import { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { requestApproximateDeviceLocation } from "@/lib/device-location";
 import { ManualLocationSheet } from "@/components/ManualLocationSheet";
 import { FrennixLogo } from "@/components/FrennixLogo";
 import type { GeocodedPlace } from "@/lib/location-geocode";
+import {
+  applySignupDeviceLocationResult,
+  applySignupManualLocation,
+  beginSignupDeviceLocationRequest,
+  cancelSignupDeviceLocationRequest,
+  initialSignupLocationStepState,
+  LOCATION_STEP_MESSAGES,
+  skipSignupDeviceLocation,
+  type SignupLocationReduction,
+  type SignupLocationStepState,
+} from "@/lib/signup-location-flow";
 import { Button, colors, spacing, typography } from "@frennix/ui";
 
-type LocationChoice = "pending" | "device" | "manual" | "skipped";
-
 type LocationOnboardingStepProps = {
+  /** False once signup leaves this step, so a late location result cannot overwrite the choice. */
+  active?: boolean;
   onLocationResolved: (place: GeocodedPlace | null) => void;
+  onDevicePermissionDeniedChange?: (denied: boolean) => void;
 };
 
-export function LocationOnboardingStep({ onLocationResolved }: LocationOnboardingStepProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+export function LocationOnboardingStep({
+  active = true,
+  onLocationResolved,
+  onDevicePermissionDeniedChange,
+}: LocationOnboardingStepProps) {
+  const [state, setState] = useState<SignupLocationStepState>(initialSignupLocationStepState);
   const [manualVisible, setManualVisible] = useState(false);
-  const [choice, setChoice] = useState<LocationChoice>("pending");
+  const stateRef = useRef(state);
+
+  function commit(result: SignupLocationReduction) {
+    if (result.effect.type === "none" && result.state === stateRef.current) return;
+    stateRef.current = result.state;
+    setState(result.state);
+    if (result.effect.type === "device_permission_denied") {
+      onDevicePermissionDeniedChange?.(true);
+      return;
+    }
+    if (result.effect.type === "advance") {
+      onDevicePermissionDeniedChange?.(result.effect.devicePermissionDenied);
+      onLocationResolved(result.effect.place);
+    }
+  }
+
+  useEffect(() => {
+    if (active) return;
+    setManualVisible(false);
+    const current = stateRef.current;
+    const dismissed = cancelSignupDeviceLocationRequest(current);
+    if (dismissed.state !== current) {
+      stateRef.current = dismissed.state;
+      setState(dismissed.state);
+    }
+  }, [active]);
 
   async function handleAllowLocation() {
-    setLoading(true);
-    setError("");
-    setChoice("device");
+    const begun = beginSignupDeviceLocationRequest(stateRef.current);
+    if (begun.state === stateRef.current) return;
+    const requestId = begun.state.requestId;
+    stateRef.current = begun.state;
+    setState(begun.state);
     try {
       const result = await requestApproximateDeviceLocation();
-      if (result.status === "granted") {
-        onLocationResolved(result.place);
-        return;
-      }
-      if (result.status === "denied") {
-        setError("Location access denied. Enter your city manually or continue without location.");
-        setChoice("pending");
-        return;
-      }
-      setError(result.message);
-      setChoice("pending");
-    } finally {
-      setLoading(false);
+      commit(applySignupDeviceLocationResult(stateRef.current, requestId, result));
+    } catch {
+      commit(
+        applySignupDeviceLocationResult(stateRef.current, requestId, {
+          status: "unavailable",
+          message: LOCATION_STEP_MESSAGES.unavailable,
+        })
+      );
     }
   }
 
   function handleNotNow() {
-    setChoice("skipped");
-    onLocationResolved(null);
+    commit(skipSignupDeviceLocation(stateRef.current));
+  }
+
+  function handleOpenManual() {
+    const cancelled = cancelSignupDeviceLocationRequest(stateRef.current);
+    if (cancelled.state !== stateRef.current) {
+      stateRef.current = cancelled.state;
+      setState(cancelled.state);
+    }
+    setManualVisible(true);
   }
 
   function handleManualSave(place: GeocodedPlace) {
-    setChoice("manual");
-    onLocationResolved(place);
     setManualVisible(false);
+    commit(applySignupManualLocation(stateRef.current, place));
   }
 
   return (
@@ -61,28 +105,21 @@ export function LocationOnboardingStep({ onLocationResolved }: LocationOnboardin
         other users.
       </Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {loading ? <ActivityIndicator color={colors.accent} /> : null}
+      {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
+      {state.loading ? (
+        <Text style={styles.status}>
+          Checking location… You can enter a city or continue without it.
+        </Text>
+      ) : null}
 
       <View style={styles.actions}>
         <Button
           title="Allow Location"
           onPress={() => void handleAllowLocation()}
-          loading={loading}
-          disabled={choice === "skipped"}
+          loading={state.loading}
         />
-        <Button
-          title="Enter Location Manually"
-          variant="secondary"
-          onPress={() => setManualVisible(true)}
-          disabled={loading || choice === "skipped"}
-        />
-        <Button
-          title="Not Now"
-          variant="ghost"
-          onPress={handleNotNow}
-          disabled={loading}
-        />
+        <Button title="Enter Location Manually" variant="secondary" onPress={handleOpenManual} />
+        <Button title="Not Now" variant="ghost" onPress={handleNotNow} />
       </View>
 
       <ManualLocationSheet
@@ -99,6 +136,7 @@ const styles = StyleSheet.create({
   logo: { alignSelf: "center", marginBottom: spacing.xs },
   heading: { ...typography.heading, color: colors.text, textAlign: "center" },
   body: { ...typography.bodySmall, color: colors.textSecondary, lineHeight: 22, textAlign: "center" },
-  error: { color: colors.danger, ...typography.caption },
+  error: { ...typography.caption, color: colors.danger },
+  status: { ...typography.caption, color: colors.textMuted, textAlign: "center", lineHeight: 18 },
   actions: { gap: spacing.sm, marginTop: spacing.sm },
 });

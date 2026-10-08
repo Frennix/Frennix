@@ -150,6 +150,26 @@ const checks: Array<{ name: string; run: () => void }> = [
       assertIncludes("packages/api/src/location-discovery.ts", "discovery_explicitly_disabled_at", "opt-out timestamp");
     },
   },
+  {
+    name: "Signup location denial does not hide public location",
+    run: () => {
+      assertIncludes(
+        "packages/api/src/location-discovery.ts",
+        "signupLocationPrivacy",
+        "signup privacy helper"
+      );
+      assertIncludes(
+        "app/onboarding.tsx",
+        "signupLocationPrivacy",
+        "onboarding uses signup privacy helper"
+      );
+      assertIncludes(
+        "components/LocationOnboardingStep.tsx",
+        "skipSignupDeviceLocation",
+        "Not Now continues signup"
+      );
+    },
+  },
 ];
 
 let passed = 0;

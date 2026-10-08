@@ -65,3 +65,8 @@ export function RootPortalOverlay({
 
   return createPortal(surface, document.body);
 }
+
+/** Mount an already-built React tree on document.body. */
+export function portalToDocumentBody(node: ReactNode) {
+  return createPortal(node, document.body);
+}

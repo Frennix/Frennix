@@ -26,6 +26,27 @@ function pickState(address: NominatimAddress): string | null {
   return candidate?.trim() || null;
 }
 
+const GEOCODE_TIMEOUT_MS = 10_000;
+
+async function fetchGeocode(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS);
+  try {
+    return await fetch(url.toString(), {
+      headers: { Accept: "application/json", "User-Agent": "Frennix/1.0 (training partner app)" },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const name = error && typeof error === "object" && "name" in error ? String(error.name) : "";
+    if (name === "AbortError") {
+      throw new Error("Location lookup timed out. Check your connection and try again.");
+    }
+    throw error instanceof Error ? error : new Error("Could not look up location");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Reverse geocode coordinates to approximate city/state via OpenStreetMap Nominatim. */
 export async function reverseGeocode(
   latitude: number,
@@ -38,9 +59,7 @@ export async function reverseGeocode(
   url.searchParams.set("zoom", "10");
   url.searchParams.set("addressdetails", "1");
 
-  const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json", "User-Agent": "Frennix/1.0 (training partner app)" },
-  });
+  const response = await fetchGeocode(url.toString());
 
   if (!response.ok) return null;
 
@@ -68,9 +87,7 @@ export async function geocodeCityState(city: string, state: string): Promise<Geo
   url.searchParams.set("countrycodes", "us");
   url.searchParams.set("addressdetails", "1");
 
-  const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json", "User-Agent": "Frennix/1.0 (training partner app)" },
-  });
+  const response = await fetchGeocode(url.toString());
 
   if (!response.ok) return null;
 

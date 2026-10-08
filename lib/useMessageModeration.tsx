@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { blockUser, getErrorMessage, muteUser, reportMessage } from "@frennix/api";
+import { blockUser, getErrorMessage, reportUser } from "@frennix/api";
 import { ContentModerationSheet } from "@/components/ContentModerationSheet";
 import { ReportReasonSheet } from "@/components/ReportReasonSheet";
 import { confirmBlockUser, showAlert, showSuccess } from "@/lib/alerts";
@@ -26,7 +26,7 @@ export function useMessageModeration(userId: string) {
   const reportMutation = useMutation({
     mutationFn: (reason: string) => {
       if (!target) throw new Error("No message selected");
-      return reportMessage(userId, target.messageId, target.senderId, reason, target.preview);
+      return reportUser(userId, target.senderId, reason);
     },
     onSuccess: () => {
       setReportVisible(false);
@@ -48,18 +48,6 @@ export function useMessageModeration(userId: string) {
     onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),
   });
 
-  const muteMutation = useMutation({
-    mutationFn: () => {
-      if (!target) throw new Error("No message selected");
-      return muteUser(userId, target.senderId);
-    },
-    onSuccess: () => {
-      setMenuVisible(false);
-      showSuccess("User muted");
-    },
-    onError: (error) => showAlert("Mute failed", getErrorMessage(error)),
-  });
-
   const sheets = (
     <>
       <ContentModerationSheet
@@ -77,8 +65,6 @@ export function useMessageModeration(userId: string) {
               }
             : undefined
         }
-        onMute={target ? () => muteMutation.mutate() : undefined}
-        muteLabel="Mute user (hide posts & stories)"
       />
       <ReportReasonSheet
         visible={reportVisible}
