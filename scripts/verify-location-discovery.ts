@@ -82,6 +82,11 @@ const checks: Array<{ name: string; run: () => void }> = [
         "prompt eligibility comment"
       );
       assertIncludes("app/(tabs)/_layout.tsx", "LocationDiscoveryPrompt", "tabs mount");
+      assertIncludes(
+        "components/LocationDiscoveryPrompt.tsx",
+        "const promptModalOpen = visible && !manualVisible",
+        "prompt unmounts while the city sheet is open"
+      );
     },
   },
   {

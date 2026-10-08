@@ -138,29 +138,27 @@ export function LocationDiscoveryPrompt() {
   }, [finishPrompt, refreshProfile, userId]);
 
   const { backdropStyle } = useCenterOverlaySafeArea(visible || manualVisible);
+  // iPhone Safari portals the city sheet to document.body. React Native Web's
+  // Modal stays at z-index 9999 and traps focus, so leaving it open paints the
+  // prompt over the form and blocks typing. Unmount it while the sheet is open.
+  const promptModalOpen = visible && !manualVisible;
 
-  if (checking || !visible) {
-    return (
-      <ManualLocationSheet
-        visible={manualVisible}
-        onClose={() => setManualVisible(false)}
-        onSave={handleManualSave}
-        title="Enter your city"
-      />
-    );
+  if (checking && !visible && !manualVisible) {
+    return null;
   }
 
   return (
     <>
-      <Modal
-        visible={visible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => void handleNotNow()}
-        accessibilityViewIsModal
-      >
+      {promptModalOpen ? (
+        <Modal
+          visible
+          animationType="none"
+          transparent
+          onRequestClose={() => void handleNotNow()}
+          accessibilityViewIsModal
+        >
         <View style={[styles.backdrop, ...backdropStyle]}>
-          <View style={styles.card}>
+          <View nativeID="discovery-prompt" style={styles.card}>
             <FrennixLogo variant="mark" height={72} style={styles.logo} />
             <Text style={styles.title}>Find Your Training Partner</Text>
             {hasLegacyCity && legacyCityLabel ? (
@@ -211,7 +209,8 @@ export function LocationDiscoveryPrompt() {
             </View>
           </View>
         </View>
-      </Modal>
+        </Modal>
+      ) : null}
       <ManualLocationSheet
         visible={manualVisible}
         onClose={() => setManualVisible(false)}
