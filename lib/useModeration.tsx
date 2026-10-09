@@ -41,16 +41,17 @@ export function useModeration(userId: string) {
 
   const reportMutation = useMutation({
     mutationFn: async ({ reason }: { reason: string }) => {
-      if (!target) return;
+      if (!target) throw new Error("Couldn’t submit that report. Please try again.");
       if (target.type === "post") {
-        await reportPost(userId, target.postId, target.authorId, reason);
-      } else if (target.type === "comment") {
-        await reportComment(userId, target.commentId, target.authorId, reason);
-      } else {
-        await reportUser(userId, target.userId, reason);
+        return reportPost(userId, target.postId, target.authorId, reason);
       }
+      if (target.type === "comment") {
+        return reportComment(userId, target.commentId, target.authorId, reason);
+      }
+      return reportUser(userId, target.userId, reason);
     },
-    onSuccess: () => {
+    onSuccess: (reportId) => {
+      if (!reportId) return;
       setReportVisible(false);
       setTarget(null);
       showSuccess("Report submitted. Our team will review it.");
@@ -133,7 +134,11 @@ export function useModeration(userId: string) {
           setReportVisible(false);
           setTarget(null);
         }}
-        onSelect={(reason) => reportMutation.mutate({ reason })}
+        submitting={reportMutation.isPending}
+        onSelect={(reason) => {
+          if (reportMutation.isPending) return;
+          reportMutation.mutate({ reason });
+        }}
       />
     </>
   );

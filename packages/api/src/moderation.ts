@@ -1,6 +1,16 @@
 import type { Block, ModerationReport, Profile, ReportStatus } from "@frennix/types";
-import { formatSupabaseError } from "./profile-utils";
+import { formatSupabaseError, getSupabaseErrorDetails } from "./profile-utils";
 import { getSupabase } from "./supabase";
+
+export const REPORT_SUBMIT_ERROR = "Couldn’t submit that report. Please try again.";
+
+function logReportSubmitFailure(error: unknown) {
+  const { code, message } = getSupabaseErrorDetails(error);
+  const safeMessage = message
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "[id]")
+    .slice(0, 180);
+  console.warn("[report] submit failed", { code: code ?? null, message: safeMessage });
+}
 
 export async function blockUser(blockerId: string, blockedId: string) {
   if (blockerId === blockedId) throw new Error("You cannot block yourself");
@@ -73,15 +83,23 @@ export async function reportContent(input: {
   reported_group_id?: string;
   reason: string;
 }) {
-  const { error } = await getSupabase().from("reports").insert({
-    ...input,
-    status: "pending",
-  });
-  if (error) throw formatSupabaseError(error, "Failed to submit report");
+  const { data, error } = await getSupabase()
+    .from("reports")
+    .insert({
+      ...input,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (error || !data?.id) {
+    if (error) logReportSubmitFailure(error);
+    throw new Error(REPORT_SUBMIT_ERROR);
+  }
+  return data.id as string;
 }
 
 export async function reportPost(reporterId: string, postId: string, authorId: string, reason: string) {
-  await reportContent({
+  return reportContent({
     reporter_id: reporterId,
     reported_post_id: postId,
     reported_user_id: authorId,
@@ -95,7 +113,7 @@ export async function reportComment(
   authorId: string,
   reason: string
 ) {
-  await reportContent({
+  return reportContent({
     reporter_id: reporterId,
     reported_comment_id: commentId,
     reported_user_id: authorId,
@@ -104,7 +122,7 @@ export async function reportComment(
 }
 
 export async function reportUser(reporterId: string, reportedUserId: string, reason: string) {
-  await reportContent({
+  return reportContent({
     reporter_id: reporterId,
     reported_user_id: reportedUserId,
     reason,
@@ -117,7 +135,7 @@ export async function reportChallenge(
   creatorId: string,
   reason: string
 ) {
-  await reportContent({
+  return reportContent({
     reporter_id: reporterId,
     reported_challenge_id: challengeId,
     reported_user_id: creatorId,
@@ -131,7 +149,7 @@ export async function reportEvent(
   creatorId: string,
   reason: string
 ) {
-  await reportContent({
+  return reportContent({
     reporter_id: reporterId,
     reported_event_id: eventId,
     reported_user_id: creatorId,
@@ -145,7 +163,7 @@ export async function reportGroup(
   ownerId: string,
   reason: string
 ) {
-  await reportContent({
+  return reportContent({
     reporter_id: reporterId,
     reported_group_id: groupId,
     reported_user_id: ownerId,

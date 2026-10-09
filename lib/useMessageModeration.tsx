@@ -28,7 +28,8 @@ export function useMessageModeration(userId: string) {
       if (!target) throw new Error("No message selected");
       return reportUser(userId, target.senderId, reason);
     },
-    onSuccess: () => {
+    onSuccess: (reportId) => {
+      if (!reportId) return;
       setReportVisible(false);
       setMenuVisible(false);
       showSuccess(ownershipMessages.reportSubmitted);
@@ -70,7 +71,11 @@ export function useMessageModeration(userId: string) {
         visible={reportVisible}
         title="Report message"
         onClose={() => setReportVisible(false)}
-        onSelect={(reason) => reportMutation.mutate(reason)}
+        submitting={reportMutation.isPending}
+        onSelect={(reason) => {
+          if (reportMutation.isPending) return;
+          reportMutation.mutate(reason);
+        }}
       />
     </>
   );
