@@ -23,6 +23,7 @@ import {
   executeStoryReactionDelivery,
   REACTION_DELIVER_ERROR as SHARED_REACTION_DELIVER_ERROR,
   REACTION_SAVE_ERROR,
+  STORY_ENDED_REACTION_ERROR,
 } from "./story-reaction-delivery";
 
 export * from "./story-insights";
@@ -262,7 +263,7 @@ async function upsertStoryReactionRow(row: {
       emoji: row.reaction,
       error: details,
     });
-    throw new Error(details || REACTION_SAVE_ERROR);
+    throw new Error(REACTION_SAVE_ERROR);
   }
   if (!data?.reaction) {
     throw new Error(REACTION_SAVE_ERROR);
@@ -359,6 +360,9 @@ export async function sendDedicatedStoryReaction(
               "[story-reaction] visibility check failed",
               { requestId, error: getTechnicalErrorMessage(error) }
             );
+            if (error instanceof Error && error.message === "Story not found") {
+              throw new Error(STORY_ENDED_REACTION_ERROR);
+            }
           }
           const saved = await upsertStoryReactionRow(row);
           await trackStoryEngagementEvent({

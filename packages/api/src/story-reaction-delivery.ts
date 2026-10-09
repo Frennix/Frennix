@@ -10,6 +10,16 @@ export const REACTION_CONVERSATION_ERROR =
   "Reaction couldn’t be delivered. Couldn’t open the conversation.";
 export const REACTION_MESSAGE_ERROR =
   "Reaction saved, but the message couldn’t be sent. Try again.";
+export const STORY_ENDED_REACTION_ERROR = "This story has ended.";
+
+const USER_FACING_REACTION_ERRORS = new Set([
+  REACTION_DELIVER_ERROR,
+  REACTION_SAVE_ERROR,
+  REACTION_CONVERSATION_ERROR,
+  REACTION_MESSAGE_ERROR,
+  STORY_ENDED_REACTION_ERROR,
+  "You cannot react to your own story",
+]);
 
 export type StoryReactionDeliveryInput = {
   requestId: number;
@@ -101,9 +111,13 @@ function reactionWriteError(step: "save" | "conversation" | "message", error: un
       : step === "conversation"
         ? REACTION_CONVERSATION_ERROR
         : REACTION_MESSAGE_ERROR;
-  if (error instanceof Error && error.message && error.message !== fallback) {
+  if (error instanceof Error && USER_FACING_REACTION_ERRORS.has(error.message)) {
     return error;
   }
+  console.warn("[story-reaction] write failed", {
+    step,
+    error: error instanceof Error ? error.message : "unknown",
+  });
   return new Error(fallback);
 }
 

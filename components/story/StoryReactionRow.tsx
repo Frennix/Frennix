@@ -1,6 +1,7 @@
 import { createElement, useEffect, useReducer, useRef } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { STORY_QUICK_REACTIONS, type StoryQuickReactionEmoji } from "@frennix/types";
+import { getErrorMessage } from "@frennix/api";
 import { colors, overlays, radius, spacing, typography } from "@frennix/ui";
 import {
   applyStoryReactionConfirmedFromServer,
@@ -128,9 +129,7 @@ export function StoryReactionRow({
         });
       }
     } catch (caught) {
-      const message = caught instanceof Error && caught.message
-        ? caught.message
-        : REACTION_DELIVER_ERROR;
+      const message = getErrorMessage(caught, REACTION_DELIVER_ERROR);
       const stillLatest = latestRequestIdRef.current === next.requestId;
       if (!stillLatest) {
         logReactionUi("stale-failure-ignored", {
@@ -156,7 +155,6 @@ export function StoryReactionRow({
         requestId: next.requestId,
         message,
       });
-      onFailed?.(message, next.requestId);
     }
   }
 

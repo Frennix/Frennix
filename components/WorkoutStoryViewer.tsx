@@ -59,6 +59,7 @@ import {
   shareStoryQuestionAnswer,
   getErrorMessage,
   getViewerStoryReaction,
+  STORY_ENDED_REACTION_ERROR,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
@@ -1197,6 +1198,10 @@ export function WorkoutStoryViewer({
                     const slideId = slideContext?.slideId ?? null;
                     const ownerId = story.user_id;
                     const viewerId = session?.user.id ?? null;
+                    const expiresAt = currentDedicatedStory?.expires_at;
+                    if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+                      throw new Error(STORY_ENDED_REACTION_ERROR);
+                    }
                     await runMountedStoryReaction({
                       emoji,
                       requestId,
@@ -1217,9 +1222,6 @@ export function WorkoutStoryViewer({
                       );
                     }
                     showStatus(REACTION_SENT_MESSAGE, requestId);
-                  }}
-                  onFailed={(message, requestId) => {
-                    showStatus(message, requestId);
                   }}
                 />
                 <StoryQuickActionsBar
