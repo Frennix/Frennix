@@ -8,6 +8,7 @@ interface ReportReasonSheetProps {
   title?: string;
   onClose: () => void;
   onSelect: (reason: string) => void;
+  submitting?: boolean;
   rootPortal?: boolean;
   webZIndex?: number;
   portalDataAttribute?: string;
@@ -18,6 +19,7 @@ export function ReportReasonSheet({
   title = "Report",
   onClose,
   onSelect,
+  submitting = false,
   rootPortal,
   webZIndex,
   portalDataAttribute,
@@ -35,7 +37,15 @@ export function ReportReasonSheet({
       <Text style={styles.subtitle}>Why are you reporting this?</Text>
       <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
         {REPORT_REASONS.map((reason) => (
-          <Pressable key={reason} style={styles.option} onPress={() => onSelect(reason)}>
+          <Pressable
+            key={reason}
+            style={[styles.option, submitting && styles.optionDisabled]}
+            disabled={submitting}
+            onPress={() => {
+              if (submitting) return;
+              onSelect(reason);
+            }}
+          >
             <Text style={styles.optionText}>{reason}</Text>
           </Pressable>
         ))}
@@ -72,6 +82,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: "center",
   },
+  optionDisabled: { opacity: 0.55 },
   optionText: { ...typography.body, color: colors.text },
   cancelOption: { backgroundColor: colors.surfaceElevated },
   cancelText: { ...typography.body, fontWeight: "600", color: colors.textSecondary },

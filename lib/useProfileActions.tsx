@@ -37,7 +37,8 @@ export function useProfileActions({ userId, profile }: UseProfileActionsOptions)
       if (!profile) throw new Error("No profile selected");
       return reportUser(userId, profile.id, reason);
     },
-    onSuccess: () => {
+    onSuccess: (reportId) => {
+      if (!reportId) return;
       setReportVisible(false);
       closeMenu();
       showSuccess(ownershipMessages.reportSubmitted);
@@ -103,7 +104,11 @@ export function useProfileActions({ userId, profile }: UseProfileActionsOptions)
         visible={reportVisible}
         title="Report profile"
         onClose={() => setReportVisible(false)}
-        onSelect={(reason) => reportMutation.mutate(reason)}
+        submitting={reportMutation.isPending}
+        onSelect={(reason) => {
+          if (reportMutation.isPending) return;
+          reportMutation.mutate(reason);
+        }}
       />
     </>
   );
