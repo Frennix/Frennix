@@ -77,8 +77,21 @@ const checks: Array<{ name: string; run: () => void }> = [
   },
   {
     name: "ui:story controls sheet",
-    run: () =>
-      mustInclude("components/story/StoryControlsSheet.tsx", "Story controls", "ui"),
+    run: () => {
+      const sheet = read("components/story/StoryControlsSheet.tsx");
+      if (!sheet.includes("Story controls") || !sheet.includes("Delete story")) {
+        throw new Error("ui: story controls menu must keep its title and delete action");
+      }
+      if (!sheet.includes("<ScrollView") || !sheet.includes("expanded") || !sheet.includes("minHeight: 0")) {
+        throw new Error("ui: story controls must scroll inside the expanded safe-area sheet");
+      }
+      if (!sheet.includes("paddingBottom: spacing.xl + contentBottomPadding")) {
+        throw new Error("ui: story controls need bottom padding below the last row");
+      }
+      if (sheet.includes("scrimTop") || sheet.includes("StoryHeaderFade")) {
+        throw new Error("ui: story controls must not change the story viewer fade");
+      }
+    },
   },
   {
     name: "ui:owner menu in viewer",
