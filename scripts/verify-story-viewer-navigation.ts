@@ -96,11 +96,27 @@ const checks: Array<{ name: string; run: () => void }> = [
   {
     name: "Footer controls sit above tap zones; reply focus pauses playback",
     run: () => {
-      if (!viewer.includes("bottom: 180")) {
+      if (!viewer.includes("bottom: Math.max(400, footerBottomPad + 300)")) {
         throw new Error("Tap zones must exclude footer control area");
       }
-      if (viewer.indexOf("zIndex: 5") < 0 || viewer.indexOf("zIndex: 4") < 0) {
-        throw new Error("Header/footer must sit above tap zones");
+      if (!/header:\s*\{[^}]*zIndex:\s*5/.test(viewer)) {
+        throw new Error("Header must sit above the top fade and tap zones");
+      }
+      if (!/footer:\s*\{[^}]*zIndex:\s*30/.test(viewer)) {
+        throw new Error("Footer must sit above the bottom fade and tap zones");
+      }
+      if (!/tapZones:\s*\{[^}]*zIndex:\s*3/.test(viewer)) {
+        throw new Error("Tap zones must stay under the header and footer");
+      }
+      const fade = read("components/story/StoryFooterGradient.tsx");
+      if (!viewer.includes("<StoryHeaderFade />") || !viewer.includes("<StoryFooterGradient />")) {
+        throw new Error("Story viewer must use the short header and footer fades");
+      }
+      if (viewer.includes("scrimTop") || fade.includes("nativeBandStrong")) {
+        throw new Error("Story viewer must not use a solid top bar or stacked fade bands");
+      }
+      if (!fade.includes('pointerEvents="none"')) {
+        throw new Error("Story fades must not receive taps");
       }
       if (!viewer.includes("onFocusChange={setInteractionLocked}")) {
         throw new Error("Reply field focus must pause auto-advance");
