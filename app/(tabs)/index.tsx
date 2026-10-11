@@ -131,6 +131,7 @@ import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { applyPendingFeedScrollReturnIfNeeded, registerFeedScrollController, trackFeedScrollPosition } from "@/lib/web-feed-scroll-restore";
 import { useFeedScrollBottomPadding } from "@/lib/use-feed-scroll-bottom-padding";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
+import { markDevStartupPerf } from "@/lib/dev-startup-perf";
 
 export default function HomeScreen() {
   markFeedRender("feed:HomeScreen:render");
@@ -807,6 +808,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!isFeedReady || feedPerfTrackedRef.current || feedLoadStartedRef.current == null) return;
     reportFeedPerfReady(posts.length);
+    markDevStartupPerf("home-feed-ready", { postCount: posts.length });
     feedPerfTrackedRef.current = true;
   }, [isFeedReady, posts.length]);
 

@@ -1,6 +1,7 @@
 import { Image, type ImageProps } from "expo-image";
 import { type StyleProp, type ImageStyle } from "react-native";
 import { filterImagePrefetchUris, isImageMediaUri } from "@frennix/types";
+import { rememberImageDimensions } from "./useImageDimensions";
 
 export type CachedImageProps = {
   uri: string;
@@ -43,7 +44,13 @@ export function CachedImage({
       recyclingKey={recyclingKey ?? uri}
       style={style}
       accessibilityLabel={accessibilityLabel}
-      onLoad={onLoad}
+      onLoad={(event) => {
+        const source = event.source;
+        if (source?.width > 0 && source?.height > 0) {
+          rememberImageDimensions(uri, source.width, source.height);
+        }
+        onLoad?.();
+      }}
       onLoadEnd={onLoadEnd}
       onError={onError}
     />

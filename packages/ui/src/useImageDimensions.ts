@@ -7,10 +7,23 @@ export type ImageDimensions = {
 };
 
 const dimensionCache = new Map<string, ImageDimensions>();
+const dimensionListeners = new Map<string, Set<(dimensions: ImageDimensions) => void>>();
 
 export function peekImageDimensions(uri: string | undefined): ImageDimensions | null {
   if (!uri) return null;
   return dimensionCache.get(uri) ?? null;
+}
+
+/** Record dimensions from the image that is already on screen. Does not start a request. */
+export function rememberImageDimensions(uri: string, width: number, height: number): void {
+  if (!uri || width <= 0 || height <= 0) return;
+  const existing = dimensionCache.get(uri);
+  if (existing?.width === width && existing?.height === height) return;
+  const next = { width, height };
+  dimensionCache.set(uri, next);
+  const listeners = dimensionListeners.get(uri);
+  if (!listeners) return;
+  for (const listener of listeners) listener(next);
 }
 
 export function computeImageDisplayHeight(
@@ -31,7 +44,11 @@ export function computeImageDisplayHeight(
   return naturalHeight;
 }
 
-export function useImageDimensions(uri: string | undefined) {
+export function useImageDimensions(
+  uri: string | undefined,
+  options?: { passive?: boolean }
+) {
+  const passive = options?.passive === true;
   const [dimensions, setDimensions] = useState<ImageDimensions | null>(() =>
     peekImageDimensions(uri)
   );
@@ -48,8 +65,30 @@ export function useImageDimensions(uri: string | undefined) {
     if (cached) {
       setDimensions(cached);
       setFailed(false);
-      return;
+      if (passive) return;
     }
+
+    if (passive) {
+      if (!cached) {
+        setDimensions(null);
+        setFailed(false);
+      }
+      const listener = (next: ImageDimensions) => {
+        setDimensions(next);
+        setFailed(false);
+      };
+      let listeners = dimensionListeners.get(uri);
+      if (!listeners) {
+        listeners = new Set();
+        dimensionListeners.set(uri, listeners);
+      }
+      listeners.add(listener);
+      return () => {
+        listeners?.delete(listener);
+      };
+    }
+
+    if (cached) return;
 
     let cancelled = false;
     setDimensions(null);
@@ -59,9 +98,8 @@ export function useImageDimensions(uri: string | undefined) {
       const img = new window.Image();
       img.onload = () => {
         if (!cancelled && img.naturalWidth > 0 && img.naturalHeight > 0) {
-          const next = { width: img.naturalWidth, height: img.naturalHeight };
-          dimensionCache.set(uri, next);
-          setDimensions(next);
+          rememberImageDimensions(uri, img.naturalWidth, img.naturalHeight);
+          setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
         }
       };
       img.onerror = () => {
@@ -77,9 +115,8 @@ export function useImageDimensions(uri: string | undefined) {
       uri,
       (width, height) => {
         if (!cancelled) {
-          const next = { width, height };
-          dimensionCache.set(uri, next);
-          setDimensions(next);
+          rememberImageDimensions(uri, width, height);
+          setDimensions({ width, height });
         }
       },
       () => {
@@ -90,7 +127,7 @@ export function useImageDimensions(uri: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [uri]);
+  }, [passive, uri]);
 
   return { dimensions, failed };
 }

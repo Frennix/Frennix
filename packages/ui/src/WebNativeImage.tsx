@@ -1,6 +1,7 @@
 import { createElement, forwardRef, useCallback, useLayoutEffect, useRef } from "react";
 import { Platform, type StyleProp, type ViewStyle } from "react-native";
 import { shouldRevealCachedDomImage } from "./progressiveImageReveal";
+import { rememberImageDimensions } from "./useImageDimensions";
 
 export type WebNativeImageProps = {
   uri: string;
@@ -30,6 +31,10 @@ export const WebNativeImage = forwardRef<HTMLImageElement, WebNativeImageProps>(
 
     const notifyReady = useCallback((source: "onLoad" | "onLoadEnd" | "cached") => {
       if (notifiedRef.current) return;
+      const img = nodeRef.current;
+      if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        rememberImageDimensions(uri, img.naturalWidth, img.naturalHeight);
+      }
       notifiedRef.current = true;
       console.info("[story-image]", { event: source, uri });
       onLoadRef.current?.();

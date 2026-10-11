@@ -141,7 +141,10 @@ export function PostMediaCarousel({
 
   const frameProbeUri = mediaItems[0]?.thumbnailUrl ?? mediaItems[0]?.url;
   const photosOnly = mediaItems.length > 0 && mediaItems.every((item) => item.kind === "image");
-  const { dimensions: photoDimensions } = useImageDimensions(photosOnly ? frameProbeUri : undefined);
+  const { dimensions: photoDimensions } = useImageDimensions(
+    photosOnly && mediaItems.length > 1 ? frameProbeUri : undefined,
+    { passive: true }
+  );
 
   const handleLayout = useCallback((width: number) => {
     if (width > 0) setContainerWidth(width);

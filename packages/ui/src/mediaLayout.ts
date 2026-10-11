@@ -98,7 +98,8 @@ export function computePhotoDisplayFrame(
   maxHeightRatio = PHOTO_MAX_HEIGHT_RATIO
 ): { height: number; contentFit: "contain" } {
   if (!containerWidth) return { height: 0, contentFit: "contain" };
-  const ratio = imageWidth > 0 && imageHeight > 0 ? imageHeight / imageWidth : 1;
+  const ratio =
+    imageWidth > 0 && imageHeight > 0 ? imageHeight / imageWidth : FEED_PHOTO_FALLBACK_RATIO;
   const naturalHeight = containerWidth * ratio;
   const maxHeight = containerWidth * maxHeightRatio;
   return { height: Math.min(naturalHeight, maxHeight), contentFit: "contain" };

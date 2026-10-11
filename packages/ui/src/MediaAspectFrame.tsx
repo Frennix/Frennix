@@ -50,7 +50,9 @@ export function MediaAspectFrame({
   children,
 }: MediaAspectFrameProps) {
   const [layoutWidth, setLayoutWidth] = useState(0);
-  const { dimensions, failed } = useImageDimensions(dimensionsUri);
+  const { dimensions, failed } = useImageDimensions(dimensionsUri, {
+    passive: sizing === "photo",
+  });
   const [stableBucket, setStableBucket] = useState<FeedMediaBucket | null>(null);
 
   const isFeed = layout === "feed";
@@ -110,7 +112,7 @@ export function MediaAspectFrame({
   const frameStyle = useMemo(
     () => [
       styles.frame,
-      isFeed ? styles.frameFeed : styles.frameInline,
+      isFeed ? (photoSizing ? styles.framePhoto : styles.frameFeed) : styles.frameInline,
       fillParent ? styles.frameFillParent : null,
       style,
       fillParent
@@ -122,7 +124,7 @@ export function MediaAspectFrame({
                 aspectRatio: photoSizing
                   ? dimensions
                     ? dimensions.width / dimensions.height
-                    : 1
+                    : 4 / 5
                   : feedBucketAspectRatio(effectiveBucket),
                 width: "100%",
               } as ViewStyle)
@@ -176,6 +178,11 @@ const styles = StyleSheet.create({
   frameFeed: {
     borderRadius: 0,
     backgroundColor: colors.background,
+    alignSelf: "stretch",
+  },
+  framePhoto: {
+    borderRadius: 0,
+    backgroundColor: colors.surfaceElevated,
     alignSelf: "stretch",
   },
   frameFillParent: {
