@@ -65,6 +65,12 @@ export const StoryAnalyticsModal = memo(function StoryAnalyticsModal({
               );
             })}
           </View>
+          {metricValue(analytics, "views") +
+            metricValue(analytics, "reactions") +
+            metricValue(analytics, "replies") ===
+          0 ? (
+            <Text style={styles.quiet}>Story insights will appear as people engage.</Text>
+          ) : null}
           {onOpenViewers ? (
             <Pressable style={styles.cta} onPress={onOpenViewers}>
               <Text style={styles.ctaText}>See who viewed</Text>
@@ -93,6 +99,11 @@ const styles = StyleSheet.create({
     ...typography.heading,
     color: colors.text,
     fontWeight: "800",
+  },
+  quiet: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    fontWeight: "600",
   },
   grid: {
     flexDirection: "row",

@@ -59,8 +59,8 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const src = read("components/WorkoutStoryViewer.tsx");
       if (!src.includes("<Avatar")) throw new Error("Profile avatar required in overlay");
-      if (!src.includes("WorkoutCompletionCard")) {
-        throw new Error("Workout completion card required");
+      if (!src.includes("StoryCompletionBadge")) {
+        throw new Error("Completed commitments must use the story completion badge");
       }
       if (src.includes("View post")) {
         throw new Error("Story viewer must not show feed/post action buttons");
@@ -92,20 +92,24 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Workout Stories 2.0 UI: action dock, motivation, insights",
+    name: "Workout story viewer uses the shared fade, quick actions, and insights",
     run: () => {
       const viewer = read("components/WorkoutStoryViewer.tsx");
       for (const token of [
-        "StoryActionDock",
-        "StoryDailyMotivation",
+        "StoryHeaderFade",
+        "StoryFooterGradient",
         "StoryInsightsStrip",
-        "WorkoutCompletionCard",
-        "StoryAchievementMoment",
+        "StoryQuickActionsBar",
+        "StoryReactionRow",
+        "StoryCompletionBadge",
         "onReact",
         "onInviteToTrain",
         "presentationStyle=\"fullScreen\"",
       ]) {
         if (!viewer.includes(token)) throw new Error(`Missing ${token}`);
+      }
+      if (viewer.includes("StoryActionDock") || viewer.includes("scrimTop")) {
+        throw new Error("Story viewer must keep the gradient chrome instead of the old dock and top bar");
       }
     },
   },
@@ -113,33 +117,38 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Story auto-advance pauses while reply composer is open",
     run: () => {
       const viewer = read("components/WorkoutStoryViewer.tsx");
-      const dock = read("components/story/StoryActionDock.tsx");
+      const reply = read("components/story/StoryReplyBar.tsx");
       if (!viewer.includes("interactionLocked") || !viewer.includes("autoAdvancePaused")) {
         throw new Error("Story viewer must pause auto-advance while interactions are active");
       }
-      if (!viewer.includes("onInteractionLockChange")) {
-        throw new Error("Story viewer must wire interaction lock from action dock");
+      if (!viewer.includes("onFocusChange={setInteractionLocked}")) {
+        throw new Error("Reply field focus must pause auto-advance");
       }
-      if (!dock.includes("onInteractionLockChange")) {
-        throw new Error("Story action dock must report interaction lock state");
+      if (!reply.includes("onFocusChange?.(true)") || !reply.includes("onFocusChange?.(false)")) {
+        throw new Error("Reply composer must report focus so playback can pause");
       }
-      if (!dock.includes("setShowReply(false)")) {
+      if (!viewer.includes("setShowReply(false)")) {
         throw new Error("Reply composer must close after send to resume auto-advance");
       }
     },
   },
   {
-    name: "Story actions are compact with four primary buttons",
+    name: "Story actions stay in the quick actions bar and reaction row",
     run: () => {
-      const dock = read("components/story/StoryActionDock.tsx");
-      for (const label of ["Like", "Strong Work", "Reply", "More"]) {
-        if (!dock.includes(label)) throw new Error(`Missing primary action ${label}`);
+      const viewer = read("components/WorkoutStoryViewer.tsx");
+      const actions = read("components/story/StoryQuickActionsBar.tsx");
+      const reactions = read("components/story/StoryReactionRow.tsx");
+      if (!viewer.includes("<StoryQuickActionsBar") || !viewer.includes("<StoryReactionRow")) {
+        throw new Error("Story viewer must use the quick actions bar and reaction row");
       }
-      if (!dock.includes("morePanel")) {
-        throw new Error("Secondary story actions must live under More");
+      for (const label of ["Message", "Invite to Workout", "Invite to Event", "View Profile"]) {
+        if (!actions.includes(label)) throw new Error(`Missing story action ${label}`);
       }
-      if (dock.includes("STORY_QUICK_REACTIONS.map((reaction)")) {
-        throw new Error("All quick reactions must not render in the primary row");
+      if (!reactions.includes("STORY_QUICK_REACTIONS.map((reaction)")) {
+        throw new Error("Reactions must stay in the reaction row");
+      }
+      if (viewer.includes("StoryActionDock")) {
+        throw new Error("Story viewer must not mount the old action dock");
       }
     },
   },
@@ -159,20 +168,42 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!viewer.includes("StoryFooterGradient")) {
         throw new Error("Story footer must use readable caption gradient");
       }
+      if (!viewer.includes("StoryHeaderFade")) {
+        throw new Error("Story header must use a fading top overlay");
+      }
+      if (viewer.includes("scrimTop") || viewer.includes('height: 180,\n    backgroundColor: "rgba(10, 10, 11, 0.55)"')) {
+        throw new Error("Story viewer must not use a solid top rectangle");
+      }
+      if (viewer.includes("Story insights will appear as people engage")) {
+        throw new Error("Empty insights copy belongs in the owner panel, not on the photo");
+      }
+      const viewers = read("components/story/StoryViewersModal.tsx");
+      const analytics = read("components/story/StoryAnalyticsModal.tsx");
+      const fade = read("components/story/StoryFooterGradient.tsx");
+      if (!viewers.includes("Story insights will appear as people engage")) {
+        throw new Error("Viewer panel must explain that insights appear as people engage");
+      }
+      if (!analytics.includes("Story insights will appear as people engage")) {
+        throw new Error("Insights panel must explain that insights appear as people engage");
+      }
+      if (!fade.includes('pointerEvents="none"') || !fade.includes('stopOpacity={stop.opacity}')) {
+        throw new Error("Story fades must be smooth gradients that do not receive taps");
+      }
+      if (fade.includes("nativeBandStrong")) {
+        throw new Error("Story footer fade must not use stacked solid bands");
+      }
     },
   },
   {
-    name: "Story actions animate and remember last reaction",
+    name: "Story reactions confirm on the current slide",
     run: () => {
-      const dock = read("components/story/StoryActionDock.tsx");
-      if (!dock.includes("Animated.spring")) {
-        throw new Error("Story action dock must animate open and close");
+      const viewer = read("components/WorkoutStoryViewer.tsx");
+      const reactions = read("components/story/StoryReactionRow.tsx");
+      if (!viewer.includes("confirmedReaction") || !viewer.includes("shouldAcceptReactionConfirmation")) {
+        throw new Error("Story viewer must confirm the reaction for the current slide");
       }
-      if (!dock.includes("readLastStoryReaction")) {
-        throw new Error("Story actions must restore last reaction preference");
-      }
-      if (!dock.includes("keyboardVisible")) {
-        throw new Error("Story must pause while keyboard is open");
+      if (!reactions.includes("applyStoryReactionSuccess")) {
+        throw new Error("Reaction row must record a successful reaction");
       }
     },
   },
@@ -194,12 +225,11 @@ const checks: Array<{ name: string; run: () => void }> = [
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
       for (const token of [
-        "markStoryViewed",
-        "sendStoryQuickReaction",
+        "markStoryViewedOptimistic",
+        "sendDedicatedStoryReaction",
         "sendStoryChallenge",
-        "sendStoryReply",
-        "sendStoryInviteToTrain",
-        "getStoryInsights",
+        "sendDedicatedStoryReply",
+        "getDedicatedStoryInsights",
         "onMarkViewed",
         "onReact",
         "onChallenge",
@@ -214,8 +244,8 @@ const checks: Array<{ name: string; run: () => void }> = [
     name: "Feed scrolls while story viewer is closed",
     run: () => {
       const feed = read("app/(tabs)/index.tsx");
-      if (!feed.includes("scrollEnabled={!feedScrollLocked}")) {
-        throw new Error("Feed scrolling must be disabled while story or interaction sheet is open");
+      if (!feed.includes("const feedScrollEnabled = !storyVisible") || !feed.includes("scrollEnabled={feedScrollEnabled}")) {
+        throw new Error("Feed scrolling must be disabled while the story viewer is open");
       }
       if (!feed.includes("feedList:") || !feed.includes("flexFill")) {
         throw new Error("Feed scroll list must use flexFill for vertical scroll");
@@ -265,9 +295,9 @@ const checks: Array<{ name: string; run: () => void }> = [
       for (const token of ["story_audience", "story_train_invites", "story_highlights"]) {
         if (!migration.includes(token)) throw new Error(`Migration missing ${token}`);
       }
-      const createPost = read("app/create-post.tsx");
-      if (!createPost.includes("story_audience")) {
-        throw new Error("Create post must support story audience");
+      const createStory = read("app/create-story.tsx");
+      if (!createStory.includes("StoryPrivacySelector")) {
+        throw new Error("Create story must keep the story privacy selector");
       }
     },
   },

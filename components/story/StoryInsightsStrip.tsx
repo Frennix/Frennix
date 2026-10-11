@@ -26,13 +26,7 @@ export function StoryInsightsStrip({
     { label: "Replies", value: insights.replies, onPress },
   ].filter((item) => item.value > 0 || item.label === "Views");
 
-  if (!items.some((item) => item.value > 0)) {
-    return (
-      <Pressable onPress={onPress} style={styles.wrap}>
-        <Text style={styles.empty}>Story insights will appear as people engage.</Text>
-      </Pressable>
-    );
-  }
+  if (!items.some((item) => item.value > 0)) return null;
 
   return (
     <View style={styles.wrap}>
@@ -72,11 +66,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontSize: 9,
     color: overlays.whiteSoft,
-    fontWeight: "600",
-  },
-  empty: {
-    ...typography.caption,
-    color: overlays.whiteFaint,
     fontWeight: "600",
   },
 });

@@ -68,7 +68,7 @@ export const StoryViewersModal = memo(function StoryViewersModal({
           )}
         />
       ) : (
-        <Text style={styles.empty}>No views yet.</Text>
+        <Text style={styles.empty}>Story insights will appear as people engage.</Text>
       )}
     </BottomOverlayShell>
   );
