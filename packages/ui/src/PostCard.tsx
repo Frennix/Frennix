@@ -4,6 +4,7 @@ import type { Post, Profile } from "@frennix/types";
 import { normalizeWorkoutTypes } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { formatRelativeTime } from "./formatRelativeTime";
+import { NutritionPostLabel } from "./NutritionPostLabel";
 import { WorkoutTypeChips } from "./WorkoutTypeChips";
 import { PostMediaCarousel } from "./PostMediaCarousel";
 import { ReactionBar } from "./ReactionBar";
@@ -54,34 +55,37 @@ export function PostCard({
     ? `Shared a post · ${formatRelativeTime(post.created_at)}`
     : formatRelativeTime(post.created_at);
   const workoutTypes = isShared ? [] : normalizeWorkoutTypes(displayPost);
+  const category = displayPost.feed_category ?? post.feed_category;
+  const showWorkoutTypes =
+    workoutTypes.length > 0 && category !== "nutrition" && category !== "general";
   const hasMedia = Boolean(displayPost.media_urls?.length);
 
   return (
     <View style={styles.card}>
-      {isOwn ? (
-        <MenuIconButton
-          style={styles.menuAnchor}
-          onPress={onOwnerActionsPress}
-          accessibilityLabel="Post options"
-        />
-      ) : onModerationPress ? (
-        <MenuIconButton
-          style={styles.menuAnchor}
-          onPress={onModerationPress}
-          accessibilityLabel="Post options"
-        />
-      ) : null}
-
       <Pressable style={styles.header} onPress={onAuthorPress}>
         <Avatar uri={author?.avatar_url} name={author?.display_name} size={44} />
         <View style={styles.headerText}>
           <Text style={styles.name}>{author?.display_name ?? "Unknown"}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
-          {workoutTypes.length ? (
+          {category === "nutrition" ? <NutritionPostLabel /> : null}
+          {showWorkoutTypes ? (
             <WorkoutTypeChips types={workoutTypes} size="compact" style={styles.workoutChips} />
           ) : null}
         </View>
       </Pressable>
+      {isOwn ? (
+        <MenuIconButton
+          style={styles.menuAnchor}
+          onPress={onOwnerActionsPress}
+          accessibilityLabel="More post actions"
+        />
+      ) : onModerationPress ? (
+        <MenuIconButton
+          style={styles.menuAnchor}
+          onPress={onModerationPress}
+          accessibilityLabel="More post actions"
+        />
+      ) : null}
 
       {isShared && sharedPost ? (
         <SharedPostPreview post={sharedPost} onPress={onPress} onMediaPress={onMediaPress} />
@@ -139,6 +143,16 @@ export function PostCard({
             </Text>
           </Pressable>
         ) : null}
+        {isOwn && category === "nutrition" && onOwnerActionsPress ? (
+          <Pressable
+            onPress={onOwnerActionsPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="More post actions"
+          >
+            <Text style={styles.action}>⋯ More</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {onReaction ? (
@@ -172,7 +186,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: spacing.sm,
     right: spacing.sm,
-    zIndex: 2,
+    zIndex: 5,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.sm,
   },

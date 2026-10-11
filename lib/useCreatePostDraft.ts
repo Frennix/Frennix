@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import type { ImagePickerAsset } from "expo-image-picker";
+import type { FeedCategory } from "@frennix/types";
 import {
   clearCreatePostDraft,
   peekMemoryDraft,
@@ -17,6 +18,7 @@ type RouteContext = {
   groupId?: string;
   challengeId?: string;
   eventId?: string;
+  feedCategory?: FeedCategory;
 };
 
 export function useCreatePostDraft(userId: string | undefined, routeContext: RouteContext) {
@@ -24,6 +26,9 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
 
   const [hydrated, setHydrated] = useState(() => Boolean(memorySeed));
   const [content, setContent] = useState(() => memorySeed?.draft.content ?? "");
+  const [feedCategory, setFeedCategory] = useState<FeedCategory>(
+    () => routeContext.feedCategory ?? memorySeed?.draft.feedCategory ?? "workout"
+  );
   const [workoutTypes, setWorkoutTypes] = useState<string[]>(() => memorySeed?.draft.workoutTypes ?? []);
   const [groupId, setGroupId] = useState<string | null>(() => memorySeed?.draft.groupId ?? null);
   const [challengeId, setChallengeId] = useState<string | null>(() => memorySeed?.draft.challengeId ?? null);
@@ -44,6 +49,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
   const buildDraft = useCallback((): CreatePostDraft => {
     return {
       content,
+      feedCategory,
       workoutTypes,
       groupId,
       challengeId,
@@ -53,7 +59,17 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
       mediaUri,
       hasStoredMedia: Boolean(mediaBytesRef.current) || Boolean(mediaUri),
     };
-  }, [content, workoutTypes, groupId, challengeId, eventId, mimeType, videoDurationSeconds, mediaUri]);
+  }, [
+    content,
+    feedCategory,
+    workoutTypes,
+    groupId,
+    challengeId,
+    eventId,
+    mimeType,
+    videoDurationSeconds,
+    mediaUri,
+  ]);
 
   const syncMemoryDraft = useCallback(() => {
     if (!userId) return;
@@ -84,12 +100,14 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     if (routeContext.groupId) setGroupId(routeContext.groupId);
     if (routeContext.challengeId) setChallengeId(routeContext.challengeId);
     if (routeContext.eventId) setEventId(routeContext.eventId);
+    if (routeContext.feedCategory) setFeedCategory(routeContext.feedCategory);
     routeAppliedRef.current = true;
-  }, [routeContext.groupId, routeContext.challengeId, routeContext.eventId]);
+  }, [routeContext.groupId, routeContext.challengeId, routeContext.eventId, routeContext.feedCategory]);
 
   const applyDraftState = useCallback(
     (draft: CreatePostDraft, restoredPickedFile?: File, mediaBytes?: ArrayBuffer | null) => {
       setContent(draft.content);
+      setFeedCategory(draft.feedCategory ?? "workout");
       setWorkoutTypes(draft.workoutTypes);
       setGroupId(draft.groupId);
       setChallengeId(draft.challengeId);
@@ -164,9 +182,14 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
   }, [userId, applyDraftState, applyRouteContext]);
 
   useEffect(() => {
+    if (routeContext.feedCategory) setFeedCategory(routeContext.feedCategory);
+  }, [routeContext.feedCategory]);
+
+  useEffect(() => {
     schedulePersist();
   }, [
     content,
+    feedCategory,
     workoutTypes,
     groupId,
     challengeId,
@@ -219,6 +242,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
 
       const draft: CreatePostDraft = {
         content,
+        feedCategory,
         workoutTypes,
         groupId,
         challengeId,
@@ -235,7 +259,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
         logCreatePostError("draft", error, { action: "save_media" });
       }
     },
-    [userId, hydrated, content, workoutTypes, groupId, challengeId, eventId, videoDurationSeconds]
+    [userId, hydrated, content, feedCategory, workoutTypes, groupId, challengeId, eventId, videoDurationSeconds]
   );
 
   const clearMedia = useCallback(async () => {
@@ -249,6 +273,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
 
     const draft: CreatePostDraft = {
       content,
+      feedCategory,
       workoutTypes,
       groupId,
       challengeId,
@@ -264,7 +289,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     } catch (error) {
       logCreatePostError("draft", error, { action: "clear_media" });
     }
-  }, [userId, hydrated, content, workoutTypes, groupId, challengeId, eventId]);
+  }, [userId, hydrated, content, feedCategory, workoutTypes, groupId, challengeId, eventId]);
 
   const clearDraft = useCallback(async () => {
     skipPersistRef.current = true;
@@ -279,6 +304,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
       }
     }
     setContent("");
+    setFeedCategory("workout");
     setWorkoutTypes([]);
     setGroupId(null);
     setChallengeId(null);
@@ -290,10 +316,28 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     skipPersistRef.current = false;
   }, [userId]);
 
+  /** Drop the saved draft without changing the form that is still on screen. */
+  const releaseStoredDraft = useCallback(async () => {
+    skipPersistRef.current = true;
+    if (persistTimerRef.current) {
+      clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    mediaBytesRef.current = null;
+    if (!userId) return;
+    try {
+      await clearCreatePostDraft(userId);
+    } catch (error) {
+      logCreatePostError("draft", error, { action: "release" });
+    }
+  }, [userId]);
+
   return {
     hydrated,
     content,
     setContent,
+    feedCategory,
+    setFeedCategory,
     workoutTypes,
     setWorkoutTypes,
     groupId,
@@ -310,6 +354,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     applyPickedMedia,
     clearMedia,
     clearDraft,
+    releaseStoredDraft,
     setPersistPaused,
     flushDraft,
   };

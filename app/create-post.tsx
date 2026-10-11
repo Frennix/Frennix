@@ -13,8 +13,11 @@ import {
 } from "react-native";
 import {
   ACTIVITIES,
+  COMPOSER_CATEGORY_TABS,
   JOURNEY_CATEGORIES,
   JOURNEY_CATEGORY_LABELS,
+  parseFeedCategory,
+  type FeedCategory,
   type JourneyCategory,
   type StoryPrivacy,
 } from "@frennix/types";
@@ -44,7 +47,8 @@ import { UploadProgressBar } from "@/components/UploadProgressBar";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { switchTab } from "@/lib/press-utils";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
-import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { beginPublish, failPublish, succeedPublish, visibleComposerCategory, type PublishPhase } from "@/lib/create-post-publish";
+import { Button, FeedCategoryTabs, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const CAPTION_MAX = 500;
 const SUCCESS_NAV_DELAY_MS = 2000;
@@ -139,17 +143,21 @@ export default function CreatePostScreen() {
     challengeId?: string;
     eventId?: string;
     intent?: string;
+    category?: string;
   }>();
   const routeGroupId = paramValue(params.groupId);
   const routeChallengeId = paramValue(params.challengeId);
   const routeEventId = paramValue(params.eventId);
   const isReelIntent = paramValue(params.intent) === "reel";
+  const routeCategory = parseFeedCategory(paramValue(params.category));
 
   const { session } = useAuth();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
   const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const publishPhaseRef = useRef<PublishPhase>("idle");
   const submittingRef = useRef(false);
+  const [lockedCategory, setLockedCategory] = useState<FeedCategory | null>(null);
   const [loading, setLoading] = useState(false);
   const [pickingMedia, setPickingMedia] = useState(false);
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
@@ -168,6 +176,8 @@ export default function CreatePostScreen() {
     hydrated,
     content,
     setContent,
+    feedCategory,
+    setFeedCategory,
     workoutTypes,
     setWorkoutTypes,
     groupId,
@@ -181,18 +191,22 @@ export default function CreatePostScreen() {
     applyPickedMedia,
     clearMedia,
     clearDraft,
+    releaseStoredDraft,
     setPersistPaused,
     flushDraft,
   } = useCreatePostDraft(userId, {
     groupId: routeGroupId,
     challengeId: routeChallengeId,
     eventId: routeEventId,
+    feedCategory: routeCategory ?? undefined,
   });
 
+  const displayCategory = visibleComposerCategory(lockedCategory, feedCategory);
   const destination = resolveDestination(groupId, challengeId, eventId);
   const contextId = groupId ?? challengeId ?? eventId;
   const isContextPost = destination !== "home";
   const hasVideo = selectedMedia.some((item) => isVideoMime(item.mimeType));
+  const showWorkoutFields = isReelIntent || displayCategory === "workout";
   const showJourneyChrome = isReelIntent;
   const videoMaxSeconds = isReelIntent ? REEL_MAX_SECONDS : VIDEO_MAX_SECONDS;
   const videoTooLongMessage = isReelIntent ? REEL_TOO_LONG_MESSAGE : VIDEO_TOO_LONG_MESSAGE;
@@ -378,8 +392,8 @@ export default function CreatePostScreen() {
 
     try {
       if (mode === "done") {
-        await clearDraft();
-        setSelectedMedia([]);
+        await releaseStoredDraft();
+        publishPhaseRef.current = succeedPublish(publishPhaseRef.current);
         router.back();
         return;
       }
@@ -388,6 +402,8 @@ export default function CreatePostScreen() {
         const message = "Reels require a video";
         setError(message);
         showAlert("Could not share", message);
+        publishPhaseRef.current = failPublish(publishPhaseRef.current);
+        setLockedCategory(null);
         setUploadStage("idle");
         setLoading(false);
         submittingRef.current = false;
@@ -412,6 +428,7 @@ export default function CreatePostScreen() {
           })),
           storyPrivacy,
           journeyCategory: mode === "reel" ? journeyCategory : null,
+          feedCategory: mode === "reel" ? null : displayCategory,
           isReel: mode === "reel",
         },
         queryClient
@@ -421,8 +438,8 @@ export default function CreatePostScreen() {
         await writeLastStoryPrivacy(storyPrivacy);
       }
 
-      await clearDraft();
-      setSelectedMedia([]);
+      await releaseStoredDraft();
+      setLockedCategory(displayCategory);
       setUploadStage("success");
 
       if (mode === "reel") {
@@ -447,12 +464,15 @@ export default function CreatePostScreen() {
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
       const message = getSharePostUserMessage(e);
+      publishPhaseRef.current = failPublish(publishPhaseRef.current);
+      setLockedCategory(null);
       setError(message);
       showAlert("Could not share", message);
       setUploadStage("idle");
       setLoading(false);
       submittingRef.current = false;
       setPersistPaused(false);
+      void flushDraft();
     }
   }
 
@@ -473,8 +493,12 @@ export default function CreatePostScreen() {
       return;
     }
 
-    if (!isReelIntent && !content && !selectedMedia.length && !workoutTypes.length) {
+    if (!isReelIntent && showWorkoutFields && !content && !selectedMedia.length && !workoutTypes.length) {
       setError("Add a caption, workout type, or photo/video");
+      return;
+    }
+    if (!isReelIntent && !showWorkoutFields && !content.trim() && !selectedMedia.length) {
+      setError("Add a caption or photo/video");
       return;
     }
     if (hasVideo && selectedMedia.some((item) => isVideoTooLong(item.durationSeconds ?? null, videoMaxSeconds))) {
@@ -482,9 +506,13 @@ export default function CreatePostScreen() {
       return;
     }
 
+    if (!beginPublish(publishPhaseRef.current)) return;
+    publishPhaseRef.current = "publishing";
     submittingRef.current = true;
     setPersistPaused(true);
     setError("");
+    const publishedCategory = feedCategory;
+    setLockedCategory(isReelIntent ? null : publishedCategory);
 
     try {
       await flushDraft();
@@ -494,9 +522,11 @@ export default function CreatePostScreen() {
         return;
       }
 
-      if (!isContextPost) {
+      if (!isContextPost && showWorkoutFields) {
+        publishPhaseRef.current = failPublish(publishPhaseRef.current);
         submittingRef.current = false;
         setPersistPaused(false);
+        setLockedCategory(null);
         setSavedSheetVisible(true);
         return;
       }
@@ -514,10 +544,10 @@ export default function CreatePostScreen() {
         {
           userId: session.user.id,
           content: content || undefined,
-          workoutTypes,
+          workoutTypes: showWorkoutFields ? workoutTypes : [],
           metrics: buildWorkoutMetrics(),
-          gym: gym.trim() || null,
-          locationName: locationName.trim() || null,
+          gym: showWorkoutFields ? gym.trim() || null : null,
+          locationName: showWorkoutFields ? locationName.trim() || null : null,
           media: selectedMedia.map((item) => ({
             uri: item.uri,
             mimeType: item.mimeType,
@@ -528,14 +558,19 @@ export default function CreatePostScreen() {
           challengeId: challengeId ?? null,
           eventId: eventId ?? null,
           journeyCategory: null,
+          feedCategory: publishedCategory,
           isReel: false,
         },
         queryClient
       );
 
-      await refreshFeedForDestination(queryClient, postDestination, session.user.id, postContextId);
-      await clearDraft();
-      setSelectedMedia([]);
+      try {
+        await refreshFeedForDestination(queryClient, postDestination, session.user.id, postContextId);
+      } catch {
+        // The meal is already saved. A slow feed refresh must not unlock a second submit.
+      }
+      await releaseStoredDraft();
+      publishPhaseRef.current = succeedPublish(publishPhaseRef.current);
       setLoading(false);
       setUploadStage("success");
 
@@ -551,6 +586,8 @@ export default function CreatePostScreen() {
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
       const message = getSharePostUserMessage(e);
+      publishPhaseRef.current = failPublish(publishPhaseRef.current);
+      setLockedCategory(null);
       setError(message);
       showAlert("Could not post", message);
       setUploadStage("idle");
@@ -564,7 +601,15 @@ export default function CreatePostScreen() {
   const progressLabel = uploadStageLabel(uploadStage, isContextPost, hasVideo);
   const showSubmittingUi = isSubmitting || uploadStage === "uploading_media" || uploadStage === "creating_post";
   const screenOptions = stackBackOptions(
-    isReelIntent ? "Share Your Journey" : isContextPost ? "Share post" : "Share workout",
+    isReelIntent
+      ? "Share Your Journey"
+      : displayCategory === "nutrition"
+        ? "Share meal"
+        : displayCategory === "general"
+          ? "Post"
+          : isContextPost
+            ? "Share post"
+            : "Share workout",
     {
       presentation: "modal",
     }
@@ -589,6 +634,16 @@ export default function CreatePostScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
       >
+        {isReelIntent ? null : (
+          <FeedCategoryTabs
+            tabs={COMPOSER_CATEGORY_TABS}
+            active={displayCategory}
+            onChange={(next) => {
+              if (!isFormLocked) setFeedCategory(next);
+            }}
+            accessibilityLabel="Post category"
+          />
+        )}
         {showJourneyChrome ? (
           <View style={styles.journeyPrompt}>
             <Text style={styles.journeyPromptTitle}>Share your journey</Text>
@@ -642,7 +697,7 @@ export default function CreatePostScreen() {
               {content.length}/{CAPTION_MAX}
             </Text>
           </View>
-        ) : (
+        ) : showWorkoutFields ? (
           <>
             <Text style={styles.sectionLabel}>Workout types</Text>
             <View style={styles.chips}>
@@ -666,9 +721,10 @@ export default function CreatePostScreen() {
               ))}
             </View>
           </>
-        )}
+        ) : null}
 
         {!isContextPost && !isReelIntent ? (
+          showWorkoutFields ? (
           <>
             <Text style={styles.sectionLabel}>Workout details</Text>
             <View style={styles.metricsRow}>
@@ -722,19 +778,32 @@ export default function CreatePostScreen() {
               disabled={isFormLocked}
             />
           </>
+          ) : null
         ) : null}
 
         {!showJourneyChrome ? (
           <View style={styles.captionBlock}>
-            <Input
-              label="What did you accomplish?"
-              value={content}
-              onChangeText={setContent}
-              multiline
-              maxLength={CAPTION_MAX}
-              editable={!isFormLocked}
-              placeholder="Crushed leg day, hit a PR, finished a 5K..."
-            />
+            {showWorkoutFields ? (
+              <Input
+                label="What did you accomplish?"
+                value={content}
+                onChangeText={setContent}
+                multiline
+                maxLength={CAPTION_MAX}
+                editable={!isFormLocked}
+                placeholder="Crushed leg day, hit a PR, finished a 5K..."
+              />
+            ) : (
+              <Input
+                label="Caption"
+                value={content}
+                onChangeText={setContent}
+                multiline
+                maxLength={CAPTION_MAX}
+                editable={!isFormLocked}
+                placeholder="What did you eat or how did it go?"
+              />
+            )}
             <Text style={styles.charCount}>
               {content.length}/{CAPTION_MAX}
             </Text>
@@ -884,14 +953,22 @@ export default function CreatePostScreen() {
             isSuccess
               ? isReelIntent
                 ? "Journey posted!"
-                : isContextPost
-                  ? "Post shared!"
-                  : "Workout shared!"
+                : displayCategory === "nutrition"
+                  ? "Meal shared!"
+                  : displayCategory === "general"
+                    ? "Post shared!"
+                    : isContextPost
+                      ? "Post shared!"
+                      : "Workout shared!"
               : isReelIntent
                 ? "Post Your Journey"
-                : isContextPost
-                  ? "Share post"
-                  : "Post Workout"
+                : displayCategory === "nutrition"
+                  ? "Share meal"
+                  : displayCategory === "general"
+                    ? "Post"
+                    : isContextPost
+                      ? "Share post"
+                      : "Post Workout"
           }
           loadingTitle={isReelIntent || isContextPost ? "Sharing…" : "Saving…"}
           onPress={submit}

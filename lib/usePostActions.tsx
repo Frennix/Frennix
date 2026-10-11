@@ -61,14 +61,14 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     onMutate: async (postId) => {
       await queryClient.cancelQueries({ queryKey: ["feed", userId] });
       await queryClient.cancelQueries({ queryKey: ["reels", userId] });
-      const previousFeed = queryClient.getQueryData(["feed", userId]);
+      const previousFeeds = queryClient.getQueriesData({ queryKey: ["feed", userId] });
       const previousReels = queryClient.getQueryData(["reels", userId]);
       removePostFromAllCaches(queryClient, userId, postId);
-      return { previousFeed, previousReels };
+      return { previousFeeds, previousReels };
     },
     onError: (error, _postId, context) => {
-      if (context?.previousFeed) {
-        queryClient.setQueryData(["feed", userId], context.previousFeed);
+      for (const [key, data] of context?.previousFeeds ?? []) {
+        queryClient.setQueryData(key, data);
       }
       if (context?.previousReels) {
         queryClient.setQueryData(["reels", userId], context.previousReels);
@@ -107,6 +107,24 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),
   });
 
+  const editOwnedPost = useCallback(
+    (post: Post) => {
+      if (!userId || post.author_id !== userId) return;
+      router.push({ pathname: "/edit-post/[id]", params: { id: post.id } });
+    },
+    [userId]
+  );
+
+  const deleteOwnedPost = useCallback(
+    (post: Post) => {
+      if (!userId || post.author_id !== userId) return;
+      confirmDeletePost(() => {
+        deleteMutation.mutate(post.id);
+      });
+    },
+    [deleteMutation, userId]
+  );
+
   const handleAction = useCallback(
     (actionId: EntityActionId) => {
       if (!activePost) return;
@@ -125,14 +143,14 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
         case "edit":
           setMenuVisible(false);
           setActivePost(null);
-          router.push({ pathname: "/edit-post/[id]", params: { id: activePost.id } });
+          editOwnedPost(activePost);
           return;
         case "delete":
           setMenuVisible(false);
           confirmDeletePost(() => {
-            setActivePost(null);
             deleteMutation.mutate(activePost.id);
           });
+          setActivePost(null);
           return;
         case "share":
           setMenuVisible(false);
@@ -160,7 +178,7 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
           closeMenu();
       }
     },
-    [activePost, blockMutation, closeMenu, deleteMutation, isOwner, onShareInApp]
+    [activePost, blockMutation, closeMenu, deleteOwnedPost, editOwnedPost, isOwner, onShareInApp]
   );
 
   const postActionSheets = (
@@ -192,6 +210,8 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
 
   return {
     openPostActions,
+    editOwnedPost,
+    deleteOwnedPost,
     resetPostActions,
     postActionSheets,
     isDeleting: deleteMutation.isPending,

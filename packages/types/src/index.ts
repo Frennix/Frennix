@@ -10,6 +10,7 @@ import type {
   ParentType,
   PreferredWorkoutTime,
 } from "./lifestyle";
+import type { FeedCategory } from "./feed-category";
 import type { JourneyCategory } from "./journey-category";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 export * from "./dedicated-story";
@@ -326,7 +327,12 @@ export interface Post {
   story_audience?: StoryAudience;
   /** Optional Frennix Reels journey category. Null/absent on legacy videos. */
   journey_category?: JourneyCategory | null;
-  /** True only for videos created through Share Your Journey. Defaults false. */
+  /**
+   * Home feed category. Null on uncategorized legacy posts (still shown in All).
+   * Separate from workout_types and journey_category.
+   */
+  feed_category?: FeedCategory | null;
+  /** True only for videos created through Share Your Journey / intent=reel. */
   is_reel?: boolean;
 }
 
@@ -686,3 +692,4 @@ export * from "./matching";
 export * from "./lifestyle";
 export * from "./training-partnership";
 export * from "./journey-category";
+export * from "./feed-category";

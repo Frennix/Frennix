@@ -13,6 +13,7 @@ import { usesMobileWebCommentsRoute } from "@/lib/mobile-web-comments-route";
 import { useBuildImmersiveVideoContext } from "@/lib/useBuildImmersiveVideoContext";
 import { usesMobileWebVideoRoute } from "@/lib/mobile-web-video-route";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
+import { flattenHomeFeedPosts, homeFeedQueryKey } from "@/lib/home-feed-query";
 import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
 import { colors } from "@frennix/ui";
 
@@ -51,7 +52,7 @@ export function PostVideoScreen({
     usesMobileWebCommentsRoute();
 
   const { fetchNextPage, hasNextPage } = useInfiniteQuery({
-    queryKey: ["feed", userId],
+    queryKey: homeFeedQueryKey(userId, "all"),
     queryFn: ({ pageParam }) => getFeed(userId, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
@@ -60,10 +61,7 @@ export function PostVideoScreen({
   });
 
   const feedPosts = useMemo(() => {
-    const cached =
-      queryClient
-        .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-        ?.pages.flatMap((page) => page.posts) ?? [];
+    const cached = flattenHomeFeedPosts(queryClient, userId, "all");
     if (cached.some((candidate) => (candidate.shared_post ?? candidate).id === displayPost.id)) {
       return cached;
     }
@@ -87,13 +85,11 @@ export function PostVideoScreen({
       fetchMore: async () => {
         const beforeCount = feedPosts.length;
         await fetchNextPage();
-        const updatedPosts =
-          queryClient
-            .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-            ?.pages.flatMap((page) => page.posts) ?? feedPosts;
-        const newPosts = updatedPosts.slice(beforeCount);
+        const updatedPosts = flattenHomeFeedPosts(queryClient, userId, "all");
+        const resolvedPosts = updatedPosts.length ? updatedPosts : feedPosts;
+        const newPosts = resolvedPosts.slice(beforeCount);
         const entries = buildPlaylistEntriesFromPosts(newPosts);
-        const feedState = queryClient.getQueryState(["feed", userId]);
+        const feedState = queryClient.getQueryState(homeFeedQueryKey(userId, "all"));
         const stillHasMore = Boolean(
           (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
             ?.nextCursor

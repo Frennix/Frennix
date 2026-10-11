@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { readImageBytes } from "@frennix/api";
+import { isFeedCategory, type FeedCategory } from "@frennix/types";
 
 export type CreatePostDraft = {
   content: string;
+  feedCategory: FeedCategory;
   workoutTypes: string[];
   groupId: string | null;
   challengeId: string | null;
@@ -58,6 +60,7 @@ function mediaKey(userId: string) {
 export function emptyCreatePostDraft(): CreatePostDraft {
   return {
     content: "",
+    feedCategory: "workout",
     workoutTypes: [],
     groupId: null,
     challengeId: null,
@@ -235,6 +238,7 @@ export async function restoreCreatePostDraft(userId: string): Promise<RestoredCr
     const draft: RestoredCreatePostDraft = {
       ...emptyCreatePostDraft(),
       ...parsed,
+      feedCategory: isFeedCategory(parsed.feedCategory) ? parsed.feedCategory : "workout",
       workoutTypes:
         parsed.workoutTypes?.length
           ? parsed.workoutTypes

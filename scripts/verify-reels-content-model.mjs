@@ -108,7 +108,8 @@ function main() {
         postsApi.includes("export function applyReelDestinationFilter") &&
         postsApi.includes("applyReelDestinationFilter(") &&
         /export async function getFeed\(/.test(postsApi) &&
-        postsApi.includes("const core = await getFeedCore(userId, cursor, limit);")
+        postsApi.includes("await getFeedCore(userId, cursor, limit, undefined, options)") &&
+        postsApi.includes('q = q.eq("is_reel", options?.isReel === true)')
     ) && ok;
 
   ok =
@@ -271,10 +272,12 @@ function main() {
     pass(
       "Every Home Feed query path excludes is_reel=true",
       feedIndex.includes("getFeedCore(userId, undefined, undefined") &&
-        feedIndex.includes("getFeed(userId, pageParam)") &&
+        feedIndex.includes("getFeed(userId, pageParam, undefined, feedOptions)") &&
         !feedIndex.includes("isReel: true") &&
         feedIndex.includes("excludeReelPosts") &&
-        banner.includes("getFeed(userId)") &&
+        banner.includes(
+          "getFeed(userId, undefined, undefined, feedCategory ? { feedCategory } : undefined)"
+        ) &&
         feedCache.includes('CACHE_PREFIX = "feed-cache:v2:"') &&
         feedCache.includes("excludeReelsFromFeedPages") &&
         feedCache.includes("stripReelsFromFeedQuery") &&

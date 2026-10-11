@@ -28,6 +28,8 @@ type UsePostInteractionOptions = {
   onSave: (post: Post) => void;
   onViewProfile: (post: Post) => void;
   onViewMedia: (post: Post, mediaIndex: number) => void;
+  onOwnerEdit?: (post: Post) => void;
+  onOwnerDelete?: (post: Post) => void;
 };
 
 export function usePostInteraction({
@@ -39,6 +41,8 @@ export function usePostInteraction({
   onSave,
   onViewProfile,
   onViewMedia,
+  onOwnerEdit,
+  onOwnerDelete,
 }: UsePostInteractionOptions) {
   const queryClient = useQueryClient();
   const [activePost, setActivePost] = useState<Post | null>(null);
@@ -169,6 +173,12 @@ export function usePostInteraction({
         case "save":
           onSave(activePost);
           return true;
+        case "owner_edit":
+          onOwnerEdit?.(activePost);
+          return true;
+        case "owner_delete":
+          onOwnerDelete?.(activePost);
+          return true;
         default:
           return true;
       }
@@ -183,6 +193,8 @@ export function usePostInteraction({
       onShare,
       onViewMedia,
       onViewProfile,
+      onOwnerEdit,
+      onOwnerDelete,
       rememberReaction,
       userId,
     ]
@@ -198,6 +210,7 @@ export function usePostInteraction({
       liked={Boolean(activePost?.liked_by_me)}
       myReaction={activePost?.my_reaction}
       saved={Boolean(activePost?.saved_by_me)}
+      viewerId={userId}
       onAction={(actionId) => handleAction(actionId)}
       onClose={closeInteraction}
     />

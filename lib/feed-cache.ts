@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { excludeReelPosts } from "@frennix/api";
 import type { FeedPage } from "@frennix/types";
+import { homeFeedQueryKey } from "@/lib/home-feed-query";
 
 const CACHE_PREFIX = "feed-cache:v2:";
 const CACHE_MAX_AGE_MS = 30 * 60 * 1000;
@@ -47,7 +48,7 @@ function readFeedCacheSync(userId: string): FeedPage[] | undefined {
 }
 
 function applyFeedCachePages(queryClient: QueryClient, userId: string, pages: FeedPage[]) {
-  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], {
+  queryClient.setQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"), {
     pages: excludeReelsFromFeedPages(pages),
     pageParams: pages.reduce<(string | undefined)[]>(
       (params, page, index) => {
@@ -110,7 +111,7 @@ export async function writeFeedCache(userId: string, pages: FeedPage[]) {
 export function hydrateFeedCacheSync(queryClient: QueryClient, userId: string) {
   if (!userId) return false;
 
-  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"));
   if (existing?.pages?.length) return false;
 
   const pages = readFeedCacheSync(userId);
@@ -123,13 +124,13 @@ export function hydrateFeedCacheSync(queryClient: QueryClient, userId: string) {
 export async function hydrateFeedCache(queryClient: QueryClient, userId: string) {
   if (!userId) return false;
 
-  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"));
   if (existing?.pages?.length) return false;
 
   const pages = await readFeedCache(userId);
   if (!pages?.length) return false;
 
-  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], {
+  queryClient.setQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"), {
     pages: excludeReelsFromFeedPages(pages),
     pageParams: pages.reduce<(string | undefined)[]>(
       (params, page, index) => {
@@ -147,7 +148,7 @@ export async function hydrateFeedCache(queryClient: QueryClient, userId: string)
 /** Drop Reel rows from the in-memory Home Feed query so they cannot linger after a Reels post. */
 export function stripReelsFromFeedQuery(queryClient: QueryClient, userId: string) {
   if (!userId) return;
-  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
+  queryClient.setQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"), (old) => {
     if (!old) return old;
     return {
       ...old,
