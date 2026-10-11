@@ -101,6 +101,21 @@ assert(consumeStoryFreshStart(), "the next open consumes the fresh start");
 assert(!consumeStoryFreshStart(), "a later open does not clear a new draft");
 
 const composer = read("app/create-story.tsx");
+assert(
+  composer.includes('import { useIsFocused } from "@react-navigation/native"'),
+  "focus comes from React Navigation, which exports useIsFocused"
+);
+assert(
+  !composer.includes("useIsFocused } from \"expo-router\"") && !composer.includes("useIsFocused } from 'expo-router'"),
+  "expo-router does not export useIsFocused"
+);
+const expoRouterExports = read("node_modules/expo-router/build/exports.js");
+assert(!expoRouterExports.includes('exports.useIsFocused'), "expo-router 4 does not export useIsFocused");
+assert(expoRouterExports.includes('exports.useFocusEffect'), "expo-router still exports useFocusEffect");
+const navigationCore = read("node_modules/@react-navigation/core/lib/module/index.js");
+const navigationNative = read("node_modules/@react-navigation/native/lib/module/index.js");
+assert(navigationCore.includes('export { useIsFocused }'), "@react-navigation/core exports useIsFocused");
+assert(navigationNative.includes("export * from '@react-navigation/core'"), "@react-navigation/native re-exports core, including useIsFocused");
 assert(composer.includes("onChange={setCategory}"), "category changes through the tab control");
 assert(!composer.includes("feed_category"), "story categories stay off the home feed column");
 assert(composer.includes("slide_meta: fields.slide_meta"), "publish writes slide metadata");

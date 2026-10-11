@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useIsFocused } from "expo-router";
+import { router } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { Video, ResizeMode } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
