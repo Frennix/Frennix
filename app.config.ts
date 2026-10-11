@@ -10,9 +10,9 @@ const config: ExpoConfig = {
   userInterfaceStyle: "dark",
   newArchEnabled: true,
   splash: {
-    image: "./assets/splash-icon.png",
-    resizeMode: "contain",
-    backgroundColor: "#000000",
+    image: "./assets/splash-screen.png",
+    resizeMode: "cover",
+    backgroundColor: "#050505",
   },
   ios: {
     supportsTablet: true,

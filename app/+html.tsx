@@ -5,6 +5,7 @@ import {
   buildDevBootShellScript,
   FRENNIX_SPLASH_BACKGROUND,
   FRENNIX_SPLASH_LOGO_PATH,
+  FRENNIX_SPLASH_STARTUP_PATH,
 } from "@/lib/boot-shell-document";
 import { frennixWebDocumentCss } from "@/lib/web-document-styles";
 
@@ -30,8 +31,8 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         <meta name="apple-mobile-web-app-title" content="Frennix" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <link rel="preload" href={FRENNIX_SPLASH_LOGO_PATH} as="image" type="image/png" />
-        <link rel="apple-touch-startup-image" href={FRENNIX_SPLASH_LOGO_PATH} />
+        <link rel="preload" href={FRENNIX_SPLASH_LOGO_PATH} as="image" type="image/webp" />
+        <link rel="apple-touch-startup-image" href={FRENNIX_SPLASH_STARTUP_PATH} />
         <ScrollViewStyleReset />
         <style id="frennix-web-scroll">{frennixWebDocumentCss}</style>
         <style id="frennix-boot-shell-css">{bootShellCss}</style>
