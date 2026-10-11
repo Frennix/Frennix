@@ -1,8 +1,17 @@
-import { FlatList, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
 import type { SuggestedAthlete } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { Button } from "./Button";
-import { formatPresenceStatus, isProfileOnline } from "./presence";
+import { isProfileOnline } from "./presence";
 import { colors, spacing, typography } from "./theme";
 
 interface PeopleYouMayKnowCarouselProps {
@@ -44,7 +53,6 @@ export function PeopleYouMayKnowCarousel({
           const isFollowLoading = followLoadingId === item.profile.id;
           const isDismissLoading = dismissLoadingId === item.profile.id;
           const online = isProfileOnline(item.profile);
-          const presenceLabel = formatPresenceStatus(item.profile);
 
           return (
             <View style={styles.card}>
@@ -55,26 +63,15 @@ export function PeopleYouMayKnowCarousel({
                 <Avatar
                   uri={item.profile.avatar_url}
                   name={item.profile.display_name}
-                  size={64}
+                  size={44}
                   showOnline
                   isOnline={online}
                 />
-                <Text style={styles.name} numberOfLines={1}>
+                <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
                   {item.profile.display_name}
                 </Text>
-                <Text style={styles.username} numberOfLines={1}>
+                <Text style={styles.username} numberOfLines={1} ellipsizeMode="tail">
                   @{item.profile.username}
-                </Text>
-                {presenceLabel ? (
-                  <Text
-                    style={[styles.presence, online && styles.presenceOnline]}
-                    numberOfLines={1}
-                  >
-                    {presenceLabel}
-                  </Text>
-                ) : null}
-                <Text style={styles.reason} numberOfLines={2}>
-                  {item.reason}
                 </Text>
               </Pressable>
               <View style={styles.actions}>
@@ -85,14 +82,21 @@ export function PeopleYouMayKnowCarousel({
                   loading={isFollowLoading}
                   style={styles.actionButton}
                 />
-                <Button
-                  title="Not Interested"
-                  variant="secondary"
+                <Pressable
+                  style={styles.dismiss}
                   onPress={() => onDismissPress?.(item)}
-                  loading={isDismissLoading}
-                  style={styles.actionButton}
-                  accessibilityLabel="Remove suggestion"
-                />
+                  disabled={isDismissLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Not Interested"
+                >
+                  {isDismissLoading ? (
+                    <ActivityIndicator color={colors.textMuted} size="small" />
+                  ) : (
+                    <Text style={styles.dismissText} numberOfLines={1}>
+                      Not Interested
+                    </Text>
+                  )}
+                </Pressable>
               </View>
             </View>
           );
@@ -126,17 +130,20 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   card: {
-    width: 176,
-    padding: spacing.md,
+    width: 148,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   profileTap: {
     alignItems: "center",
-    gap: 4,
+    gap: 2,
+    width: "100%",
+    minWidth: 0,
   },
   name: {
     ...typography.bodySmall,
@@ -144,6 +151,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     textAlign: "center",
     width: "100%",
+    minHeight: 36,
+    lineHeight: 18,
   },
   username: {
     ...typography.caption,
@@ -151,27 +160,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
     width: "100%",
   },
-  presence: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: "center",
-    width: "100%",
-  },
-  presenceOnline: { color: colors.accent, fontWeight: "600" },
-  reason: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: "center",
-    minHeight: 28,
-    lineHeight: 14,
-  },
   actions: {
     width: "100%",
-    gap: spacing.xs,
+    gap: 2,
   },
   actionButton: {
     width: "100%",
     minHeight: 36,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  dismiss: {
+    minHeight: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xs,
+  },
+  dismissText: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

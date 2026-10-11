@@ -1,15 +1,17 @@
 import { memo, useMemo } from "react";
-import { StyleSheet, View } from "react-native";
-import type { FeedStory, SuggestedAthlete } from "@frennix/types";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { HOME_FEED_TABS, type FeedStory, type HomeFeedTab, type SuggestedAthlete } from "@frennix/types";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import {
   FeedHeroBanner,
   FeedQuickActionCards,
+  FeedCategoryTabs,
   FeedStoriesRow,
   PeopleYouMayKnowCarousel,
   colors,
   feedLayout,
   spacing,
+  typography,
 } from "@frennix/ui";
 import { openCreatePost, openCreateStory, pushScreen, switchTab } from "@/lib/press-utils";
 
@@ -26,6 +28,9 @@ interface FeedHeaderProps {
   showSuggestions?: boolean;
   showStories?: boolean;
   showQuickActions?: boolean;
+  feedTab?: HomeFeedTab;
+  onFeedTabChange?: (tab: HomeFeedTab) => void;
+  showFeedTabs?: boolean;
 }
 
 export const FeedHeader = memo(function FeedHeader({
@@ -41,10 +46,13 @@ export const FeedHeader = memo(function FeedHeader({
   showSuggestions = true,
   showStories = true,
   showQuickActions = true,
+  feedTab = "all",
+  onFeedTabChange,
+  showFeedTabs = true,
 }: FeedHeaderProps) {
   const quickActions = useMemo(
     () => [
-      { key: "share", emoji: "🏋️", title: "Share", onPress: openCreatePost },
+      { key: "share", emoji: "🏋️", title: "Share", onPress: () => openCreatePost() },
       { key: "stories", emoji: "🔍", title: "Explore", onPress: () => pushScreen("/stories/explore") },
       { key: "athletes", emoji: "🎯", title: "Athletes", onPress: () => switchTab("/(tabs)/discover") },
       { key: "events", emoji: "📅", title: "Events", onPress: () => switchTab("/(tabs)/events") },
@@ -58,7 +66,7 @@ export const FeedHeader = memo(function FeedHeader({
         <SectionErrorBoundary label="feed-hero-banner" compact>
           <FeedHeroBanner
             onFindAthletes={() => switchTab("/(tabs)/discover")}
-            onShareWorkout={openCreatePost}
+            onShareWorkout={() => openCreatePost()}
           />
         </SectionErrorBoundary>
       ) : null}
@@ -99,6 +107,25 @@ export const FeedHeader = memo(function FeedHeader({
           />
         </SectionErrorBoundary>
       ) : null}
+
+      {showFeedTabs && onFeedTabChange ? (
+        <FeedCategoryTabs
+          tabs={HOME_FEED_TABS}
+          active={feedTab}
+          onChange={onFeedTabChange}
+          accessibilityLabel="Home feed"
+        />
+      ) : null}
+      {feedTab === "nutrition" ? (
+        <Pressable
+          style={styles.shareMeal}
+          onPress={() => openCreatePost({ category: "nutrition" })}
+          accessibilityRole="button"
+          accessibilityLabel="Share a meal"
+        >
+          <Text style={styles.shareMealText}>+ Share a meal</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 });
@@ -113,5 +140,16 @@ const styles = StyleSheet.create({
   },
   storiesShortcutsGroup: {
     gap: spacing.xxs,
+  },
+  shareMeal: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingVertical: spacing.xs,
+  },
+  shareMealText: {
+    ...typography.body,
+    color: colors.accent,
+    fontWeight: "700",
   },
 });

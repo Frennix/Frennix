@@ -31,7 +31,7 @@ export const FeedEmptyMotivation = memo(function FeedEmptyMotivation({
         <Text style={styles.emoji}>💪</Text>
         <Text style={styles.title}>Your feed is warming up</Text>
         <Text style={styles.body}>{motivation}</Text>
-        <Pressable style={styles.cta} onPress={onShareWorkout ?? openCreatePost}>
+        <Pressable style={styles.cta} onPress={onShareWorkout ?? (() => openCreatePost())}>
           <Text style={styles.ctaText}>Share a workout</Text>
         </Pressable>
       </View>

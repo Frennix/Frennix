@@ -1,7 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+import { excludeReelPosts } from "@frennix/api";
 import type { FeedPage } from "@frennix/types";
+import { homeFeedQueryKey } from "@/lib/home-feed-query";
+
+function stripReelPostsFromHomePages(pages: FeedPage[]): FeedPage[] {
+  return pages.map((page) => ({
+    ...page,
+    posts: excludeReelPosts(page.posts),
+  }));
+}
 
 const CACHE_PREFIX = "feed-cache:v1:";
 const CACHE_MAX_AGE_MS = 30 * 60 * 1000;
@@ -39,12 +48,13 @@ function readFeedCacheSync(userId: string): FeedPage[] | undefined {
 }
 
 function applyFeedCachePages(queryClient: QueryClient, userId: string, pages: FeedPage[]) {
-  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], {
-    pages,
-    pageParams: pages.reduce<(string | undefined)[]>(
+  const homePages = stripReelPostsFromHomePages(pages);
+  queryClient.setQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"), {
+    pages: homePages,
+    pageParams: homePages.reduce<(string | undefined)[]>(
       (params, page, index) => {
         if (index === 0) return [undefined];
-        params.push(pages[index - 1]?.nextCursor ?? undefined);
+        params.push(homePages[index - 1]?.nextCursor ?? undefined);
         return params;
       },
       []
@@ -73,7 +83,7 @@ export async function writeFeedCache(userId: string, pages: FeedPage[]) {
   if (!userId || !pages.length) return;
   const payload: CachedFeedPayload = {
     savedAt: Date.now(),
-    pages: pages.slice(0, 2),
+    pages: stripReelPostsFromHomePages(pages).slice(0, 2),
   };
   try {
     await AsyncStorage.setItem(cacheKey(userId), JSON.stringify(payload));
@@ -86,7 +96,7 @@ export async function writeFeedCache(userId: string, pages: FeedPage[]) {
 export function hydrateFeedCacheSync(queryClient: QueryClient, userId: string) {
   if (!userId) return false;
 
-  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"));
   if (existing?.pages?.length) return false;
 
   const pages = readFeedCacheSync(userId);
@@ -99,23 +109,24 @@ export function hydrateFeedCacheSync(queryClient: QueryClient, userId: string) {
 export async function hydrateFeedCache(queryClient: QueryClient, userId: string) {
   if (!userId) return false;
 
-  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+  const existing = queryClient.getQueryData<InfiniteData<FeedPage>>(homeFeedQueryKey(userId, "all"));
   if (existing?.pages?.length) return false;
 
   const pages = await readFeedCache(userId);
   if (!pages?.length) return false;
 
-  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], {
-    pages,
-    pageParams: pages.reduce<(string | undefined)[]>(
-      (params, page, index) => {
-        if (index === 0) return [undefined];
-        params.push(pages[index - 1]?.nextCursor ?? undefined);
-        return params;
-      },
-      []
-    ),
-  });
-
+  applyFeedCachePages(queryClient, userId, pages);
   return true;
+}
+
+/** Drop journey Reels from an already-hydrated Home feed cache (login / reopen). */
+export function stripReelsFromHomeFeedCache(queryClient: QueryClient, userId: string) {
+  if (!userId) return;
+  queryClient.setQueriesData<InfiniteData<FeedPage>>({ queryKey: ["feed", userId] }, (current) => {
+    if (!current?.pages?.length) return current;
+    return {
+      ...current,
+      pages: stripReelPostsFromHomePages(current.pages),
+    };
+  });
 }

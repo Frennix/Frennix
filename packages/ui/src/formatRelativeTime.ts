@@ -58,7 +58,12 @@ const POST_KIND_LABELS: Record<string, string> = {
   text: "Update",
 };
 
-export function formatPostKindLabel(postType: string) {
+export function formatPostKindLabel(postType: string, feedCategory?: string | null) {
+  if (feedCategory === "nutrition") {
+    if (postType === "photo") return "Nutrition photo";
+    if (postType === "video") return "Nutrition video";
+    return "Nutrition post";
+  }
   return POST_KIND_LABELS[postType] ?? "Post";
 }
 
@@ -69,13 +74,14 @@ export function formatFeedPostHeaderMeta(
     challenge_id?: string | null;
     group_id?: string | null;
     event_id?: string | null;
+    feed_category?: string | null;
   },
   isShared?: boolean
 ) {
   if (isShared) return `Shared a post · ${formatRelativeTime(post.created_at)}`;
 
   const time = formatRelativeTime(post.created_at);
-  const kind = post.challenge_id ? "Achievement" : formatPostKindLabel(post.post_type);
+  const kind = post.challenge_id ? "Achievement" : formatPostKindLabel(post.post_type, post.feed_category);
 
   if (post.group_id) return `${kind} · Group · ${time}`;
   if (post.event_id) return `${kind} · Event · ${time}`;
@@ -91,9 +97,11 @@ export function formatFeedCompactHeaderMeta(
     challenge_id?: string | null;
     group_id?: string | null;
     event_id?: string | null;
+    feed_category?: string | null;
   },
   workoutTypes: string[] | null | undefined
 ) {
+  if (post.feed_category === "nutrition") return formatFeedPostHeaderMeta(post, false);
   const time = formatRelativeTime(post.created_at);
   const workout = formatWorkoutTypesInline(workoutTypes);
   if (workout) return `${workout} · ${time}`;
@@ -111,11 +119,12 @@ export function formatFeedPostMeta(
     group_id?: string | null;
     event_id?: string | null;
     shared_post_id?: string | null;
+    feed_category?: string | null;
   },
   isShared?: boolean
 ) {
   const header = formatFeedPostHeaderMeta(post, isShared);
-  if (isShared) return header;
+  if (isShared || post.feed_category === "nutrition") return header;
 
   const workoutTypes =
     post.workout_types?.length
@@ -127,7 +136,7 @@ export function formatFeedPostMeta(
   if (!inline) return header;
 
   const time = formatRelativeTime(post.created_at);
-  const kind = post.challenge_id ? "Achievement" : formatPostKindLabel(post.post_type);
+  const kind = post.challenge_id ? "Achievement" : formatPostKindLabel(post.post_type, post.feed_category);
   return `${kind} · ${inline} · ${time}`;
 }
 

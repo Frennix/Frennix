@@ -15,6 +15,7 @@ import { frennixRefreshControlProps } from '@/lib/screen-shell';
 import {
   getFeed,
   getFeedCore,
+  excludeReelPosts,
   enrichPostsWithInteractions,
   applyDefaultPostInteractions,
   getFeedStories,
@@ -22,6 +23,7 @@ import {
   getDismissedSuggestionIds,
   peekFeedFollowingIds,
   getErrorMessage,
+  getTechnicalErrorMessage,
   getDedicatedStoryInsights,
   getDedicatedStoryAnalytics,
   getStoryViewers,
@@ -38,8 +40,11 @@ import {
 } from "@frennix/api";
 import {
   STORY_CHALLENGE_RESPONSES,
+  feedCategoryForHomeTab,
   normalizePostMediaItems,
   type FeedStory,
+  type HomeFeedTab,
+  type FrennixStory,
   type Post,
   type StoryChallengeKey,
   type StoryQuickReactionEmoji,
@@ -61,6 +66,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { FeedBackground } from "@/components/FeedBackground";
 import { UndoSnackbar } from "@/components/UndoSnackbar";
 import { FeedEmptyMotivation } from "@/components/FeedEmptyMotivation";
+import { NutritionFeedEmpty } from "@/components/NutritionFeedEmpty";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
@@ -76,6 +82,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
+import { setSelectedHomeFeedTab } from "@/lib/selected-home-feed-tab";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
 import { usePostInteraction } from "@/lib/usePostInteraction";
 import { useFeedCommentsSheet } from "@/lib/useFeedCommentsSheet";
@@ -84,11 +91,17 @@ import { useScrollAtTop } from "@/lib/useScrollAtTop";
 import { useTabScrollRegistration } from "@/lib/useTabScrollRegistration";
 import { useFeedLike } from "@/lib/useFeedLike";
 import { useFeedInfiniteScroll } from "@/lib/useFeedInfiniteScroll";
+import { flattenHomeFeedPosts, homeFeedQueryKey } from "@/lib/home-feed-query";
 import { useFeedNewPostsBanner } from "@/lib/useFeedNewPostsBanner";
 import { useGuardedRefresh } from "@/lib/useGuardedRefresh";
 import type { FeedListRow } from "@/lib/feed-list-rows";
-import { hydrateFeedCache, hydrateFeedCacheSync, writeFeedCache } from "@/lib/feed-cache";
-import { mergeEnrichedFeedPage } from "@/lib/feed-enrichment-merge";
+import {
+  hydrateFeedCache,
+  hydrateFeedCacheSync,
+  stripReelsFromHomeFeedCache,
+  writeFeedCache,
+} from "@/lib/feed-cache";
+import { mergeEnrichedFeedPage, overlayCachedFeedInteractions } from "@/lib/feed-enrichment-merge";
 import {
   markFeedCacheHydrated,
   markFeedPerf,
@@ -149,9 +162,9 @@ export default function HomeScreen() {
   const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
   const [activeInsightStoryId, setActiveInsightStoryId] = useState<string | null>(null);
   const [activeInsightSlideId, setActiveInsightSlideId] = useState<string | null>(null);
-  const { openShare, shareSheet, shareVisible } = useSharePost(userId);
+  const { openShare, resetShare, shareSheet, shareVisible } = useSharePost(userId);
   markFeedHook("share-post");
-  const { openPostActions, postActionSheets } = usePostActions({
+  const { openPostActions, editOwnedPost, deleteOwnedPost, resetPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
@@ -164,9 +177,19 @@ export default function HomeScreen() {
   markFeedHook("feed-like");
   const { openGallery, lightbox, lightboxVisible, closeGallery } = useImageLightbox();
   markFeedHook("image-lightbox");
+  useEffect(() => {
+    if (!lightboxVisible) {
+      resetShare();
+      resetPostActions();
+    }
+  }, [lightboxVisible, resetPostActions, resetShare]);
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
   const [storiesDeferred, setStoriesDeferred] = useState(false);
+  const [feedTab, setFeedTab] = useState<HomeFeedTab>("all");
+  useEffect(() => {
+    setSelectedHomeFeedTab(feedTab);
+  }, [feedTab]);
   const [deferFeedSecondary, setDeferFeedSecondary] = useState(false);
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
@@ -211,6 +234,8 @@ export default function HomeScreen() {
         thumbnailUrl: displayPost.thumbnail_url,
       });
     },
+    onOwnerEdit: editOwnedPost,
+    onOwnerDelete: deleteOwnedPost,
   });
   markFeedHook("post-interaction");
 
@@ -307,8 +332,15 @@ export default function HomeScreen() {
       emoji: StoryQuickReactionEmoji,
       slideId?: string | null
     ) => {
-      if (!userId) return;
-      await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
+      if (!userId || !storyId) {
+        throw new Error("Reaction couldn’t be sent. Try again.");
+      }
+      try {
+        await sendDedicatedStoryReaction(userId, storyUserId, storyId, emoji, slideId);
+      } catch (error) {
+        console.error("[story-reaction]", getTechnicalErrorMessage(error));
+        throw error;
+      }
     },
     [userId]
   );
@@ -327,8 +359,15 @@ export default function HomeScreen() {
 
   const handleStoryReply = useCallback(
     async (storyUserId: string, text: string, storyId?: string | null) => {
-      if (!userId || !storyId) return;
-      await sendDedicatedStoryReply(userId, storyUserId, text, storyId);
+      if (!userId || !storyId) {
+        throw new Error("Message couldn’t be sent. Try again.");
+      }
+      try {
+        await sendDedicatedStoryReply(userId, storyUserId, text, storyId);
+      } catch (error) {
+        console.error("[story-reply]", getTechnicalErrorMessage(error));
+        throw error;
+      }
     },
     [userId]
   );
@@ -461,29 +500,38 @@ export default function HomeScreen() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["feed", userId],
+    queryKey: homeFeedQueryKey(userId ?? "", feedTab),
     queryFn: async ({ pageParam }) => {
+      const feedOptions = {
+        feedCategory: feedCategoryForHomeTab(feedTab) ?? undefined,
+      };
       if (pageParam) {
         markFeedPerf("feed_page_next_start");
-        const page = await getFeed(userId, pageParam);
+        const page = await getFeed(userId, pageParam, undefined, feedOptions);
         markFeedPerf("feed_page_next_ready", { post_count: page.posts.length });
         return page;
       }
 
       markFeedPerf("feed_query_start");
       const enrichGen = ++feedEnrichGenRef.current;
-      const core = await getFeedCore(userId, undefined, undefined, (phase, detail) => {
-        if (phase === "scope" && detail?.start) markFeedPerf("feed_scope_start");
-        if (phase === "scope" && detail?.author_count != null) markFeedPerf("feed_scope_ready", detail);
-        if (phase === "posts" && detail?.start) markFeedPerf("feed_posts_query_start");
-        if (phase === "posts" && detail?.count != null) markFeedPerf("feed_posts_query_ready", detail);
-      });
+      const core = await getFeedCore(
+        userId,
+        undefined,
+        undefined,
+        (phase, detail) => {
+          if (phase === "scope" && detail?.start) markFeedPerf("feed_scope_start");
+          if (phase === "scope" && detail?.author_count != null) markFeedPerf("feed_scope_ready", detail);
+          if (phase === "posts" && detail?.start) markFeedPerf("feed_posts_query_start");
+          if (phase === "posts" && detail?.count != null) markFeedPerf("feed_posts_query_ready", detail);
+        },
+        feedOptions
+      );
       markFeedPerf("feed_filtering_ready", { post_count: core.posts.length });
 
-      const page = {
+      const page = overlayCachedFeedInteractions(queryClient, userId, {
         posts: core.posts.map(applyDefaultPostInteractions),
         nextCursor: core.nextCursor,
-      };
+      });
       markFeedPerf("feed_data_in_react", { post_count: page.posts.length });
       markFeedPerf("feed_page_1_ready", { post_count: page.posts.length, enriched: false });
 
@@ -505,7 +553,10 @@ export default function HomeScreen() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!userId,
     staleTime: 60_000,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => {
+      if (previousQuery?.queryKey?.[2] !== feedTab) return undefined;
+      return previousData;
+    },
   });
   markFeedHook("feed-query");
 
@@ -530,7 +581,10 @@ export default function HomeScreen() {
   });
   markFeedHook("suggestions-query");
 
-  const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data?.pages]);
+  const posts = useMemo(
+    () => excludeReelPosts(data?.pages.flatMap((page) => page.posts) ?? []),
+    [data?.pages]
+  );
 
   useEffect(() => {
     if (Platform.OS !== "web" || !userId) return;
@@ -560,8 +614,10 @@ export default function HomeScreen() {
     onViewableItemsChanged,
     viewabilityConfig,
     visiblePostIds,
+    priorityPostIds,
   } = useFeedInfiniteScroll({
     posts,
+    scopeKey: feedTab,
     pageCount,
     isFeedReady,
     hasNextPage: !!hasNextPage,
@@ -647,6 +703,7 @@ export default function HomeScreen() {
   const { newPostCount, showBanner, clearBanner } = useFeedNewPostsBanner({
     userId,
     posts,
+    feedCategory: feedCategoryForHomeTab(feedTab),
     atTop: feedAtTop,
     enabled: isFeedReady,
     onNewPostsWhileAtTop: () => {
@@ -662,6 +719,13 @@ export default function HomeScreen() {
     if (useWebScroll) scrollScrollViewToTop(webScrollRef.current);
     else scrollFlatListToTop(listRef.current);
   }, [useWebScroll]);
+
+  const feedTabScrollRef = useRef(feedTab);
+  useEffect(() => {
+    if (feedTabScrollRef.current === feedTab) return;
+    feedTabScrollRef.current = feedTab;
+    scrollFeedToTop();
+  }, [feedTab, scrollFeedToTop]);
 
   const handleNewPostsBannerPress = useCallback(async () => {
     clearBanner();
@@ -693,23 +757,19 @@ export default function HomeScreen() {
     markFeedPerf("route_mount");
     if (session) markFeedPerf("auth_session_ready");
     if (viewerProfile) markFeedPerf("profile_ready");
+    stripReelsFromHomeFeedCache(queryClient, userId);
     if (hydrateFeedCacheSync(queryClient, userId)) {
-      const cachedPosts =
-        queryClient
-          .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-          ?.pages.flatMap((page) => page.posts) ?? [];
+      const cachedPosts = flattenHomeFeedPosts(queryClient, userId, "all");
       markFeedCacheHydrated(cachedPosts.length);
     }
   }, [queryClient, session, userId, viewerProfile]);
 
   useEffect(() => {
     if (!userId) return;
+    stripReelsFromHomeFeedCache(queryClient, userId);
     void hydrateFeedCache(queryClient, userId).then((hydrated) => {
       if (!hydrated) return;
-      const cachedPosts =
-        queryClient.getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])?.pages.flatMap(
-          (page) => page.posts
-        ) ?? [];
+      const cachedPosts = flattenHomeFeedPosts(queryClient, userId, "all");
       markFeedCacheHydrated(cachedPosts.length);
     });
   }, [queryClient, userId]);
@@ -726,9 +786,9 @@ export default function HomeScreen() {
   }, [posts.length > 0 ? posts[0]?.id : null]);
 
   useEffect(() => {
-    if (!userId || !data?.pages.length) return;
+    if (!userId || feedTab !== "all" || !data?.pages.length) return;
     void writeFeedCache(userId, data.pages);
-  }, [data?.pages, userId]);
+  }, [data?.pages, feedTab, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -772,7 +832,6 @@ export default function HomeScreen() {
     onAuthorPress: () => undefined,
     onCommentAuthorPress: () => undefined,
     onLike: () => undefined,
-    onDoubleTapLike: () => undefined,
     onComment: () => undefined,
     onShare: () => undefined,
     onSave: () => undefined,
@@ -797,9 +856,6 @@ export default function HomeScreen() {
     },
     onLike: (post: Post) => {
       toggleLikePost(post.id);
-    },
-    onDoubleTapLike: (post: Post) => {
-      if (!post.liked_by_me) toggleLikePost(post.id);
     },
     onComment: (post: Post) => {
       openComments(post);
@@ -847,28 +903,20 @@ export default function HomeScreen() {
           hasMore: Boolean(hasNextPage),
           originMediaIndex: index,
           getPost: (postId) => {
-            const cachedPosts =
-              queryClient
-                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-                ?.pages.flatMap((page) => page.posts) ?? posts;
-            return cachedPosts.find(
+            const cachedPosts = flattenHomeFeedPosts(queryClient, userId, feedTab);
+            const resolvedPosts = cachedPosts.length ? cachedPosts : posts;
+            return resolvedPosts.find(
               (candidate) => (candidate.shared_post ?? candidate).id === postId
             );
           },
           buildImmersiveContext: buildImmersiveVideoContext,
           fetchMore: async () => {
-            const beforeCount =
-              queryClient
-                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-                ?.pages.flatMap((page) => page.posts).length ?? posts.length;
+            const beforeCount = flattenHomeFeedPosts(queryClient, userId, feedTab).length || posts.length;
             await fetchNextPage();
-            const updatedPosts =
-              queryClient
-                .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
-                ?.pages.flatMap((page) => page.posts) ?? [];
+            const updatedPosts = flattenHomeFeedPosts(queryClient, userId, feedTab);
             const newPosts = updatedPosts.slice(beforeCount);
             const entries = buildPlaylistEntriesFromPosts(newPosts);
-            const feedState = queryClient.getQueryState(["feed", userId]);
+            const feedState = queryClient.getQueryState(homeFeedQueryKey(userId, feedTab));
             const stillHasMore = Boolean(
               (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
                 ?.nextCursor
@@ -918,7 +966,6 @@ export default function HomeScreen() {
       onAuthorPress: (post) => feedActionsRef.current.onAuthorPress(post),
       onCommentAuthorPress: (username) => feedActionsRef.current.onCommentAuthorPress(username),
       onLike: (post) => feedActionsRef.current.onLike(post),
-      onDoubleTapLike: (post) => feedActionsRef.current.onDoubleTapLike?.(post),
       onComment: (post) => feedActionsRef.current.onComment(post),
       onShare: (post) => feedActionsRef.current.onShare(post),
       onSave: (post) => feedActionsRef.current.onSave(post),
@@ -964,6 +1011,7 @@ export default function HomeScreen() {
             interactionActive={activePost?.id === item.post.id}
             inlineComposerEnabled={!commentsVisible}
             mediaActive={mediaActive}
+            mediaPriority={priorityPostIds.has(item.post.id) ? "high" : "low"}
             mediaPageIndex={carouselIndices[item.post.id] ?? 0}
             onMediaPageIndexChange={(pageIndex) => setCarouselIndex(item.post.id, pageIndex)}
             onPrimaryMediaReady={onPrimaryMediaReady}
@@ -975,6 +1023,7 @@ export default function HomeScreen() {
       feedActions,
       userId,
       visiblePostIds,
+      priorityPostIds,
       carouselIndices,
       setCarouselIndex,
       activePost?.id,
@@ -1006,6 +1055,8 @@ export default function HomeScreen() {
           }}
           onFollowPress={(profileId) => toggleFollow(profileId)}
           onDismissPress={dismissSuggestionRequest}
+          feedTab={feedTab}
+          onFeedTabChange={setFeedTab}
         />
         </SectionErrorBoundary>
       </FeedRenderTraceProbe>
@@ -1020,6 +1071,7 @@ export default function HomeScreen() {
       followMutation.variables?.targetUserId,
       toggleFollow,
       dismissSuggestionRequest,
+      feedTab,
     ]
   );
 
@@ -1159,7 +1211,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (isError && posts.length === 0) {
+  if (isError && posts.length === 0 && feedTab === "all") {
     markFeedRender("feed:branch:error", "data", getErrorMessage(error));
     return (
       <View style={styles.container}>
@@ -1173,6 +1225,27 @@ export default function HomeScreen() {
   }
 
   markFeedRender("feed:branch:main");
+
+  const listEmpty =
+    isError && posts.length === 0 ? (
+      <QueryErrorState
+        title="Could not load feed"
+        message={getErrorMessage(error)}
+        onRetry={() => void refetch()}
+      />
+    ) : showFeedSkeleton || (posts.length === 0 && isFetching && !isError) ? (
+      <View style={styles.initialSkeletons}>
+        <FeedPostCardSkeleton />
+        <FeedPostCardSkeleton />
+        <FeedPostCardSkeleton />
+        <FeedPostCardSkeleton />
+        <FeedPostCardSkeleton />
+      </View>
+    ) : feedTab === "nutrition" ? (
+      <NutritionFeedEmpty />
+    ) : (
+      <FeedEmptyMotivation suggestions={suggestions} />
+    );
 
   if (isolateFeedList) {
     return (
@@ -1232,19 +1305,7 @@ export default function HomeScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             ListHeaderComponent={listHeader}
-            ListEmptyComponent={
-              showFeedSkeleton ? (
-                <View style={styles.initialSkeletons}>
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                </View>
-              ) : (
-                <FeedEmptyMotivation suggestions={suggestions} />
-              )
-            }
+            ListEmptyComponent={listEmpty}
             refreshControl={refreshControl}
             onLayout={(height) => handleListLayout(height)}
             onContentSizeChange={handleContentSizeChange}
@@ -1282,19 +1343,7 @@ export default function HomeScreen() {
               if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
             }}
             ListHeaderComponent={listHeader}
-            ListEmptyComponent={
-              showFeedSkeleton ? (
-                <View style={styles.initialSkeletons}>
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                  <FeedPostCardSkeleton />
-                </View>
-              ) : (
-                <FeedEmptyMotivation suggestions={suggestions} />
-              )
-            }
+            ListEmptyComponent={listEmpty}
             renderItem={renderItem}
           />
           </FeedRenderTraceProbe>
@@ -1369,6 +1418,33 @@ export default function HomeScreen() {
         }}
         onFollow={handleStoryFollow}
         onInviteToTrain={handleStoryInviteToTrain}
+        onStoryUpdated={(updated: FrennixStory) => {
+          queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
+            current?.map((item) => ({
+              ...item,
+              active_stories: item.active_stories.map((story) =>
+                story.id === updated.id ? { ...story, ...updated } : story
+              ),
+            }))
+          );
+          void queryClient.invalidateQueries({ queryKey: ["feed-stories"] });
+        }}
+        onStoryDeleted={(storyId, ownerId) => {
+          queryClient.setQueryData<FeedStory[]>(["feed-stories", userId], (current) =>
+            current
+              ?.map((item) =>
+                item.user_id === ownerId
+                  ? {
+                      ...item,
+                      active_stories: item.active_stories.filter((story) => story.id !== storyId),
+                    }
+                  : item
+              )
+              .filter((item) => item.is_self || item.active_stories.length > 0)
+          );
+          void queryClient.removeQueries({ queryKey: ["story-viewer-count"] });
+          void queryClient.removeQueries({ queryKey: ["story-insights"] });
+        }}
         onMarkCommitmentComplete={
           activeStory?.is_self
             ? () => {

@@ -66,7 +66,7 @@ export async function sharePostToConversation(
 }
 
 export async function sharePostToGroup(postId: string, groupId: string, userId: string) {
-  await assertPostShareable(postId, userId);
+  const post = await assertPostShareable(postId, userId);
 
   const member = await isGroupMember(groupId, userId);
   if (!member) throw new Error("You must be a group member to share here");
@@ -76,6 +76,7 @@ export async function sharePostToGroup(postId: string, groupId: string, userId: 
     shared_post_id: postId,
     group_id: groupId,
     post_type: "text",
+    ...(post.feed_category ? { feed_category: post.feed_category } : {}),
   });
 }
 
@@ -84,7 +85,7 @@ export async function sharePostToChallenge(
   challengeId: string,
   userId: string
 ) {
-  await assertPostShareable(postId, userId);
+  const post = await assertPostShareable(postId, userId);
 
   const participant = await isChallengeParticipant(challengeId, userId);
   if (!participant) throw new Error("You must join this challenge to share here");
@@ -94,6 +95,7 @@ export async function sharePostToChallenge(
     shared_post_id: postId,
     challenge_id: challengeId,
     post_type: "text",
+    ...(post.feed_category ? { feed_category: post.feed_category } : {}),
   });
 }
 

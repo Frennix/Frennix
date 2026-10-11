@@ -10,7 +10,6 @@ export type FeedListItemActions = {
   onAuthorPress: (post: Post) => void;
   onCommentAuthorPress: (username: string) => void;
   onLike: (post: Post) => void;
-  onDoubleTapLike?: (post: Post) => void;
   onComment: (post: Post) => void;
   onShare: (post: Post) => void;
   onSave: (post: Post) => void;
@@ -29,6 +28,8 @@ type FeedListItemProps = {
   interactionActive?: boolean;
   /** When true, mount feed media (images/videos). Deferred until row is near viewport. */
   mediaActive?: boolean;
+  /** Visible rows download before offscreen lookahead. */
+  mediaPriority?: "high" | "low";
   mediaPageIndex?: number;
   onMediaPageIndexChange?: (index: number) => void;
   inlineComposerEnabled?: boolean;
@@ -37,6 +38,7 @@ type FeedListItemProps = {
 function feedItemPropsEqual(prev: FeedListItemProps, next: FeedListItemProps) {
   if (prev.userId !== next.userId) return false;
   if (prev.mediaActive !== next.mediaActive) return false;
+  if (prev.mediaPriority !== next.mediaPriority) return false;
   if (prev.mediaPageIndex !== next.mediaPageIndex) return false;
   if (prev.interactionActive !== next.interactionActive) return false;
   if (prev.inlineComposerEnabled !== next.inlineComposerEnabled) return false;
@@ -66,6 +68,7 @@ export const FeedListItem = memo(function FeedListItem({
   actions,
   interactionActive = false,
   mediaActive = true,
+  mediaPriority = "high",
   mediaPageIndex,
   onMediaPageIndexChange,
   inlineComposerEnabled = true,
@@ -77,7 +80,6 @@ export const FeedListItem = memo(function FeedListItem({
       onAuthorPress: () => actions.onAuthorPress(post),
       onCommentAuthorPress: actions.onCommentAuthorPress,
       onLike: () => actions.onLike(post),
-      onDoubleTapLike: actions.onDoubleTapLike ? () => actions.onDoubleTapLike!(post) : undefined,
       onComment: () => actions.onComment(post),
       onShare: () => actions.onShare(post),
       onSave: () => actions.onSave(post),
@@ -112,7 +114,6 @@ export const FeedListItem = memo(function FeedListItem({
       onAuthorPress={handlers.onAuthorPress}
       onCommentAuthorPress={handlers.onCommentAuthorPress}
       onLike={handlers.onLike}
-      onDoubleTapLike={handlers.onDoubleTapLike}
       onComment={handlers.onComment}
       onShare={handlers.onShare}
       onSave={handlers.onSave}
@@ -123,6 +124,7 @@ export const FeedListItem = memo(function FeedListItem({
       videoRouteHrefForIndex={handlers.videoRouteHrefForIndex}
       onVideoRouteNavigate={handlers.onVideoRouteNavigate}
       mediaActive={mediaActive}
+      loadPriority={mediaPriority}
       mediaPageIndex={mediaPageIndex}
       onMediaPageIndexChange={onMediaPageIndexChange}
       inlineComposerEnabled={inlineComposerEnabled}

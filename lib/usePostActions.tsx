@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
+import { Platform } from "react-native";
 import type { Post } from "@frennix/types";
 import { blockUser, deletePost, getErrorMessage, reportPost } from "@frennix/api";
 import { EntityActionSheet } from "@/components/EntityActionSheet";
@@ -12,6 +13,7 @@ import { confirmBlockUser, confirmDeletePost, showAlert, showSuccess } from "@/l
 import { invalidateAfterBlock } from "@/lib/ownership/invalidate-after-block";
 import { ownershipMessages } from "@/lib/ownership/messages";
 import { invalidatePostQueries, removePostFromAllCaches } from "@/lib/post-cache";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import { getSharedPostTargetId } from "@frennix/ui";
 
 interface UsePostActionsOptions {
@@ -39,6 +41,12 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     setActivePost(null);
   }, []);
 
+  const resetPostActions = useCallback(() => {
+    setMenuVisible(false);
+    setReportVisible(false);
+    setActivePost(null);
+  }, []);
+
   const openPostActions = useCallback(
     (post: Post) => {
       if (!userId) return;
@@ -52,13 +60,13 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     mutationFn: (postId: string) => deletePost(postId, userId),
     onMutate: async (postId) => {
       await queryClient.cancelQueries({ queryKey: ["feed", userId] });
-      const previous = queryClient.getQueryData(["feed", userId]);
+      const previousFeeds = queryClient.getQueriesData({ queryKey: ["feed", userId] });
       removePostFromAllCaches(queryClient, userId, postId);
-      return { previous };
+      return { previousFeeds };
     },
     onError: (error, _postId, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["feed", userId], context.previous);
+      for (const [key, data] of context?.previousFeeds ?? []) {
+        queryClient.setQueryData(key, data);
       }
       showAlert("Something went wrong", getErrorMessage(error) || ownershipMessages.errorGeneric);
     },
@@ -93,6 +101,24 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
     onError: (error) => showAlert(ownershipMessages.blockFailed, getErrorMessage(error)),
   });
 
+  const editOwnedPost = useCallback(
+    (post: Post) => {
+      if (!userId || post.author_id !== userId) return;
+      router.push({ pathname: "/edit-post/[id]", params: { id: post.id } });
+    },
+    [userId]
+  );
+
+  const deleteOwnedPost = useCallback(
+    (post: Post) => {
+      if (!userId || post.author_id !== userId) return;
+      confirmDeletePost(() => {
+        deleteMutation.mutate(post.id);
+      });
+    },
+    [deleteMutation, userId]
+  );
+
   const handleAction = useCallback(
     (actionId: EntityActionId) => {
       if (!activePost) return;
@@ -111,14 +137,12 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
         case "edit":
           setMenuVisible(false);
           setActivePost(null);
-          router.push({ pathname: "/edit-post/[id]", params: { id: activePost.id } });
+          editOwnedPost(activePost);
           return;
         case "delete":
           setMenuVisible(false);
-          confirmDeletePost(() => {
-            setActivePost(null);
-            deleteMutation.mutate(activePost.id);
-          });
+          setActivePost(null);
+          deleteOwnedPost(activePost);
           return;
         case "share":
           setMenuVisible(false);
@@ -146,7 +170,7 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
           closeMenu();
       }
     },
-    [activePost, blockMutation, closeMenu, deleteMutation, isOwner, onShareInApp]
+    [activePost, blockMutation, closeMenu, deleteOwnedPost, editOwnedPost, isOwner, onShareInApp]
   );
 
   const postActionSheets = (
@@ -157,6 +181,9 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
         actions={menuActions}
         onSelect={handleAction}
         onClose={closeMenu}
+        rootPortal={Platform.OS === "web"}
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-post-options"
       />
       <ReportReasonSheet
         visible={reportVisible}
@@ -166,12 +193,18 @@ export function usePostActions({ userId, onDeleted, onShareInApp }: UsePostActio
           setActivePost(null);
         }}
         onSelect={(reason) => reportMutation.mutate(reason)}
+        rootPortal={Platform.OS === "web"}
+        webZIndex={OVERLAY_Z_INDEX.commentOptions}
+        portalDataAttribute="frennix-post-report"
       />
     </>
   );
 
   return {
     openPostActions,
+    editOwnedPost,
+    deleteOwnedPost,
+    resetPostActions,
     postActionSheets,
     isDeleting: deleteMutation.isPending,
     /** @deprecated Use openPostActions — kept for gradual migration */

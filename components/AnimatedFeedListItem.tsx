@@ -13,6 +13,7 @@ type AnimatedFeedListItemProps = {
   actions: FeedListItemActions;
   interactionActive?: boolean;
   mediaActive?: boolean;
+  mediaPriority?: "high" | "low";
   mediaPageIndex?: number;
   onMediaPageIndexChange?: (index: number) => void;
 };

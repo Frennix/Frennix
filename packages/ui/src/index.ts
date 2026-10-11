@@ -18,6 +18,8 @@ export * from "./FeedHeroBanner";
 export * from "./FeedQuickActionCards";
 export * from "./WorkoutStatsPills";
 export * from "./PeopleYouMayKnowCarousel";
+export * from "./FeedCategoryTabs";
+export * from "./NutritionPostLabel";
 export * from "./FeedCommentPreview";
 export * from "./PostMediaCarousel";
 export * from "./formatRelativeTime";

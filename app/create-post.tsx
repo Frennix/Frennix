@@ -13,7 +13,13 @@ import {
 } from "react-native";
 import {
   ACTIVITIES,
+  COMPOSER_CATEGORY_TABS,
+  JOURNEY_CATEGORIES,
+  JOURNEY_CATEGORY_LABELS,
+  parseFeedCategory,
   STORY_PRIVACY_OPTIONS,
+  type FeedCategory,
+  type JourneyCategory,
   type StoryPrivacy,
   type StoryShareMode,
 } from "@frennix/types";
@@ -37,7 +43,8 @@ import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
 import { UploadProgressBar } from "@/components/UploadProgressBar";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
-import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { beginPublish, failPublish, succeedPublish, visibleComposerCategory, type PublishPhase } from "@/lib/create-post-publish";
+import { Button, FeedCategoryTabs, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const CAPTION_MAX = 500;
 const SUCCESS_NAV_DELAY_MS = 2000;
@@ -67,7 +74,7 @@ function mimeFromAsset(asset: ImagePicker.ImagePickerAsset): string {
 
 function uploadStageLabel(
   stage: UploadStage,
-  isContextPost: boolean,
+  successLabel: string,
   uploadingVideo: boolean
 ) {
   if (stage === "uploading_media") {
@@ -75,8 +82,7 @@ function uploadStageLabel(
   }
   if (stage === "creating_post") return "Sharing…";
   if (stage === "success") {
-    const shared = isContextPost ? "Post shared successfully" : "Workout shared successfully";
-    return `${shared}. Opening your post…`;
+    return `${successLabel}. Opening your post…`;
   }
   return "";
 }
@@ -116,6 +122,7 @@ async function refreshFeedForDestination(
 
   await queryClient.invalidateQueries({ queryKey: ["feed", userId] });
   await queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] });
+  await queryClient.invalidateQueries({ queryKey: ["reels", userId] });
   await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
   await queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] });
   await queryClient.refetchQueries({ queryKey: ["feed", userId] });
@@ -126,33 +133,45 @@ function navigateAfterPost(postId: string) {
 }
 
 export default function CreatePostScreen() {
-  const params = useLocalSearchParams<{ groupId?: string; challengeId?: string; eventId?: string }>();
+  const params = useLocalSearchParams<{
+    groupId?: string;
+    challengeId?: string;
+    eventId?: string;
+    intent?: string;
+    category?: string;
+  }>();
   const routeGroupId = paramValue(params.groupId);
   const routeChallengeId = paramValue(params.challengeId);
   const routeEventId = paramValue(params.eventId);
+  const isReelIntent = paramValue(params.intent) === "reel";
+  const routeCategory = parseFeedCategory(paramValue(params.category));
 
   const { session } = useAuth();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
   const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const submittingRef = useRef(false);
+  const publishPhaseRef = useRef<PublishPhase>("idle");
+  const [lockedCategory, setLockedCategory] = useState<FeedCategory | null>(null);
   const [loading, setLoading] = useState(false);
   const [pickingMedia, setPickingMedia] = useState(false);
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
   const [error, setError] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<SelectedMediaItem[]>([]);
-  const [storyPrivacy, setStoryPrivacy] = useState<StoryPrivacy>("followers");
+  const [storyPrivacy, setStoryPrivacy] = useState<StoryPrivacy>("everyone");
   const [savedSheetVisible, setSavedSheetVisible] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState("");
   const [distanceKm, setDistanceKm] = useState("");
   const [calories, setCalories] = useState("");
   const [gym, setGym] = useState("");
   const [locationName, setLocationName] = useState("");
+  const [journeyCategory, setJourneyCategory] = useState<JourneyCategory | null>(null);
 
   const {
     hydrated,
     content,
     setContent,
+    feedCategory,
+    setFeedCategory,
     workoutTypes,
     setWorkoutTypes,
     groupId,
@@ -165,19 +184,30 @@ export default function CreatePostScreen() {
     setVideoDurationSeconds,
     applyPickedMedia,
     clearMedia,
-    clearDraft,
+    releaseStoredDraft,
     setPersistPaused,
     flushDraft,
   } = useCreatePostDraft(userId, {
     groupId: routeGroupId,
     challengeId: routeChallengeId,
     eventId: routeEventId,
+    feedCategory: routeCategory ?? undefined,
   });
 
+  const displayCategory = visibleComposerCategory(lockedCategory, feedCategory);
   const destination = resolveDestination(groupId, challengeId, eventId);
   const contextId = groupId ?? challengeId ?? eventId;
   const isContextPost = destination !== "home";
   const hasVideo = selectedMedia.some((item) => isVideoMime(item.mimeType));
+  const showWorkoutFields = isReelIntent || displayCategory === "workout";
+  const showJourneyChrome = isReelIntent || (showWorkoutFields && hasVideo);
+  const successLabel = !showWorkoutFields
+    ? displayCategory === "nutrition"
+      ? "Meal shared successfully"
+      : "Post shared successfully"
+    : isContextPost
+      ? "Post shared successfully"
+      : "Workout shared successfully";
   const hasPhotos = selectedMedia.some((item) => !isVideoMime(item.mimeType));
   const isSubmitting = loading;
   const isSuccess = uploadStage === "success";
@@ -336,17 +366,54 @@ export default function CreatePostScreen() {
     };
   }
 
+  function scheduleLeave(postId: string | null) {
+    if (navigateTimeoutRef.current) return;
+    navigateTimeoutRef.current = setTimeout(() => {
+      navigateTimeoutRef.current = null;
+      if (postId) navigateAfterPost(postId);
+      else router.back();
+    }, SUCCESS_NAV_DELAY_MS);
+  }
+
+  function enterPublishing() {
+    if (loading || isSuccess || navigateTimeoutRef.current) return false;
+    const next = beginPublish(publishPhaseRef.current);
+    if (!next) return false;
+    publishPhaseRef.current = next;
+    return true;
+  }
+
+  function finishPublishing(postId: string | null) {
+    publishPhaseRef.current = succeedPublish(publishPhaseRef.current);
+    setLoading(false);
+    setUploadStage("success");
+    scheduleLeave(postId);
+  }
+
+  function abortPublishing() {
+    publishPhaseRef.current = failPublish(publishPhaseRef.current);
+    setLockedCategory(null);
+    setUploadStage("idle");
+    setLoading(false);
+    setPersistPaused(false);
+  }
+
   async function executeShare(mode: StoryShareMode | "done") {
     if (!session?.user.id) return;
+    if (!enterPublishing()) return;
 
+    const publishedCategory = feedCategory;
+    setPersistPaused(true);
+    setLockedCategory(publishedCategory);
     setLoading(true);
     setUploadStage("creating_post");
     setSavedSheetVisible(false);
+    setError("");
 
     try {
       if (mode === "done") {
-        await clearDraft();
-        setSelectedMedia([]);
+        await releaseStoredDraft();
+        publishPhaseRef.current = succeedPublish(publishPhaseRef.current);
         router.back();
         return;
       }
@@ -356,10 +423,10 @@ export default function CreatePostScreen() {
         {
           userId: session.user.id,
           content: content || undefined,
-          workoutTypes,
+          workoutTypes: showWorkoutFields ? workoutTypes : [],
           metrics: buildWorkoutMetrics(),
-          gym: gym.trim() || null,
-          locationName: locationName.trim() || null,
+          gym: showWorkoutFields ? gym.trim() || null : null,
+          locationName: showWorkoutFields ? locationName.trim() || null : null,
           media: selectedMedia.map((item) => ({
             uri: item.uri,
             mimeType: item.mimeType,
@@ -367,85 +434,76 @@ export default function CreatePostScreen() {
             durationSeconds: item.durationSeconds,
           })),
           storyPrivacy,
+          journeyCategory: showJourneyChrome ? journeyCategory : null,
+          feedCategory: isReelIntent ? null : publishedCategory,
+          isReel: isReelIntent,
         },
         queryClient
       );
 
-      await clearDraft();
-      setSelectedMedia([]);
-      setUploadStage("success");
-
-      navigateTimeoutRef.current = setTimeout(() => {
-        if (result.postId) {
-          navigateAfterPost(result.postId);
-        } else {
-          router.back();
-        }
-        setUploadStage("idle");
-        submittingRef.current = false;
-        setPersistPaused(false);
-        setLoading(false);
-      }, SUCCESS_NAV_DELAY_MS);
+      await releaseStoredDraft();
+      finishPublishing(result.postId);
     } catch (e) {
       const message = getSharePostUserMessage(e);
+      abortPublishing();
       setError(message);
       showAlert("Could not share", message);
-      setUploadStage("idle");
-      setLoading(false);
-      submittingRef.current = false;
-      setPersistPaused(false);
+      void flushDraft();
     }
   }
 
   async function submit() {
-    if (submittingRef.current || loading || isSuccess || navigateTimeoutRef.current) return;
-
     if (!session?.user.id) {
       const message = "You must be signed in to post";
       setError(message);
       showAlert("Create post", message);
       return;
     }
-    if (!content && !selectedMedia.length && !workoutTypes.length) {
-      setError("Add a caption, workout type, or photo/video");
+    if (showWorkoutFields) {
+      if (!content && !selectedMedia.length && !workoutTypes.length) {
+        setError("Add a caption, workout type, or photo/video");
+        return;
+      }
+    } else if (!content.trim() && !selectedMedia.length) {
+      setError("Add a caption or photo/video");
       return;
     }
     if (hasVideo && selectedMedia.some((item) => isVideoTooLong(item.durationSeconds ?? null))) {
       showAlert("Video too long", VIDEO_TOO_LONG_MESSAGE);
       return;
     }
+    if (!enterPublishing()) return;
 
-    submittingRef.current = true;
+    const publishedCategory = feedCategory;
+    const publishedShowWorkout = isReelIntent || publishedCategory === "workout";
     setPersistPaused(true);
     setError("");
 
     try {
       await flushDraft();
 
-      if (!isContextPost) {
-        submittingRef.current = false;
+      if (!isContextPost && publishedShowWorkout) {
+        publishPhaseRef.current = failPublish(publishPhaseRef.current);
         setPersistPaused(false);
         setSavedSheetVisible(true);
         return;
       }
 
-      setLoading(true);
-      setUploadStage("idle");
-      const postDestination = destination;
-      const postContextId = contextId;
-
+      setLockedCategory(publishedCategory);
       setLoading(true);
       setUploadStage("creating_post");
+      const postDestination = destination;
+      const postContextId = contextId;
 
       const result = await shareWorkout(
         "feed",
         {
           userId: session.user.id,
           content: content || undefined,
-          workoutTypes,
+          workoutTypes: publishedShowWorkout ? workoutTypes : [],
           metrics: buildWorkoutMetrics(),
-          gym: gym.trim() || null,
-          locationName: locationName.trim() || null,
+          gym: publishedShowWorkout ? gym.trim() || null : null,
+          locationName: publishedShowWorkout ? locationName.trim() || null : null,
           media: selectedMedia.map((item) => ({
             uri: item.uri,
             mimeType: item.mimeType,
@@ -455,43 +513,45 @@ export default function CreatePostScreen() {
           groupId: groupId ?? null,
           challengeId: challengeId ?? null,
           eventId: eventId ?? null,
+          journeyCategory: showJourneyChrome ? journeyCategory : null,
+          feedCategory: isReelIntent ? null : publishedCategory,
+          isReel: isReelIntent,
         },
         queryClient
       );
 
-      await refreshFeedForDestination(queryClient, postDestination, session.user.id, postContextId);
-      await clearDraft();
-      setSelectedMedia([]);
-      setLoading(false);
-      setUploadStage("success");
-
-      navigateTimeoutRef.current = setTimeout(() => {
-        if (result.postId) {
-          navigateAfterPost(result.postId);
-        } else {
-          router.back();
-        }
-        setUploadStage("idle");
-        submittingRef.current = false;
-        setPersistPaused(false);
-      }, SUCCESS_NAV_DELAY_MS);
+      try {
+        await refreshFeedForDestination(queryClient, postDestination, session.user.id, postContextId);
+      } catch {
+        // The meal is already saved. A slow feed refresh must not unlock a second submit.
+      }
+      await releaseStoredDraft();
+      finishPublishing(result.postId);
     } catch (e) {
       const message = getSharePostUserMessage(e);
+      abortPublishing();
       setError(message);
       showAlert("Could not post", message);
-      setUploadStage("idle");
-      setLoading(false);
-      submittingRef.current = false;
-      setPersistPaused(false);
       void flushDraft();
     }
   }
 
-  const progressLabel = uploadStageLabel(uploadStage, isContextPost, hasVideo);
+  const progressLabel = uploadStageLabel(uploadStage, successLabel, hasVideo);
   const showSubmittingUi = isSubmitting || uploadStage === "uploading_media" || uploadStage === "creating_post";
-  const screenOptions = stackBackOptions(isContextPost ? "Share post" : "Share workout", {
-    presentation: "modal",
-  });
+  const screenOptions = stackBackOptions(
+    isReelIntent
+      ? "Share Your Journey"
+      : displayCategory === "nutrition"
+        ? "Share meal"
+        : displayCategory === "general"
+          ? "Post"
+          : isContextPost
+            ? "Share post"
+            : "Share workout",
+    {
+      presentation: "modal",
+    }
+  );
 
   if (!hydrated) {
     return (
@@ -512,29 +572,82 @@ export default function CreatePostScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
       >
-        <Text style={styles.sectionLabel}>Workout types</Text>
-        <View style={styles.chips}>
-          {ACTIVITIES.map((activity) => (
-            <Pressable
-              key={activity}
-              style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
-              onPress={() =>
-                setWorkoutTypes((current) =>
-                  current.includes(activity)
-                    ? current.filter((item) => item !== activity)
-                    : [...current, activity]
-                )
-              }
-              disabled={isFormLocked}
-            >
-              <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
-                {formatActivity(activity)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        {isReelIntent ? null : (
+          <FeedCategoryTabs
+            tabs={COMPOSER_CATEGORY_TABS}
+            active={displayCategory}
+            onChange={(next) => {
+              if (!isFormLocked) setFeedCategory(next);
+            }}
+            accessibilityLabel="Post category"
+          />
+        )}
 
-        {!isContextPost ? (
+        {showJourneyChrome ? (
+          <View style={styles.journeyPrompt}>
+            <Text style={styles.journeyPromptTitle}>Share your journey</Text>
+            <Text style={styles.journeyPromptText}>
+              Your journey could be the reason someone else keeps going. Tell your story.
+            </Text>
+          </View>
+        ) : null}
+
+        {showJourneyChrome ? (
+          <>
+            <Text style={styles.sectionLabel}>Journey category</Text>
+            <Text style={styles.sectionHint}>Optional — helps others find journeys like yours</Text>
+            <View style={styles.chips}>
+              {JOURNEY_CATEGORIES.map((category) => {
+                const selected = journeyCategory === category;
+                return (
+                  <Pressable
+                    key={category}
+                    style={[styles.chip, selected && styles.chipActive]}
+                    onPress={() =>
+                      setJourneyCategory((current) => (current === category ? null : category))
+                    }
+                    disabled={isFormLocked}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={JOURNEY_CATEGORY_LABELS[category]}
+                  >
+                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                      {JOURNEY_CATEGORY_LABELS[category]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+
+        {showWorkoutFields ? (
+          <>
+            <Text style={styles.sectionLabel}>Workout types</Text>
+            <View style={styles.chips}>
+              {ACTIVITIES.map((activity) => (
+                <Pressable
+                  key={activity}
+                  style={[styles.chip, workoutTypes.includes(activity) && styles.chipActive]}
+                  onPress={() =>
+                    setWorkoutTypes((current) =>
+                      current.includes(activity)
+                        ? current.filter((item) => item !== activity)
+                        : [...current, activity]
+                    )
+                  }
+                  disabled={isFormLocked}
+                >
+                  <Text style={[styles.chipText, workoutTypes.includes(activity) && styles.chipTextActive]}>
+                    {formatActivity(activity)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {showWorkoutFields && !isContextPost ? (
           <>
             <Text style={styles.sectionLabel}>Workout details</Text>
             <View style={styles.metricsRow}>
@@ -589,6 +702,9 @@ export default function CreatePostScreen() {
                   style={[styles.chip, storyPrivacy === option.value && styles.chipActive]}
                   onPress={() => setStoryPrivacy(option.value)}
                   disabled={isFormLocked}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: storyPrivacy === option.value, disabled: isFormLocked }}
+                  accessibilityLabel={option.label}
                 >
                   <Text
                     style={[styles.chipText, storyPrivacy === option.value && styles.chipTextActive]}
@@ -603,13 +719,25 @@ export default function CreatePostScreen() {
 
         <View style={styles.captionBlock}>
           <Input
-            label="What did you accomplish?"
+            label={
+              displayCategory === "nutrition" && !isReelIntent
+                ? "Caption"
+                : displayCategory === "general" && !isReelIntent
+                  ? "Caption"
+                  : "What did you accomplish?"
+            }
             value={content}
             onChangeText={setContent}
             multiline
             maxLength={CAPTION_MAX}
             editable={!isFormLocked}
-            placeholder="Crushed leg day, hit a PR, finished a 5K..."
+            placeholder={
+              displayCategory === "nutrition" && !isReelIntent
+                ? "Meal, recipe, or meal-prep idea..."
+                : displayCategory === "general" && !isReelIntent
+                  ? "Share an update..."
+                  : "Crushed leg day, hit a PR, finished a 5K..."
+            }
           />
           <Text style={styles.charCount}>
             {content.length}/{CAPTION_MAX}
@@ -695,7 +823,9 @@ export default function CreatePostScreen() {
               loadingTitle="Opening library…"
             />
             <Text style={styles.mediaHelper}>
-              Add up to {MAX_PHOTOS} photos or one workout video up to 60 seconds.
+              {showWorkoutFields
+                ? `Add up to ${MAX_PHOTOS} photos or one workout video up to 60 seconds.`
+                : `Add up to ${MAX_PHOTOS} photos or one video up to 60 seconds.`}
             </Text>
           </View>
         )}
@@ -725,14 +855,22 @@ export default function CreatePostScreen() {
         <Button
           title={
             isSuccess
-              ? isContextPost
-                ? "Post shared!"
-                : "Workout shared!"
-              : isContextPost
-                ? "Share post"
-                : "Save Workout"
+              ? displayCategory === "nutrition" && !isReelIntent
+                ? "Meal shared!"
+                : displayCategory === "general" && !isReelIntent
+                  ? "Posted!"
+                  : isContextPost
+                    ? "Post shared!"
+                    : "Workout shared!"
+              : displayCategory === "nutrition" && !isReelIntent
+                ? "Share meal"
+                : displayCategory === "general" && !isReelIntent
+                  ? "Post"
+                  : isContextPost
+                    ? "Share post"
+                    : "Save Workout"
           }
-          loadingTitle={isContextPost ? "Sharing…" : "Saving…"}
+          loadingTitle={showWorkoutFields && !isContextPost ? "Saving…" : "Sharing…"}
           onPress={submit}
           loading={showSubmittingUi}
           disabled={isFormLocked}
@@ -757,6 +895,24 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     marginBottom: spacing.xs,
+  },
+  journeyPrompt: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  journeyPromptTitle: {
+    ...typography.body,
+    color: colors.accent,
+    fontWeight: "700",
+  },
+  journeyPromptText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    lineHeight: 20,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   metricsRow: { flexDirection: "row", gap: spacing.sm },

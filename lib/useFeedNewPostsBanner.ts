@@ -2,7 +2,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getFeed } from "@frennix/api";
-import type { Post } from "@frennix/types";
+import type { FeedCategory, Post } from "@frennix/types";
 import { countNewFeedPosts } from "@/lib/feed-new-posts";
 
 const PEEK_INTERVAL_MS = 45_000;
@@ -11,6 +11,8 @@ const PEEK_AT_TOP_INTERVAL_MS = 90_000;
 type UseFeedNewPostsBannerOptions = {
   userId: string;
   posts: Post[];
+  /** When set, peek the same category the visible tab is showing. */
+  feedCategory?: FeedCategory | null;
   atTop: boolean;
   enabled?: boolean;
   /** When the user is at the top and new posts arrive, refresh in place (no banner). */
@@ -20,6 +22,7 @@ type UseFeedNewPostsBannerOptions = {
 export function useFeedNewPostsBanner({
   userId,
   posts,
+  feedCategory = null,
   atTop,
   enabled = true,
   onNewPostsWhileAtTop,
@@ -39,8 +42,9 @@ export function useFeedNewPostsBanner({
 
     try {
       const head = await queryClient.fetchQuery({
-        queryKey: ["feed-head-peek", userId],
-        queryFn: () => getFeed(userId),
+        queryKey: ["feed-head-peek", userId, feedCategory ?? "all"],
+        queryFn: () =>
+          getFeed(userId, undefined, undefined, feedCategory ? { feedCategory } : undefined),
         staleTime: 20_000,
       });
       const count = countNewFeedPosts(postsRef.current, head.posts);
@@ -53,7 +57,7 @@ export function useFeedNewPostsBanner({
     } catch {
       // Silent — banner is optional; pull-to-refresh remains the fallback.
     }
-  }, [enabled, queryClient, userId]);
+  }, [enabled, feedCategory, queryClient, userId]);
 
   useEffect(() => {
     if (!enabled || !isFocused) return;

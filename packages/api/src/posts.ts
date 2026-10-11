@@ -1,6 +1,6 @@
-import type { Comment, FeedPage, Post, PostType } from "@frennix/types";
+import type { Comment, FeedPage, JourneyCategory, Post, PostType } from "@frennix/types";
 import { normalizePostWorkoutFields } from "@frennix/types";
-import { formatSupabaseError } from "./profile-utils";
+import { formatSupabaseError, isUniqueConstraintError } from "./profile-utils";
 import { normalizeMediaExt, isVideoMime } from "./media-utils";
 import {
   readMediaUploadBody,
@@ -261,12 +261,48 @@ export async function enrichPostsWithInteractions(
 
 export type FeedCorePhase = "scope" | "posts";
 
+export type FeedCoreOptions = {
+  /** When set, only return posts of this type (used by Frennix Reels). */
+  postType?: PostType;
+  /**
+   * Home feed excludes journey Reels. Defaults to true.
+   * Ignored when `reelsOnly` is set.
+   */
+  excludeReels?: boolean;
+  /** Reels tab: only posts explicitly marked `is_reel`. Not every video. */
+  reelsOnly?: boolean;
+  /**
+   * Home tab filter. Applied in the paginated query.
+   * Omit for All, which includes nutrition and uncategorized posts.
+   */
+  feedCategory?: import("@frennix/types").FeedCategory | null;
+};
+
+export function isReelPost(
+  post: { is_reel?: boolean | null } | null | undefined
+): boolean {
+  return post?.is_reel === true;
+}
+
+export function excludeReelPosts<
+  T extends { is_reel?: boolean | null; shared_post?: { is_reel?: boolean | null } | null },
+>(posts: T[]): T[] {
+  return posts.filter((post) => !isReelPost(post) && !isReelPost(post.shared_post));
+}
+
+export function onlyReelPosts<
+  T extends { is_reel?: boolean | null; shared_post?: { is_reel?: boolean | null } | null },
+>(posts: T[]): T[] {
+  return posts.filter((post) => isReelPost(post) || isReelPost(post.shared_post));
+}
+
 /** Fast path: feed scope + post rows with author profiles — no likes/comments/reactions yet. */
 export async function getFeedCore(
   userId: string,
   cursor?: string,
   limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE,
-  onPhase?: (phase: FeedCorePhase, detail?: Record<string, unknown>) => void
+  onPhase?: (phase: FeedCorePhase, detail?: Record<string, unknown>) => void,
+  options?: FeedCoreOptions
 ): Promise<FeedPage> {
   onPhase?.("scope", { start: true });
   const { authorIds, groupIds, challengeIds } = await getFeedScope(userId);
@@ -288,6 +324,20 @@ export async function getFeedCore(
     .order("created_at", { ascending: false })
     .limit(limit);
 
+  if (options?.postType) {
+    q = q.eq("post_type", options.postType);
+  }
+
+  if (options?.reelsOnly) {
+    q = q.eq("is_reel", true);
+  } else if (options?.excludeReels !== false) {
+    q = q.eq("is_reel", false);
+  }
+
+  if (options?.feedCategory) {
+    q = q.eq("feed_category", options.feedCategory);
+  }
+
   if (cursor) {
     q = q.lt("created_at", cursor);
   }
@@ -299,7 +349,12 @@ export async function getFeedCore(
     return { posts: [], nextCursor: null };
   }
 
-  const posts = (data as Post[]).map((post) => normalizePostWorkoutFields(post));
+  const mapped = (data as Post[]).map((post) => normalizePostWorkoutFields(post));
+  const posts = options?.reelsOnly
+    ? onlyReelPosts(mapped)
+    : options?.excludeReels === false
+      ? mapped
+      : excludeReelPosts(mapped);
   const nextCursor = data.length === limit ? data[data.length - 1].created_at : null;
   onPhase?.("posts", { count: posts.length });
 
@@ -323,9 +378,26 @@ export function applyDefaultPostInteractions(post: Post): Post {
 export async function getFeed(
   userId: string,
   cursor?: string,
+  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE,
+  options?: FeedCoreOptions
+): Promise<FeedPage> {
+  const core = await getFeedCore(userId, cursor, limit, undefined, options);
+  if (!core.posts.length) return core;
+
+  const posts = await enrichPosts(core.posts, userId);
+  return { posts, nextCursor: core.nextCursor };
+}
+
+/** Journey Reels only — `is_reel=true`. Regular Home videos are excluded. */
+export async function getVideoFeed(
+  userId: string,
+  cursor?: string,
   limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
 ): Promise<FeedPage> {
-  const core = await getFeedCore(userId, cursor, limit);
+  const core = await getFeedCore(userId, cursor, limit, undefined, {
+    postType: "video",
+    reelsOnly: true,
+  });
   if (!core.posts.length) return core;
 
   const posts = await enrichPosts(core.posts, userId);
@@ -374,6 +446,9 @@ export async function createPost(input: {
   event_id?: string | null;
   shared_post_id?: string | null;
   story_audience?: import("@frennix/types").StoryAudience;
+  journey_category?: JourneyCategory | null;
+  feed_category?: import("@frennix/types").FeedCategory | null;
+  is_reel?: boolean;
 }) {
   const workout_types =
     input.workout_types?.length
@@ -382,8 +457,16 @@ export async function createPost(input: {
         ? [input.workout_type]
         : [];
 
-  const { workout_type: _legacy, workout_types: _ignored, story_audience, workout_metrics, ...rest } =
-    input;
+  const {
+    workout_type: _legacy,
+    workout_types: _ignored,
+    story_audience,
+    workout_metrics,
+    journey_category,
+    feed_category,
+    is_reel,
+    ...rest
+  } = input;
 
   const { data, error } = await getSupabase()
     .from("posts")
@@ -392,6 +475,9 @@ export async function createPost(input: {
       workout_types,
       ...(workout_metrics ? { workout_metrics } : {}),
       ...(story_audience ? { story_audience } : {}),
+      ...(journey_category ? { journey_category } : {}),
+      ...(feed_category ? { feed_category } : {}),
+      ...(is_reel ? { is_reel: true } : {}),
     })
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
     .single();
@@ -445,14 +531,33 @@ export async function uploadPostThumbnail(userId: string, bytes: Uint8Array) {
   return data.publicUrl;
 }
 
-export async function toggleLike(postId: string, userId: string, liked: boolean) {
+export type ToggleLikeResult = {
+  liked_by_me: boolean;
+  like_count: number;
+};
+
+async function fetchPostLikeState(postId: string, userId: string): Promise<ToggleLikeResult> {
+  const [{ count }, { data: like }] = await Promise.all([
+    getSupabase().from("likes").select("*", { count: "exact", head: true }).eq("post_id", postId),
+    getSupabase().from("likes").select("id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
+  ]);
+  return { liked_by_me: !!like, like_count: count ?? 0 };
+}
+
+export async function toggleLike(
+  postId: string,
+  userId: string,
+  liked: boolean
+): Promise<ToggleLikeResult> {
   if (liked) {
     const { error } = await getSupabase().from("likes").delete().eq("post_id", postId).eq("user_id", userId);
     if (error) throw error;
   } else {
     const { error } = await getSupabase().from("likes").insert({ post_id: postId, user_id: userId });
-    if (error) throw error;
+    // Already liked in the database — treat as success so the UI can show the saved like.
+    if (error && !isUniqueConstraintError(error)) throw error;
   }
+  return fetchPostLikeState(postId, userId);
 }
 
 export async function getPost(postId: string, userId: string): Promise<Post | null> {
@@ -510,6 +615,7 @@ export type UpdatePostPatch = {
   media_urls?: string[];
   thumbnail_url?: string | null;
   post_type?: Post["post_type"];
+  feed_category?: import("@frennix/types").FeedCategory | null;
 };
 
 export async function removePostsStorageFiles(urls: string[]) {
