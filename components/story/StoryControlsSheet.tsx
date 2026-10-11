@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { FrennixStory, StoryPrivacy, StorySlideMediaType } from "@frennix/types";
 import { getStoryPrivacyOption } from "@frennix/types";
 import { deleteStory, updateStoryControls } from "@frennix/api";
@@ -8,6 +8,7 @@ import { StoryPrivacySelector } from "@/components/story/StoryPrivacySelector";
 import { saveStoryMediaToDevice } from "@/lib/save-story-media";
 import { writeLastStoryPrivacy } from "@/lib/story-privacy-preferences";
 import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
+import { useSheetSafeArea } from "@/lib/use-sheet-safe-area";
 import { colors, spacing, typography } from "@frennix/ui";
 
 type SheetView = "menu" | "privacy" | "delete" | "error";
@@ -56,6 +57,8 @@ export function StoryControlsSheet({
       deletingRef.current = false;
     }
   }, [visible]);
+
+  const { sheetMaxHeight, contentBottomPadding } = useSheetSafeArea(true, visible);
 
   if (!story) return null;
 
@@ -179,11 +182,23 @@ export function StoryControlsSheet({
       onClose={busy ? () => undefined : onClose}
       dismissOnBackdrop={!busy}
       rootPortal
+      expanded
+      sheetMaxHeight={sheetMaxHeight}
+      sheetStyle={styles.sheetClip}
       webZIndex={OVERLAY_Z_INDEX.commentOptions}
       backdropColor="rgba(10, 10, 11, 0.92)"
       accessibilityViewIsModal
     >
-      <View style={styles.sheet}>
+      <ScrollView
+        style={[styles.scroll, { maxHeight: sheetMaxHeight }]}
+        contentContainerStyle={[
+          styles.sheet,
+          { paddingBottom: spacing.xl + contentBottomPadding },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
+        bounces
+      >
         <Text style={styles.title}>
           {view === "privacy"
             ? "Story privacy"
@@ -294,14 +309,23 @@ export function StoryControlsSheet({
             <Text style={styles.progress}>{progress || "Working…"}</Text>
           </View>
         ) : null}
-      </View>
+      </ScrollView>
     </BottomOverlayShell>
   );
 }
 
 const styles = StyleSheet.create({
+  sheetClip: {
+    paddingBottom: 0,
+  },
+  scroll: {
+    width: "100%",
+    minHeight: 0,
+    flexGrow: 0,
+    flexShrink: 1,
+    ...(Platform.OS === "web" ? ({ overflowY: "auto" } as object) : null),
+  },
   sheet: {
-    paddingBottom: spacing.lg,
     gap: spacing.xs,
   },
   title: {
