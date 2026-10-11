@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { getStoriesByLocation, getStoriesByWorkoutTag } from "@frennix/api";
+import { readStoryComposerMeta, storyDisplayLabel } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { Avatar, colors, formatRelativeTime, spacing, typography } from "@frennix/ui";
@@ -55,7 +56,9 @@ export default function StoryDiscoverScreen() {
               <Text style={styles.subtitle}>
                 @{item.profile.username} · {formatRelativeTime(item.story.created_at)}
               </Text>
-              {item.story.workout_tag ? (
+              {readStoryComposerMeta(item.story.slides ?? [])?.category === "nutrition" ? (
+                <Text style={styles.tag}>{storyDisplayLabel(item.story)}</Text>
+              ) : item.story.workout_tag ? (
                 <Text style={styles.tag}>#{item.story.workout_tag}</Text>
               ) : null}
             </View>

@@ -5,7 +5,7 @@ import {
   getProfileHighlights,
   getStoryDiscoveryLanes,
 } from "@frennix/api";
-import { STORY_HIGHLIGHT_PRESETS, STORY_WORKOUT_TAGS } from "@frennix/types";
+import { STORY_HIGHLIGHT_PRESETS, STORY_WORKOUT_TAGS, storyDisplayLabel } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { pushScreen } from "@/lib/press-utils";
@@ -57,7 +57,7 @@ export default function StoryExploreScreen() {
                       {item.profile.display_name}
                     </Text>
                     <Text style={styles.cardMeta} numberOfLines={1}>
-                      {item.story.workout_tag ?? "Story"} · {formatRelativeTime(item.story.created_at)}
+                      {storyDisplayLabel(item.story)} · {formatRelativeTime(item.story.created_at)}
                     </Text>
                     {item.view_count ? (
                       <Text style={styles.cardViews}>{item.view_count} views</Text>

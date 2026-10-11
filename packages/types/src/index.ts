@@ -14,6 +14,7 @@ import type { FeedCategory } from "./feed-category";
 import type { JourneyCategory } from "./journey-category";
 export type { WorkoutStoryMetrics, WorkoutStoryMilestone, StoryAudience } from "./workout-story";
 export * from "./dedicated-story";
+export * from "./story-composer";
 export * from "./training-calendar";
 export * from "./achievements";
 export * from "./reputation";
