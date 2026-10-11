@@ -638,6 +638,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authBootstrapTimedOut || (!loading && !(session?.user.id && profileLoading));
 
   useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    if (session?.user.id) {
+      document.documentElement.setAttribute("data-frennix-auth", "in");
+      return;
+    }
+    document.documentElement.removeAttribute("data-frennix-auth");
+  }, [session?.user.id]);
+
+  useEffect(() => {
     if (!authReady) return;
     markDevStartupPerf("auth-ready", {
       hasSession: Boolean(session),

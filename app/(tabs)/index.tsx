@@ -630,11 +630,11 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== "web") return;
-      hideFrennixBootShell();
+      if (userId) hideFrennixBootShell();
       restoreWebDocumentScrollLock();
       requestSafariVisualViewportRemeasure();
       applyPendingFeedScrollReturnIfNeeded();
-    }, [])
+    }, [userId])
   );
 
   const {
@@ -1169,7 +1169,7 @@ export default function HomeScreen() {
   const handleListLayout = useCallback(
     (height: number) => {
       listLayoutHeightRef.current = height;
-      if (Platform.OS === "web" && height >= 60) {
+      if (Platform.OS === "web" && userId && height >= 60) {
         hideFrennixBootShell();
         applyPendingFeedScrollReturnIfNeeded();
       }
@@ -1180,7 +1180,7 @@ export default function HomeScreen() {
       );
       reportFeedDebugMetrics(height, contentHeightRef.current);
     },
-    [reportFeedDebugMetrics]
+    [reportFeedDebugMetrics, userId]
   );
 
   const handleContentSizeChange = useCallback(
