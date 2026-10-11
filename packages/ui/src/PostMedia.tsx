@@ -19,7 +19,6 @@ import { VideoPosterFallback } from "./VideoPosterFallback";
 import { useVideoPoster } from "./useVideoPoster";
 import { WebVideoFrame } from "./WebVideoFrame";
 import { FEED_VIDEO_FALLBACK_RATIO, feedFillParentStyle, type MediaLayout } from "./mediaLayout";
-import { feedMediaRules } from "./feed-layout/feedMediaRules";
 import { colors, radius } from "./theme";
 
 const PHOTO_DOUBLE_TAP_MS = 280;
@@ -283,6 +282,7 @@ function FeedImage({
       maxHeight={maxHeight}
       fillParent={fillParent}
       feedFrameBucket={feedFrameBucket}
+      sizing="photo"
     >
       {() => (
         <>
@@ -302,7 +302,7 @@ function FeedImage({
               uri={uri}
               placeholderUri={thumbnailUrl}
               style={styles.image}
-              contentFit={layout === "feed" ? feedMediaRules.contentFit : "contain"}
+              contentFit="contain"
               accessibilityLabel="Post photo"
               onError={() => {
                 setImageLoaded(false);

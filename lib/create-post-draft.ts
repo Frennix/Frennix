@@ -2,6 +2,26 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { readImageBytes } from "@frennix/api";
 import { isFeedCategory, type FeedCategory } from "@frennix/types";
+import {
+  clearMemoryDraft,
+  currentDraftWriteGeneration,
+  isDraftWriteCurrent,
+  markComposerPublished,
+  peekMemoryDraft,
+  writeMemoryDraft,
+} from "./create-post-draft-session";
+
+export {
+  clearMemoryDraft,
+  composerNeedsFreshStart,
+  consumeComposerFreshStart,
+  currentDraftWriteGeneration,
+  invalidateDraftWrites,
+  isDraftWriteCurrent,
+  markComposerPublished,
+  peekMemoryDraft,
+  writeMemoryDraft,
+} from "./create-post-draft-session";
 
 export type CreatePostDraft = {
   content: string;
@@ -19,31 +39,6 @@ export type CreatePostDraft = {
 export type RestoredCreatePostDraft = CreatePostDraft & {
   pickedFile?: File;
 };
-
-type MemoryDraft = {
-  draft: CreatePostDraft;
-  mediaBytes: ArrayBuffer | null;
-  pickedFile?: File;
-};
-
-const memoryDrafts = new Map<string, MemoryDraft>();
-
-export function peekMemoryDraft(userId: string): MemoryDraft | undefined {
-  return memoryDrafts.get(userId);
-}
-
-export function writeMemoryDraft(
-  userId: string,
-  draft: CreatePostDraft,
-  mediaBytes: ArrayBuffer | null,
-  pickedFile?: File
-) {
-  memoryDrafts.set(userId, { draft, mediaBytes, pickedFile });
-}
-
-export function clearMemoryDraft(userId: string) {
-  memoryDrafts.delete(userId);
-}
 
 const DRAFT_VERSION = 2;
 const DB_NAME = "frennix-create-post-media";
@@ -211,11 +206,15 @@ export async function readMediaBytesForDraft(
 export async function saveCreatePostDraft(
   userId: string,
   draft: CreatePostDraft,
-  mediaBytes?: ArrayBuffer | null
+  mediaBytes?: ArrayBuffer | null,
+  writeGeneration = currentDraftWriteGeneration()
 ) {
-  const payload: CreatePostDraft = {
+  if (!isDraftWriteCurrent(writeGeneration)) return;
+
+  const payload: CreatePostDraft & { writeGeneration: number } = {
     ...draft,
     hasStoredMedia: Boolean(mediaBytes) || draft.hasStoredMedia,
+    writeGeneration,
   };
 
   if (mediaBytes) {
@@ -226,7 +225,17 @@ export async function saveCreatePostDraft(
     await clearMediaBlob(userId);
   }
 
+  if (!isDraftWriteCurrent(writeGeneration)) return;
   await AsyncStorage.setItem(draftKey(userId), JSON.stringify(payload));
+
+  if (!isDraftWriteCurrent(writeGeneration)) {
+    const raw = await AsyncStorage.getItem(draftKey(userId));
+    const stored = raw ? (JSON.parse(raw) as { writeGeneration?: number }) : null;
+    if (stored?.writeGeneration === writeGeneration) {
+      await AsyncStorage.removeItem(draftKey(userId));
+      await clearMediaBlob(userId);
+    }
+  }
 }
 
 export async function restoreCreatePostDraft(userId: string): Promise<RestoredCreatePostDraft | null> {
@@ -234,7 +243,16 @@ export async function restoreCreatePostDraft(userId: string): Promise<RestoredCr
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as CreatePostDraft & { workoutType?: string | null };
+    const parsed = JSON.parse(raw) as CreatePostDraft & {
+      workoutType?: string | null;
+      writeGeneration?: number;
+    };
+    if (
+      typeof parsed.writeGeneration === "number" &&
+      !isDraftWriteCurrent(parsed.writeGeneration)
+    ) {
+      return null;
+    }
     const draft: RestoredCreatePostDraft = {
       ...emptyCreatePostDraft(),
       ...parsed,

@@ -60,17 +60,16 @@ type PhotoAdjustEditorProps = {
 
 export function PhotoAdjustEditor({ uri, mode = "feed", onDone, onCancel }: PhotoAdjustEditorProps) {
   const isAvatar = mode === "avatar";
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const horizontalPadding = spacing.md * 2;
+  const [imageUri, setImageUri] = useState(uri);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const { frameWidth, frameHeight } = useMemo(() => {
     const containerWidth = screenWidth - horizontalPadding;
     return isAvatar
       ? avatarFrameSize(containerWidth)
-      : feedFrameSize(containerWidth, screenWidth);
-  }, [screenWidth, isAvatar]);
-
-  const [imageUri, setImageUri] = useState(uri);
-  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+      : feedFrameSize(containerWidth, screenHeight, imageSize ?? undefined);
+  }, [imageSize, isAvatar, screenHeight, screenWidth]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [rotating, setRotating] = useState(false);

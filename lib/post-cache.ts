@@ -1,5 +1,6 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import type { FeedPage, Post } from "@frennix/types";
+import { noteFeedPostRemoved } from "./feed-new-posts";
 
 function removePostFromFeedPages(pages: FeedPage[], postId: string): FeedPage[] {
   return pages.map((page) => ({
@@ -16,12 +17,17 @@ function updatePostInFeedPages(pages: FeedPage[], updated: Post): FeedPage[] {
 }
 
 export function removePostFromAllCaches(queryClient: QueryClient, userId: string, postId: string) {
-  queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
-    if (!old) return old;
+  noteFeedPostRemoved(postId);
+  queryClient.setQueriesData<InfiniteData<FeedPage>>({ queryKey: ["feed", userId] }, (old) => {
+    if (!old?.pages) return old;
     return {
       ...old,
       pages: removePostFromFeedPages(old.pages, postId),
     };
+  });
+  queryClient.setQueriesData<FeedPage>({ queryKey: ["feed-head-peek", userId] }, (old) => {
+    if (!old?.posts) return old;
+    return { ...old, posts: old.posts.filter((post) => post.id !== postId) };
   });
 
   queryClient.setQueriesData<FeedPage>({ queryKey: ["user-posts"] }, (old) => {
@@ -220,6 +226,7 @@ export async function invalidatePostQueries(
     queryClient.invalidateQueries({ queryKey: ["event-posts"] }),
     queryClient.invalidateQueries({ queryKey: ["saved-posts", userId] }),
     queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] }),
+    queryClient.invalidateQueries({ queryKey: ["feed-head-peek", userId] }),
     queryClient.invalidateQueries({ queryKey: ["profile-stats", userId] }),
   ];
 

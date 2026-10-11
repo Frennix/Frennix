@@ -1,7 +1,7 @@
 import * as ImageManipulator from "expo-image-manipulator";
 import { Image, Platform } from "react-native";
 
-/** Feed card media uses full width × 360px — match this aspect in the crop frame. */
+/** Legacy feed crop height. New posts fit the original image instead of this frame. */
 export const FEED_MEDIA_HEIGHT = 360;
 
 export type ImageDimensions = {
@@ -94,11 +94,7 @@ export type CropRegion = {
   height: number;
 };
 
-export function feedFrameSize(containerWidth: number, screenWidth: number) {
-  const frameWidth = containerWidth;
-  const frameHeight = frameWidth * (FEED_MEDIA_HEIGHT / screenWidth);
-  return { frameWidth, frameHeight };
-}
+export { feedFrameSize } from "./photo-frame";
 
 /** Square crop frame for profile avatars (displayed as a circle in the app). */
 export function avatarFrameSize(containerWidth: number) {

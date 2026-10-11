@@ -5,6 +5,9 @@ import type { ImagePickerAsset } from "expo-image-picker";
 import type { FeedCategory } from "@frennix/types";
 import {
   clearCreatePostDraft,
+  currentDraftWriteGeneration,
+  isDraftWriteCurrent,
+  markComposerPublished,
   peekMemoryDraft,
   readMediaBytesForDraft,
   restoreCreatePostDraft,
@@ -77,10 +80,11 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
   }, [userId, buildDraft, pickedFile]);
 
   const flushDraft = useCallback(async () => {
-    if (!userId || skipPersistRef.current) return;
+    const generation = currentDraftWriteGeneration();
+    if (!userId || skipPersistRef.current || !isDraftWriteCurrent(generation)) return;
     syncMemoryDraft();
     try {
-      await saveCreatePostDraft(userId, buildDraft(), mediaBytesRef.current);
+      await saveCreatePostDraft(userId, buildDraft(), mediaBytesRef.current, generation);
     } catch (error) {
       logCreatePostError("draft", error, { action: "flush" });
     }
@@ -238,7 +242,8 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
       const bytes = await readMediaBytesForDraft(asset.uri, mime, file);
       mediaBytesRef.current = bytes;
 
-      if (!userId || !hydrated) return;
+      const generation = currentDraftWriteGeneration();
+      if (!userId || !hydrated || skipPersistRef.current || !isDraftWriteCurrent(generation)) return;
 
       const draft: CreatePostDraft = {
         content,
@@ -252,9 +257,9 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
         mediaUri: asset.uri,
         hasStoredMedia: Boolean(bytes),
       };
-      writeMemoryDraft(userId, draft, bytes, file);
+      writeMemoryDraft(userId, draft, bytes, file, generation);
       try {
-        await saveCreatePostDraft(userId, draft, bytes);
+        await saveCreatePostDraft(userId, draft, bytes, generation);
       } catch (error) {
         logCreatePostError("draft", error, { action: "save_media" });
       }
@@ -269,7 +274,8 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     setPickedFile(undefined);
     setVideoDurationSeconds(null);
 
-    if (!userId || !hydrated) return;
+    const generation = currentDraftWriteGeneration();
+    if (!userId || !hydrated || skipPersistRef.current || !isDraftWriteCurrent(generation)) return;
 
     const draft: CreatePostDraft = {
       content,
@@ -283,9 +289,9 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
       mediaUri: null,
       hasStoredMedia: false,
     };
-    writeMemoryDraft(userId, draft, null);
+    writeMemoryDraft(userId, draft, null, undefined, generation);
     try {
-      await saveCreatePostDraft(userId, draft, null);
+      await saveCreatePostDraft(userId, draft, null, generation);
     } catch (error) {
       logCreatePostError("draft", error, { action: "clear_media" });
     }
@@ -316,6 +322,31 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     skipPersistRef.current = false;
   }, [userId]);
 
+  const resetComposerFields = useCallback(
+    (category: FeedCategory) => {
+      skipPersistRef.current = true;
+      if (persistTimerRef.current) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+      mediaBytesRef.current = null;
+      setContent("");
+      setFeedCategory(category);
+      setWorkoutTypes([]);
+      setGroupId(routeContext.groupId ?? null);
+      setChallengeId(routeContext.challengeId ?? null);
+      setEventId(routeContext.eventId ?? null);
+      setMediaUri(null);
+      setMimeType("image/jpeg");
+      setPickedFile(undefined);
+      setVideoDurationSeconds(null);
+      hydratedForUserRef.current = userId ?? null;
+      routeAppliedRef.current = true;
+      skipPersistRef.current = false;
+    },
+    [routeContext.groupId, routeContext.challengeId, routeContext.eventId, userId]
+  );
+
   /** Drop the saved draft without changing the form that is still on screen. */
   const releaseStoredDraft = useCallback(async () => {
     skipPersistRef.current = true;
@@ -325,6 +356,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     }
     mediaBytesRef.current = null;
     if (!userId) return;
+    markComposerPublished(userId);
     try {
       await clearCreatePostDraft(userId);
     } catch (error) {
@@ -355,6 +387,7 @@ export function useCreatePostDraft(userId: string | undefined, routeContext: Rou
     clearMedia,
     clearDraft,
     releaseStoredDraft,
+    resetComposerFields,
     setPersistPaused,
     flushDraft,
   };

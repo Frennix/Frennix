@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { Video, ResizeMode } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -46,6 +47,7 @@ import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
 import { UploadProgressBar } from "@/components/UploadProgressBar";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { switchTab } from "@/lib/press-utils";
+import { composerNeedsFreshStart, consumeComposerFreshStart } from "@/lib/create-post-draft";
 import { useCreatePostDraft } from "@/lib/useCreatePostDraft";
 import { beginPublish, failPublish, succeedPublish, visibleComposerCategory, type PublishPhase } from "@/lib/create-post-publish";
 import { Button, FeedCategoryTabs, Input, colors, radius, spacing, typography } from "@frennix/ui";
@@ -151,6 +153,7 @@ export default function CreatePostScreen() {
   const isReelIntent = paramValue(params.intent) === "reel";
   const routeCategory = parseFeedCategory(paramValue(params.category));
 
+  const isFocused = useIsFocused();
   const { session } = useAuth();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
@@ -192,6 +195,7 @@ export default function CreatePostScreen() {
     clearMedia,
     clearDraft,
     releaseStoredDraft,
+    resetComposerFields,
     setPersistPaused,
     flushDraft,
   } = useCreatePostDraft(userId, {
@@ -214,6 +218,27 @@ export default function CreatePostScreen() {
   const isSubmitting = loading;
   const isSuccess = uploadStage === "success";
   const isFormLocked = isSubmitting || isSuccess;
+
+  useLayoutEffect(() => {
+    if (!isFocused || !userId || !composerNeedsFreshStart(userId)) return;
+    consumeComposerFreshStart(userId);
+    resetComposerFields(routeCategory ?? "workout");
+    setSelectedMedia([]);
+    setLockedCategory(null);
+    setDurationMinutes("");
+    setDistanceKm("");
+    setCalories("");
+    setGym("");
+    setLocationName("");
+    setJourneyCategory(null);
+    setError("");
+    setSavedSheetVisible(false);
+    setUploadStage("idle");
+    setLoading(false);
+    submittingRef.current = false;
+    publishPhaseRef.current = "idle";
+    setPersistPaused(false);
+  }, [isFocused, resetComposerFields, routeCategory, userId]);
 
   useEffect(() => {
     if (!hydrated || selectedMedia.length) return;
@@ -446,7 +471,6 @@ export default function CreatePostScreen() {
         switchTab("/(tabs)/reels");
         setUploadStage("idle");
         submittingRef.current = false;
-        setPersistPaused(false);
         setLoading(false);
         return;
       }
@@ -459,7 +483,6 @@ export default function CreatePostScreen() {
         }
         setUploadStage("idle");
         submittingRef.current = false;
-        setPersistPaused(false);
         setLoading(false);
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
@@ -582,7 +605,6 @@ export default function CreatePostScreen() {
         }
         setUploadStage("idle");
         submittingRef.current = false;
-        setPersistPaused(false);
       }, SUCCESS_NAV_DELAY_MS);
     } catch (e) {
       const message = getSharePostUserMessage(e);

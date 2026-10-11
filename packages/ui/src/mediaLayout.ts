@@ -88,6 +88,22 @@ export function feedMediaContentFit(): "cover" {
   return "cover";
 }
 
+/** Photos stay at their own aspect ratio. Only extremely tall images are fit inside a cap. */
+export const PHOTO_MAX_HEIGHT_RATIO = 2;
+
+export function computePhotoDisplayFrame(
+  containerWidth: number,
+  imageWidth: number,
+  imageHeight: number,
+  maxHeightRatio = PHOTO_MAX_HEIGHT_RATIO
+): { height: number; contentFit: "contain" } {
+  if (!containerWidth) return { height: 0, contentFit: "contain" };
+  const ratio = imageWidth > 0 && imageHeight > 0 ? imageHeight / imageWidth : 1;
+  const naturalHeight = containerWidth * ratio;
+  const maxHeight = containerWidth * maxHeightRatio;
+  return { height: Math.min(naturalHeight, maxHeight), contentFit: "contain" };
+}
+
 /** Deterministic carousel frame size — avoids height:100% collapse through web FlatList. */
 export function resolveFeedCarouselFrameSizing(
   containerWidth: number,
