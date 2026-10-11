@@ -48,7 +48,7 @@ import { StoryCountdownCard } from "./story/StoryCountdownCard";
 import { StoryQuestionCard } from "./story/StoryQuestionCard";
 import { StoryChallengeAccepts } from "./story/StoryChallengeAccepts";
 import { StoryCompletionBadge } from "./story/StoryCompletionBadge";
-import { StoryFooterGradient } from "./story/StoryFooterGradient";
+import { StoryFooterGradient, StoryHeaderFade } from "./story/StoryFooterGradient";
 import { StoryQuestionAnswersModal } from "./story/StoryQuestionAnswersModal";
 import {
   voteStoryPoll,
@@ -949,7 +949,7 @@ export function WorkoutStoryViewer({
             ) : null}
           </Animated.View>
 
-          <View style={styles.scrimTop} pointerEvents="none" />
+          <StoryHeaderFade />
           <StoryFooterGradient />
 
           <View
@@ -1369,15 +1369,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 280,
     gap: spacing.sm,
-  },
-  scrimTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 180,
-    backgroundColor: "rgba(10, 10, 11, 0.55)",
-    zIndex: 1,
   },
   header: {
     position: "absolute",

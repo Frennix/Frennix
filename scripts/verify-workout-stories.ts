@@ -159,6 +159,30 @@ const checks: Array<{ name: string; run: () => void }> = [
       if (!viewer.includes("StoryFooterGradient")) {
         throw new Error("Story footer must use readable caption gradient");
       }
+      if (!viewer.includes("StoryHeaderFade")) {
+        throw new Error("Story header must use a fading top overlay");
+      }
+      if (viewer.includes("scrimTop") || viewer.includes('height: 180,\n    backgroundColor: "rgba(10, 10, 11, 0.55)"')) {
+        throw new Error("Story viewer must not use a solid top rectangle");
+      }
+      if (viewer.includes("Story insights will appear as people engage")) {
+        throw new Error("Empty insights copy belongs in the owner panel, not on the photo");
+      }
+      const viewers = read("components/story/StoryViewersModal.tsx");
+      const analytics = read("components/story/StoryAnalyticsModal.tsx");
+      const fade = read("components/story/StoryFooterGradient.tsx");
+      if (!viewers.includes("Story insights will appear as people engage")) {
+        throw new Error("Viewer panel must explain that insights appear as people engage");
+      }
+      if (!analytics.includes("Story insights will appear as people engage")) {
+        throw new Error("Insights panel must explain that insights appear as people engage");
+      }
+      if (!fade.includes('pointerEvents="none"') || !fade.includes('stopOpacity={stop.opacity}')) {
+        throw new Error("Story fades must be smooth gradients that do not receive taps");
+      }
+      if (fade.includes("nativeBandStrong")) {
+        throw new Error("Story footer fade must not use stacked solid bands");
+      }
     },
   },
   {
