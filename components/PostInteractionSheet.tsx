@@ -22,8 +22,8 @@ import {
   isLightHapticAction,
   isMediumHapticAction,
   isReactionAction,
+  moreSectionsForPost,
   partitionPrimaryActions,
-  POST_INTERACTION_MORE_SECTIONS,
   type PostInteractionAction,
   type PostInteractionActionId,
 } from "@/lib/post-interaction-actions";
@@ -44,6 +44,7 @@ type PostInteractionSheetProps = {
   liked: boolean;
   myReaction: string | null | undefined;
   saved: boolean;
+  viewerId?: string | null;
   onAction: (actionId: PostInteractionActionId) => boolean | void | Promise<boolean | void>;
   onClose: () => void;
 };
@@ -94,6 +95,7 @@ export function PostInteractionSheet({
   liked,
   myReaction,
   saved,
+  viewerId,
   onAction,
   onClose,
 }: PostInteractionSheetProps) {
@@ -110,7 +112,8 @@ export function PostInteractionSheet({
     [primaryActions]
   );
   const usePriorityLayout = primaryActions.length <= 4;
-  const moreActionCount = countMoreActions();
+  const moreSections = useMemo(() => moreSectionsForPost(post, viewerId), [post, viewerId]);
+  const moreActionCount = countMoreActions(moreSections);
   const moreScrollBounded = moreActionCount > MORE_ACTIONS_SCROLL_THRESHOLD;
   const primaryScrollNeeded = primaryActions.length > PRIMARY_ACTIONS_SCROLL_THRESHOLD;
   const isPrimaryPanel = panel === "primary";
@@ -249,7 +252,7 @@ export function PostInteractionSheet({
       <View
         style={[styles.moreScroll, moreScrollBounded ? { maxHeight: moreScrollMaxHeight } : null]}
       >
-        {POST_INTERACTION_MORE_SECTIONS.map((section) => (
+        {moreSections.map((section) => (
           <View key={section.title} style={styles.section}>
             <Text
               style={styles.sectionTitle}

@@ -17,7 +17,7 @@ import { NotificationOnboardingPrompt } from "@/components/NotificationOnboardin
 import { LocationDiscoveryPrompt } from "@/components/LocationDiscoveryPrompt";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { StartupMountProbe } from "@/components/StartupMountProbe";
-import { openCreatePost, pushScreen } from "@/lib/press-utils";
+import { openCreatePost, openCreatePostForCurrentFeed, pushScreen } from "@/lib/press-utils";
 import { colors, typography } from "@frennix/ui";
 import { flexFill, webTabSceneShell } from "@/lib/flex-layout";
 import { isFeedIsolateDisabled } from "@/lib/feed-isolate";
@@ -219,7 +219,7 @@ const TabsShell = memo(function TabsShell() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            openCreatePost();
+            openCreatePostForCurrentFeed();
           },
         }}
       />

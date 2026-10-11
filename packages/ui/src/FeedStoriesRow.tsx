@@ -1,6 +1,7 @@
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View, Animated, Easing, type ViewStyle } from "react-native";
 import { useEffect, useRef } from "react";
 import type { FeedStory } from "@frennix/types";
+import { storyRingLabel } from "@frennix/types";
 import { Avatar } from "./Avatar";
 import { ScalePressable } from "./ScalePressable";
 import { formatRelativeTime, formatStreakBadgeLabel } from "./formatRelativeTime";
@@ -23,10 +24,7 @@ function storyLabel(item: FeedStory): string {
   const latest = stories.at(-1);
   if (!latest) return item.is_self ? "Your Story" : "No story yet";
   const time = formatRelativeTime(latest.created_at);
-  if (latest.workout_tag) return `${latest.workout_tag} · ${time}`;
-  const slideCount = latest.slides?.length ?? 0;
-  if (slideCount > 1) return `${slideCount} slides · ${time}`;
-  return `Story · ${time}`;
+  return `${storyRingLabel(latest)} · ${time}`;
 }
 
 function storyProgress(item: FeedStory): number {

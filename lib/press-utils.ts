@@ -1,4 +1,6 @@
 import { router, type Href } from "expo-router";
+import type { FeedCategory } from "@frennix/types";
+import { getSelectedHomeFeedTab } from "@/lib/selected-home-feed-tab";
 
 /** Push a stack/modal screen immediately (no deferred queue). */
 export function pushScreen(href: Href) {
@@ -40,20 +42,33 @@ let createPostNavLocked = false;
 type OpenCreatePostOptions = {
   /** Opens the existing create-post flow with Reels journey chrome. */
   intent?: "reel";
+  /** Opens the composer with Workout, Nutrition, or General selected. */
+  category?: FeedCategory;
 };
 
 /** Open create-post modal once per tap — never queued behind other navigation. */
 export function openCreatePost(options?: OpenCreatePostOptions) {
   if (createPostNavLocked) return;
   createPostNavLocked = true;
-  if (options?.intent === "reel") {
-    router.push({ pathname: "/create-post", params: { intent: "reel" } });
-  } else {
-    router.push("/create-post");
-  }
+  router.push({
+    pathname: "/create-post",
+    params: {
+      intent: options?.intent === "reel" ? "reel" : "",
+      category: options?.category ?? "",
+    },
+  });
   setTimeout(() => {
     createPostNavLocked = false;
   }, 400);
+}
+
+/** Bottom Post button. Nutrition stays selected so a second meal can be published. */
+export function openCreatePostForCurrentFeed() {
+  if (getSelectedHomeFeedTab() === "nutrition") {
+    openCreatePost({ category: "nutrition" });
+    return;
+  }
+  openCreatePost();
 }
 
 let createStoryNavLocked = false;

@@ -11,7 +11,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { ACTIVITIES, normalizeWorkoutTypes } from "@frennix/types";
+import {
+  ACTIVITIES,
+  COMPOSER_CATEGORY_TABS,
+  normalizeWorkoutTypes,
+  resolveFeedCategory,
+  type FeedCategory,
+} from "@frennix/types";
 import {
   getErrorMessage,
   getPost,
@@ -36,7 +42,7 @@ import {
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { stackBackOptions } from "@/lib/stack-navigation";
 import { invalidatePostQueries, updatePostInAllCaches } from "@/lib/post-cache";
-import { Button, CachedImage, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, CachedImage, FeedCategoryTabs, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const CAPTION_MAX = 500;
 const MAX_PHOTOS = 10;
@@ -81,6 +87,7 @@ export default function EditPostScreen() {
   const originalThumbnailRef = useRef<string | null>(null);
 
   const [content, setContent] = useState("");
+  const [feedCategory, setFeedCategory] = useState<FeedCategory>("workout");
   const [workoutTypes, setWorkoutTypes] = useState<string[]>([]);
   const [mediaItems, setMediaItems] = useState<EditMediaItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -100,12 +107,14 @@ export default function EditPostScreen() {
       return;
     }
     setContent(post.content ?? "");
+    setFeedCategory(resolveFeedCategory(post));
     setWorkoutTypes(normalizeWorkoutTypes(post));
     setMediaItems(mediaItemsFromPost(post));
     originalMediaRef.current = post.media_urls ?? [];
     originalThumbnailRef.current = post.thumbnail_url ?? null;
   }, [post, userId]);
 
+  const showWorkoutFields = feedCategory === "workout";
   const hasVideo = mediaItems.some((item) => isVideoMime(item.mimeType));
   const hasPhotos = mediaItems.some((item) => !isVideoMime(item.mimeType));
   const isFormLocked = loading;
@@ -201,8 +210,13 @@ export default function EditPostScreen() {
 
   async function submit() {
     if (!id || !userId || !post) return;
-    if (!content.trim() && !workoutTypes.length && !mediaItems.length) {
-      setError("Add a caption, workout type, or media");
+    if (showWorkoutFields) {
+      if (!content.trim() && !workoutTypes.length && !mediaItems.length) {
+        setError("Add a caption, workout type, or media");
+        return;
+      }
+    } else if (!content.trim() && !mediaItems.length) {
+      setError("Add a caption or photo/video");
       return;
     }
     if (hasVideo && mediaItems.some((item) => isVideoTooLong(item.durationSeconds ?? null))) {
@@ -247,8 +261,11 @@ export default function EditPostScreen() {
           postType = "photo";
           if (!hasVideo) thumbnailUrl = null;
         }
-      } else if (workoutTypes.length || content.trim()) {
+      } else if (showWorkoutFields && (workoutTypes.length || content.trim())) {
         postType = "workout_update";
+        thumbnailUrl = null;
+      } else if (content.trim()) {
+        postType = "text";
         thumbnailUrl = null;
       }
 
@@ -265,7 +282,8 @@ export default function EditPostScreen() {
         userId,
         {
           content: content.trim() || null,
-          workout_types: workoutTypes,
+          ...(showWorkoutFields ? { workout_types: workoutTypes } : { workout_types: [] }),
+          feed_category: feedCategory,
           media_urls: finalMediaUrls,
           thumbnail_url: thumbnailUrl,
           post_type: postType,
@@ -275,7 +293,13 @@ export default function EditPostScreen() {
 
       updatePostInAllCaches(queryClient, userId, { ...post, ...updated });
       await invalidatePostQueries(queryClient, userId, id);
-      showSuccess("Workout updated successfully.");
+      showSuccess(
+        feedCategory === "nutrition"
+          ? "Meal updated."
+          : feedCategory === "general"
+            ? "Post updated."
+            : "Workout updated successfully."
+      );
       router.back();
     } catch (e) {
       const message = getErrorMessage(e) || "Something went wrong. Please try again.";
@@ -286,10 +310,13 @@ export default function EditPostScreen() {
     }
   }
 
+  const editTitle =
+    feedCategory === "nutrition" ? "Edit meal" : feedCategory === "general" ? "Edit post" : "Edit workout";
+
   if (isLoading || !post) {
     return (
       <>
-        <Stack.Screen options={stackBackOptions("Edit workout", { presentation: "modal" })} />
+        <Stack.Screen options={stackBackOptions("Edit post", { presentation: "modal" })} />
         <View style={styles.centered}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -299,8 +326,19 @@ export default function EditPostScreen() {
 
   return (
     <>
-      <Stack.Screen options={stackBackOptions("Edit workout", { presentation: "modal" })} />
+      <Stack.Screen options={stackBackOptions(editTitle, { presentation: "modal" })} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <FeedCategoryTabs
+          tabs={COMPOSER_CATEGORY_TABS}
+          active={feedCategory}
+          onChange={(next) => {
+            if (!isFormLocked) setFeedCategory(next);
+          }}
+          accessibilityLabel="Post category"
+        />
+
+        {showWorkoutFields ? (
+          <>
         <Text style={styles.sectionLabel}>Workout types</Text>
         <View style={styles.chips}>
           {ACTIVITIES.map((activity) => (
@@ -322,6 +360,8 @@ export default function EditPostScreen() {
             </Pressable>
           ))}
         </View>
+          </>
+        ) : null}
 
         <View style={styles.captionBlock}>
           <Input
@@ -331,7 +371,13 @@ export default function EditPostScreen() {
             multiline
             maxLength={CAPTION_MAX}
             editable={!isFormLocked}
-            placeholder="Update your workout caption..."
+            placeholder={
+              feedCategory === "nutrition"
+                ? "Meal, recipe, or meal-prep idea..."
+                : feedCategory === "general"
+                  ? "Update your post..."
+                  : "Update your workout caption..."
+            }
           />
           <Text style={styles.charCount}>
             {content.length}/{CAPTION_MAX}
@@ -438,7 +484,9 @@ export default function EditPostScreen() {
               disabled={isFormLocked}
             />
             <Text style={styles.mediaHelper}>
-              Add up to {MAX_PHOTOS} photos or one workout video up to 60 seconds.
+              {showWorkoutFields
+                ? `Add up to ${MAX_PHOTOS} photos or one workout video up to 60 seconds.`
+                : `Add up to ${MAX_PHOTOS} photos or one video up to 60 seconds.`}
             </Text>
           </View>
         )}

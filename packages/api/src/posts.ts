@@ -269,6 +269,11 @@ export type FeedCoreOptions = {
    * False/omitted: normal Feed — Reels are excluded.
    */
   isReel?: boolean;
+  /**
+   * Home tab filter. Applied in the paginated query.
+   * Omit for All, which includes nutrition and uncategorized posts.
+   */
+  feedCategory?: import("@frennix/types").FeedCategory | null;
 };
 
 export function applyReelDestinationFilter(posts: Post[], wantReels: boolean): Post[] {
@@ -330,6 +335,10 @@ export async function getFeedCore(
   // Never infer Reels from post_type alone. Explicit flag + post-fetch guard.
   q = q.eq("is_reel", options?.isReel === true);
 
+  if (options?.feedCategory) {
+    q = q.eq("feed_category", options.feedCategory);
+  }
+
   if (cursor) {
     q = q.lt("created_at", cursor);
   }
@@ -368,9 +377,12 @@ export function applyDefaultPostInteractions(post: Post): Post {
 export async function getFeed(
   userId: string,
   cursor?: string,
-  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE
+  limit = cursor ? FEED_PAGE_SIZE : FEED_INITIAL_PAGE_SIZE,
+  options?: FeedCoreOptions
 ): Promise<FeedPage> {
-  const core = await getFeedCore(userId, cursor, limit);
+  const core = options
+    ? await getFeedCore(userId, cursor, limit, undefined, options)
+    : await getFeedCore(userId, cursor, limit);
   if (!core.posts.length) return core;
 
   const posts = await enrichPosts(core.posts, userId);
@@ -439,6 +451,7 @@ export async function createPost(input: {
   shared_post_id?: string | null;
   story_audience?: import("@frennix/types").StoryAudience;
   journey_category?: JourneyCategory | null;
+  feed_category?: import("@frennix/types").FeedCategory | null;
   /** Explicit Reels destination. Optional; defaults to false. */
   is_reel?: boolean;
   isReel?: boolean;
@@ -456,6 +469,7 @@ export async function createPost(input: {
     story_audience,
     workout_metrics,
     journey_category,
+    feed_category,
     is_reel,
     isReel,
     ...rest
@@ -472,6 +486,7 @@ export async function createPost(input: {
       ...(workout_metrics ? { workout_metrics } : {}),
       ...(story_audience ? { story_audience } : {}),
       ...(journey_category ? { journey_category } : {}),
+      ...(feed_category ? { feed_category } : {}),
     })
     .select(`*, author:profiles!posts_author_id_fkey(*)`)
     .single();
@@ -609,6 +624,7 @@ export type UpdatePostPatch = {
   media_urls?: string[];
   thumbnail_url?: string | null;
   post_type?: Post["post_type"];
+  feed_category?: import("@frennix/types").FeedCategory | null;
 };
 
 export async function removePostsStorageFiles(urls: string[]) {

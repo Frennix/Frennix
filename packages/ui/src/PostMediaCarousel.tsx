@@ -17,11 +17,13 @@ import { PostMedia } from "./PostMedia";
 import {
   FEED_FALLBACK_BUCKET,
   FEED_PORTRAIT_FRAME_RATIO,
+  computePhotoDisplayFrame,
   feedBucketAspectRatio,
   feedFillParentStyle,
   resolveFeedCarouselFrameSizing,
   type FeedMediaBucket,
 } from "./mediaLayout";
+import { useImageDimensions } from "./useImageDimensions";
 import { colors, spacing, typography } from "./theme";
 
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
@@ -138,6 +140,8 @@ export function PostMediaCarousel({
   );
 
   const frameProbeUri = mediaItems[0]?.thumbnailUrl ?? mediaItems[0]?.url;
+  const photosOnly = mediaItems.length > 0 && mediaItems.every((item) => item.kind === "image");
+  const { dimensions: photoDimensions } = useImageDimensions(photosOnly ? frameProbeUri : undefined);
 
   const handleLayout = useCallback((width: number) => {
     if (width > 0) setContainerWidth(width);
@@ -222,13 +226,24 @@ export function PostMediaCarousel({
         dimensionsUri={frameProbeUri}
         layout="feed"
         style={styles.media}
+        sizing={photosOnly ? "photo" : "bucket"}
       >
         {({ bucket }) => {
           const frameBucket = (bucket ?? FEED_FALLBACK_BUCKET) as FeedMediaBucket;
-          const { frameHeight, frameAspectRatio } = resolveFeedCarouselFrameSizing(
-            containerWidth,
-            frameBucket
-          );
+          const photoFrame = photosOnly
+            ? computePhotoDisplayFrame(
+                containerWidth,
+                photoDimensions?.width ?? 0,
+                photoDimensions?.height ?? 0
+              )
+            : null;
+          const { frameHeight, frameAspectRatio } = photoFrame
+            ? {
+                frameHeight: photoFrame.height,
+                frameAspectRatio:
+                  photoFrame.height > 0 ? containerWidth / photoFrame.height : 1,
+              }
+            : resolveFeedCarouselFrameSizing(containerWidth, frameBucket);
           const frameSizingStyle: ViewStyle =
             containerWidth > 0
               ? { height: frameHeight }

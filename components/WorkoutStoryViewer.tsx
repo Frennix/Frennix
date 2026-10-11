@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FeedStory } from "@frennix/types";
+import { readStoryComposerMeta, storyDisplayLabel } from "@frennix/types";
 import {
   canonicalizeStoryReaction,
   type StoryChallengeKey,
@@ -357,6 +358,10 @@ export function WorkoutStoryViewer({
     if (!slideContext) return activeStories[0] ?? null;
     return activeStories.find((item) => item.id === slideContext.storyId) ?? null;
   }, [activeStories, slideContext]);
+  const composerMeta = useMemo(
+    () => readStoryComposerMeta(currentDedicatedStory?.slides ?? []),
+    [currentDedicatedStory]
+  );
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
   const needsMedia = storySlideNeedsMedia(activeSlide);
@@ -1096,7 +1101,9 @@ export function WorkoutStoryViewer({
               </View>
             ) : null}
 
-            {currentDedicatedStory?.workout_tag ? (
+            {composerMeta?.category === "nutrition" && currentDedicatedStory ? (
+              <Text style={styles.workoutTag}>{storyDisplayLabel(currentDedicatedStory)}</Text>
+            ) : composerMeta?.category !== "general" && currentDedicatedStory?.workout_tag ? (
               <Pressable
                 style={styles.metaPressable}
                 onPress={() => onDiscoverTag?.(currentDedicatedStory.workout_tag!)}

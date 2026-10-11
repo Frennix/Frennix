@@ -22,6 +22,8 @@ export type PostInteractionActionId =
   | "view_media"
   | "share"
   | "save"
+  | "owner_edit"
+  | "owner_delete"
   | "reaction_laugh"
   | "reaction_impressive"
   | "reaction_beast"
@@ -186,12 +188,46 @@ export function isMediumHapticAction(id: PostInteractionActionId): boolean {
     id === "view_profile" ||
     id === "share" ||
     id === "save" ||
-    id === "view_media"
+    id === "view_media" ||
+    id === "owner_edit" ||
+    id === "owner_delete"
   );
 }
 
-export function countMoreActions(): number {
-  return POST_INTERACTION_MORE_SECTIONS.reduce((total, section) => total + section.actions.length, 0);
+type InteractionPost = {
+  author_id?: string | null;
+  feed_category?: string | null;
+  shared_post?: { feed_category?: string | null } | null;
+};
+
+const NUTRITION_OWNER_SECTION: PostInteractionSection = {
+  title: "Your post",
+  actions: [
+    { id: "owner_edit", category: "profile", emoji: "✎", label: "Edit" },
+    { id: "owner_delete", category: "profile", emoji: "🗑️", label: "Delete" },
+  ],
+};
+
+/** Nutrition posts keep social actions and drop workout invitations, challenges, and rematch. */
+export function moreSectionsForPost(
+  post: InteractionPost | null | undefined,
+  viewerId?: string | null
+): PostInteractionSection[] {
+  const category = post?.shared_post?.feed_category ?? post?.feed_category;
+  const sections =
+    category === "nutrition"
+      ? POST_INTERACTION_MORE_SECTIONS.filter(
+          (section) => !section.actions.some((action) => action.category === "fitness")
+        )
+      : POST_INTERACTION_MORE_SECTIONS;
+  if (category === "nutrition" && viewerId && post?.author_id === viewerId) {
+    return [NUTRITION_OWNER_SECTION, ...sections];
+  }
+  return sections;
+}
+
+export function countMoreActions(sections: PostInteractionSection[] = POST_INTERACTION_MORE_SECTIONS): number {
+  return sections.reduce((total, section) => total + section.actions.length, 0);
 }
 
 /** Scroll the More panel when action count exceeds this. */

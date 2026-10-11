@@ -14,6 +14,7 @@ import { normalizeWorkoutTypes } from "@frennix/types";
 import { ReactionBar } from "./ReactionBar";
 import { getSharedPostTargetId, SharedPostPreview } from "./SharedPostPreview";
 import { WorkoutStatsPills } from "./WorkoutStatsPills";
+import { NutritionPostLabel } from "./NutritionPostLabel";
 import { WorkoutTypeChips } from "./WorkoutTypeChips";
 import { formatWorkoutTypeLabel } from "./formatRelativeTime";
 import {
@@ -122,6 +123,9 @@ export const FeedPostCard = memo(function FeedPostCard({
     return null;
   }, [contentTitle, workoutTypes]);
   const workoutDescription = contentDescription ?? (contentTitle ? null : displayPost.content);
+  const category = displayPost.feed_category ?? post.feed_category;
+  const showNutritionLabel = category === "nutrition";
+  const showWorkoutDetails = !isShared && category !== "nutrition" && category !== "general";
 
   const handleMorePress = useMemo(() => {
     if (isOwn && onOwnerActionsPress) return onOwnerActionsPress;
@@ -139,7 +143,12 @@ export const FeedPostCard = memo(function FeedPostCard({
 
   return (
     <FeedLayout.Root active={interactionActive}>
-      <FeedLayout.Label>{slots?.label}</FeedLayout.Label>
+      {showNutritionLabel || slots?.label ? (
+        <FeedLayout.Label>
+          {showNutritionLabel ? <NutritionPostLabel /> : null}
+          {slots?.label}
+        </FeedLayout.Label>
+      ) : null}
 
       <FeedLayout.Header>
         <ScalePressable
@@ -236,13 +245,13 @@ export const FeedPostCard = memo(function FeedPostCard({
         </FeedLayout.Caption>
       ) : null}
 
-      {!isShared && workoutTypes.length > 0 ? (
+      {showWorkoutDetails && workoutTypes.length > 0 ? (
         <FeedLayout.BelowMedia>
           <WorkoutTypeChips types={workoutTypes} size="default" />
         </FeedLayout.BelowMedia>
       ) : null}
 
-      {!isShared ? (
+      {showWorkoutDetails ? (
         <FeedLayout.BelowMedia>
           <WorkoutStatsPills
             metrics={displayPost.workout_metrics}

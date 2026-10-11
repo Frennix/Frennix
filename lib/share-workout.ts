@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type {
+  FeedCategory,
   JourneyCategory,
   PostType,
   StoryPrivacy,
@@ -47,6 +48,8 @@ export type WorkoutShareInput = {
   challengeId?: string | null;
   eventId?: string | null;
   journeyCategory?: JourneyCategory | null;
+  /** Home feed category. Reels omit this so they stay off Workouts and Nutrition. */
+  feedCategory?: FeedCategory | null;
   /** True only for Share Your Journey videos. Defaults false. */
   isReel?: boolean;
 };
@@ -70,7 +73,11 @@ function buildWorkoutSlideData(
   };
 }
 
-async function uploadFeedMediaAssets(userId: string, media: WorkoutShareMedia[]) {
+async function uploadFeedMediaAssets(
+  userId: string,
+  media: WorkoutShareMedia[],
+  asWorkout = true
+) {
   const mediaUrls: string[] = [];
   let thumbnailUrl: string | null = null;
   let postType: PostType = "text";
@@ -96,7 +103,7 @@ async function uploadFeedMediaAssets(userId: string, media: WorkoutShareMedia[])
   } else if (media.length) {
     postType = "photo";
   } else if (media.length === 0) {
-    postType = "workout_update";
+    postType = asWorkout ? "workout_update" : "text";
   }
 
   for (const item of media) {
@@ -200,7 +207,13 @@ export async function shareWorkout(
       "Creating post"
     );
   } else if (shouldFeed) {
-    const { mediaUrls, thumbnailUrl, postType } = await uploadFeedMediaAssets(input.userId, input.media);
+    const homeCategory = input.feedCategory ?? "workout";
+    const includeWorkoutFields = homeCategory === "workout";
+    const { mediaUrls, thumbnailUrl, postType } = await uploadFeedMediaAssets(
+      input.userId,
+      input.media,
+      includeWorkoutFields
+    );
     createdPost = await withTimeout(
       createPost({
         author_id: input.userId,
@@ -208,12 +221,13 @@ export async function shareWorkout(
         media_urls: mediaUrls,
         thumbnail_url: thumbnailUrl,
         post_type: postType,
-        workout_types: input.workoutTypes,
-        workout_metrics: input.metrics,
+        workout_types: includeWorkoutFields ? input.workoutTypes : [],
+        ...(includeWorkoutFields ? { workout_metrics: input.metrics } : {}),
         group_id: input.groupId ?? null,
         challenge_id: input.challengeId ?? null,
         event_id: input.eventId ?? null,
-        journey_category: postType === "video" ? input.journeyCategory ?? null : null,
+        journey_category: postType === "video" && includeWorkoutFields ? input.journeyCategory ?? null : null,
+        ...(homeCategory ? { feed_category: homeCategory } : {}),
         is_reel: false,
       }),
       POST_CREATE_TIMEOUT_MS,
@@ -264,10 +278,16 @@ export async function shareWorkout(
     return { postId: confirmedReel.id, storyId: null, post: confirmedReel };
   }
 
-  await queryClient.invalidateQueries({ queryKey: ["feed", input.userId] });
-  await queryClient.invalidateQueries({ queryKey: ["feed-stories", input.userId] });
-  await queryClient.invalidateQueries({ queryKey: ["reels", input.userId] });
-  await queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+  try {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["feed", input.userId] }),
+      queryClient.invalidateQueries({ queryKey: ["feed-stories", input.userId] }),
+      queryClient.invalidateQueries({ queryKey: ["reels", input.userId] }),
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] }),
+    ]);
+  } catch {
+    // The post is already saved. A failed refresh must not fail publishing.
+  }
 
   return { postId: createdPost?.id ?? null, storyId, post: createdPost };
 }

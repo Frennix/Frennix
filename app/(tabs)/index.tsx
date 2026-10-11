@@ -40,7 +40,9 @@ import {
 } from "@frennix/api";
 import {
   STORY_CHALLENGE_RESPONSES,
+  feedCategoryForHomeTab,
   normalizePostMediaItems,
+  type HomeFeedTab,
   type FeedStory,
   type FrennixStory,
   type Post,
@@ -64,6 +66,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { FeedBackground } from "@/components/FeedBackground";
 import { UndoSnackbar } from "@/components/UndoSnackbar";
 import { FeedEmptyMotivation } from "@/components/FeedEmptyMotivation";
+import { NutritionFeedEmpty } from "@/components/NutritionFeedEmpty";
 import { FeedHeader } from "@/components/FeedHeader";
 import { FeedListItem, type FeedListItemActions } from "@/components/FeedListItem";
 import { AnimatedFeedListItem } from "@/components/AnimatedFeedListItem";
@@ -79,6 +82,8 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { openCreatePost, openCreateStory, pushScreen } from "@/lib/press-utils";
+import { setSelectedHomeFeedTab } from "@/lib/selected-home-feed-tab";
+import { homeFeedQueryKey } from "@/lib/home-feed-query";
 import { openStoryWorkoutInvite } from "@/lib/story-calendar-invite";
 import { buildDedicatedStorySlides, prefetchAuthorizedViewerMedia } from "@/lib/story-utils";
 import { usePostInteraction } from "@/lib/usePostInteraction";
@@ -155,7 +160,7 @@ export default function HomeScreen() {
   const [activeInsightSlideId, setActiveInsightSlideId] = useState<string | null>(null);
   const { openShare, resetShare, shareSheet, shareVisible } = useSharePost(userId);
   markFeedHook("share-post");
-  const { openPostActions, resetPostActions, postActionSheets } = usePostActions({
+  const { openPostActions, editOwnedPost, deleteOwnedPost, resetPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (post) => openShare(post.shared_post ?? post),
   });
@@ -177,6 +182,10 @@ export default function HomeScreen() {
   const [feedDebugCollapsed, setFeedDebugCollapsed] = useState(false);
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
   const [storiesDeferred, setStoriesDeferred] = useState(false);
+  const [feedTab, setFeedTab] = useState<HomeFeedTab>("all");
+  useEffect(() => {
+    setSelectedHomeFeedTab(feedTab);
+  }, [feedTab]);
   const [deferFeedSecondary, setDeferFeedSecondary] = useState(false);
   const setCarouselIndex = useCallback((postId: string, index: number) => {
     setCarouselIndices((current) => ({ ...current, [postId]: index }));
@@ -221,6 +230,8 @@ export default function HomeScreen() {
         thumbnailUrl: displayPost.thumbnail_url,
       });
     },
+    onOwnerEdit: editOwnedPost,
+    onOwnerDelete: deleteOwnedPost,
   });
   markFeedHook("post-interaction");
 
@@ -490,11 +501,14 @@ export default function HomeScreen() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["feed", userId],
+    queryKey: homeFeedQueryKey(userId ?? "", feedTab),
     queryFn: async ({ pageParam }) => {
+      const feedOptions = {
+        feedCategory: feedCategoryForHomeTab(feedTab) ?? undefined,
+      };
       if (pageParam) {
         markFeedPerf("feed_page_next_start");
-        const page = await getFeed(userId, pageParam);
+        const page = await getFeed(userId, pageParam, undefined, feedOptions);
         markFeedPerf("feed_page_next_ready", { post_count: page.posts.length });
         return page;
       }
@@ -506,7 +520,7 @@ export default function HomeScreen() {
         if (phase === "scope" && detail?.author_count != null) markFeedPerf("feed_scope_ready", detail);
         if (phase === "posts" && detail?.start) markFeedPerf("feed_posts_query_start");
         if (phase === "posts" && detail?.count != null) markFeedPerf("feed_posts_query_ready", detail);
-      });
+      }, feedOptions);
       markFeedPerf("feed_filtering_ready", { post_count: core.posts.length });
 
       const page = overlayCachedFeedInteractions(queryClient, userId, {
@@ -534,7 +548,10 @@ export default function HomeScreen() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!userId,
     staleTime: 60_000,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => {
+      if (previousQuery?.queryKey?.[2] !== feedTab) return undefined;
+      return previousData;
+    },
   });
   markFeedHook("feed-query");
 
@@ -680,6 +697,7 @@ export default function HomeScreen() {
   const { newPostCount, showBanner, clearBanner } = useFeedNewPostsBanner({
     userId,
     posts,
+    feedCategory: feedCategoryForHomeTab(feedTab),
     atTop: feedAtTop,
     enabled: isFeedReady,
     onNewPostsWhileAtTop: () => {
@@ -729,7 +747,7 @@ export default function HomeScreen() {
     if (hydrateFeedCacheSync(queryClient, userId)) {
       const cachedPosts =
         queryClient
-          .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+          .getQueryData<{ pages: { posts: Post[] }[] }>(homeFeedQueryKey(userId, "all"))
           ?.pages.flatMap((page) => page.posts) ?? [];
       markFeedCacheHydrated(cachedPosts.length);
     }
@@ -740,7 +758,7 @@ export default function HomeScreen() {
     void hydrateFeedCache(queryClient, userId).then((hydrated) => {
       if (!hydrated) return;
       const cachedPosts =
-        queryClient.getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])?.pages.flatMap(
+        queryClient.getQueryData<{ pages: { posts: Post[] }[] }>(homeFeedQueryKey(userId, "all"))?.pages.flatMap(
           (page) => page.posts
         ) ?? [];
       markFeedCacheHydrated(cachedPosts.length);
@@ -759,7 +777,7 @@ export default function HomeScreen() {
   }, [posts.length > 0 ? posts[0]?.id : null]);
 
   useEffect(() => {
-    if (!userId || !data?.pages.length) return;
+    if (!userId || feedTab !== "all" || !data?.pages.length) return;
     void writeFeedCache(userId, data.pages);
   }, [data?.pages, userId]);
 
@@ -844,7 +862,7 @@ export default function HomeScreen() {
         getPost: (postId) => {
           const cachedPosts =
             queryClient
-              .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+              .getQueryData<{ pages: { posts: Post[] }[] }>(homeFeedQueryKey(userId, feedTab))
               ?.pages.flatMap((page) => page.posts) ?? posts;
           return excludeReelPosts(cachedPosts).find(
             (candidate) =>
@@ -855,16 +873,16 @@ export default function HomeScreen() {
         fetchMore: async () => {
           const beforeCount =
             queryClient
-              .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+              .getQueryData<{ pages: { posts: Post[] }[] }>(homeFeedQueryKey(userId, feedTab))
               ?.pages.flatMap((page) => page.posts).length ?? posts.length;
           await fetchNextPage();
           const updatedPosts =
             queryClient
-              .getQueryData<{ pages: { posts: Post[] }[] }>(["feed", userId])
+              .getQueryData<{ pages: { posts: Post[] }[] }>(homeFeedQueryKey(userId, feedTab))
               ?.pages.flatMap((page) => page.posts) ?? [];
           const newPosts = updatedPosts.slice(beforeCount);
           const entries = buildPlaylistEntriesFromPosts(newPosts);
-          const feedState = queryClient.getQueryState(["feed", userId]);
+          const feedState = queryClient.getQueryState(homeFeedQueryKey(userId, feedTab));
           const stillHasMore = Boolean(
             (feedState?.data as { pages: { nextCursor?: string }[] } | undefined)?.pages.at(-1)
               ?.nextCursor
@@ -1038,6 +1056,8 @@ export default function HomeScreen() {
       <FeedRenderTraceProbe id="feed:ui:list-header">
         <SectionErrorBoundary label="feed-stories-header" compact>
         <FeedHeader
+          feedTab={feedTab}
+          onFeedTabChange={setFeedTab}
           showHero={false}
           showQuickActions={false}
           showStories={storiesDeferred && !isolateStories}
@@ -1067,6 +1087,7 @@ export default function HomeScreen() {
       </FeedRenderTraceProbe>
     ),
     [
+      feedTab,
       stories,
       storiesDeferred,
       isolateStories,
@@ -1297,6 +1318,8 @@ export default function HomeScreen() {
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
                 </View>
+              ) : feedTab === "nutrition" ? (
+                <NutritionFeedEmpty />
               ) : (
                 <FeedEmptyMotivation suggestions={suggestions} />
               )
@@ -1347,6 +1370,8 @@ export default function HomeScreen() {
                   <FeedPostCardSkeleton />
                   <FeedPostCardSkeleton />
                 </View>
+              ) : feedTab === "nutrition" ? (
+                <NutritionFeedEmpty />
               ) : (
                 <FeedEmptyMotivation suggestions={suggestions} />
               )

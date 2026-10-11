@@ -1,10 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { Video, ResizeMode } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -14,11 +16,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  MEAL_TAGS,
+  NUTRITION_MEAL_TEMPLATES,
+  NUTRITION_STORY_POLLS,
+  STORY_COMPOSER_TABS,
   STORY_LOCATION_TYPES,
   STORY_POLL_PRESETS,
   STORY_WORKOUT_TAGS,
+  publishedStoryFields,
+  type StoryComposerCategory,
   type StoryLocationType,
-  type StoryPollPresetId,
   type StoryPrivacy,
   type StorySlideDraft,
 } from "@frennix/types";
@@ -48,9 +55,10 @@ import { showAlert } from "@/lib/alerts";
 import { StoryPrivacySelector } from "@/components/story/StoryPrivacySelector";
 import { readLastStoryPrivacy, writeLastStoryPrivacy } from "@/lib/story-privacy-preferences";
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
+import { consumeStoryFreshStart, markStoryPublished } from "@/lib/story-composer-session";
 import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
 import { useAuth } from "@/providers/AuthProvider";
-import { Button, Input, colors, radius, spacing, typography } from "@frennix/ui";
+import { Button, FeedCategoryTabs, Input, colors, radius, spacing, typography } from "@frennix/ui";
 
 const MAX_SLIDES = 10;
 const CAPTION_MAX = 280;
@@ -68,17 +76,21 @@ function newDraftId() {
 export default function CreateStoryScreen() {
   const { session } = useAuth();
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const userId = session?.user.id ?? "";
   const queryClient = useQueryClient();
   const submittingRef = useRef(false);
 
+  const [category, setCategory] = useState<StoryComposerCategory>("workout");
   const [slides, setSlides] = useState<StorySlideDraft[]>([]);
   const [privacy, setPrivacy] = useState<StoryPrivacy>("everyone");
   const [workoutTag, setWorkoutTag] = useState<string | null>(null);
+  const [mealTemplateId, setMealTemplateId] = useState<string | null>(null);
+  const [mealTag, setMealTag] = useState<string | null>(null);
   const [locationName, setLocationName] = useState("");
   const [locationType, setLocationType] = useState<StoryLocationType | null>(null);
   const [caption, setCaption] = useState("");
-  const [selectedPollPreset, setSelectedPollPreset] = useState<StoryPollPresetId | "custom" | null>(null);
+  const [selectedPollPreset, setSelectedPollPreset] = useState<string | null>(null);
   const [customPollQuestion, setCustomPollQuestion] = useState("");
   const [customPollOptions, setCustomPollOptions] = useState("");
   const [trainingChallengePrompt, setTrainingChallengePrompt] = useState("");
@@ -99,6 +111,47 @@ export default function CreateStoryScreen() {
       if (saved) setPrivacy(saved);
     });
   }, []);
+
+  function resetComposer() {
+    setCategory("workout");
+    setSlides([]);
+    setWorkoutTag(null);
+    setMealTemplateId(null);
+    setMealTag(null);
+    setLocationName("");
+    setLocationType(null);
+    setCaption("");
+    setSelectedPollPreset(null);
+    setCustomPollQuestion("");
+    setCustomPollOptions("");
+    setTrainingChallengePrompt("");
+    setCountdownLabel("");
+    setCountdownDate("");
+    setCountdownTime("");
+    setTrainingQuestion("");
+    setWorkoutCommitment("");
+    setPreviewMode(false);
+    setError("");
+  }
+
+  useLayoutEffect(() => {
+    if (!focused || !consumeStoryFreshStart()) return;
+    resetComposer();
+  }, [focused]);
+
+  useEffect(() => {
+    if (!focused || Platform.OS !== "web" || typeof document === "undefined") return;
+    const scrollFocusedField = () => {
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) {
+          active.scrollIntoView({ block: "center", inline: "nearest" });
+        }
+      });
+    };
+    document.addEventListener("focusin", scrollFocusedField);
+    return () => document.removeEventListener("focusin", scrollFocusedField);
+  }, [focused]);
 
   async function pickMedia() {
     if (loading) return;
@@ -199,6 +252,17 @@ export default function CreateStoryScreen() {
     setError("");
 
     try {
+      const fields = publishedStoryFields({
+        category,
+        workoutTag,
+        mealTemplateId,
+        mealTag,
+        trainingChallenge: trainingChallengePrompt,
+        workoutCommitment,
+        question: trainingQuestion,
+      });
+      const pollPresets =
+        category === "nutrition" ? NUTRITION_STORY_POLLS : category === "workout" ? STORY_POLL_PRESETS : [];
       const uploadedSlides = [];
       for (let index = 0; index < slides.length; index += 1) {
         const slide = slides[index];
@@ -207,7 +271,8 @@ export default function CreateStoryScreen() {
           media_url: mediaUrl,
           media_type: isVideoMime(slide.mimeType) ? ("video" as const) : ("photo" as const),
           caption: index === 0 ? captionForPublish || null : null,
-          workout_type: workoutTag,
+          workout_type: fields.workout_type,
+          slide_meta: fields.slide_meta,
           sort_order: index,
         });
       }
@@ -216,7 +281,7 @@ export default function CreateStoryScreen() {
         publishStory({
           user_id: userId,
           privacy,
-          workout_tag: workoutTag,
+          workout_tag: fields.workout_tag,
           location_name: locationName.trim() || null,
           location_type: locationType,
           slides: uploadedSlides,
@@ -226,7 +291,7 @@ export default function CreateStoryScreen() {
       );
 
       if (selectedPollPreset && selectedPollPreset !== "custom") {
-        const preset = STORY_POLL_PRESETS.find((item) => item.id === selectedPollPreset);
+        const preset = pollPresets.find((item) => item.id === selectedPollPreset);
         if (preset) {
           await createStoryPoll({
             storyId: publishedStory.id,
@@ -246,8 +311,8 @@ export default function CreateStoryScreen() {
         });
       }
 
-      if (trainingChallengePrompt.trim()) {
-        await createStoryTrainingChallenge(publishedStory.id, trainingChallengePrompt.trim());
+      if (fields.trainingChallenge) {
+        await createStoryTrainingChallenge(publishedStory.id, fields.trainingChallenge);
       }
 
       const countdownAt = combineDateAndTime(countdownDate, countdownTime);
@@ -259,21 +324,22 @@ export default function CreateStoryScreen() {
         });
       }
 
-      if (trainingQuestion.trim()) {
-        await createStoryQuestion(publishedStory.id, trainingQuestion.trim());
+      if (fields.question) {
+        await createStoryQuestion(publishedStory.id, fields.question);
       }
 
-      if (workoutCommitment.trim()) {
+      if (fields.workoutCommitment) {
         await createStoryWorkoutCommitment({
           storyId: publishedStory.id,
           userId,
-          commitmentText: workoutCommitment.trim(),
+          commitmentText: fields.workoutCommitment,
           dueAt: countdownAt,
         });
       }
 
       await writeLastStoryPrivacy(privacy);
       await queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] });
+      markStoryPublished();
       router.back();
     } catch (publishError) {
       setError(getErrorMessage(publishError));
@@ -283,17 +349,43 @@ export default function CreateStoryScreen() {
     }
   }
 
+  const visiblePolls =
+    category === "nutrition" ? NUTRITION_STORY_POLLS : category === "workout" ? STORY_POLL_PRESETS : [];
+  const captionPlaceholder =
+    category === "nutrition"
+      ? "Today’s meal with @sarah"
+      : category === "general"
+        ? "Add a caption"
+        : "Great workout with @sarah";
+  const questionLabel = category === "workout" ? "Training question (optional)" : "Question (optional)";
+  const questionPlaceholder =
+    category === "nutrition"
+      ? "What should I make next?"
+      : category === "general"
+        ? "Ask a question"
+        : "What's your favorite leg exercise?";
+  const pollLabel = category === "workout" ? "Workout poll (optional)" : "Poll (optional)";
+
   return (
     <ScrollView
+      style={styles.screen}
       contentContainerStyle={[
         styles.container,
-        { paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.md },
+        { paddingBottom: Math.max(insets.bottom, spacing.lg) + 160 },
       ]}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      automaticallyAdjustKeyboardInsets
     >
         <Text style={styles.lead}>
-          Fitness-first stories disappear after 24 hours. Share workouts, challenges, and training invites — not feed posts.
+          Stories disappear after 24 hours. Share workouts, meals, and everyday moments.
         </Text>
+        <FeedCategoryTabs
+          tabs={STORY_COMPOSER_TABS}
+          active={category}
+          onChange={setCategory}
+          accessibilityLabel="Story category"
+        />
 
         {previewMode && previewSlide ? (
           <View style={styles.previewCard}>
@@ -307,10 +399,11 @@ export default function CreateStoryScreen() {
                 useNativeControls
               />
             ) : (
-              <View style={styles.previewMedia}>
-                <Text style={styles.previewPlaceholder}>Photo preview</Text>
-              </View>
+              <Image source={{ uri: previewSlide.uri }} style={styles.previewMedia} resizeMode="contain" />
             )}
+            {slides.length > 1 ? (
+              <Text style={styles.previewPlaceholder}>{slides.length} slides</Text>
+            ) : null}
             {captionForPublish ? <Text style={styles.previewCaption}>{captionForPublish}</Text> : null}
           </View>
         ) : (
@@ -341,28 +434,69 @@ export default function CreateStoryScreen() {
           value={caption}
           onChangeText={setCaption}
           maxLength={CAPTION_MAX}
-          placeholder="Great workout with @sarah"
+          placeholder={captionPlaceholder}
           editable={!loading}
         />
 
-        <Text style={styles.sectionLabel}>Quick templates</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {STORY_WORKOUT_TEMPLATES.map((template) => (
-            <Pressable
-              key={template.id}
-              style={[styles.chip, caption === template.caption && styles.chipActive]}
-              onPress={() => setCaption(template.caption)}
-            >
-              <Text style={[styles.chipText, caption === template.caption && styles.chipTextActive]}>
-                {template.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        {category === "workout" ? (
+          <>
+            <Text style={styles.sectionLabel}>Quick templates</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {STORY_WORKOUT_TEMPLATES.map((template) => (
+                <Pressable
+                  key={template.id}
+                  style={[styles.chip, caption === template.caption && styles.chipActive]}
+                  onPress={() => setCaption(template.caption)}
+                >
+                  <Text style={[styles.chipText, caption === template.caption && styles.chipTextActive]}>
+                    {template.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
 
-        <Text style={styles.sectionLabel}>Workout poll (optional)</Text>
+        {category === "nutrition" ? (
+          <>
+            <Text style={styles.sectionLabel}>Meal templates</Text>
+            <View style={styles.chipRow}>
+              {NUTRITION_MEAL_TEMPLATES.map((template) => (
+                <Pressable
+                  key={template.id}
+                  style={[styles.chip, mealTemplateId === template.id && styles.chipActive]}
+                  onPress={() =>
+                    setMealTemplateId((current) => {
+                      if (current === template.id) return null;
+                      setCaption(template.caption);
+                      return template.id;
+                    })
+                  }
+                >
+                  <Text style={[styles.chipText, mealTemplateId === template.id && styles.chipTextActive]}>
+                    {template.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.sectionLabel}>Meal tag (optional)</Text>
+            <View style={styles.chipRow}>
+              {MEAL_TAGS.map((tag) => (
+                <Pressable
+                  key={tag}
+                  style={[styles.chip, mealTag === tag && styles.chipActive]}
+                  onPress={() => setMealTag((current) => (current === tag ? null : tag))}
+                >
+                  <Text style={[styles.chipText, mealTag === tag && styles.chipTextActive]}>{tag}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        <Text style={styles.sectionLabel}>{pollLabel}</Text>
         <View style={styles.chipRow}>
-          {STORY_POLL_PRESETS.map((preset) => (
+          {visiblePolls.map((preset) => (
             <Pressable
               key={preset.id}
               style={[styles.chip, selectedPollPreset === preset.id && styles.chipActive]}
@@ -394,7 +528,7 @@ export default function CreateStoryScreen() {
               label="Poll question"
               value={customPollQuestion}
               onChangeText={setCustomPollQuestion}
-              placeholder="What's your go-to warm-up?"
+              placeholder={category === "workout" ? "What's your go-to warm-up?" : "Add a question"}
               editable={!loading}
             />
             <Input
@@ -407,35 +541,45 @@ export default function CreateStoryScreen() {
           </>
         ) : null}
 
-        <Input
-          label="Training challenge (optional)"
-          value={trainingChallengePrompt}
-          onChangeText={setTrainingChallengePrompt}
-          placeholder="100 push-ups today — who's in?"
-          editable={!loading}
-        />
+        {category === "workout" ? (
+          <Input
+            label="Training challenge (optional)"
+            value={trainingChallengePrompt}
+            onChangeText={setTrainingChallengePrompt}
+            placeholder="100 push-ups today — who's in?"
+            editable={!loading}
+          />
+        ) : null}
 
         <Input
-          label="Training question (optional)"
+          label={questionLabel}
           value={trainingQuestion}
           onChangeText={setTrainingQuestion}
-          placeholder="What's your favorite leg exercise?"
+          placeholder={questionPlaceholder}
           editable={!loading}
         />
 
-        <Input
-          label="Workout commitment (optional)"
-          value={workoutCommitment}
-          onChangeText={setWorkoutCommitment}
-          placeholder="5K run before sunset"
-          editable={!loading}
-        />
+        {category === "workout" ? (
+          <Input
+            label="Workout commitment (optional)"
+            value={workoutCommitment}
+            onChangeText={setWorkoutCommitment}
+            placeholder="5K run before sunset"
+            editable={!loading}
+          />
+        ) : null}
 
         <Input
           label="Countdown label (optional)"
           value={countdownLabel}
           onChangeText={setCountdownLabel}
-          placeholder="Race day · Leg day · Group run"
+          placeholder={
+            category === "nutrition"
+              ? "Meal prep Sunday"
+              : category === "general"
+                ? "Event · Reminder"
+                : "Race day · Leg day · Group run"
+          }
           editable={!loading}
         />
         <View style={styles.inlineRow}>
@@ -462,18 +606,22 @@ export default function CreateStoryScreen() {
         <Text style={styles.sectionLabel}>Privacy</Text>
         <StoryPrivacySelector value={privacy} onChange={setPrivacy} disabled={loading} />
 
-        <Text style={styles.sectionLabel}>Workout tag</Text>
-        <View style={styles.chipRow}>
-          {STORY_WORKOUT_TAGS.map((tag) => (
-            <Pressable
-              key={tag}
-              style={[styles.chip, workoutTag === tag && styles.chipActive]}
-              onPress={() => setWorkoutTag((current) => (current === tag ? null : tag))}
-            >
-              <Text style={[styles.chipText, workoutTag === tag && styles.chipTextActive]}>{tag}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {category === "workout" ? (
+          <>
+            <Text style={styles.sectionLabel}>Workout tag</Text>
+            <View style={styles.chipRow}>
+              {STORY_WORKOUT_TAGS.map((tag) => (
+                <Pressable
+                  key={tag}
+                  style={[styles.chip, workoutTag === tag && styles.chipActive]}
+                  onPress={() => setWorkoutTag((current) => (current === tag ? null : tag))}
+                >
+                  <Text style={[styles.chipText, workoutTag === tag && styles.chipTextActive]}>{tag}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <Input
           label="Location (optional)"
@@ -523,6 +671,9 @@ export default function CreateStoryScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   container: {
     padding: spacing.lg,
     gap: spacing.md,
