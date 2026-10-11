@@ -109,7 +109,7 @@ function main() {
         viewer.includes("useCommentsVideoPeekLayout") &&
         sheet.includes("computeBaselineVideoPeekHeight") &&
         sheet.includes("COMMENTS_VIDEO_PEEK_TARGET_MIN_PX") &&
-        sheet.includes("videoPeekBaselineRef") &&
+        sheet.includes("captureImmersiveSessionLayoutHeight") &&
         sheet.includes("videoOverlayColumn") &&
         styles.includes("data-frennix-immersive-comments-open")
     ) && ok;

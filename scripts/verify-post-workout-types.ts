@@ -53,7 +53,11 @@ const checks: Array<{ name: string; run: () => void }> = [
         "workoutTypes.includes(activity)",
         "create-post must toggle activities in an array"
       );
-      assertIncludes("app/create-post.tsx", "workout_types: workoutTypes", "create-post must save workout_types");
+      assertIncludes(
+        "app/create-post.tsx",
+        "workoutTypes: showWorkoutFields ? workoutTypes : []",
+        "create-post must save workout types for workout posts"
+      );
     },
   },
   {
@@ -64,7 +68,11 @@ const checks: Array<{ name: string; run: () => void }> = [
         "workoutTypes.includes(activity)",
         "edit-post must toggle activities in an array"
       );
-      assertIncludes("app/edit-post/[id].tsx", "workout_types: workoutTypes", "edit-post must save workout_types");
+      assertIncludes(
+        "app/edit-post/[id].tsx",
+        "workout_types: showWorkoutFields ? workoutTypes : []",
+        "edit-post must save workout types for workout posts"
+      );
     },
   },
   {

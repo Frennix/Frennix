@@ -11,6 +11,7 @@ export type CachedImageProps = {
   cachePolicy?: ImageProps["cachePolicy"];
   recyclingKey?: string;
   accessibilityLabel?: string;
+  priority?: ImageProps["priority"];
   onLoad?: () => void;
   onLoadEnd?: () => void;
   onError?: () => void;
@@ -28,6 +29,7 @@ export function CachedImage({
   cachePolicy = "memory-disk",
   recyclingKey,
   accessibilityLabel,
+  priority,
   onLoad,
   onLoadEnd,
   onError,
@@ -40,6 +42,7 @@ export function CachedImage({
       contentFit={contentFit}
       transition={transition}
       cachePolicy={cachePolicy}
+      priority={priority}
       recyclingKey={recyclingKey ?? uri}
       style={style}
       accessibilityLabel={accessibilityLabel}

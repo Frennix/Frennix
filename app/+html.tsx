@@ -22,6 +22,7 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
+        <title>Frennix</title>
         <meta name="theme-color" content={FRENNIX_SPLASH_BACKGROUND} />
         <meta name="color-scheme" content="dark" />
         <link rel="manifest" href="/manifest.webmanifest" />

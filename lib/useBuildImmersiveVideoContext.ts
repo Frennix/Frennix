@@ -15,17 +15,22 @@ export type BuildImmersiveVideoContextBundle = {
   buildImmersiveContext: (post: Post) => ImmersiveVideoGalleryContext | undefined;
   shareSheet: ReactNode;
   postActionSheets: ReactNode;
+  resetOverlayMenus: () => void;
 };
 
 /** Shared post actions for immersive video overlay and /video deep links. */
 export function useBuildImmersiveVideoContext(userId: string): BuildImmersiveVideoContextBundle {
   const { toggleLikePost } = useFeedLike(userId);
   const postReaction = usePostReaction(userId);
-  const { openShare, shareSheet } = useSharePost(userId);
-  const { openPostActions, postActionSheets } = usePostActions({
+  const { openShare, resetShare, shareSheet } = useSharePost(userId);
+  const { openPostActions, resetPostActions, postActionSheets } = usePostActions({
     userId,
     onShareInApp: (target) => openShare(target.shared_post ?? target),
   });
+  const resetOverlayMenus = useCallback(() => {
+    resetShare();
+    resetPostActions();
+  }, [resetPostActions, resetShare]);
   const { toggleFollow, isFollowing } = useSuggestedFollow(userId);
 
   const buildImmersiveContext = useCallback(
@@ -42,7 +47,6 @@ export function useBuildImmersiveVideoContext(userId: string): BuildImmersiveVid
             postReaction.mutate({
               postId: post.id,
               emoji: STRONG_WORK_EMOJI,
-              currentEmoji: post.my_reaction,
             }),
           onComment: () => {
             /* ImmersiveVideoOverlayShell opens the comments sheet. */
@@ -73,7 +77,8 @@ export function useBuildImmersiveVideoContext(userId: string): BuildImmersiveVid
       buildImmersiveContext,
       shareSheet,
       postActionSheets,
+      resetOverlayMenus,
     }),
-    [buildImmersiveContext, postActionSheets, shareSheet]
+    [buildImmersiveContext, postActionSheets, resetOverlayMenus, shareSheet]
   );
 }

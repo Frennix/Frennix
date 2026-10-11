@@ -1,7 +1,11 @@
 import type { FrennixStory, Profile, StoryPrivacy } from "@frennix/types";
-import { getFollowing } from "./follows";
 import { getProfilesByIds } from "./profiles";
 import { getSupabase } from "./supabase";
+import {
+  canViewerSeeStoryPrivacy,
+  getStoryPrivacyContext,
+  hydrateDedicatedStories,
+} from "./story-privacy";
 
 async function fetchStoriesWithSlides(storyRows: Record<string, unknown>[]): Promise<FrennixStory[]> {
   if (!storyRows.length) return [];
@@ -23,20 +27,7 @@ async function fetchStoriesWithSlides(storyRows: Record<string, unknown>[]): Pro
     slidesByStory.set(storyId, list);
   }
 
-  return storyRows.map((row) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    privacy: row.privacy as FrennixStory["privacy"],
-    post_id: row.post_id as string | null,
-    workout_tag: row.workout_tag as string | null,
-    location_name: row.location_name as string | null,
-    location_type: row.location_type as FrennixStory["location_type"],
-    challenge_id: row.challenge_id as string | null,
-    challenge_prompt: row.challenge_prompt as string | null,
-    created_at: row.created_at as string,
-    expires_at: row.expires_at as string,
-    slides: slidesByStory.get(row.id as string) ?? [],
-  }));
+  return hydrateDedicatedStories(storyRows, slidesByStory);
 }
 
 export type DiscoverStoryItem = {
@@ -53,35 +44,7 @@ export type StoryDiscoveryLane = {
 };
 
 async function getViewerPrivacyContext(viewerId: string) {
-  const following = await getFollowing(viewerId);
-  const followingIds = new Set(following.map((profile) => profile.id));
-
-  const { data: followersOfViewer } = await getSupabase()
-    .from("follows")
-    .select("follower_id")
-    .eq("following_id", viewerId);
-
-  const mutualFriendIds = new Set<string>();
-  for (const row of followersOfViewer ?? []) {
-    const followerId = row.follower_id as string;
-    if (followingIds.has(followerId)) mutualFriendIds.add(followerId);
-  }
-
-  return { followingIds, mutualFriendIds };
-}
-
-function canViewerSeeStory(
-  privacy: StoryPrivacy,
-  authorId: string,
-  viewerId: string,
-  followingIds: Set<string>,
-  mutualFriendIds: Set<string>
-): boolean {
-  if (authorId === viewerId) return true;
-  if (privacy === "everyone") return true;
-  if (privacy === "friends") return mutualFriendIds.has(authorId);
-  if (privacy === "followers") return followingIds.has(authorId);
-  return false;
+  return getStoryPrivacyContext(viewerId);
 }
 
 async function attachProfiles(
@@ -113,14 +76,13 @@ async function filterDiscoverStories(
 ): Promise<FrennixStory[]> {
   if (!storyRows.length) return [];
 
-  const { followingIds, mutualFriendIds } = await getViewerPrivacyContext(viewerId);
+  const context = await getViewerPrivacyContext(viewerId);
   const visibleRows = storyRows.filter((row) =>
-    canViewerSeeStory(
+    canViewerSeeStoryPrivacy(
       row.privacy as StoryPrivacy,
       row.user_id as string,
       viewerId,
-      followingIds,
-      mutualFriendIds
+      context
     )
   );
 
@@ -234,8 +196,8 @@ export async function getNearbyStories(
 }
 
 export async function getFriendsStories(viewerId: string, limit = 30): Promise<DiscoverStoryItem[]> {
-  const { followingIds, mutualFriendIds } = await getViewerPrivacyContext(viewerId);
-  const friendIds = [...mutualFriendIds];
+  const context = await getViewerPrivacyContext(viewerId);
+  const friendIds = [...context.mutualFriendIds];
   if (!friendIds.length) return [];
 
   const now = new Date().toISOString();
@@ -251,12 +213,11 @@ export async function getFriendsStories(viewerId: string, limit = 30): Promise<D
   if (!storyRows?.length) return [];
 
   const visibleRows = storyRows.filter((row) =>
-    canViewerSeeStory(
+    canViewerSeeStoryPrivacy(
       row.privacy as StoryPrivacy,
       row.user_id as string,
       viewerId,
-      followingIds,
-      mutualFriendIds
+      context
     )
   );
 

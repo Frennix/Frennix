@@ -8,10 +8,11 @@ import {
   type ViewStyle,
 } from "react-native";
 import { CachedImage } from "./CachedImage";
+import { feedDisplayImageUri, feedImageRequestAttrs, type FeedMediaLoadPriority } from "./feedMediaDelivery";
 import { MediaLoadError } from "./MediaLoadError";
 import { Skeleton } from "./Skeleton";
 import { WebNativeImage } from "./WebNativeImage";
-import { isDecodedDomImage } from "./progressiveImageReveal";
+import { shouldRevealCachedDomImage } from "./progressiveImageReveal";
 import { colors } from "./theme";
 
 type ProgressiveImageProps = {
@@ -26,6 +27,10 @@ type ProgressiveImageProps = {
   fadeDuration?: number;
   /** When false, skip skeleton placeholder (use initials/background until image loads). */
   showPlaceholder?: boolean;
+  /** Feed display requests a resized WebP and falls back to the original URL on error. */
+  delivery?: "original" | "feed";
+  /** Visible rows should outrank offscreen lookahead. */
+  loadPriority?: FeedMediaLoadPriority;
 };
 
 const DEFAULT_FADE_MS = 280;
@@ -42,11 +47,26 @@ export function ProgressiveImage({
   recyclingKey,
   fadeDuration = DEFAULT_FADE_MS,
   showPlaceholder = true,
+  delivery = "original",
+  loadPriority,
 }: ProgressiveImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [useOriginal, setUseOriginal] = useState(false);
   const [useNativeWebFallback, setUseNativeWebFallback] = useState(Platform.OS === "web");
   const [retryKey, setRetryKey] = useState(0);
+  const seenUri = useRef(uri);
+  if (seenUri.current !== uri) {
+    seenUri.current = uri;
+    if (useOriginal) setUseOriginal(false);
+  }
+  const optimizedUri = delivery === "feed" ? feedDisplayImageUri(uri) : uri;
+  const requestUri = useOriginal ? uri : optimizedUri;
+  const placeholderRequest =
+    placeholderUri && delivery === "feed" ? feedDisplayImageUri(placeholderUri) : placeholderUri;
+  const showThumb = Boolean(placeholderRequest && placeholderRequest !== requestUri);
+  const requestAttrs = feedImageRequestAttrs(loadPriority);
+  const imagePriority = loadPriority === "low" ? "low" : loadPriority === "high" ? "high" : undefined;
   const opacity = useRef(new Animated.Value(0)).current;
   const revealedRef = useRef(false);
   const webImgRef = useRef<HTMLImageElement | null>(null);
@@ -64,19 +84,22 @@ export function ProgressiveImage({
   };
 
   useLayoutEffect(() => {
-    setLoaded(false);
     setFailed(false);
     setUseNativeWebFallback(Platform.OS === "web");
+
+    if (Platform.OS === "web" && shouldRevealCachedDomImage(webImgRef.current)) {
+      reveal();
+      return;
+    }
+
     revealedRef.current = false;
     opacity.setValue(0);
-
-    if (Platform.OS === "web" && useNativeWebFallback && isDecodedDomImage(webImgRef.current)) {
-      reveal();
-    }
-  }, [uri, retryKey, opacity, useNativeWebFallback]);
+    setLoaded(false);
+  }, [requestUri, retryKey, opacity]);
 
   const handleRetry = () => {
     setFailed(false);
+    setUseOriginal(false);
     setUseNativeWebFallback(Platform.OS === "web");
     revealedRef.current = false;
     opacity.setValue(0);
@@ -85,6 +108,10 @@ export function ProgressiveImage({
   };
 
   const handleExpoImageError = () => {
+    if (delivery === "feed" && !useOriginal && optimizedUri !== uri) {
+      setUseOriginal(true);
+      return;
+    }
     if (Platform.OS === "web" && !useNativeWebFallback) {
       setUseNativeWebFallback(true);
       revealedRef.current = false;
@@ -104,18 +131,30 @@ export function ProgressiveImage({
 
   if (Platform.OS === "web" && useNativeWebFallback) {
     return (
-      <View style={[styles.wrap, style]} accessibilityLabel={accessibilityLabel}>
-        {!loaded && showPlaceholder && !placeholderUri ? (
-          <Skeleton style={StyleSheet.absoluteFillObject} />
+      <View
+        style={[styles.wrap, style]}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ busy: !loaded }}
+      >
+        {showPlaceholder ? <Skeleton width="100%" height="100%" style={StyleSheet.absoluteFillObject} /> : null}
+        {showThumb ? (
+          <WebNativeImage
+            uri={placeholderRequest!}
+            contentFit={contentFit}
+            accessibilityLabel={accessibilityLabel}
+            fetchPriority="high"
+            loading="eager"
+          />
         ) : null}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
           <WebNativeImage
-            key={retryKey}
+            key={`${requestUri}-${retryKey}`}
             ref={webImgRef}
-            uri={uri}
+            uri={requestUri}
             contentFit={contentFit}
-            style={StyleSheet.absoluteFill}
             accessibilityLabel={accessibilityLabel}
+            fetchPriority={requestAttrs.fetchPriority}
+            loading={requestAttrs.loading}
             onLoad={reveal}
             onError={handleExpoImageError}
           />
@@ -125,24 +164,28 @@ export function ProgressiveImage({
   }
 
   return (
-    <View style={[styles.wrap, style]} accessibilityLabel={accessibilityLabel}>
-      {placeholderUri ? (
+    <View
+      style={[styles.wrap, style]}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ busy: !loaded }}
+    >
+      {showPlaceholder ? <Skeleton width="100%" height="100%" style={StyleSheet.absoluteFillObject} /> : null}
+      {showThumb ? (
         <CachedImage
-          uri={placeholderUri}
+          uri={placeholderRequest!}
           style={StyleSheet.absoluteFillObject}
           contentFit={contentFit}
+          priority="high"
           recyclingKey={recyclingKey ? `${recyclingKey}-thumb` : undefined}
         />
       ) : null}
-      {!loaded && showPlaceholder && !placeholderUri ? (
-        <Skeleton style={StyleSheet.absoluteFillObject} />
-      ) : null}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
         <CachedImage
-          key={retryKey}
-          uri={uri}
-          placeholderUri={placeholderUri}
+          key={`${requestUri}-${retryKey}`}
+          uri={requestUri}
+          placeholderUri={showThumb ? placeholderRequest : undefined}
           contentFit={contentFit}
+          priority={imagePriority}
           recyclingKey={recyclingKey}
           accessibilityLabel={accessibilityLabel}
           style={StyleSheet.absoluteFill}
@@ -157,6 +200,7 @@ export function ProgressiveImage({
 
 const styles = StyleSheet.create({
   wrap: {
+    position: "relative",
     overflow: "hidden",
     backgroundColor: colors.background,
     width: "100%",

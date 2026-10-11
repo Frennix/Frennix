@@ -65,7 +65,11 @@ export {
   VIDEO_REVEAL_FALLBACK_MS,
   VIDEO_REVEAL_POLL_MS,
 } from "./videoMediaDelivery";
-export { FullscreenVideoSlide } from "./FullscreenVideoSlide";
+export {
+  FullscreenVideoSlide,
+  type FullscreenVideoSlideHandle,
+  type FullscreenVideoPlaybackSnapshot,
+} from "./FullscreenVideoSlide";
 export {
   buildFeedVideoPlaybackId,
   captureFeedVideoForFullscreen,

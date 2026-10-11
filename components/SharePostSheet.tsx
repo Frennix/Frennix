@@ -24,6 +24,9 @@ interface SharePostSheetProps {
   loading?: boolean;
   sharing?: boolean;
   onShare: (destination: ShareDestination, targetId: string) => void;
+  rootPortal?: boolean;
+  webZIndex?: number;
+  portalDataAttribute?: string;
 }
 
 export function SharePostSheet({
@@ -36,6 +39,9 @@ export function SharePostSheet({
   loading,
   sharing,
   onShare,
+  rootPortal,
+  webZIndex,
+  portalDataAttribute,
 }: SharePostSheetProps) {
   const [step, setStep] = useState<ShareStep>("menu");
 
@@ -174,6 +180,9 @@ export function SharePostSheet({
       onClose={handleClose}
       sheetMaxHeight="70%"
       dismissOnBackdrop={!sharing}
+      rootPortal={rootPortal}
+      webZIndex={webZIndex}
+      portalDataAttribute={portalDataAttribute}
     >
       {post ? (
         <Text style={styles.previewHint} numberOfLines={2}>

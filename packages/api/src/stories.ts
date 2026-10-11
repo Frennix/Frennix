@@ -1,24 +1,16 @@
-import type { FeedStory, FrennixStory, Profile, StoryLocationType, StoryPrivacy, StorySlide } from "@frennix/types";
+import type { FeedStory, FrennixStory, Profile, StorySlide } from "@frennix/types";
 import { getFollowing } from "./follows";
 import { normalizeProfile } from "./profile-normalize";
 import { computeWorkoutStreakFromDates } from "./streaks";
 import { getSupabase } from "./supabase";
+import {
+  canViewerSeeStoryPrivacy,
+  getConnectedProfiles,
+  getStoryPrivacyContext,
+  hydrateDedicatedStories,
+} from "./story-privacy";
 
 const WORKOUT_POST_TYPES = ["workout_update", "photo", "video"] as const;
-
-function canViewerSeeStoryPrivacy(
-  privacy: StoryPrivacy,
-  authorId: string,
-  viewerId: string,
-  followingIds: Set<string>,
-  mutualFriendIds: Set<string>
-): boolean {
-  if (authorId === viewerId) return true;
-  if (privacy === "everyone") return true;
-  if (privacy === "friends") return mutualFriendIds.has(authorId);
-  if (privacy === "followers") return followingIds.has(authorId);
-  return false;
-}
 
 function groupSlidesByStory(slides: StorySlide[]): Map<string, StorySlide[]> {
   const map = new Map<string, StorySlide[]>();
@@ -62,21 +54,7 @@ async function fetchActiveStoriesForUsers(userIds: string[]): Promise<FrennixSto
   if (slidesError) throw slidesError;
 
   const slidesByStory = groupSlidesByStory((slideRows ?? []) as StorySlide[]);
-
-  return storyRows.map((row) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    privacy: row.privacy as StoryPrivacy,
-    post_id: row.post_id as string | null,
-    workout_tag: row.workout_tag as string | null,
-    location_name: row.location_name as string | null,
-    location_type: row.location_type as StoryLocationType | null,
-    challenge_id: row.challenge_id as string | null,
-    challenge_prompt: row.challenge_prompt as string | null,
-    created_at: row.created_at as string,
-    expires_at: row.expires_at as string,
-    slides: slidesByStory.get(row.id as string) ?? [],
-  }));
+  return hydrateDedicatedStories(storyRows as Record<string, unknown>[], slidesByStory);
 }
 
 async function getStoryViewStatus(
@@ -110,9 +88,10 @@ async function getStoryViewStatus(
 }
 
 export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
-  const [selfProfile, following] = await Promise.all([
+  const [selfProfile, following, privacyContext] = await Promise.all([
     getSupabase().from("profiles_reader").select("*").eq("id", viewerId).single(),
     getFollowing(viewerId),
+    getStoryPrivacyContext(viewerId),
   ]);
 
   if (selfProfile.error) throw selfProfile.error;
@@ -120,26 +99,19 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
   const self = normalizeProfile(selfProfile.data as Profile);
   if (!self) return [];
 
+  const followingIds = new Set(following.map((profile) => profile.id));
+  const connectedProfiles = await getConnectedProfiles(viewerId, followingIds);
+
   const profiles: Profile[] = [
     self,
     ...following.map((row) => normalizeProfile(row)).filter((row): row is Profile => Boolean(row)),
+    ...connectedProfiles,
   ];
-  const userIds = profiles.map((profile) => profile.id);
+  const userIds = [...new Set(profiles.map((profile) => profile.id))];
   if (!userIds.length) return [];
 
-  const followingIds = new Set(following.map((profile) => profile.id));
   const now = new Date();
-
-  const { data: followersOfViewer } = await getSupabase()
-    .from("follows")
-    .select("follower_id")
-    .eq("following_id", viewerId);
-
-  const mutualFriendIds = new Set<string>();
-  for (const row of followersOfViewer ?? []) {
-    const followerId = row.follower_id as string;
-    if (followingIds.has(followerId)) mutualFriendIds.add(followerId);
-  }
+  const { followingIds: viewerFollowingIds, mutualFriendIds, connectedIds } = privacyContext;
 
   const [{ data: workoutPosts }, activeStories] = await Promise.all([
     getSupabase()
@@ -166,13 +138,11 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
   const storiesByUser = new Map<string, FrennixStory[]>();
   for (const story of activeStories) {
     if (
-      !canViewerSeeStoryPrivacy(
-        story.privacy,
-        story.user_id,
-        viewerId,
-        followingIds,
-        mutualFriendIds
-      )
+      !canViewerSeeStoryPrivacy(story.privacy, story.user_id, viewerId, {
+        followingIds: viewerFollowingIds,
+        mutualFriendIds,
+        connectedIds,
+      })
     ) {
       continue;
     }
@@ -197,7 +167,7 @@ export async function getFeedStories(viewerId: string): Promise<FeedStory[]> {
       active_stories: userStories,
       last_workout: null,
       is_self: profile.id === viewerId,
-      viewer_follows: profile.id === viewerId || followingIds.has(profile.id),
+      viewer_follows: profile.id === viewerId || viewerFollowingIds.has(profile.id),
       viewed: viewedByUser.get(profile.id) ?? true,
     };
   });
@@ -225,20 +195,8 @@ export async function getFeedStoriesForPartners(
   if (!partners.length) return [];
 
   const userIds = partners.map((profile) => profile.id);
-  const following = await getFollowing(viewerId);
-  const followingIds = new Set(following.map((profile) => profile.id));
+  const privacyContext = await getStoryPrivacyContext(viewerId);
   const now = new Date();
-
-  const { data: followersOfViewer } = await getSupabase()
-    .from("follows")
-    .select("follower_id")
-    .eq("following_id", viewerId);
-
-  const mutualFriendIds = new Set<string>();
-  for (const row of followersOfViewer ?? []) {
-    const followerId = row.follower_id as string;
-    if (followingIds.has(followerId)) mutualFriendIds.add(followerId);
-  }
 
   const [{ data: workoutPosts }, activeStories] = await Promise.all([
     getSupabase()
@@ -264,15 +222,7 @@ export async function getFeedStoriesForPartners(
 
   const storiesByUser = new Map<string, FrennixStory[]>();
   for (const story of activeStories) {
-    if (
-      !canViewerSeeStoryPrivacy(
-        story.privacy,
-        story.user_id,
-        viewerId,
-        followingIds,
-        mutualFriendIds
-      )
-    ) {
+    if (!canViewerSeeStoryPrivacy(story.privacy, story.user_id, viewerId, privacyContext)) {
       continue;
     }
     const list = storiesByUser.get(story.user_id) ?? [];
@@ -296,7 +246,7 @@ export async function getFeedStoriesForPartners(
       active_stories: userStories,
       last_workout: null,
       is_self: false,
-      viewer_follows: followingIds.has(profile.id),
+      viewer_follows: privacyContext.followingIds.has(profile.id),
       viewed: viewedByUser.get(profile.id) ?? true,
     };
   });

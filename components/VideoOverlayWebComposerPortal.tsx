@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { WebCommentComposerRow, type WebCommentComposerRowProps } from "@/components/WebCommentComposerRow";
-import { computeVideoOverlayComposerTop } from "@/lib/video-overlay-visual-viewport-layout";
+import {
+  computeVideoOverlayComposerBottom,
+  measureVideoOverlayViewportFrame,
+} from "@/lib/video-overlay-visual-viewport-layout";
 
 export type VideoOverlayWebComposerPortalProps = WebCommentComposerRowProps;
 
 function applyComposerPosition(composerRow: HTMLElement): void {
-  const composerTop = computeVideoOverlayComposerTop(composerRow.offsetHeight);
+  const frame = measureVideoOverlayViewportFrame();
+  const composerBottom = computeVideoOverlayComposerBottom(frame);
 
-  composerRow.style.top = `${composerTop}px`;
-  composerRow.style.bottom = "auto";
+  composerRow.style.top = "auto";
+  composerRow.style.bottom = `${composerBottom}px`;
 }
 
 /** Web-only portaled composer for the immersive video comments overlay. */

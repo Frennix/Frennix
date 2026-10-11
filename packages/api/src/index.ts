@@ -25,6 +25,8 @@ export * from "./crash-reports";
 export * from "./reactions";
 export * from "./stories";
 export * from "./story-publish";
+export * from "./story-privacy";
+export * from "./story-controls";
 export * from "./story-discovery";
 export * from "./story-engagement";
 export * from "./workout-story-utils";

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
 import type { PostType } from "@frennix/types";
+import type { FeedMediaLoadPriority } from "./feedMediaDelivery";
 import { PostMediaCarousel } from "./PostMediaCarousel";
 import { Skeleton } from "./Skeleton";
 import { FEED_PORTRAIT_FRAME_RATIO } from "./mediaLayout";
@@ -23,6 +24,7 @@ interface FeedMediaSlotProps {
   /** Scope id for feed video playback coordination (typically post id). */
   playbackScopeId?: string;
   onPrimaryMediaReady?: (source: "image" | "video") => void;
+  loadPriority?: FeedMediaLoadPriority;
 }
 
 function FeedMediaSkeleton({ style }: { style?: ViewStyle }) {
@@ -47,6 +49,7 @@ export function FeedMediaSlot({
   visible = true,
   playbackScopeId,
   onPrimaryMediaReady,
+  loadPriority,
 }: FeedMediaSlotProps) {
   const containerRef = useRef<View>(null);
   const [active, setActive] = useState(false);
@@ -101,6 +104,7 @@ export function FeedMediaSlot({
       mediaVisible={active}
       playbackScopeId={playbackScopeId}
       onPrimaryMediaReady={onPrimaryMediaReady}
+      loadPriority={loadPriority}
     />
   );
 }

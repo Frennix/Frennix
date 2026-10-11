@@ -18,6 +18,119 @@ function pass(name, ok, detail = "") {
   return ok;
 }
 
+async function probeDiscoveryPrompt(browser, harnessUrl) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      if (url.includes("/rest/v1/profiles")) {
+        return new Response(
+          JSON.stringify({
+            id: "prompt-user",
+            onboarding_complete: true,
+            city: "Portland",
+            state: "OR",
+            location_prompt_completed_at: new Date().toISOString(),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("nominatim.openstreetmap.org")) {
+        const parsed = new URL(url);
+        const query = parsed.searchParams.get("q") ?? "Portland, OR";
+        const [cityPart, statePart] = query.split(",").map((part) => part.trim());
+        return new Response(
+          JSON.stringify([
+            {
+              lat: "45.5152",
+              lon: "-122.6784",
+              address: { city: cityPart || "Portland", state: statePart || "Oregon" },
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return originalFetch(input, init);
+    };
+  });
+
+  let ok = true;
+  try {
+    await page.goto(harnessUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#manual-location-harness", { timeout: 60_000 });
+    await page.getByText("Show discovery prompt", { exact: true }).click();
+    const discoveryPrompt = page.locator("#discovery-prompt");
+    await discoveryPrompt.waitFor({ timeout: 10_000 });
+    ok = pass("Discovery prompt opens with the city sheet mounted", true) && ok;
+    await discoveryPrompt.getByText("Enter Location Manually", { exact: true }).click();
+    await discoveryPrompt.waitFor({ state: "hidden", timeout: 10_000 });
+    await page.getByText("Enter your city", { exact: true }).waitFor({ timeout: 10_000 });
+    const promptCity = page.locator('[data-testid="manual-location-city"]').last();
+    const promptState = page.locator('[data-testid="manual-location-state"]').last();
+    await promptCity.click();
+    await promptCity.fill("Portland");
+    await promptState.click();
+    await promptState.fill("OR");
+    const sheetStack = await page.evaluate(() => {
+      const sheet = document.getElementById("bottom-action-sheet");
+      const prompt = document.getElementById("discovery-prompt");
+      const city = document.querySelector('[data-testid="manual-location-city"]');
+      const cityRect = city?.getBoundingClientRect();
+      const top = cityRect ? document.elementFromPoint(cityRect.left + 12, cityRect.top + 12) : null;
+      return {
+        promptGone: prompt == null,
+        zIndex: sheet ? Number(getComputedStyle(sheet).zIndex) : 0,
+        cityIsTop: Boolean(city && (top === city || city.contains(top))),
+      };
+    });
+    ok =
+      pass(
+        "Manual entry replaces the location prompt",
+        sheetStack.promptGone &&
+          sheetStack.zIndex > 9999 &&
+          sheetStack.cityIsTop &&
+          (await promptCity.inputValue()) === "Portland" &&
+          (await promptState.inputValue()) === "OR",
+        JSON.stringify(sheetStack)
+      ) && ok;
+    await page.getByText("Cancel", { exact: true }).click();
+    await page.getByText("Enter your city", { exact: true }).waitFor({ state: "hidden", timeout: 10_000 });
+    await discoveryPrompt.waitFor({ timeout: 10_000 });
+    ok = pass("Cancel returns to the location prompt", true) && ok;
+    await discoveryPrompt.getByText("Enter Location Manually", { exact: true }).click();
+    await page.getByText("Enter your city", { exact: true }).waitFor({ timeout: 10_000 });
+    ok =
+      pass(
+        "Reopening manual entry keeps the typed city",
+        (await promptCity.inputValue()) === "Portland" && (await promptState.inputValue()) === "OR"
+      ) && ok;
+    await page.getByText("Save location", { exact: true }).click();
+    await page.waitForFunction(() => document.getElementById("prompt-saved")?.textContent === "saved", {
+      timeout: 10_000,
+    });
+    await discoveryPrompt.waitFor({ state: "hidden", timeout: 10_000 });
+    await page.getByText("Enter your city", { exact: true }).waitFor({ state: "hidden", timeout: 10_000 });
+    ok = pass("Saving from the prompt finishes setup", true) && ok;
+  } catch (error) {
+    ok = pass("Discovery prompt and city sheet", false, error instanceof Error ? error.message : String(error)) && ok;
+    const text = await page.locator("body").innerText().catch(() => "");
+    console.log(text.slice(0, 800));
+  }
+  const hookError = errors.some((message) => /Rendered more hooks than during the previous render/i.test(message));
+  ok = pass("Prompt flow has no hooks-order crash", !hookError, hookError ? errors.join(" | ") : "") && ok;
+  if (errors.length && !hookError) console.log("prompt pageerrors", errors.slice(0, 6));
+  await context.close();
+  return ok;
+}
+
 async function probeIosKeyboard(browser, harnessUrl) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -209,6 +322,18 @@ async function main() {
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      if (url.includes("/rest/v1/profiles")) {
+        return new Response(
+          JSON.stringify({
+            id: "prompt-user",
+            onboarding_complete: true,
+            city: "Portland",
+            state: "OR",
+            location_prompt_completed_at: new Date().toISOString(),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
       if (url.includes("nominatim.openstreetmap.org")) {
         const parsed = new URL(url);
         const query = parsed.searchParams.get("q") ?? "Austin, Texas";
@@ -365,6 +490,7 @@ async function main() {
     console.log("pageerrors", errors.slice(0, 6));
   }
 
+  ok = (await probeDiscoveryPrompt(browser, `http://127.0.0.1:${harnessPort}/`)) && ok;
   ok = (await probeIosKeyboard(browser, `http://127.0.0.1:${harnessPort}/`)) && ok;
 
   harnessServer.close();

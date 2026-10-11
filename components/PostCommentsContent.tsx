@@ -17,11 +17,13 @@ import {
   type NativeSyntheticEvent,
   type TextInputContentSizeChangeEventData,
 } from "react-native";
-import { addComment, getComments, toggleCommentLike } from "@frennix/api";
+import { addComment, getComments, getErrorMessage } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useCommentActions } from "@/lib/useCommentActions";
+import { useCommentLike } from "@/lib/useCommentLike";
 import { logCommentsInputZoomSnapshot } from "@/lib/comments-input-zoom-diagnostics";
 import { hapticLight } from "@/lib/haptics";
+import { adjustPostCommentCount } from "@/lib/post-cache";
 import { WebCommentComposerRow } from "@/components/WebCommentComposerRow";
 import { Avatar, CommentThread, colors, getSharedPostTargetId, spacing, typography } from "@frennix/ui";
 
@@ -31,8 +33,8 @@ const ESTIMATED_LINE_HEIGHT = 22;
 const COMPOSER_AVATAR_WIDTH_PX = 32;
 const COMPOSER_POST_WIDTH_PX = 48;
 const COMPOSER_ROW_GAP_PX = spacing.xs;
-/** Instagram-like cap: grow through ~5 visible lines, then scroll internally. */
-const MAX_VISIBLE_LINES = 5;
+/** Instagram-like cap: grow through 6 visible lines, then scroll internally. */
+const MAX_VISIBLE_LINES = 6;
 /** Internal textarea inset — included in border-box height/width. */
 const COMMENT_TEXTAREA_PADDING_X_PX = 14;
 const COMMENT_TEXTAREA_PADDING_Y_PX = 8;
@@ -153,6 +155,7 @@ export function CommentComposerRow({
   posting,
   onComposerFocus,
   onComposerBlur,
+  compactComposer = false,
 }: CommentComposerRowProps) {
   if (Platform.OS === "web") {
     return (
@@ -166,6 +169,7 @@ export function CommentComposerRow({
         posting={posting}
         onFocus={onComposerFocus}
         onBlur={onComposerBlur}
+        hideAvatar={compactComposer}
       />
     );
   }
@@ -332,10 +336,17 @@ export function usePostCommentsContent({
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
       queryClient.invalidateQueries({ queryKey: ["post", postId] });
       queryClient.invalidateQueries({ queryKey: ["feed"] });
+      queryClient.invalidateQueries({ queryKey: ["reels"] });
     },
   });
 
-  const { data: comments = [] } = useQuery({
+  const {
+    data: comments = [],
+    error: commentsError,
+    isError: commentsFailed,
+    isPending: commentsPending,
+    refetch: refetchComments,
+  } = useQuery({
     queryKey: ["comments", postId, userId],
     queryFn: () => getComments(postId, userId),
     enabled: enabled && !!postId && !!userId,
@@ -357,6 +368,7 @@ export function usePostCommentsContent({
     queryClient.invalidateQueries({ queryKey: ["comments", postId] });
     queryClient.invalidateQueries({ queryKey: ["post", postId] });
     queryClient.invalidateQueries({ queryKey: ["feed"] });
+    queryClient.invalidateQueries({ queryKey: ["reels"] });
   }, [postId, queryClient]);
 
   type CommentMutationVars = {
@@ -391,14 +403,27 @@ export function usePostCommentsContent({
         appendOptimisticComment(old, optimistic, parentId)
       );
 
+      if (!parentId) {
+        adjustPostCommentCount(queryClient, userId, postId, 1);
+        if (post.id !== postId) {
+          adjustPostCommentCount(queryClient, userId, post.id, 1);
+        }
+      }
+
       setCommentText("");
       setReplyTo(null);
 
-      return { previousComments, replyToComment };
+      return { previousComments, replyToComment, incrementedTopLevel: !parentId };
     },
     onError: (_error, { text, replyToComment }, context) => {
       if (context?.previousComments) {
         queryClient.setQueryData(["comments", postId, userId], context.previousComments);
+      }
+      if (context?.incrementedTopLevel) {
+        adjustPostCommentCount(queryClient, userId, postId, -1);
+        if (post.id !== postId) {
+          adjustPostCommentCount(queryClient, userId, post.id, -1);
+        }
       }
       setCommentText(text);
       if (replyToComment) setReplyTo(replyToComment);
@@ -408,13 +433,7 @@ export function usePostCommentsContent({
     },
   });
 
-  const commentLikeMutation = useMutation({
-    mutationFn: ({ commentId, liked }: { commentId: string; liked: boolean }) =>
-      toggleCommentLike(commentId, userId, liked),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comments", postId] });
-    },
-  });
+  const { toggleCommentLikeState } = useCommentLike(postId, userId);
 
   const commentPlaceholder = replyTo
     ? `Reply to ${replyTo.author?.display_name ?? "comment"}…`
@@ -432,8 +451,7 @@ export function usePostCommentsContent({
     });
   }, [commentMutation, commentText, replyTo]);
 
-  const useVideoOverlayWebComposer =
-    useVideoOverlayWebComposerOption || (compactComposer && Platform.OS === "web");
+  const useVideoOverlayWebComposer = useVideoOverlayWebComposerOption;
 
   const replyBanner = replyTo ? (
     <View style={styles.replyBanner}>
@@ -478,18 +496,75 @@ export function usePostCommentsContent({
       }
     : null;
 
+  useEffect(() => {
+    if (!enabled || Platform.OS !== "web") return;
+    const state = commentsPending
+      ? "loading"
+      : commentsFailed
+        ? "error"
+        : comments.length
+          ? "list"
+          : "empty";
+    console.info("[frennix-comments-diag] comments-query", {
+      postId,
+      state,
+      count: comments.length,
+      pending: commentsPending,
+      failed: commentsFailed,
+    });
+  }, [comments.length, commentsFailed, commentsPending, enabled, postId]);
+
   const thread = (
     <>
       {useVideoOverlayWebComposer ? replyBanner : null}
-      <CommentThread
-        comments={comments}
-        currentUserId={userId}
-        onReply={setReplyTo}
-        onLike={(comment) =>
-          commentLikeMutation.mutate({ commentId: comment.id, liked: !!comment.liked_by_me })
-        }
-        onMenuPress={openCommentActions}
-      />
+      {commentsPending && comments.length === 0 ? (
+        <View
+          style={styles.threadState}
+          accessibilityLabel="Loading comments"
+          {...(Platform.OS === "web" ? ({ "data-frennix-comments-state": "loading" } as object) : null)}
+        >
+          <ActivityIndicator color={colors.accent} size="small" />
+          <Text style={styles.threadStateText}>Loading comments…</Text>
+        </View>
+      ) : commentsFailed ? (
+        <View
+          style={styles.threadState}
+          accessibilityLabel="Could not load comments"
+          {...(Platform.OS === "web" ? ({ "data-frennix-comments-state": "error" } as object) : null)}
+        >
+          <Text style={styles.threadStateText}>
+            {getErrorMessage(commentsError, "Could not load comments. Check your connection and try again.")}
+          </Text>
+          <Pressable
+            onPress={() => {
+              void refetchComments();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading comments"
+            style={styles.retryButton}
+          >
+            <Text style={styles.retryLabel}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : comments.length === 0 ? (
+        <View
+          style={styles.threadState}
+          accessibilityLabel="No comments yet"
+          {...(Platform.OS === "web" ? ({ "data-frennix-comments-state": "empty" } as object) : null)}
+        >
+          <Text style={styles.threadStateText}>No comments yet</Text>
+        </View>
+      ) : (
+        <View {...(Platform.OS === "web" ? ({ "data-frennix-comments-state": "list" } as object) : null)}>
+          <CommentThread
+            comments={comments}
+            currentUserId={userId}
+            onReply={setReplyTo}
+            onLike={(comment) => toggleCommentLikeState(comment.id, !!comment.liked_by_me)}
+            onMenuPress={openCommentActions}
+          />
+        </View>
+      )}
     </>
   );
 
@@ -650,4 +725,34 @@ const styles = StyleSheet.create({
   },
   replyBannerText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
   replyCancel: { ...typography.caption, color: colors.accent, fontWeight: "600" },
+  threadState: {
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    minHeight: 0,
+    flexGrow: 0,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  threadStateText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+  retryButton: {
+    minHeight: 40,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  retryLabel: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: "700",
+  },
 });

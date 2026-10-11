@@ -3,6 +3,7 @@ import { Platform, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing } from "@frennix/ui";
 import { resolveBottomSheetWebFrame } from "@/lib/bottom-sheet-web-frame";
+import { OVERLAY_Z_INDEX } from "@/lib/overlay-z-index";
 import {
   measureSafariVisualViewport,
   OVERLAY_BOTTOM_SAFETY_MARGIN_PX,
@@ -126,6 +127,7 @@ export function useBottomActionSheetLayout(
             flexDirection: "column",
             justifyContent: "flex-end",
             overflow: "hidden",
+            zIndex: OVERLAY_Z_INDEX.actionSheet,
           } as ViewStyle)
         : null,
     [frame]

@@ -74,6 +74,7 @@ export function ImmersiveVideoPlaylistViewer({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [fetchingMore, setFetchingMore] = useState(false);
   const [showEndState, setShowEndState] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
   const handoffAppliedRef = useRef(false);
   const fetchInFlightRef = useRef(false);
   const webScrollRef = useRef<HTMLDivElement | null>(null);
@@ -207,6 +208,7 @@ export function ImmersiveVideoPlaylistViewer({
             postActions={immersiveContext.postActions}
             onClose={onClose}
             commentsOverlayOpen={isActive && commentsOverlayOpen}
+            onScrubbingChange={isActive ? setScrubbing : undefined}
           />
         </View>
       );
@@ -257,14 +259,15 @@ export function ImmersiveVideoPlaylistViewer({
           ref={webScrollRef}
           className="frennix-immersive-video-playlist-scroll"
           onScroll={handleWebScroll}
+          {...({ "data-frennix-reel-scrubbing": scrubbing ? "true" : "false" } as object)}
           style={{
             width: stageWidth,
             height: stageHeight,
-            overflowY: "scroll",
-            scrollSnapType: "y mandatory",
+            overflowY: scrubbing ? "hidden" : "scroll",
+            scrollSnapType: scrubbing ? "none" : "y mandatory",
             WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
-            touchAction: "pan-y",
+            touchAction: scrubbing ? "none" : "pan-y",
             backgroundColor: colors.background,
           }}
         >
@@ -308,6 +311,7 @@ export function ImmersiveVideoPlaylistViewer({
         data={entries}
         keyExtractor={(entry) => entry.playbackId}
         pagingEnabled
+        scrollEnabled={!scrubbing}
         decelerationRate="fast"
         snapToInterval={stageHeight}
         snapToAlignment="start"

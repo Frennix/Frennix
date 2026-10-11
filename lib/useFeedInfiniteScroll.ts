@@ -8,12 +8,16 @@ import { prefetchPostImages } from "@/lib/prefetch-post-images";
 const PREFETCH_VIEWPORT_MULTIPLIER = 3;
 /** Activate media for rows this many indices ahead of the last visible post. */
 const MEDIA_LOOKAHEAD_ITEMS = 8;
+/** First screen of an iPhone feed is one tall post plus the next row. */
+const PRIORITY_INITIAL_POSTS = 2;
 const MEDIA_LOOKBEHIND_ITEMS = 2;
 /** Wait before auto-fetching page 2 so the first screen can render first. */
 const AUTO_PAGE_TWO_DELAY_MS = 2500;
 
 type UseFeedInfiniteScrollOptions = {
   posts: Post[];
+  /** Resets media visibility and page prefetch when the feed filter changes. */
+  scopeKey?: string;
   pageCount: number;
   isFeedReady: boolean;
   hasNextPage: boolean;
@@ -24,6 +28,7 @@ type UseFeedInfiniteScrollOptions = {
 
 export function useFeedInfiniteScroll({
   posts,
+  scopeKey = "all",
   pageCount,
   isFeedReady,
   hasNextPage,
@@ -36,10 +41,22 @@ export function useFeedInfiniteScroll({
 
   const [nearEnd, setNearEnd] = useState(false);
   const [visiblePostIds, setVisiblePostIds] = useState<Set<string>>(() => new Set());
+  const [priorityPostIds, setPriorityPostIds] = useState<Set<string>>(() => new Set());
   const nearEndRef = useRef(false);
   const fetchInFlightRef = useRef(false);
   const seededInitialPostsRef = useRef(false);
   const autoPageTwoRequestedRef = useRef(false);
+  const prefetchedPageCountRef = useRef(0);
+
+  useEffect(() => {
+    seededInitialPostsRef.current = false;
+    autoPageTwoRequestedRef.current = false;
+    nearEndRef.current = false;
+    prefetchedPageCountRef.current = 0;
+    setNearEnd(false);
+    setVisiblePostIds(new Set());
+    setPriorityPostIds(new Set());
+  }, [scopeKey]);
 
   // FlatList viewability often does not fire on first paint (especially Safari web).
   // Seed the first screen of posts so feed media mounts immediately.
@@ -55,6 +72,15 @@ export function useFeedInfiniteScroll({
       }
       return next;
     });
+    setPriorityPostIds((prev) => {
+      const next = new Set(prev);
+      const end = Math.min(posts.length, PRIORITY_INITIAL_POSTS);
+      for (let i = 0; i < end; i++) {
+        next.add(posts[i].id);
+      }
+      return next;
+    });
+    prefetchPostImages(posts.slice(0, PRIORITY_INITIAL_POSTS), PRIORITY_INITIAL_POSTS);
   }, [posts]);
 
   const requestNextPage = useCallback(() => {
@@ -84,7 +110,6 @@ export function useFeedInfiniteScroll({
   }, [nearEnd, hasNextPage, isFetchingNextPage, requestNextPage]);
 
   // Prefetch images for newly loaded tail posts.
-  const prefetchedPageCountRef = useRef(0);
   useEffect(() => {
     if (pageCount <= prefetchedPageCountRef.current) return;
     prefetchedPageCountRef.current = pageCount;
@@ -152,8 +177,26 @@ export function useFeedInfiniteScroll({
       if (visiblePosts.length) {
         prefetchPostImages(visiblePosts, 6);
       }
+
+      const priority = new Set<string>();
+      for (const entry of viewableItems) {
+        if (!entry.isViewable || entry.item?.kind !== "post") continue;
+        priority.add(entry.item.post.id);
+      }
+      if (priority.size) {
+        setPriorityPostIds(priority);
+      }
     }
   ).current;
+
+  const resolvedPriorityPostIds = useMemo(() => {
+    const stillOnScreen = posts.some((post) => priorityPostIds.has(post.id));
+    if (priorityPostIds.size > 0 && stillOnScreen) return priorityPostIds;
+    const next = new Set<string>();
+    const end = Math.min(posts.length, PRIORITY_INITIAL_POSTS);
+    for (let i = 0; i < end; i++) next.add(posts[i].id);
+    return next;
+  }, [posts, priorityPostIds]);
 
   const showTrailingSkeletons = hasNextPage && (nearEnd || isFetchingNextPage);
 
@@ -173,5 +216,6 @@ export function useFeedInfiniteScroll({
     onViewableItemsChanged,
     viewabilityConfig,
     visiblePostIds,
+    priorityPostIds: resolvedPriorityPostIds,
   };
 }

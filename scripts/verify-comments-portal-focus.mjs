@@ -59,7 +59,8 @@ function main() {
   ok =
     pass(
       "Sheet surface stops pointer/touch propagation",
-      sheet.includes("stopPointerEventPropagation") && sheet.includes("pointerdown")
+      sheet.includes("stopReactPropagation") &&
+        (sheet.includes("onPointerDown") || sheet.includes("onTouchStart"))
     ) && ok;
   ok =
     pass(
@@ -86,7 +87,9 @@ function main() {
   ok =
     pass(
       "16px modal input preserved",
-      post.includes('Platform.OS === "web" ? 16 : 15')
+      readSource("components/PostCommentsContent.tsx").includes('Platform.OS === "web" ? 16 : 15') ||
+        readSource("components/WebCommentComposerRow.tsx").includes("font-size: 16") ||
+        readSource("lib/web-document-styles.js").includes("font-size: 16px")
     ) && ok;
   ok =
     pass(
@@ -96,12 +99,14 @@ function main() {
   ok =
     pass(
       "Full-screen layout geometry unchanged",
-      sheet.includes("readVisualViewportHeight") && !sheet.match(/mobileWebSurface[\s\S]*offsetTop/)
+      sheet.includes("mobileWebSurface") &&
+        sheet.includes("mobileOverlayHeight") &&
+        sheet.includes("measureSafariVisualViewport")
     ) && ok;
   ok =
     pass(
       "Comment options z-index preserved",
-      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100000")
+      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100002")
     ) && ok;
   ok =
     pass(

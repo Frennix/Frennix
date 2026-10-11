@@ -9,12 +9,14 @@ type FeedPerfSession = {
 };
 
 let activeSession: FeedPerfSession | null = null;
+let firstMediaMarked = false;
 
 function now() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
 }
 
 export function startFeedPerfSession(userId: string) {
+  firstMediaMarked = false;
   activeSession = {
     userId,
     startedAt: now(),
@@ -39,6 +41,12 @@ export function markFeedCacheHydrated(postCount: number) {
   markFeedPerf("cache_hydrated", { post_count: postCount });
 }
 
+export function markFirstFeedMediaReady(source: "image" | "video" | "poster") {
+  if (firstMediaMarked) return;
+  firstMediaMarked = true;
+  markFeedPerf("first_media_ready", { source });
+}
+
 export function reportFeedPerfReady(postCount: number) {
   if (!activeSession || activeSession.reported) return;
   activeSession.reported = true;
@@ -60,4 +68,5 @@ export function reportFeedPerfReady(postCount: number) {
 
 export function resetFeedPerfSession() {
   activeSession = null;
+  firstMediaMarked = false;
 }

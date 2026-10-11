@@ -7,7 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { hasPersistedAuthToken } from "@/lib/auth-storage";
 import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
 import { isAuthenticatedDestinationReady } from "@/lib/authenticated-startup-ready";
-import { replaceWithAuthenticatedTabs } from "@/lib/auth-navigation";
+import { redirectToLogin, replaceWithAuthenticatedTabs } from "@/lib/auth-navigation";
 import { isSupabaseConfigured } from "@/lib/config";
 import { logDiagnostic } from "@/lib/client-diagnostics";
 import { trackAppStartup } from "@/lib/beta-health-analytics";
@@ -81,7 +81,7 @@ function IndexGate({
 
   const handleLogout = () => {
     void signOut().finally(() => {
-      if (typeof window !== "undefined") window.location.replace("/(auth)/login");
+      redirectToLogin();
     });
   };
 

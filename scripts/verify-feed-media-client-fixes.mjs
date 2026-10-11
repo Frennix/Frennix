@@ -201,6 +201,34 @@ async function main() {
 
   ok =
     pass(
+      "Feed images request a resized display file and keep a retry fallback",
+      progressive.includes("feedDisplayImageUri") &&
+        progressive.includes("setUseOriginal") &&
+        progressive.includes("MediaLoadError")
+    ) && ok;
+
+  ok =
+    pass(
+      "Visible images set fetch priority so they are not queued behind lookahead",
+      progressive.includes("fetchPriority") && read("packages/ui/src/WebNativeImage.tsx").includes("fetchpriority")
+    ) && ok;
+
+  ok =
+    pass(
+      "Feed video does not capture a second full-file poster",
+      postMedia.includes('layout !== "feed"') && feedPlayer.includes("shouldAttachFeedVideoSource")
+    ) && ok;
+
+  ok =
+    pass(
+      "Missing video poster shows a placeholder before playback",
+      feedPlayer.includes("shouldShowFeedVideoLoadingPlaceholder") &&
+        feedPlayer.includes("<Skeleton") &&
+        !feedPlayer.includes("shouldPlay || inView || preloadGranted")
+    ) && ok;
+
+  ok =
+    pass(
       "expo-image failure can fall back to native web img",
       progressive.includes("setUseNativeWebFallback(true)")
     ) && ok;
@@ -217,14 +245,23 @@ async function main() {
     pass(
       "Cached web images reveal after reset via complete/naturalWidth check",
       progressive.includes("useLayoutEffect") &&
-        progressive.includes("isDecodedDomImage") &&
-        progressive.includes("webImgRef")
+        progressive.includes("shouldRevealCachedDomImage") &&
+        progressive.includes("webImgRef") &&
+        !progressive.includes("[uri, retryKey, opacity, useNativeWebFallback]")
+    ) && ok;
+
+  ok =
+    pass(
+      "Carousel photo press wrapper fills the parent-locked slide",
+      postMedia.includes("feedFillParentStyle") &&
+        postMedia.includes("fillParent ? feedFillParentStyle()") &&
+        postMediaCarousel.includes("feedFillParentStyle")
     ) && ok;
 
   ok =
     pass(
       "Unloaded feed image cannot open lightbox",
-      postMedia.includes("imageLoaded") && postMedia.includes("if (imageFailed || !imageLoaded) return")
+      postMedia.includes("imageLoaded") && postMedia.includes("imageFailed || !imageLoaded")
     ) && ok;
 
   ok =

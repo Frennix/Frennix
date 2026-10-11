@@ -45,9 +45,11 @@ import {
   subscribeFeedVideoDomAdopted,
   unregisterFeedVideoDom,
 } from "./feedVideoDom";
+import { feedDisplayImageUri, shouldAttachFeedVideoSource, type FeedMediaLoadPriority } from "./feedMediaDelivery";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { MediaLoadError } from "./MediaLoadError";
 import { ProgressiveImage } from "./ProgressiveImage";
+import { Skeleton } from "./Skeleton";
 import {
   VIDEO_FIRST_FRAME_TIMEOUT_MS,
   VIDEO_REVEAL_FALLBACK_MS,
@@ -90,6 +92,8 @@ interface FeedVideoPlayerProps {
   onVisualReady?: () => void;
   fillParent?: boolean;
   feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
+  /** Offscreen rows must not download the video until they are near the viewport. */
+  loadPriority?: FeedMediaLoadPriority;
 }
 
 /**
@@ -109,6 +113,7 @@ export function FeedVideoPlayer({
   onVisualReady,
   fillParent = false,
   feedFrameBucket,
+  loadPriority = "high",
 }: FeedVideoPlayerProps) {
   const internalPoster = useVideoPoster(posterState ? undefined : uri, posterState ? null : thumbnailUrl);
   const resolvedPoster = posterState ?? internalPoster;
@@ -231,6 +236,9 @@ export function FeedVideoPlayer({
     if (!playbackId) return;
     setFeedVideoPreloadCandidate(playbackId, false);
   }, [playbackId]);
+
+  const loadPriorityRef = useRef(loadPriority);
+  loadPriorityRef.current = loadPriority;
 
   const shouldPlay = Boolean(
     inView &&
@@ -434,14 +442,23 @@ export function FeedVideoPlayer({
     const video = document.createElement("video");
     video.className = "feed-inline-video feed-inline-video-cover";
     configureFeedWebVideoElement(video);
-    video.src = uri;
     video.muted = mutedRef.current;
     video.loop = true;
     video.playsInline = true;
-    video.preload =
-      shouldPlayRef.current || preloadGrantedRef.current ? "auto" : "metadata";
+    const attachNow = shouldAttachFeedVideoSource({
+      loadPriority: loadPriorityRef.current,
+      inView: inViewRef.current,
+      preloadGranted: preloadGrantedRef.current,
+      shouldPlay: shouldPlayRef.current,
+    });
+    video.preload = attachNow ? "auto" : "none";
+    if (attachNow) {
+      video.setAttribute("fetchpriority", loadPriorityRef.current === "low" ? "low" : "high");
+      video.src = uri;
+    }
     const posterUri = resolvedPoster.posterUri ?? thumbnailUrl ?? undefined;
-    if (posterUri) video.poster = posterUri;
+    const displayPoster = posterUri ? feedDisplayImageUri(posterUri) : undefined;
+    if (displayPoster) video.poster = displayPoster;
     Object.assign(video.style, {
       width: "100%",
       height: "100%",
@@ -546,17 +563,30 @@ export function FeedVideoPlayer({
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const video = webVideoRef.current;
-    if (!video || (!preloadGranted && !shouldPlay)) return;
+    if (!video) return;
+    const attach = shouldAttachFeedVideoSource({
+      loadPriority,
+      inView,
+      preloadGranted,
+      shouldPlay,
+    });
+    if (!attach) return;
+    video.setAttribute("fetchpriority", loadPriority === "low" ? "low" : "high");
+    if (!video.getAttribute("src")) {
+      video.preload = "auto";
+      video.src = uri;
+      return;
+    }
     if (video.preload !== "auto") {
       video.preload = "auto";
+      if (
+        video.readyState === HTMLMediaElement.HAVE_NOTHING &&
+        !isFeedVideoFullscreenHandoff(playbackId)
+      ) {
+        video.load();
+      }
     }
-    if (
-      video.readyState === HTMLMediaElement.HAVE_NOTHING &&
-      !isFeedVideoFullscreenHandoff(playbackId)
-    ) {
-      video.load();
-    }
-  }, [playbackId, preloadGranted, shouldPlay, uri, retryKey]);
+  }, [inView, loadPriority, playbackId, preloadGranted, shouldPlay, uri, retryKey]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || hasRenderedFrame || failed) return;
@@ -852,19 +882,22 @@ export function FeedVideoPlayer({
     shouldShowFeedVideoPosterLayer(presentationPosterUri, hasRenderedFrame) &&
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);
-  const showLoadingPlaceholder =
-    shouldShowFeedVideoLoadingPlaceholder(
-      presentationPosterUri,
-      hasRenderedFrame,
-      !videoDomAdopted &&
-        !isFeedVideoFullscreenHandoff(playbackId) &&
-        (shouldPlay || inView || preloadGranted)
-    );
+  const showLoadingPlaceholder = shouldShowFeedVideoLoadingPlaceholder(
+    presentationPosterUri,
+    hasRenderedFrame,
+    !videoDomAdopted && !isFeedVideoFullscreenHandoff(playbackId)
+  );
   const showBufferingSpinner =
-    (showStallSpinner || (showLoadingPlaceholder && !hasRenderedFrame)) &&
-    shouldPlay &&
+    (showStallSpinner || showLoadingPlaceholder) &&
+    (shouldPlay || loadPriority === "high" || inView) &&
     !videoDomAdopted &&
     !isFeedVideoFullscreenHandoff(playbackId);
+  const attachVideoSource = shouldAttachFeedVideoSource({
+    loadPriority,
+    inView,
+    preloadGranted,
+    shouldPlay,
+  });
 
   const videoBody =
     Platform.OS === "web" ? (
@@ -891,6 +924,9 @@ export function FeedVideoPlayer({
               style={styles.videoFill}
               contentFit="cover"
               accessibilityLabel="Video frame"
+              delivery="feed"
+              loadPriority={loadPriority}
+              onLoad={notifyVisualReady}
             />
           </View>
         ) : null}
@@ -899,6 +935,7 @@ export function FeedVideoPlayer({
       (() => {
         try {
           const { Video, ResizeMode } = require("expo-av") as typeof import("expo-av");
+          if (!attachVideoSource) return null;
           return (
             <Video
               key={retryKey}
@@ -957,6 +994,8 @@ export function FeedVideoPlayer({
           >
             <View style={styles.mediaLayer} pointerEvents="box-none">
               <View style={styles.videoSurface} pointerEvents="none">
+                {videoBody}
+
                 {showPosterBackdrop ? (
                   <View style={styles.posterLayer} pointerEvents="none">
                     <ProgressiveImage
@@ -965,15 +1004,18 @@ export function FeedVideoPlayer({
                       style={styles.videoFill}
                       contentFit="cover"
                       accessibilityLabel="Video poster"
+                      delivery="feed"
+                      loadPriority="high"
+                      onLoad={notifyVisualReady}
                     />
                   </View>
                 ) : null}
 
                 {showLoadingPlaceholder ? (
-                  <View style={styles.loadingPlaceholder} pointerEvents="none" />
+                  <View style={styles.loadingPlaceholder} pointerEvents="none">
+                    <Skeleton width="100%" height="100%" style={StyleSheet.absoluteFillObject} />
+                  </View>
                 ) : null}
-
-                {videoBody}
 
                 {showBufferingSpinner ? (
                   <View
@@ -1081,12 +1123,12 @@ const styles = StyleSheet.create({
   },
   posterLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
+    zIndex: 2,
     backgroundColor: colors.background,
   },
   loadingPlaceholder: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
+    zIndex: 2,
     backgroundColor: colors.surfaceElevated,
   },
   bufferingSpinnerLayer: {
@@ -1094,7 +1136,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
-    zIndex: 2,
+    zIndex: 3,
   },
   muteLayer: {
     ...StyleSheet.absoluteFillObject,

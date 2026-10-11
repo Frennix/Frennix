@@ -21,6 +21,7 @@ type StoryQuickActionsBarProps = {
   onInviteEvent: () => void;
   onJoinChallenge?: () => void;
   onViewProfile: () => void;
+  showMessage?: boolean;
 };
 
 function ActionTile({
@@ -49,7 +50,7 @@ function ActionTile({
       ) : (
         <Text style={styles.emoji}>{emoji}</Text>
       )}
-      <Text style={styles.label} numberOfLines={1}>
+      <Text style={styles.label} numberOfLines={2}>
         {label}
       </Text>
     </Pressable>
@@ -66,9 +67,10 @@ export function StoryQuickActionsBar({
   onInviteEvent,
   onJoinChallenge,
   onViewProfile,
+  showMessage = true,
 }: StoryQuickActionsBarProps) {
   const actions: QuickAction[] = [
-    { key: "message", emoji: "💬", label: "Message", onPress: onMessage },
+    ...(showMessage ? [{ key: "message", emoji: "💬", label: "Message", onPress: onMessage }] : []),
     { key: "workout", emoji: "🤝", label: "Invite to Workout", onPress: onInviteWorkout, loading: inviteLoading },
     { key: "event", emoji: "📅", label: "Invite to Event", onPress: onInviteEvent },
     ...(hasChallenge && onJoinChallenge
@@ -97,12 +99,16 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     flexWrap: "wrap",
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     gap: spacing.xs,
   },
   tile: {
     flexGrow: 1,
-    flexBasis: "30%",
-    minWidth: 96,
+    flexBasis: "31%",
+    maxWidth: "32%",
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     minHeight: touchTarget,
@@ -124,7 +130,7 @@ const styles = StyleSheet.create({
   label: {
     ...typography.caption,
     fontSize: 9,
-    lineHeight: 11,
+    lineHeight: 12,
     color: colors.text,
     fontWeight: "700",
     textAlign: "center",

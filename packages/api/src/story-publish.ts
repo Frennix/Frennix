@@ -16,6 +16,12 @@ import {
 import { getSupabase } from "./supabase";
 import { formatSupabaseError } from "./profile-utils";
 import { publishPlatformActivity } from "./platform-activity-engine";
+import {
+  STORY_PRIVATE_MEDIA_PREFIX,
+  hydrateDedicatedStories,
+  mapDedicatedStory,
+  resolveStorySlides,
+} from "./story-privacy";
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -49,7 +55,7 @@ export async function uploadStoryMedia(
   file?: File | null
 ) {
   const ext = normalizeMediaExt(mimeType);
-  const fileName = `${userId}/stories/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const body = await readMediaUploadBody(uri, mimeType, file);
   const contentType = mimeType.includes("/")
     ? mimeType
@@ -60,15 +66,14 @@ export async function uploadStoryMedia(
   const timeoutMs = isVideoMime(mimeType) ? VIDEO_UPLOAD_TIMEOUT_MS : IMAGE_UPLOAD_TIMEOUT_MS;
 
   const { error } = await withTimeout(
-    getSupabase().storage.from("posts").upload(fileName, body, { contentType, upsert: false }),
+    getSupabase().storage.from("stories").upload(fileName, body, { contentType, upsert: false }),
     timeoutMs,
     "Story media upload"
   );
 
   if (error) throw formatSupabaseError(error, "Story media upload failed");
 
-  const { data } = getSupabase().storage.from("posts").getPublicUrl(fileName);
-  return data.publicUrl;
+  return `${STORY_PRIVATE_MEDIA_PREFIX}${fileName}`;
 }
 
 function parseMentions(text: string): string[] {
@@ -102,7 +107,8 @@ export async function publishStory(input: PublishStoryInput): Promise<FrennixSto
     .from("stories")
     .insert({
       user_id: input.user_id,
-      privacy: input.privacy ?? "followers",
+      privacy: input.privacy ?? "everyone",
+      commenting_enabled: true,
       post_id: input.post_id ?? null,
       workout_tag: input.workout_tag ?? null,
       location_name: input.location_name ?? null,
@@ -180,20 +186,10 @@ export async function publishStory(input: PublishStoryInput): Promise<FrennixSto
     },
   }).catch(() => undefined);
 
-  return {
-    id: storyId,
-    user_id: input.user_id,
-    privacy: storyRow.privacy as StoryPrivacy,
-    post_id: storyRow.post_id as string | null,
-    workout_tag: storyRow.workout_tag as string | null,
-    location_name: storyRow.location_name as string | null,
-    location_type: storyRow.location_type as StoryLocationType | null,
-    challenge_id: storyRow.challenge_id as string | null,
-    challenge_prompt: storyRow.challenge_prompt as string | null,
-    created_at: storyRow.created_at as string,
-    expires_at: storyRow.expires_at as string,
-    slides: (insertedSlides ?? []) as StorySlide[],
-  };
+  return mapDedicatedStory(
+    storyRow as Record<string, unknown>,
+    await resolveStorySlides((insertedSlides ?? []) as StorySlide[])
+  );
 }
 
 export async function getUserActiveStories(userId: string): Promise<FrennixStory[]> {
@@ -227,18 +223,5 @@ export async function getUserActiveStories(userId: string): Promise<FrennixStory
     slidesByStory.set(storyId, list);
   }
 
-  return stories.map((row) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    privacy: row.privacy as StoryPrivacy,
-    post_id: row.post_id as string | null,
-    workout_tag: row.workout_tag as string | null,
-    location_name: row.location_name as string | null,
-    location_type: row.location_type as StoryLocationType | null,
-    challenge_id: row.challenge_id as string | null,
-    challenge_prompt: row.challenge_prompt as string | null,
-    created_at: row.created_at as string,
-    expires_at: row.expires_at as string,
-    slides: slidesByStory.get(row.id as string) ?? [],
-  }));
+  return hydrateDedicatedStories(stories as Record<string, unknown>[], slidesByStory);
 }

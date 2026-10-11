@@ -5,7 +5,6 @@ import {
   addComment,
   getComments,
   getPost,
-  toggleCommentLike,
 } from "@frennix/api";
 import type { Comment, Post } from "@frennix/types";
 import { useAuth } from "@/providers/AuthProvider";
@@ -15,6 +14,7 @@ import { useSharePost } from "@/lib/useSharePost";
 import { useSavePost } from "@/lib/useSavePost";
 import { usePostReaction } from "@/lib/usePostReaction";
 import { useFeedLike } from "@/lib/useFeedLike";
+import { useCommentLike } from "@/lib/useCommentLike";
 import { hapticLight } from "@/lib/haptics";
 import { DetailLoading } from "@/components/DetailLoading";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -171,18 +171,14 @@ export default function PostDetailScreen() {
     },
   });
 
-  const commentLikeMutation = useMutation({
-    mutationFn: ({ commentId, liked }: { commentId: string; liked: boolean }) =>
-      toggleCommentLike(commentId, userId, liked),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["comments", id] }),
-  });
+  const { toggleCommentLikeState } = useCommentLike(id!, userId);
 
   function handleReply(comment: Comment) {
     setReplyTo(comment);
   }
 
   function handleLike(comment: Comment) {
-    commentLikeMutation.mutate({ commentId: comment.id, liked: !!comment.liked_by_me });
+    toggleCommentLikeState(comment.id, !!comment.liked_by_me);
   }
 
   if (postLoading) return <DetailLoading />;

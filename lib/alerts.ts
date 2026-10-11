@@ -203,6 +203,23 @@ export function confirmDeletePost(onConfirm: () => void) {
   confirmDelete("Post", onConfirm);
 }
 
+export function confirmDeleteStory(onConfirm: () => void) {
+  const title = "Delete this story?";
+  const message = "This story will be permanently removed.";
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 export function confirmDeleteGroup(onConfirm: () => void) {
   confirmDelete("Group", onConfirm);
 }

@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react-native";
-import type { PostMediaItem } from "@frennix/types";
+import { getJourneyCategoryLabel, type PostMediaItem } from "@frennix/types";
 import {
   Avatar,
   FullscreenVideoSlide,
@@ -20,12 +20,16 @@ import {
   spacing,
   touchTarget,
   typography,
+  type FeedVideoFullscreenHandoff,
 } from "@frennix/ui";
 import type { ImmersiveVideoGalleryContext } from "@/lib/immersive-video-gallery";
 import { computeBaselineVideoPeekHeight } from "@/components/CommentsBottomSheet";
+import { ReelScrubBar } from "@/components/ReelScrubBar";
 import { useOpenImmersiveVideoComments } from "@/lib/immersive-video-comments-context";
 import { useCommentsVideoPeekLayout } from "@/lib/comments-overlay-state";
-import type { FeedVideoFullscreenHandoff } from "@frennix/ui";
+import { getImmersiveSessionLayoutHeight } from "@/lib/immersive-session-layout";
+import { useLivePostEngagement } from "@/lib/useFeedLike";
+import { useAuth } from "@/providers/AuthProvider";
 
 const STRONG_WORK_EMOJI = "💪";
 const CAPTION_COLLAPSE_LINES = 2;
@@ -51,6 +55,8 @@ type ImmersiveVideoViewerProps = {
   onClose: () => void;
   /** Comments sheet is open over the lower portion — shrink video into the peek region. */
   commentsOverlayOpen?: boolean;
+  /** Horizontal scrubbing should not move the vertical Reel playlist. */
+  onScrubbingChange?: (scrubbing: boolean) => void;
 };
 
 export function ImmersiveVideoViewer({
@@ -64,8 +70,10 @@ export function ImmersiveVideoViewer({
   postActions,
   onClose,
   commentsOverlayOpen = false,
+  onScrubbingChange,
 }: ImmersiveVideoViewerProps) {
   const insets = useSafeAreaInsets();
+  const { session } = useAuth();
   const videoRef = useRef<FullscreenVideoSlideHandle>(null);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [muted, setMuted] = useState(
@@ -73,11 +81,15 @@ export function ImmersiveVideoViewer({
   );
 
   const post = postActions.post;
+  const liveEngagement = useLivePostEngagement(post, session?.user.id ?? "");
   const displayPost = post.shared_post ?? post;
   const author = post.author;
   const caption = (post.content ?? displayPost.content ?? "").trim();
-  const liked = Boolean(post.liked_by_me);
-  const respectActive = post.my_reaction === STRONG_WORK_EMOJI;
+  const journeyCategoryLabel = getJourneyCategoryLabel(
+    displayPost.journey_category ?? post.journey_category
+  );
+  const liked = liveEngagement.liked;
+  const respectActive = liveEngagement.myReaction === STRONG_WORK_EMOJI;
 
   const topInset = Math.max(insets.top, spacing.sm);
   const bottomInset = Math.max(insets.bottom, spacing.sm);
@@ -151,7 +163,10 @@ export function ImmersiveVideoViewer({
 
   const captionNeedsExpand = caption.length > 96;
   const videoPeekLayout = useCommentsVideoPeekLayout();
-  const fallbackPeekHeight = computeBaselineVideoPeekHeight(stageHeight);
+  const layoutFallbackHeight =
+    getImmersiveSessionLayoutHeight() ??
+    (Platform.OS === "web" && typeof window !== "undefined" ? window.innerHeight : stageHeight);
+  const fallbackPeekHeight = computeBaselineVideoPeekHeight(layoutFallbackHeight);
   const videoStageHeight = commentsOverlayOpen
     ? videoPeekLayout?.height ?? fallbackPeekHeight
     : stageHeight;
@@ -240,7 +255,7 @@ export function ImmersiveVideoViewer({
       {commentsOverlayOpen ? null : (
         <>
           <View
-            style={[styles.actionRail, { bottom: bottomInset + 120 }]}
+            style={[styles.actionRail, { bottom: bottomInset + 132 }]}
             pointerEvents="box-none"
             {...(Platform.OS === "web"
               ? ({ "data-frennix-immersive-rail": "true" } as object)
@@ -257,7 +272,7 @@ export function ImmersiveVideoViewer({
             strokeWidth={2}
             fill={liked ? colors.accent : "transparent"}
           />
-          <Text style={styles.railCount}>{formatActionCount(post.like_count)}</Text>
+          <Text style={styles.railCount}>{formatActionCount(liveEngagement.likeCount)}</Text>
         </RailAction>
 
         <RailAction
@@ -289,70 +304,100 @@ export function ImmersiveVideoViewer({
         </RailAction>
           </View>
 
-          <View style={[styles.bottomMeta, { paddingBottom: bottomInset + 58 }]} pointerEvents="box-none">
-        <Pressable
-          style={styles.authorRow}
-          onPress={postActions.onAuthorPress}
-          accessibilityRole="button"
-          accessibilityLabel="View author profile"
-        >
-          <Avatar uri={author?.avatar_url} name={author?.display_name} size={36} />
-          <View style={styles.authorTextCol}>
-            <Text style={styles.authorName} numberOfLines={1}>
-              {author?.display_name ?? "Unknown"}
-            </Text>
-            {author?.username ? (
-              <Text style={styles.authorUsername} numberOfLines={1}>
-                @{author.username}
-              </Text>
-            ) : null}
-          </View>
-          {postActions.showFollow && postActions.onFollow ? (
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                postActions.onFollow?.();
-              }}
-              style={styles.followButton}
-              accessibilityRole="button"
-              accessibilityLabel="Follow"
-            >
-              <Text style={styles.followLabel}>Follow</Text>
-            </Pressable>
-          ) : null}
-        </Pressable>
-
-        {caption ? (
-          <View style={styles.captionBlock}>
-            <Text
-              style={styles.captionText}
-              numberOfLines={captionExpanded ? undefined : CAPTION_COLLAPSE_LINES}
-            >
-              {caption}
-            </Text>
-            {captionNeedsExpand && !captionExpanded ? (
+          <View
+            style={[styles.bottomChrome, { paddingBottom: bottomInset + spacing.sm }]}
+            pointerEvents="box-none"
+            {...(Platform.OS === "web"
+              ? ({ "data-frennix-reel-bottom-chrome": "true" } as object)
+              : null)}
+          >
+            <View style={styles.bottomMeta} pointerEvents="box-none">
               <Pressable
-                onPress={() => setCaptionExpanded(true)}
-                hitSlop={8}
+                style={styles.authorRow}
+                onPress={postActions.onAuthorPress}
                 accessibilityRole="button"
-                accessibilityLabel="Show more caption"
+                accessibilityLabel="View author profile"
               >
-                <Text style={styles.moreLabel}>more</Text>
+                <Avatar uri={author?.avatar_url} name={author?.display_name} size={36} />
+                <View style={styles.authorTextCol}>
+                  <Text style={styles.authorName} numberOfLines={1}>
+                    {author?.display_name ?? "Unknown"}
+                  </Text>
+                  {author?.username ? (
+                    <Text style={styles.authorUsername} numberOfLines={1}>
+                      @{author.username}
+                    </Text>
+                  ) : null}
+                  {journeyCategoryLabel ? (
+                    <View
+                      style={styles.categoryChip}
+                      accessibilityRole="text"
+                      accessibilityLabel={`Journey category ${journeyCategoryLabel}`}
+                    >
+                      <Text style={styles.categoryLabel}>{journeyCategoryLabel}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {postActions.showFollow && postActions.onFollow ? (
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation?.();
+                      postActions.onFollow?.();
+                    }}
+                    style={styles.followButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Follow"
+                  >
+                    <Text style={styles.followLabel}>Follow</Text>
+                  </Pressable>
+                ) : null}
               </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-          </View>
 
-          <View style={[styles.commentComposerHost, { paddingBottom: bottomInset + spacing.sm }]}>
-            <Pressable
-              style={styles.commentComposerTrigger}
-              onPress={() => openComments()}
-              accessibilityRole="button"
-              accessibilityLabel="Add a comment"
+              {caption ? (
+                <View style={styles.captionBlock}>
+                  <Text
+                    style={styles.captionText}
+                    numberOfLines={captionExpanded ? undefined : CAPTION_COLLAPSE_LINES}
+                  >
+                    {caption}
+                  </Text>
+                  {captionNeedsExpand && !captionExpanded ? (
+                    <Pressable
+                      onPress={() => setCaptionExpanded(true)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Show more caption"
+                    >
+                      <Text style={styles.moreLabel}>more</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+
+            <View
+              style={styles.commentComposerHost}
+              {...(Platform.OS === "web"
+                ? ({ "data-frennix-reel-composer-stack": "true" } as object)
+                : null)}
             >
-              <Text style={styles.commentComposerPlaceholder}>Add a comment…</Text>
-            </Pressable>
+              <ReelScrubBar
+                videoRef={videoRef}
+                isActive={isActive}
+                onScrubbingChange={onScrubbingChange}
+              />
+              <Pressable
+                style={styles.commentComposerTrigger}
+                onPress={() => openComments()}
+                accessibilityRole="button"
+                accessibilityLabel="Add a comment"
+                {...(Platform.OS === "web"
+                  ? ({ "data-frennix-reel-comment-field": "true" } as object)
+                  : null)}
+              >
+                <Text style={styles.commentComposerPlaceholder}>Add a comment…</Text>
+              </Pressable>
+            </View>
           </View>
         </>
       )}
@@ -496,13 +541,18 @@ const styles = StyleSheet.create({
   railActive: {
     transform: [{ scale: 1.08 }],
   },
-  bottomMeta: {
+  bottomChrome: {
     position: "absolute",
     left: 0,
-    right: 72,
+    right: 0,
     bottom: 0,
-    zIndex: 35,
+    zIndex: 45,
     paddingHorizontal: spacing.md,
+    gap: spacing.xs,
+  },
+  bottomMeta: {
+    marginRight: 72,
+    zIndex: 35,
     gap: spacing.xs,
   },
   authorRow: {
@@ -522,6 +572,23 @@ const styles = StyleSheet.create({
   authorUsername: {
     ...typography.caption,
     color: "rgba(255,255,255,0.82)",
+  },
+  categoryChip: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(34, 197, 94, 0.28)",
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.85)",
+  },
+  categoryLabel: {
+    ...typography.caption,
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 11,
+    lineHeight: 14,
   },
   followButton: {
     paddingHorizontal: spacing.md,
@@ -548,13 +615,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   commentComposerHost: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 45,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
+    zIndex: 46,
+    paddingTop: 2,
+    gap: 2,
   },
   commentComposerTrigger: {
     minHeight: 44,

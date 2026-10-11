@@ -32,17 +32,19 @@ function main() {
   ok =
     pass(
       "Mobile web uses full-screen comments path",
-      sheet.includes("useMobileWebFullscreen") && sheet.includes("data-frennix-comments-fullscreen")
+      sheet.includes("isMobileWebFullscreenMode") && sheet.includes("data-frennix-comments-fullscreen")
     ) && ok;
   ok =
     pass(
-      "Full-screen root height uses visualViewport.height only",
-      sheet.includes("readVisualViewportHeight") && !sheet.includes("offsetTop") && !sheet.includes("keyboardInset")
+      "Full-screen root height uses visual viewport measurement",
+      sheet.includes("measureSafariVisualViewport") &&
+        sheet.includes("mobileOverlayHeight") &&
+        !sheet.includes("keyboardInset")
     ) && ok;
   ok =
     pass(
       "No partial-height sheet ratio on mobile web path",
-      !sheet.includes("SHEET_OPEN_RATIO") || sheet.includes("useMobileWebFullscreen")
+      !sheet.includes("SHEET_OPEN_RATIO") || sheet.includes("isMobileWebFullscreenMode")
     ) && ok;
   const mobileBlock = sheet.match(/const mobileWebSurface = \([\s\S]*?\n  \);/)?.[0] ?? "";
   ok =
@@ -58,7 +60,9 @@ function main() {
   ok =
     pass(
       "Composer is final flex child without independent positioning",
-      sheet.includes("composerHost") && sheet.includes("flexShrink: 0") && !sheet.includes("position: \"absolute\"")
+      sheet.includes("composerHost") &&
+        sheet.includes("flexShrink: 0") &&
+        sheet.includes("styles.composerHost")
     ) && ok;
   ok =
     pass(
@@ -90,12 +94,13 @@ function main() {
   ok =
     pass(
       "Comment options z-index unchanged",
-      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100000")
+      readSource("lib/overlay-z-index.ts").includes("commentOptions: 100002") &&
+        readSource("lib/overlay-z-index.ts").includes("commentsVideoOverlay: 100001")
     ) && ok;
   ok =
     pass(
       "16px comment input preserved",
-      readSource("components/PostCommentsSheet.tsx").includes('Platform.OS === "web" ? 16 : 15')
+      readSource("components/PostCommentsContent.tsx").includes('Platform.OS === "web" ? 16 : 15')
     ) && ok;
 
   console.log("");

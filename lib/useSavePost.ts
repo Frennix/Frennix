@@ -27,13 +27,15 @@ export function useSavePost(userId: string) {
       await queryClient.cancelQueries({ queryKey: ["feed", userId] });
       await queryClient.cancelQueries({ queryKey: ["saved-posts", userId] });
 
-      const previousFeed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
+      const previousFeeds = queryClient.getQueriesData<InfiniteData<FeedPage>>({
+        queryKey: ["feed", userId],
+      });
       const previousSaved = queryClient.getQueryData<InfiniteData<FeedPage>>([
         "saved-posts",
         userId,
       ]);
 
-      queryClient.setQueryData<InfiniteData<FeedPage>>(["feed", userId], (old) => {
+      queryClient.setQueriesData<InfiniteData<FeedPage>>({ queryKey: ["feed", userId] }, (old) => {
         if (!old) return old;
         return {
           ...old,
@@ -83,11 +85,11 @@ export function useSavePost(userId: string) {
         return patchPostSaved(old, saved);
       });
 
-      return { previousFeed, previousSaved };
+      return { previousFeeds, previousSaved };
     },
     onError: (_err, _vars, context) => {
-      if (context?.previousFeed) {
-        queryClient.setQueryData(["feed", userId], context.previousFeed);
+      for (const [key, data] of context?.previousFeeds ?? []) {
+        queryClient.setQueryData(key, data);
       }
       if (context?.previousSaved) {
         queryClient.setQueryData(["saved-posts", userId], context.previousSaved);

@@ -9,6 +9,7 @@ interface SharedPostPreviewProps {
   onPress?: () => void;
   compact?: boolean;
   onMediaPress?: (uri: string, index: number) => void;
+  loadPriority?: import("./feedMediaDelivery").FeedMediaLoadPriority;
 }
 
 export function SharedPostPreview({
@@ -16,6 +17,7 @@ export function SharedPostPreview({
   onPress,
   compact,
   onMediaPress,
+  loadPriority,
 }: SharedPostPreviewProps) {
   const author = post.author;
   const hasMedia = Boolean(post.media_urls?.length);
@@ -49,6 +51,7 @@ export function SharedPostPreview({
             postType={post.post_type}
             thumbnailUrl={post.thumbnail_url}
             onMediaPress={onMediaPress}
+            loadPriority={loadPriority}
           />
         </View>
       ) : null}

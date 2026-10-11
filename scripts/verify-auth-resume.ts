@@ -73,6 +73,31 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "Web logout hard-navigates to login so settings/tabs unmount",
+    run: () => {
+      assertIncludes(
+        "lib/auth-navigation.ts",
+        "window.location.replace(LOGIN_WEB_PATH)",
+        "web logout must hard-navigate"
+      );
+      assertIncludes("lib/auth-navigation.ts", 'LOGIN_WEB_PATH = "/login"', "login web path");
+      assertIncludes("app/settings.tsx", "redirectToLogin()", "settings must use shared logout redirect");
+      assertIncludes(
+        "lib/auth-navigation.ts",
+        "redirectToLogin()",
+        "signed-out guard must use shared logout redirect"
+      );
+    },
+  },
+  {
+    name: "Sign-out clears local session before waiting on Supabase",
+    run: () => {
+      assertIncludes("providers/AuthProvider.tsx", "explicitSignOutRef", "explicit sign-out flag");
+      assertIncludes("providers/AuthProvider.tsx", 'supabaseSignOut({ scope: "local" })', "local signOut scope");
+      assertIncludes("packages/api/src/auth.ts", 'options ?? { scope: "local" }', "API signOut defaults to local");
+    },
+  },
+  {
     name: "Profile cache helper exists for Safari resume hydration",
     run: () => {
       assertIncludes("lib/auth-profile-cache.ts", "readCachedProfile", "profile cache read helper required");

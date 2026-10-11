@@ -10,7 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { PostType, PostMediaItem } from "@frennix/types";
-import { normalizePostMediaItems } from "@frennix/types";
+import { isImageMediaUri, normalizePostMediaItems } from "@frennix/types";
 import { prefetchCachedImages } from "./CachedImage";
 import { MediaAspectFrame } from "./MediaAspectFrame";
 import { PostMedia } from "./PostMedia";
@@ -18,9 +18,11 @@ import {
   FEED_FALLBACK_BUCKET,
   FEED_PORTRAIT_FRAME_RATIO,
   feedBucketAspectRatio,
+  feedFillParentStyle,
   resolveFeedCarouselFrameSizing,
   type FeedMediaBucket,
 } from "./mediaLayout";
+import { feedDisplayImageUri, type FeedMediaLoadPriority } from "./feedMediaDelivery";
 import { colors, spacing, typography } from "./theme";
 
 const WEB_HORIZONTAL_SCROLL_STYLE: ViewStyle | undefined =
@@ -46,6 +48,7 @@ interface PostMediaCarouselProps {
   /** Scope id for feed video playback coordination (typically post id). */
   playbackScopeId?: string;
   onPrimaryMediaReady?: (source: "image" | "video") => void;
+  loadPriority?: FeedMediaLoadPriority;
 }
 
 function renderCarouselSlide({
@@ -60,6 +63,7 @@ function renderCarouselSlide({
   onPrimaryMediaReady,
   fillParent,
   feedFrameBucket,
+  loadPriority,
 }: {
   item: PostMediaItem;
   itemIndex: number;
@@ -71,6 +75,7 @@ function renderCarouselSlide({
   playbackScopeId?: string;
   onPrimaryMediaReady?: (source: "image" | "video") => void;
   fillParent?: boolean;
+  loadPriority?: FeedMediaLoadPriority;
   feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
 }) {
   return (
@@ -78,7 +83,7 @@ function renderCarouselSlide({
       uri={item.url}
       postType={item.kind === "video" ? "video" : "photo"}
       thumbnailUrl={item.thumbnailUrl}
-      style={styles.media}
+      style={fillParent ? [styles.media, feedFillParentStyle()] : styles.media}
       layout="feed"
       pressDelayMs={200}
       slideActive={itemIndex === activeIndex}
@@ -106,6 +111,7 @@ function renderCarouselSlide({
           ? () => onPrimaryMediaReady(item.kind === "video" ? "video" : "image")
           : undefined
       }
+      loadPriority={loadPriority}
     />
   );
 }
@@ -123,6 +129,7 @@ export function PostMediaCarousel({
   mediaVisible = true,
   playbackScopeId,
   onPrimaryMediaReady,
+  loadPriority,
 }: PostMediaCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -134,7 +141,12 @@ export function PostMediaCarousel({
     [mediaUrls, postType, thumbnailUrl]
   );
 
-  const frameProbeUri = mediaItems[0]?.thumbnailUrl ?? mediaItems[0]?.url;
+  const firstMedia = mediaItems[0];
+  const frameProbeUri = firstMedia?.thumbnailUrl
+    ? feedDisplayImageUri(firstMedia.thumbnailUrl)
+    : firstMedia && isImageMediaUri(firstMedia.url)
+      ? feedDisplayImageUri(firstMedia.url)
+      : undefined;
 
   const handleLayout = useCallback((width: number) => {
     if (width > 0) setContainerWidth(width);
@@ -173,10 +185,9 @@ export function PostMediaCarousel({
 
   useEffect(() => {
     if (!containerWidth || mediaItems.length <= 1) return;
-    const neighbors = [
-      mediaItems[activeIndex + 1]?.url,
-      mediaItems[activeIndex - 1]?.url,
-    ].filter(Boolean) as string[];
+    const neighbors = [mediaItems[activeIndex + 1]?.url, mediaItems[activeIndex - 1]?.url]
+      .filter((url): url is string => Boolean(url && isImageMediaUri(url)))
+      .map((url) => feedDisplayImageUri(url));
     if (neighbors.length) void prefetchCachedImages(neighbors);
   }, [activeIndex, mediaItems, containerWidth]);
 
@@ -199,6 +210,7 @@ export function PostMediaCarousel({
           mediaVisible,
           playbackScopeId,
           onPrimaryMediaReady,
+          loadPriority,
         })}
       </View>
     );
@@ -269,6 +281,7 @@ export function PostMediaCarousel({
                         onPrimaryMediaReady,
                         fillParent: true,
                         feedFrameBucket: frameBucket,
+                        loadPriority,
                       })}
                     </View>
                   )}

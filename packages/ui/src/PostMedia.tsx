@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Platform,
+  Pressable,
   StyleSheet,
-  TouchableOpacity,
   View,
   type StyleProp,
   type ViewStyle,
@@ -18,9 +18,21 @@ import { VideoPreview } from "./VideoPreview";
 import { VideoPosterFallback } from "./VideoPosterFallback";
 import { useVideoPoster } from "./useVideoPoster";
 import { WebVideoFrame } from "./WebVideoFrame";
-import { FEED_VIDEO_FALLBACK_RATIO, type MediaLayout } from "./mediaLayout";
+import { FEED_VIDEO_FALLBACK_RATIO, feedFillParentStyle, type MediaLayout } from "./mediaLayout";
 import { feedMediaRules } from "./feed-layout/feedMediaRules";
+import { feedDisplayImageUri, type FeedMediaLoadPriority } from "./feedMediaDelivery";
 import { colors, radius } from "./theme";
+
+const PHOTO_DOUBLE_TAP_MS = 280;
+const PHOTO_OPEN_LOCK_MS = PHOTO_DOUBLE_TAP_MS + 170;
+const PHOTO_TAP_MOVE_PX = 10;
+
+const WEB_PHOTO_TOUCH_STYLE: ViewStyle | undefined =
+  Platform.OS === "web"
+    ? ({
+        touchAction: "manipulation",
+      } as ViewStyle)
+    : undefined;
 
 interface PostMediaProps {
   uri: string;
@@ -48,6 +60,8 @@ interface PostMediaProps {
   /** @deprecated Row visibility no longer autoplays feed video. */
   mediaVisible?: boolean;
   onVisualReady?: () => void;
+  /** Visible feed rows load before offscreen lookahead. */
+  loadPriority?: FeedMediaLoadPriority;
 }
 
 function isVideoMedia(postType?: PostType, uri?: string) {
@@ -136,10 +150,13 @@ export function PostMedia({
   fillParent = false,
   feedFrameBucket,
   onVisualReady,
+  loadPriority,
 }: PostMediaProps) {
   const isVideo = isVideoMedia(postType, uri);
   const [playing, setPlaying] = useState(false);
-  const posterState = useVideoPoster(isVideo ? uri : undefined, thumbnailUrl);
+  // Feed playback already downloads the video. A second poster capture of a
+  // non-fast-start file (often ~35MB) keeps the frame blank until both finish.
+  const posterState = useVideoPoster(isVideo && layout !== "feed" ? uri : undefined, thumbnailUrl);
   const dimensionsUri = isVideo
     ? posterState.posterUri ?? thumbnailUrl ?? undefined
     : uri;
@@ -164,6 +181,7 @@ export function PostMedia({
         videoRouteHref={videoRouteHref}
         onVideoRouteNavigate={onVideoRouteNavigate}
         onVisualReady={onVisualReady}
+        loadPriority={loadPriority}
       />
     );
   }
@@ -217,6 +235,7 @@ export function PostMedia({
       onVisualReady={onVisualReady}
       fillParent={fillParent}
       feedFrameBucket={feedFrameBucket}
+      loadPriority={loadPriority}
     />
   );
 }
@@ -227,11 +246,12 @@ function FeedImage({
   style,
   layout,
   onImagePress,
-  pressDelayMs,
+  pressDelayMs: _pressDelayMs,
   maxHeight,
   fillParent = false,
   feedFrameBucket,
   onVisualReady,
+  loadPriority,
 }: {
   uri: string;
   thumbnailUrl?: string | null;
@@ -243,19 +263,36 @@ function FeedImage({
   fillParent?: boolean;
   feedFrameBucket?: import("./mediaLayout").FeedMediaBucket;
   onVisualReady?: () => void;
+  loadPriority?: FeedMediaLoadPriority;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const openedAt = useRef(0);
+  const tapMoved = useRef(false);
+  const tapStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setImageFailed(false);
     setImageLoaded(false);
   }, [uri, retryKey]);
 
+  const handlePhotoPress = () => {
+    if (!onImagePress || imageFailed || !imageLoaded || tapMoved.current) return;
+    const now = Date.now();
+    if (now - openedAt.current < PHOTO_OPEN_LOCK_MS) return;
+    openedAt.current = now;
+    onImagePress();
+  };
+
+  const isFeed = layout === "feed";
+  const dimensionProbeUri = isFeed
+    ? feedDisplayImageUri(thumbnailUrl || uri)
+    : (thumbnailUrl ?? uri);
+
   const content = (
     <MediaAspectFrame
-      dimensionsUri={thumbnailUrl ?? uri}
+      dimensionsUri={dimensionProbeUri}
       layout={layout}
       style={style}
       maxHeight={maxHeight}
@@ -282,6 +319,8 @@ function FeedImage({
               style={styles.image}
               contentFit={layout === "feed" ? feedMediaRules.contentFit : "contain"}
               accessibilityLabel="Post photo"
+              delivery={isFeed ? "feed" : "original"}
+              loadPriority={loadPriority}
               onError={() => {
                 setImageLoaded(false);
                 setImageFailed(true);
@@ -300,19 +339,31 @@ function FeedImage({
 
   if (onImagePress) {
     return (
-      <TouchableOpacity
-        activeOpacity={0.95}
-        delayPressIn={pressDelayMs ?? 0}
-        onPress={() => {
-          if (imageFailed || !imageLoaded) return;
-          onImagePress();
+      <Pressable
+        onPress={handlePhotoPress}
+        onTouchStart={(event) => {
+          tapMoved.current = false;
+          const touch = event.nativeEvent.touches[0];
+          tapStart.current = touch ? { x: touch.pageX, y: touch.pageY } : null;
         }}
+        onTouchMove={(event) => {
+          const touch = event.nativeEvent.touches[0];
+          if (!touch || !tapStart.current) return;
+          if (
+            Math.hypot(touch.pageX - tapStart.current.x, touch.pageY - tapStart.current.y) >
+            PHOTO_TAP_MOVE_PX
+          ) {
+            tapMoved.current = true;
+          }
+        }}
+        style={[fillParent ? feedFillParentStyle() : styles.imagePress, WEB_PHOTO_TOUCH_STYLE]}
         accessibilityRole="button"
         accessibilityLabel="View full image"
+        accessibilityHint="Double tap or tap to open the full-screen photo"
         accessibilityState={{ disabled: imageFailed || !imageLoaded }}
       >
         {content}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
@@ -323,6 +374,11 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
+    flex: 1,
+    alignSelf: "stretch",
+  },
+  imagePress: {
+    width: "100%",
   },
   imageFallback: {
     ...StyleSheet.absoluteFillObject,

@@ -46,11 +46,15 @@ import {
   answerStoryQuestion,
   getStoryQuestionAnswersForOwner,
   shareStoryQuestionAnswer,
+  getErrorMessage,
 } from "@frennix/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { StoryInsightsStrip } from "./story/StoryInsightsStrip";
 import { StoryViewerEyeButton } from "./story/StoryViewerEyeButton";
+import { StoryControlsButton } from "./story/StoryControlsButton";
+import { StoryControlsSheet } from "./story/StoryControlsSheet";
 import { useStoryViewersRealtime } from "@/lib/useStoryViewersRealtime";
+import type { FrennixStory } from "@frennix/types";
 import {
   buildDedicatedStorySlides,
   prefetchStorySlide,
@@ -180,10 +184,21 @@ const STORY_ROOT_STYLE = Platform.select({
     right: 0,
     bottom: 0,
     width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     height: "100%",
+    overflowX: "hidden",
+    overflowY: "hidden",
+    boxSizing: "border-box",
+    overscrollBehaviorX: "none",
+    touchAction: "pan-y",
     zIndex: 9999,
+  } as object,
+  default: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
   },
-  default: {},
 });
 
 export interface WorkoutStoryViewerProps {
@@ -218,6 +233,8 @@ export interface WorkoutStoryViewerProps {
   onDiscoverLocation?: (location: string) => void;
   onViewProfileFromStory?: (storyUserId: string, username: string) => void;
   onMarkCommitmentComplete?: () => void | Promise<void>;
+  onStoryUpdated?: (story: FrennixStory) => void;
+  onStoryDeleted?: (storyId: string, ownerId: string) => void;
   storyInsights?: StoryInsights | null;
   followLoading?: boolean;
   inviteLoading?: boolean;
@@ -247,6 +264,8 @@ export function WorkoutStoryViewer({
   onDiscoverLocation,
   onViewProfileFromStory,
   onMarkCommitmentComplete,
+  onStoryUpdated,
+  onStoryDeleted,
   storyInsights,
   followLoading,
   inviteLoading,
@@ -260,6 +279,8 @@ export function WorkoutStoryViewer({
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [questionAnswersVisible, setQuestionAnswersVisible] = useState(false);
   const [showReply, setShowReply] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
   const progress = useRef(new Animated.Value(0)).current;
   const dismissY = useRef(new Animated.Value(0)).current;
   const slideOpacity = useRef(new Animated.Value(1)).current;
@@ -287,7 +308,7 @@ export function WorkoutStoryViewer({
   }, [activeStories, slideContext]);
   const isVideoSlide = activeSlide?.kind === "media" && activeSlide.mediaKind === "video";
   const timerKey = `${storyIndex}-${slideIndex}-${visible}`;
-  const autoAdvancePaused = paused || interactionLocked || showReply;
+  const autoAdvancePaused = paused || interactionLocked || showReply || controlsOpen;
 
   useEffect(() => {
     if (!visible) return;
@@ -297,6 +318,8 @@ export function WorkoutStoryViewer({
     setInteractionLocked(false);
     setCaptionExpanded(false);
     setShowReply(false);
+    setControlsOpen(false);
+    setStatusMessage("");
     dismissY.setValue(0);
     elapsedMsRef.current = 0;
   }, [visible, initialStoryIndex, dismissY]);
@@ -333,20 +356,43 @@ export function WorkoutStoryViewer({
   ]);
 
   useEffect(() => {
+    if (!visible) return;
+    if (!story || activeStories.length === 0) {
+      onClose();
+    }
+  }, [activeStories.length, onClose, story, visible]);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
 
     if (!visible) {
       document.body.style.removeProperty("overflow");
+      document.body.style.removeProperty("overflow-x");
+      document.documentElement.style.removeProperty("overflow-x");
       return;
     }
 
     const previousOverflow = document.body.style.overflow;
+    const previousBodyOverflowX = document.body.style.overflowX;
+    const previousHtmlOverflowX = document.documentElement.style.overflowX;
     document.body.style.overflow = "hidden";
+    document.body.style.overflowX = "hidden";
+    document.documentElement.style.overflowX = "hidden";
     return () => {
       if (previousOverflow) {
         document.body.style.overflow = previousOverflow;
       } else {
         document.body.style.removeProperty("overflow");
+      }
+      if (previousBodyOverflowX) {
+        document.body.style.overflowX = previousBodyOverflowX;
+      } else {
+        document.body.style.removeProperty("overflow-x");
+      }
+      if (previousHtmlOverflowX) {
+        document.documentElement.style.overflowX = previousHtmlOverflowX;
+      } else {
+        document.documentElement.style.removeProperty("overflow-x");
       }
     };
   }, [visible]);
@@ -363,6 +409,50 @@ export function WorkoutStoryViewer({
     }
     onClose();
   }, [onClose, slideIndex, slides.length, stories.length, storyIndex]);
+
+  const showStatus = useCallback((message: string) => {
+    setStatusMessage(message);
+    setTimeout(() => setStatusMessage(""), 2200);
+  }, []);
+
+  const handleControlsUpdated = useCallback(
+    (updated: FrennixStory) => {
+      onStoryUpdated?.(updated);
+    },
+    [onStoryUpdated]
+  );
+
+  const handleControlsDeleted = useCallback(
+    (deletedStoryId: string) => {
+      const ownerId = story?.user_id ?? "";
+      const remainingStories = activeStories.filter((item) => item.id !== deletedStoryId);
+      onStoryDeleted?.(deletedStoryId, ownerId);
+      setControlsOpen(false);
+      showStatus("Story deleted.");
+
+      if (remainingStories.length > 0) {
+        const deletedAt = activeStories.findIndex((item) => item.id === deletedStoryId);
+        const nextStory = remainingStories[deletedAt] ?? remainingStories[Math.max(0, deletedAt - 1)];
+        const nextSlides = buildDedicatedStorySlides(remainingStories);
+        const nextIndex = nextSlides.findIndex((slide) => slide.storyId === nextStory.id);
+        setSlideIndex(Math.max(0, nextIndex));
+        return;
+      }
+
+      if (storyIndex < stories.length - 1) {
+        setStoryIndex((current) => current + 1);
+        setSlideIndex(0);
+        return;
+      }
+      if (storyIndex > 0) {
+        setStoryIndex((current) => current - 1);
+        setSlideIndex(0);
+        return;
+      }
+      setTimeout(() => onClose(), 700);
+    },
+    [activeStories, onClose, onStoryDeleted, showStatus, story?.user_id, storyIndex, stories.length]
+  );
 
   const stopTimer = useCallback(() => {
     timerRef.current?.stop();
@@ -401,10 +491,10 @@ export function WorkoutStoryViewer({
     elapsedMsRef.current = 0;
     progress.setValue(0);
     setPlaybackEpoch((epoch) => epoch + 1);
-    if (!paused && !interactionLocked && !showReply) {
+    if (!paused && !interactionLocked && !showReply && !controlsOpen) {
       startTimer(0);
     }
-  }, [interactionLocked, paused, progress, showReply, startTimer, stopTimer]);
+  }, [controlsOpen, interactionLocked, paused, progress, showReply, startTimer, stopTimer]);
 
   const handleLeftTap = useCallback(() => {
     if (slideIndex > 0) {
@@ -416,13 +506,13 @@ export function WorkoutStoryViewer({
 
   const tryNavigate = useCallback(
     (action: () => void) => {
-      if (didHoldRef.current || interactionLocked) return;
+      if (didHoldRef.current || interactionLocked || controlsOpen) return;
       const now = Date.now();
       if (now - lastNavAtRef.current < NAV_DEBOUNCE_MS) return;
       lastNavAtRef.current = now;
       action();
     },
-    [interactionLocked]
+    [controlsOpen, interactionLocked]
   );
 
   useEffect(() => {
@@ -603,6 +693,7 @@ export function WorkoutStoryViewer({
   const showCaption = Boolean(caption) && activeSlide?.kind !== "workout";
   const captionNeedsMore = caption.length > 96 || caption.includes("\n");
   const activeStoryId = slideContext?.storyId ?? currentDedicatedStory?.id ?? null;
+  const commentingEnabled = currentDedicatedStory?.commenting_enabled !== false;
   const canEngage = Boolean(activeStoryId) && !story.is_self;
 
   const timePosted = currentDedicatedStory
@@ -672,6 +763,15 @@ export function WorkoutStoryViewer({
                 />
               ) : null}
 
+              {story.is_self && currentDedicatedStory ? (
+                <StoryControlsButton
+                  onPress={() => {
+                    setControlsOpen(true);
+                    setPaused(true);
+                  }}
+                />
+              ) : null}
+
               <Pressable
                 style={styles.closeButton}
                 onPress={onClose}
@@ -695,7 +795,17 @@ export function WorkoutStoryViewer({
             ) : null}
           </View>
 
-          <View style={[styles.footer, { paddingBottom: footerBottomPad }]} pointerEvents="box-none">
+          <View
+            style={[
+              styles.footer,
+              {
+                paddingBottom: footerBottomPad,
+                left: Math.max(insets.left, spacing.md),
+                right: Math.max(insets.right, spacing.md),
+              },
+            ]}
+            pointerEvents="box-none"
+          >
             {workoutSlide?.kind === "workout" ? (
               <View style={styles.compactWorkoutMeta} pointerEvents="none">
                 <WorkoutTypeChips
@@ -742,13 +852,19 @@ export function WorkoutStoryViewer({
             ) : null}
 
             {currentDedicatedStory?.workout_tag ? (
-              <Pressable onPress={() => onDiscoverTag?.(currentDedicatedStory.workout_tag!)}>
+              <Pressable
+                style={styles.metaPressable}
+                onPress={() => onDiscoverTag?.(currentDedicatedStory.workout_tag!)}
+              >
                 <Text style={styles.workoutTag}>#{currentDedicatedStory.workout_tag}</Text>
               </Pressable>
             ) : null}
 
             {currentDedicatedStory?.location_name ? (
-              <Pressable onPress={() => onDiscoverLocation?.(currentDedicatedStory.location_name!)}>
+              <Pressable
+                style={styles.metaPressable}
+                onPress={() => onDiscoverLocation?.(currentDedicatedStory.location_name!)}
+              >
                 <Text style={styles.locationTag}>📍 {currentDedicatedStory.location_name}</Text>
               </Pressable>
             ) : null}
@@ -807,28 +923,55 @@ export function WorkoutStoryViewer({
 
             {canEngage ? (
               <View style={styles.engageStack}>
-                {showReply ? (
+                {showReply && commentingEnabled ? (
                   <StoryReplyBar
                     disabled={paused}
                     compact
                     onCancel={() => setShowReply(false)}
                     onFocusChange={setInteractionLocked}
                     onSend={async (text) => {
-                      await onReply?.(story.user_id, text, activeStoryId);
-                      setShowReply(false);
+                      if (!activeStoryId) {
+                        throw new Error("Message couldn’t be sent. Try again.");
+                      }
+                      try {
+                        await onReply?.(story.user_id, text, activeStoryId);
+                        showStatus("Message sent.");
+                        setShowReply(false);
+                      } catch (error) {
+                        showStatus(
+                          getErrorMessage(error, "Message couldn’t be sent. Try again.")
+                        );
+                        throw error;
+                      }
                     }}
                   />
                 ) : null}
                 <StoryReactionRow
                   disabled={paused}
-                  onReact={(emoji) =>
-                    onReact?.(story.user_id, activeStoryId!, emoji, slideContext?.slideId ?? null)
-                  }
+                  onReact={async (emoji) => {
+                    if (!activeStoryId) {
+                      throw new Error("Reaction couldn’t be sent. Try again.");
+                    }
+                    try {
+                      await onReact?.(
+                        story.user_id,
+                        activeStoryId,
+                        emoji,
+                        slideContext?.slideId ?? null
+                      );
+                    } catch (error) {
+                      showStatus(
+                        getErrorMessage(error, "Reaction couldn’t be sent. Try again.")
+                      );
+                      throw error;
+                    }
+                  }}
                 />
                 <StoryQuickActionsBar
                   disabled={paused || showReply}
                   hasChallenge={hasTrainingChallenge}
                   inviteLoading={inviteLoading}
+                  showMessage={commentingEnabled}
                   onMessage={() => setShowReply(true)}
                   onInviteWorkout={() =>
                     onInviteToTrain?.(story.user_id, currentDedicatedStory?.post_id ?? null)
@@ -852,7 +995,7 @@ export function WorkoutStoryViewer({
             ) : null}
           </View>
 
-          <View style={styles.tapZones} pointerEvents="box-none">
+          <View style={styles.tapZones} pointerEvents={controlsOpen ? "none" : "box-none"}>
             <Pressable
               style={styles.tapZoneLeft}
               onPress={() => tryNavigate(handleLeftTap)}
@@ -880,7 +1023,42 @@ export function WorkoutStoryViewer({
             />
           </View>
         </Animated.View>
+        {statusMessage ? (
+          <View style={styles.statusToast} pointerEvents="none">
+            <Text style={styles.statusToastText}>{statusMessage}</Text>
+          </View>
+        ) : null}
       </View>
+      <StoryControlsSheet
+        visible={controlsOpen && story.is_self}
+        story={currentDedicatedStory}
+        mediaType={
+          activeSlide?.kind === "media"
+            ? activeSlide.mediaKind === "video"
+              ? "video"
+              : "photo"
+            : null
+        }
+        mediaUrl={activeSlide?.kind === "media" ? activeSlide.url : null}
+        userId={session?.user.id ?? ""}
+        onClose={() => {
+          setControlsOpen(false);
+          setPaused(false);
+        }}
+        onUpdated={handleControlsUpdated}
+        onDeleted={handleControlsDeleted}
+        onSaveResult={(result, kind) => {
+          if (result === "shared") {
+            showStatus(
+              kind === "video"
+                ? "Use Save Video in the share sheet."
+                : "Use Save Image in the share sheet."
+            );
+            return;
+          }
+          showStatus(kind === "video" ? "Video saved." : "Photo saved.");
+        }}
+      />
       <StoryQuestionAnswersModal
         visible={questionAnswersVisible}
         answers={questionAnswers}
@@ -895,15 +1073,26 @@ export function WorkoutStoryViewer({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     backgroundColor: colors.black,
+    overflow: "hidden",
   },
   stage: {
     flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     backgroundColor: colors.black,
     overflow: "hidden",
   },
   engageStack: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     gap: spacing.sm,
+    zIndex: 6,
   },
   mediaStage: {
     ...StyleSheet.absoluteFillObject,
@@ -933,8 +1122,12 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: 0,
-    zIndex: 4,
+    zIndex: 6,
     gap: spacing.xs,
+    width: "auto",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   progressRow: {
     flexDirection: "row",
@@ -1006,6 +1199,23 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: "800",
   },
+  statusToast: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: 120,
+    alignItems: "center",
+  },
+  statusToastText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: "700",
+    backgroundColor: "rgba(10, 10, 11, 0.92)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
   compactWorkoutMeta: {
     gap: 4,
   },
@@ -1018,6 +1228,8 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     lineHeight: 22,
+    flexShrink: 1,
+    minWidth: 0,
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -1025,6 +1237,14 @@ const styles = StyleSheet.create({
   captionBlock: {
     gap: 2,
     marginBottom: spacing.xs,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  metaPressable: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
   },
   captionMore: {
     ...typography.caption,
@@ -1147,11 +1367,15 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.accent,
     fontWeight: "700",
+    flexShrink: 1,
+    minWidth: 0,
   },
   locationTag: {
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: "600",
+    flexShrink: 1,
+    minWidth: 0,
   },
   challengeCta: {
     alignSelf: "flex-start",

@@ -1,17 +1,10 @@
-import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { getErrorMessage, toggleLike } from "@frennix/api";
-import type { FeedPage, Post } from "@frennix/types";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { getErrorMessage, getTechnicalErrorMessage, toggleLike } from "@frennix/api";
+import type { Post } from "@frennix/types";
 import { showAlert } from "@/lib/alerts";
 import { hapticLike } from "@/lib/haptics";
-
-function findPostInFeed(feed: InfiniteData<FeedPage> | undefined, postId: string): Post | undefined {
-  if (!feed) return undefined;
-  for (const page of feed.pages) {
-    const post = page.posts.find((p) => p.id === postId);
-    if (post) return post;
-  }
-  return undefined;
-}
+import { findPostInAllCaches, mapPostInAllCaches } from "@/lib/post-cache";
 
 function patchPostLike(post: Post, liked: boolean): Post {
   return {
@@ -21,70 +14,93 @@ function patchPostLike(post: Post, liked: boolean): Post {
   };
 }
 
-function patchPostsInFeedPage(page: FeedPage, postId: string, liked: boolean): FeedPage {
-  return {
-    ...page,
-    posts: page.posts.map((p) => (p.id === postId ? patchPostLike(p, liked) : p)),
-  };
-}
-
-function patchFeed(
-  feed: InfiniteData<FeedPage>,
-  postId: string,
-  liked: boolean
-): InfiniteData<FeedPage> {
-  return {
-    ...feed,
-    pages: feed.pages.map((page) => patchPostsInFeedPage(page, postId, liked)),
-  };
-}
-
 type LikeVars = { postId: string; liked: boolean };
+
+const DUPLICATE_PRESS_MS = 400;
 
 export function useFeedLike(userId: string) {
   const queryClient = useQueryClient();
+  const likeChainRef = useRef(new Map<string, Promise<void>>());
+  const lastToggleAtRef = useRef(new Map<string, number>());
 
   const likeMutation = useMutation({
     mutationFn: ({ postId, liked }: LikeVars) => toggleLike(postId, userId, liked),
-    onMutate: ({ postId, liked }) => {
+    onMutate: async ({ postId, liked }) => {
       if (!liked) hapticLike();
 
-      const previousFeed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-      const previousPost = queryClient.getQueryData<Post>(["post", postId, userId]);
+      await queryClient.cancelQueries({ queryKey: ["feed", userId] });
+      await queryClient.cancelQueries({ queryKey: ["reels", userId] });
+      await queryClient.cancelQueries({ queryKey: ["post", postId] });
 
-      if (previousFeed) {
-        queryClient.setQueryData<InfiniteData<FeedPage>>(
-          ["feed", userId],
-          patchFeed(previousFeed, postId, liked)
-        );
-      }
+      const previous = findPostInAllCaches(queryClient, userId, postId);
+      mapPostInAllCaches(queryClient, userId, postId, (post) => patchPostLike(post, liked));
 
-      if (previousPost) {
-        queryClient.setQueryData<Post>(["post", postId, userId], patchPostLike(previousPost, liked));
-      }
-
-      void queryClient.cancelQueries({ queryKey: ["feed", userId] });
-
-      return { previousFeed, previousPost };
+      return { previous };
     },
     onError: (error, { postId }, context) => {
-      if (context?.previousFeed) {
-        queryClient.setQueryData(["feed", userId], context.previousFeed);
+      if (context?.previous) {
+        mapPostInAllCaches(queryClient, userId, postId, () => context.previous as Post);
       }
-      if (context?.previousPost) {
-        queryClient.setQueryData(["post", postId, userId], context.previousPost);
+      if (typeof __DEV__ !== "undefined" && __DEV__) {
+        console.error("[like] post failed", {
+          postId,
+          userId,
+          error: getTechnicalErrorMessage(error),
+        });
       }
-      showAlert("Like failed", getErrorMessage(error));
+      showAlert("Like failed", getErrorMessage(error, "Couldn't update that like. Please try again."));
+    },
+    onSuccess: (result, { postId }) => {
+      mapPostInAllCaches(queryClient, userId, postId, (post) => ({
+        ...post,
+        liked_by_me: result.liked_by_me,
+        like_count: result.like_count,
+      }));
     },
   });
+
+  function readLiked(postId: string): boolean {
+    return Boolean(findPostInAllCaches(queryClient, userId, postId)?.liked_by_me);
+  }
 
   function toggleLikePost(postId: string) {
     if (!userId) return;
 
-    const feed = queryClient.getQueryData<InfiniteData<FeedPage>>(["feed", userId]);
-    const liked = !!findPostInFeed(feed, postId)?.liked_by_me;
-    likeMutation.mutate({ postId, liked });
+    const now = Date.now();
+    const lastToggleAt = lastToggleAtRef.current.get(postId) ?? 0;
+    if (now - lastToggleAt < DUPLICATE_PRESS_MS) return;
+    lastToggleAtRef.current.set(postId, now);
+
+    const previous = likeChainRef.current.get(postId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(async () => {
+        await likeMutation.mutateAsync({ postId, liked: readLiked(postId) });
+      })
+      .catch(() => undefined);
+    likeChainRef.current.set(postId, next);
   }
 
   return { toggleLikePost };
+}
+
+/** Re-read like/respect fields from shared post caches so viewers stay in sync. */
+export function useLivePostEngagement(post: Post | undefined, userId: string) {
+  const queryClient = useQueryClient();
+  const [, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (!post?.id || !userId) return;
+    return queryClient.getQueryCache().subscribe(() => {
+      setVersion((value) => value + 1);
+    });
+  }, [post?.id, queryClient, userId]);
+
+  const latest = post?.id ? findPostInAllCaches(queryClient, userId, post.id) : undefined;
+  const source = latest ?? post;
+  return {
+    liked: Boolean(source?.liked_by_me),
+    likeCount: source?.like_count ?? 0,
+    myReaction: source?.my_reaction,
+  };
 }

@@ -1,12 +1,19 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import type { Post, Profile, SuggestedAthlete } from "@frennix/types";
 import { Button } from "@frennix/ui";
+import { initSupabase, isSupabaseInitialized } from "../packages/api/src/supabase";
 import { DiscoverProfilePreviewSheet } from "@/components/DiscoverProfilePreviewSheet";
+import { LocationDiscoveryPrompt } from "@/components/LocationDiscoveryPrompt";
 import { LocationOnboardingStep } from "@/components/LocationOnboardingStep";
 import { ManualLocationSheet } from "@/components/ManualLocationSheet";
 import { PostInteractionSheet } from "@/components/PostInteractionSheet";
+import { AuthContext } from "@/providers/AuthProvider";
+
+if (!isSupabaseInitialized()) {
+  initSupabase("https://frennix-sheet-test.supabase.co", "test-anon-key");
+}
 
 const profile = {
   id: "u1",
@@ -55,6 +62,37 @@ export function ManualLocationSheetHarness() {
   const [postVisible, setPostVisible] = useState(false);
   const [discoverVisible, setDiscoverVisible] = useState(false);
   const [postPanel, setPostPanel] = useState<"primary" | "more">("primary");
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [promptSaved, setPromptSaved] = useState("idle");
+  const [promptProfile, setPromptProfile] = useState(
+    () =>
+      ({
+        ...profile,
+        id: "prompt-user",
+        onboarding_complete: true,
+        location_prompt_completed_at: null,
+      }) as Profile
+  );
+  const promptAuth = useMemo(
+    () => ({
+      session: { user: { id: "prompt-user" } } as never,
+      profile: promptProfile,
+      authReady: true,
+      loading: false,
+      profileLoading: false,
+      authBootstrapTimedOut: false,
+      profileFetchFailed: false,
+      passwordRecovery: false,
+      clearPasswordRecovery: () => undefined,
+      refreshProfile: async (updated?: string | Profile) => {
+        setPromptSaved("saved");
+        if (updated && typeof updated === "object") setPromptProfile(updated);
+      },
+      applySession: async () => undefined,
+      signOut: async () => undefined,
+    }),
+    [promptProfile]
+  );
 
   return (
     <SafeAreaProvider>
@@ -101,6 +139,14 @@ export function ManualLocationSheetHarness() {
           onClose={() => setDiscoverVisible(false)}
           onViewFullProfile={() => undefined}
         />
+
+        <Text nativeID="prompt-saved">{promptSaved}</Text>
+        <Button title="Show discovery prompt" onPress={() => setShowPrompt(true)} />
+        {showPrompt ? (
+          <AuthContext.Provider value={promptAuth}>
+            <LocationDiscoveryPrompt />
+          </AuthContext.Provider>
+        ) : null}
 
         <Text nativeID="onboarding-marker">Onboarding location</Text>
         <LocationOnboardingStep

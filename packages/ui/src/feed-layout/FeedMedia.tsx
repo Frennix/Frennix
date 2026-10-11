@@ -1,6 +1,7 @@
 import { memo, type ReactNode } from "react";
 import { View } from "react-native";
 import type { PostType } from "@frennix/types";
+import type { FeedMediaLoadPriority } from "../feedMediaDelivery";
 import { FeedMediaSlot } from "../FeedMediaSlot";
 import { FeedLayout } from "./FeedLayout";
 
@@ -22,6 +23,7 @@ export type FeedMediaProps = {
   /** Extension: overlay on media — premium gate, play badge, ad marker. */
   overlay?: ReactNode;
   onPrimaryMediaReady?: (source: "image" | "video") => void;
+  loadPriority?: FeedMediaLoadPriority;
 };
 
 /**
@@ -42,6 +44,7 @@ export const FeedMedia = memo(function FeedMedia({
   embedded = false,
   overlay,
   onPrimaryMediaReady,
+  loadPriority,
 }: FeedMediaProps) {
   if (!mediaUrls.length) return null;
 
@@ -60,6 +63,7 @@ export const FeedMedia = memo(function FeedMedia({
           visible={visible}
           playbackScopeId={playbackScopeId}
           onPrimaryMediaReady={onPrimaryMediaReady}
+          loadPriority={loadPriority}
         />
         {overlay ? <FeedLayout.MediaOverlay>{overlay}</FeedLayout.MediaOverlay> : null}
       </View>

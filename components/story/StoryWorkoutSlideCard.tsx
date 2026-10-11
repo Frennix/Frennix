@@ -73,6 +73,9 @@ export function StoryWorkoutSlideCard({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.black,
@@ -80,6 +83,9 @@ const styles = StyleSheet.create({
   },
   card: {
     alignSelf: "stretch",
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     gap: spacing.md,
     padding: spacing.xl,
     borderRadius: 24,

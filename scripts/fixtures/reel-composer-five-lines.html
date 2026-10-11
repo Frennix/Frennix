@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=390, initial-scale=1" />
+    <title>Reel composer six-line render</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #111;
+        color: #fff;
+        font-family: -apple-system, sans-serif;
+      }
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        height: 420px;
+        width: 390px;
+        overflow: hidden;
+        background: #1b1b1e;
+      }
+      .list {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      [data-frennix-comment-composer-host="true"] {
+        flex: 0 0 auto;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        height: auto;
+        overflow: visible;
+        max-height: none;
+        padding: 8px;
+      }
+      [data-frennix-reel-comment-composer="true"] {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-end;
+        height: auto;
+        max-height: none;
+        flex-shrink: 0;
+        overflow: visible;
+      }
+      [data-video-comment-field="true"] {
+        position: relative;
+        flex: 1 1 0%;
+        display: block;
+        width: 0;
+        min-width: 0;
+        height: var(--comment-field-height, 48px) !important;
+        min-height: 48px !important;
+        max-height: var(--comment-field-max-height, 156px) !important;
+        box-sizing: border-box;
+        overflow: hidden !important;
+        contain: paint !important;
+        isolation: isolate;
+        border: 1px solid #34343a;
+        border-radius: 24px;
+        background: #1b1b1e;
+      }
+      [data-video-comment-field="true"] textarea {
+        display: block;
+        width: 100%;
+        height: var(--comment-field-height, 48px) !important;
+        min-height: 0 !important;
+        max-height: var(--comment-field-max-height, 156px) !important;
+        margin: 0;
+        padding: 12px 16px;
+        box-sizing: border-box;
+        border: 0;
+        outline: 0;
+        resize: none;
+        font-size: 16px;
+        line-height: 22px;
+        overflow-y: auto;
+        background: transparent;
+        color: #fff;
+      }
+      [data-frennix-reel-comment-composer="true"] [data-video-comment-field="true"] {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: flex-end !important;
+        flex: 1 1 auto !important;
+        flex-shrink: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        contain: none !important;
+        isolation: auto !important;
+      }
+      [data-frennix-reel-comment-composer="true"] textarea[data-frennix-comment-input="true"] {
+        flex: 1 1 auto !important;
+        height: auto !important;
+        min-height: 48px !important;
+        max-height: var(--comment-field-max-height, 156px) !important;
+      }
+      [data-frennix-comment-send="true"] {
+        flex: 0 0 auto;
+        align-self: flex-end;
+        min-height: 44px;
+        border: 0;
+        background: transparent;
+        color: #20d760;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="list">comments list yields</div>
+      <div data-frennix-comment-composer-host="true">
+        <div data-frennix-reel-comment-composer="true" data-web-comment-composer-row="true">
+          <div data-video-comment-field="true">
+            <textarea data-frennix-comment-input="true" rows="1"></textarea>
+            <button type="button" data-frennix-comment-send="true">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const LINE_HEIGHT = 22;
+      const MAX_LINES = 6;
+      const MIN_HEIGHT = 48;
+
+      function computeMax(textarea) {
+        const style = getComputedStyle(textarea);
+        const lineHeight = Number.parseFloat(style.lineHeight) || LINE_HEIGHT;
+        const padding =
+          (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+        const border =
+          (Number.parseFloat(style.borderTopWidth) || 0) +
+          (Number.parseFloat(style.borderBottomWidth) || 0);
+        return Math.ceil(MAX_LINES * lineHeight + padding + border);
+      }
+
+      function measureContent(textarea) {
+        const style = getComputedStyle(textarea);
+        const probe = document.createElement("textarea");
+        probe.value = textarea.value;
+        probe.rows = 1;
+        probe.style.cssText = [
+          "position:absolute",
+          "left:-9999px",
+          "height:auto",
+          "max-height:none",
+          "overflow:hidden",
+          `width:${Math.max(textarea.clientWidth, 1)}px`,
+          `font-size:${style.fontSize}`,
+          `line-height:${style.lineHeight}`,
+          `font-family:${style.fontFamily}`,
+          `padding:${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          "border:none",
+          `box-sizing:${style.boxSizing}`,
+          "white-space:pre-wrap",
+        ].join(";");
+        document.body.appendChild(probe);
+        const measured = probe.scrollHeight;
+        probe.remove();
+        return Math.max(measured, textarea.scrollHeight);
+      }
+
+      function sync(textarea, field) {
+        const maxHeight = computeMax(textarea);
+        field.style.setProperty("height", "auto", "important");
+        field.style.setProperty("max-height", "none", "important");
+        field.style.setProperty("overflow", "visible", "important");
+        field.style.setProperty("contain", "none", "important");
+        field.style.setProperty("--comment-field-max-height", `${maxHeight}px`);
+        textarea.style.setProperty("height", "auto", "important");
+        textarea.style.setProperty("max-height", "none", "important");
+        const measured = measureContent(textarea);
+        const next = Math.max(MIN_HEIGHT, Math.min(measured, maxHeight));
+        textarea.style.setProperty("max-height", `${maxHeight}px`, "important");
+        textarea.style.setProperty("height", `${next}px`, "important");
+        return { maxHeight, measured, next };
+      }
+
+      const textarea = document.querySelector("textarea");
+      const field = document.querySelector("[data-video-comment-field='true']");
+      textarea.value = "one\ntwo\nthree\nfour\nfive\nsix";
+      const applied = sync(textarea, field);
+      const style = getComputedStyle(textarea);
+      const fieldStyle = getComputedStyle(field);
+      const padding =
+        (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+      const lineHeight = Number.parseFloat(style.lineHeight) || LINE_HEIGHT;
+      const visibleLines = (textarea.clientHeight - padding) / lineHeight;
+      const result = {
+        ok:
+          visibleLines >= 5.9 &&
+          textarea.clientHeight + 1 >= applied.maxHeight &&
+          field.clientHeight + 1 >= textarea.clientHeight &&
+          fieldStyle.height !== "48px" &&
+          fieldStyle.overflow !== "hidden",
+        visibleLines,
+        textareaClientHeight: textarea.clientHeight,
+        textareaScrollHeight: textarea.scrollHeight,
+        fieldClientHeight: field.clientHeight,
+        fieldComputedHeight: fieldStyle.height,
+        fieldOverflow: fieldStyle.overflow,
+        maxHeight: applied.maxHeight,
+        measured: applied.measured,
+        next: applied.next,
+      };
+      document.documentElement.dataset.result = JSON.stringify(result);
+      document.title = result.ok ? "FIVE_LINES_OK" : "FIVE_LINES_FAIL";
+    </script>
+  </body>
+</html>

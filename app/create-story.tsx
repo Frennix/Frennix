@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Video, ResizeMode } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   STORY_LOCATION_TYPES,
   STORY_POLL_PRESETS,
-  STORY_PRIVACY_OPTIONS,
   STORY_WORKOUT_TAGS,
   type StoryLocationType,
   type StoryPollPresetId,
@@ -46,6 +45,8 @@ import {
   VIDEO_TOO_LONG_MESSAGE,
 } from "@/lib/media-duration";
 import { showAlert } from "@/lib/alerts";
+import { StoryPrivacySelector } from "@/components/story/StoryPrivacySelector";
+import { readLastStoryPrivacy, writeLastStoryPrivacy } from "@/lib/story-privacy-preferences";
 import { requestPhotoAdjustment } from "@/lib/photo-adjustment-flow";
 import { ReorderablePhotoStrip } from "@/components/ReorderablePhotoStrip";
 import { useAuth } from "@/providers/AuthProvider";
@@ -72,7 +73,7 @@ export default function CreateStoryScreen() {
   const submittingRef = useRef(false);
 
   const [slides, setSlides] = useState<StorySlideDraft[]>([]);
-  const [privacy, setPrivacy] = useState<StoryPrivacy>("followers");
+  const [privacy, setPrivacy] = useState<StoryPrivacy>("everyone");
   const [workoutTag, setWorkoutTag] = useState<string | null>(null);
   const [locationName, setLocationName] = useState("");
   const [locationType, setLocationType] = useState<StoryLocationType | null>(null);
@@ -92,6 +93,12 @@ export default function CreateStoryScreen() {
 
   const hasVideo = slides.some((slide) => isVideoMime(slide.mimeType));
   const previewSlide = slides[0] ?? null;
+
+  useEffect(() => {
+    void readLastStoryPrivacy().then((saved) => {
+      if (saved) setPrivacy(saved);
+    });
+  }, []);
 
   async function pickMedia() {
     if (loading) return;
@@ -265,6 +272,7 @@ export default function CreateStoryScreen() {
         });
       }
 
+      await writeLastStoryPrivacy(privacy);
       await queryClient.invalidateQueries({ queryKey: ["feed-stories", userId] });
       router.back();
     } catch (publishError) {
@@ -452,19 +460,7 @@ export default function CreateStoryScreen() {
         </View>
 
         <Text style={styles.sectionLabel}>Privacy</Text>
-        <View style={styles.chipRow}>
-          {STORY_PRIVACY_OPTIONS.map((option) => (
-            <Pressable
-              key={option.value}
-              style={[styles.chip, privacy === option.value && styles.chipActive]}
-              onPress={() => setPrivacy(option.value)}
-            >
-              <Text style={[styles.chipText, privacy === option.value && styles.chipTextActive]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <StoryPrivacySelector value={privacy} onChange={setPrivacy} disabled={loading} />
 
         <Text style={styles.sectionLabel}>Workout tag</Text>
         <View style={styles.chipRow}>

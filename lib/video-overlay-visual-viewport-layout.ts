@@ -1,32 +1,81 @@
+import { getImmersiveSessionLayoutHeight } from "@/lib/immersive-session-layout";
 import { isIosSafariBrowser, isWebStandalone } from "@/lib/pwa";
 import {
-  isVisualViewportKeyboardOpen,
   measureSafariVisualViewport,
   readEnvSafeAreaTop,
   type SafariVisualViewportSnapshot,
 } from "@/lib/safari-visual-viewport";
 import { VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX } from "@/lib/use-video-overlay-portaled-composer-reserve";
 
-/** Safari tab toolbar band above the keyboard — not present in standalone PWA. */
+export {
+  resolveVideoOverlayPeekAndSheetHeight,
+  resolveVideoOverlayVisibleGeometry,
+  VIDEO_OVERLAY_HEADER_CHROME_PX,
+  VIDEO_OVERLAY_KEYBOARD_HEADER_MIN_PX,
+  VIDEO_OVERLAY_KEYBOARD_PEEK_FLOOR_PX,
+  VIDEO_OVERLAY_KEYBOARD_PEEK_MAX_PX,
+  VIDEO_OVERLAY_MIN_LIST_PX,
+  VIDEO_OVERLAY_SINGLE_LINE_COMPOSER_RESERVE_PX,
+  VIDEO_PEEK_ABSOLUTE_MIN_PX,
+  VIDEO_PEEK_MIN_LAYOUT_FRACTION,
+  type VideoOverlayPeekBandInput,
+  type VideoOverlayVisibleGeometry,
+} from "@/lib/video-overlay-peek-geometry";
+
+/** Historical Safari toolbar estimate — never subtract when visualViewport already shrank. */
 export const IOS_SAFARI_FLOATING_CONTROLS_PX = 90;
 
-const KEYBOARD_OPEN_THRESHOLD_PX = 100;
+/** Visual shrink must exceed Safari toolbar/URL-bar motion (~40–90px). */
+export const KEYBOARD_OPEN_THRESHOLD_PX = 140;
 
 export type VideoOverlayViewportFrame = {
   offsetTop: number;
   visualHeight: number;
-  /** Visual viewport height minus Safari floating toolbar when applicable. */
+  /** Visual viewport height minus any measured overlapping chrome. */
   usableHeight: number;
   safariControlsClearance: number;
   safeAreaTop: number;
   keyboardOpen: boolean;
+  /** Layout viewport height (`window.innerHeight`) at sample time. */
+  layoutHeight: number;
 };
 
-function isVideoOverlayKeyboardOpen(snapshot: SafariVisualViewportSnapshot): boolean {
-  return (
-    isVisualViewportKeyboardOpen(snapshot) ||
-    snapshot.layoutHeight - snapshot.visualHeight > KEYBOARD_OPEN_THRESHOLD_PX
-  );
+export type SafariControlsClearanceInput = {
+  isIosSafari: boolean;
+  standalone: boolean;
+  keyboardOpen: boolean;
+  bottomChrome: number;
+  layoutHeight: number;
+  visualHeight: number;
+};
+
+/**
+ * Extra Safari-tab chrome to subtract from visualHeight.
+ * Standalone PWA uses safe-area padding instead.
+ * Safari browser: skip the 90px constant when visualViewport already excluded chrome/keyboard.
+ */
+export function resolveSafariControlsClearance(input: SafariControlsClearanceInput): number {
+  if (input.standalone || !input.isIosSafari || !input.keyboardOpen) {
+    return 0;
+  }
+
+  const alreadyAccountedInVisualViewport =
+    input.bottomChrome > 0 || input.layoutHeight - input.visualHeight > 0;
+  if (alreadyAccountedInVisualViewport) {
+    return 0;
+  }
+
+  return 0;
+}
+
+/**
+ * Keyboard open = visual viewport dropped vs the frozen session (or current
+ * layout height) by more than the toolbar/URL-bar band. Do not use a live
+ * `innerHeight` that iOS already shrank with the keyboard.
+ */
+export function isVideoOverlayKeyboardOpen(snapshot: SafariVisualViewportSnapshot): boolean {
+  const baselineHeight = getImmersiveSessionLayoutHeight() ?? snapshot.layoutHeight;
+  return baselineHeight - snapshot.visualHeight > KEYBOARD_OPEN_THRESHOLD_PX;
 }
 
 /** Mode-aware visual viewport frame for the immersive video comments overlay. */
@@ -34,10 +83,14 @@ export function measureVideoOverlayViewportFrame(): VideoOverlayViewportFrame {
   const snapshot = measureSafariVisualViewport();
   const standalone = isWebStandalone();
   const keyboardOpen = isVideoOverlayKeyboardOpen(snapshot);
-  const safariControlsClearance =
-    isIosSafariBrowser() && !standalone && keyboardOpen
-      ? IOS_SAFARI_FLOATING_CONTROLS_PX
-      : 0;
+  const safariControlsClearance = resolveSafariControlsClearance({
+    isIosSafari: isIosSafariBrowser(),
+    standalone,
+    keyboardOpen,
+    bottomChrome: snapshot.bottomChrome,
+    layoutHeight: snapshot.layoutHeight,
+    visualHeight: snapshot.visualHeight,
+  });
   const safeAreaTop = standalone ? readEnvSafeAreaTop() : 0;
   const usableHeight = Math.max(180, snapshot.visualHeight - safariControlsClearance);
 
@@ -48,7 +101,14 @@ export function measureVideoOverlayViewportFrame(): VideoOverlayViewportFrame {
     safariControlsClearance,
     safeAreaTop,
     keyboardOpen,
+    layoutHeight: snapshot.layoutHeight,
   };
+}
+
+/** Gap between the layout viewport bottom and the visible visual-viewport bottom. */
+export function computeVideoOverlayComposerBottom(frame: VideoOverlayViewportFrame): number {
+  const visualBottom = frame.offsetTop + frame.visualHeight - frame.safariControlsClearance;
+  return Math.max(0, Math.round(frame.layoutHeight - visualBottom + VIDEO_OVERLAY_COMPOSER_CLEARANCE_PX));
 }
 
 /** Fixed `top` for the portaled composer — matches the overlay frame bottom. */

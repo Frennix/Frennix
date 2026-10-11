@@ -52,11 +52,14 @@ const checks: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "Feed photos probe thumbnail dimensions before full image",
+    name: "Feed photos probe a resized display image, not the original file",
     run: () => {
       const src = read("packages/ui/src/PostMedia.tsx");
-      if (!src.includes("dimensionsUri={thumbnailUrl ?? uri}")) {
-        throw new Error("Feed photos must probe thumbnailUrl before full-resolution uri");
+      if (!src.includes("feedDisplayImageUri")) {
+        throw new Error("Feed photos must request a resized display image");
+      }
+      if (src.includes("dimensionsUri={thumbnailUrl ?? uri}")) {
+        throw new Error("Feed dimension probe must not download the original file");
       }
     },
   },
@@ -66,6 +69,9 @@ const checks: Array<{ name: string; run: () => void }> = [
       const src = read("packages/ui/src/PostMediaCarousel.tsx");
       if (!src.includes("fillParent: true")) {
         throw new Error("Carousel slides must fill a shared feed frame");
+      }
+      if (!src.includes("feedFillParentStyle")) {
+        throw new Error("Carousel slides must pass fill-parent style through photo wrappers");
       }
       if (!src.includes("<MediaAspectFrame")) {
         throw new Error("Multi-image carousel must wrap slides in one MediaAspectFrame");
@@ -87,6 +93,29 @@ const checks: Array<{ name: string; run: () => void }> = [
       const src = read("packages/ui/src/FeedPostCard.tsx");
       if (!src.includes("<FeedMedia")) {
         throw new Error("FeedPostCard must render FeedMedia for media");
+      }
+    },
+  },
+  {
+    name: "Photo double-tap opens the existing lightbox without liking",
+    run: () => {
+      const media = read("packages/ui/src/PostMedia.tsx");
+      if (!media.includes("PHOTO_DOUBLE_TAP_MS")) {
+        throw new Error("Feed photos must detect a localized double-tap");
+      }
+      if (!media.includes('touchAction: "manipulation"')) {
+        throw new Error("Feed photos must use touch-action manipulation against Safari page zoom");
+      }
+      if (!media.includes("onImagePress") || !media.includes("FeedVideoPlayer")) {
+        throw new Error("Photo and video press paths must stay separate");
+      }
+      const card = read("packages/ui/src/FeedPostCard.tsx");
+      if (card.includes("onDoubleTapLike") || card.includes("handleMediaAreaPress")) {
+        throw new Error("FeedPostCard must not treat double-tap as like");
+      }
+      const lightbox = read("components/ImageLightbox.tsx");
+      if (!lightbox.includes("zoomPanForDoubleTap") || !lightbox.includes("toggleZoomAt")) {
+        throw new Error("Fullscreen photo double-tap must zoom near the tap point");
       }
     },
   },

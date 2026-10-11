@@ -1,5 +1,6 @@
 import type { FrennixStory, StoryHighlightCategory } from "@frennix/types";
 import { getSupabase } from "./supabase";
+import { hydrateDedicatedStories } from "./story-privacy";
 
 export type StoryHighlight = {
   id: string;
@@ -156,18 +157,5 @@ export async function getHighlightStories(highlightId: string): Promise<FrennixS
     slidesByStory.set(storyId, list);
   }
 
-  return storyRows.map((row) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    privacy: row.privacy as FrennixStory["privacy"],
-    post_id: row.post_id as string | null,
-    workout_tag: row.workout_tag as string | null,
-    location_name: row.location_name as string | null,
-    location_type: row.location_type as FrennixStory["location_type"],
-    challenge_id: row.challenge_id as string | null,
-    challenge_prompt: row.challenge_prompt as string | null,
-    created_at: row.created_at as string,
-    expires_at: row.expires_at as string,
-    slides: slidesByStory.get(row.id as string) ?? [],
-  }));
+  return hydrateDedicatedStories(storyRows as Record<string, unknown>[], slidesByStory);
 }
