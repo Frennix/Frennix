@@ -194,7 +194,7 @@ if (vapidPublicKey && !html.includes('name="frennix-vapid-public-key"')) {
   html = html.replace("</head>", `${vapidMeta}  </head>`);
 }
 
-if (!html.includes('rel="preload"') || !html.includes("frennix-splash-logo")) {
+if (!html.includes('rel="preload"') || !html.includes("frennix-splash-screen")) {
   html = html.replace("</head>", `    ${splashHeadTags}\n  </head>`);
 }
 
