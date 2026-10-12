@@ -1,11 +1,21 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+type AuthStorage = {
+  getItem: (key: string) => string | null | Promise<string | null>;
+  setItem: (key: string, value: string) => void | Promise<void>;
+  removeItem: (key: string) => void | Promise<void>;
+};
+
+export type InitSupabaseOptions = {
+  storage?: AuthStorage;
+  storageKey?: string;
+  detectSessionInUrl?: boolean;
+};
+
 let client: SupabaseClient | null = null;
 let initializedUrl: string | null = null;
 
-const detectSessionInUrl = typeof window !== "undefined";
-
-export function initSupabase(url: string, anonKey: string) {
+export function initSupabase(url: string, anonKey: string, options?: InitSupabaseOptions) {
   if (client) return client;
 
   initializedUrl = url;
@@ -13,7 +23,9 @@ export function initSupabase(url: string, anonKey: string) {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl,
+      detectSessionInUrl: options?.detectSessionInUrl ?? typeof window !== "undefined",
+      ...(options?.storage ? { storage: options.storage } : {}),
+      ...(options?.storageKey ? { storageKey: options.storageKey } : {}),
     },
   });
   return client;

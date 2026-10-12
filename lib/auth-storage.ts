@@ -1,5 +1,13 @@
+import { Platform } from "react-native";
+import {
+  clearNativeAuthStorageSync,
+  nativeSessionHasAccessToken,
+  nativeSessionIsExpiredWithoutRefresh,
+} from "@/lib/native-auth-storage";
+
 /** True when a Supabase auth token is still present in browser storage. */
 export function hasPersistedAuthToken(): boolean {
+  if (Platform.OS !== "web") return nativeSessionHasAccessToken();
   if (typeof localStorage === "undefined") return false;
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
@@ -18,6 +26,7 @@ export function hasPersistedAuthToken(): boolean {
 
 /** True when persisted auth metadata indicates the session is past expiry. */
 export function isPersistedSessionExpired(): boolean {
+  if (Platform.OS !== "web") return nativeSessionIsExpiredWithoutRefresh();
   if (typeof localStorage === "undefined") return false;
   const nowSec = Math.floor(Date.now() / 1000);
   for (let i = 0; i < localStorage.length; i += 1) {
@@ -40,12 +49,17 @@ export function isPersistedSessionExpired(): boolean {
 
 /** Remove expired Supabase auth entries from browser storage. */
 export function clearExpiredPersistedAuth(): boolean {
+  if (Platform.OS !== "web") {
+    if (!nativeSessionIsExpiredWithoutRefresh()) return false;
+    return clearNativeAuthStorageSync();
+  }
   if (!isPersistedSessionExpired() || typeof localStorage === "undefined") return false;
   return clearAllPersistedAuth();
 }
 
 /** Remove all Supabase auth entries from browser storage. */
 export function clearAllPersistedAuth(): boolean {
+  if (Platform.OS !== "web") return clearNativeAuthStorageSync();
   if (typeof localStorage === "undefined") return false;
   const keys: string[] = [];
   for (let i = 0; i < localStorage.length; i += 1) {

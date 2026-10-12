@@ -27,6 +27,7 @@ import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/rec
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
 import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
+import { hydrateNativeAuthStorage } from "@/lib/native-auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
 import { markDevStartupPerf } from "@/lib/dev-startup-perf";
@@ -406,6 +407,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function bootstrapAuth() {
       logStartupStep("auth:init:start", { phase: "bootstrap" });
+      if (Platform.OS !== "web") {
+        try {
+          await hydrateNativeAuthStorage();
+        } catch (error) {
+          console.error(
+            "[auth] native session restore failed",
+            error instanceof Error ? error.message : "storage"
+          );
+        }
+      }
       if (typeof window !== "undefined" && isWebRecoveryHash()) {
         try {
           const isRecovery = await withTimeout(

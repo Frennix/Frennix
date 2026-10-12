@@ -1,5 +1,7 @@
+import { Platform } from "react-native";
 import { initSupabase, isSupabaseInitialized } from "@frennix/api";
 import { config, isSupabaseConfigured } from "./config";
+import { NATIVE_AUTH_STORAGE_KEY, nativeAuthStorage } from "./native-auth-storage";
 import { markStartupMount } from "./startup-mount-trace";
 
 markStartupMount("init-supabase:module", "sync");
@@ -23,7 +25,15 @@ function logSupabaseConfigAtInit() {
 export function ensureSupabaseInitialized() {
   if (!isSupabaseConfigured() || isSupabaseInitialized()) return;
   logSupabaseConfigAtInit();
-  initSupabase(config.supabaseUrl, config.supabaseAnonKey);
+  if (Platform.OS === "web") {
+    initSupabase(config.supabaseUrl, config.supabaseAnonKey);
+    return;
+  }
+  initSupabase(config.supabaseUrl, config.supabaseAnonKey, {
+    storage: nativeAuthStorage,
+    storageKey: NATIVE_AUTH_STORAGE_KEY,
+    detectSessionInUrl: false,
+  });
 }
 
 ensureSupabaseInitialized();
