@@ -628,7 +628,7 @@ export default function CreatePostScreen() {
       : displayCategory === "nutrition"
         ? "Share meal"
         : displayCategory === "general"
-          ? "Post"
+          ? "Create post"
           : isContextPost
             ? "Share post"
             : "Share workout",
@@ -823,7 +823,11 @@ export default function CreatePostScreen() {
                 multiline
                 maxLength={CAPTION_MAX}
                 editable={!isFormLocked}
-                placeholder="What did you eat or how did it go?"
+                placeholder={
+                  displayCategory === "nutrition"
+                    ? "What did you eat today?"
+                    : "What's on your mind?"
+                }
               />
             )}
             <Text style={styles.charCount}>
@@ -906,7 +910,13 @@ export default function CreatePostScreen() {
         ) : (
           <View style={styles.addMediaBlock}>
             <Button
-              title={isReelIntent ? "Add video" : "Add photos or video"}
+              title={
+                isReelIntent
+                  ? "Add video"
+                  : displayCategory === "nutrition"
+                    ? "Add meal photos or video"
+                    : "Add photos or video"
+              }
               variant="secondary"
               onPress={pickMedia}
               disabled={isFormLocked || pickingMedia}
@@ -916,7 +926,9 @@ export default function CreatePostScreen() {
             <Text style={styles.mediaHelper}>
               {isReelIntent
                 ? "Videos up to 90 seconds."
-                : `Add up to ${MAX_PHOTOS} photos or one workout video up to 60 seconds.`}
+                : displayCategory === "workout"
+                  ? `Add up to ${MAX_PHOTOS} photos or one workout video up to 60 seconds.`
+                  : `Add up to ${MAX_PHOTOS} photos or one video up to 60 seconds.`}
             </Text>
           </View>
         )}
