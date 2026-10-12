@@ -29,6 +29,7 @@ import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
 import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
+import { markDevStartupPerf } from "@/lib/dev-startup-perf";
 import { logStartupStep } from "@/lib/startup-step-log";
 
 /** Grace period while Supabase refreshes the session after tab resume (ms). */
@@ -637,7 +638,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authBootstrapTimedOut || (!loading && !(session?.user.id && profileLoading));
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !authReady) return;
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    if (session?.user.id) {
+      document.documentElement.setAttribute("data-frennix-auth", "in");
+      return;
+    }
+    document.documentElement.removeAttribute("data-frennix-auth");
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    markDevStartupPerf("auth-ready", {
+      hasSession: Boolean(session),
+      hasProfile: Boolean(profile),
+    });
+    if (Platform.OS !== "web") return;
     recordWebStartupCheckpoint("auth:provider-ready", {
       hasSession: Boolean(session),
       hasProfile: Boolean(profile),

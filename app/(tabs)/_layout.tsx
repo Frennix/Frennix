@@ -26,6 +26,8 @@ import { useCommentsOverlayOpen } from "@/lib/comments-overlay-state";
 import { useTabSceneLayoutGuard } from "@/lib/tab-scene-layout-guard";
 import { restoreWebDocumentScrollLock } from "@/lib/web-modal-scroll-lock";
 import { recordWebStartupCheckpoint } from "@/lib/web-startup-checkpoints";
+import { hideFrennixBootShell } from "@/lib/hide-boot-shell";
+import { markDevStartupPerf } from "@/lib/dev-startup-perf";
 
 const HeaderBell = memo(function HeaderBell() {
   const { session } = useAuth();
@@ -262,8 +264,10 @@ export default function TabsLayout() {
     if (Platform.OS === "web") {
       restoreWebDocumentScrollLock();
       recordWebStartupCheckpoint("tabs-layout:mounted");
+      if (session?.user.id) hideFrennixBootShell();
     }
-  }, []);
+    if (session?.user.id) markDevStartupPerf("home-shell-ready");
+  }, [session?.user.id]);
 
   return (
     <StartupMountProbe id="tabs-layout">

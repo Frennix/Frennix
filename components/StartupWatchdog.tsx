@@ -27,12 +27,25 @@ function isStartupComplete(): boolean {
   );
 }
 
+function tabShellAwaitingSession(): boolean {
+  if (typeof document === "undefined") return false;
+  if (document.documentElement.getAttribute("data-frennix-auth") === "in") return false;
+  const scene = document.getElementById("feed-tab-scene");
+  if (!scene) return false;
+  const rect = scene.getBoundingClientRect();
+  const style = getComputedStyle(scene);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  if (Number(style.opacity) < 0.05) return false;
+  return rect.height >= 160 && rect.width >= 20;
+}
+
 /** Hides the HTML boot shell and surfaces a retry UI if React startup stalls. */
 export function StartupWatchdog() {
   const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
     const check = () => {
+      if (tabShellAwaitingSession()) return;
       if (isStartupComplete()) {
         hideFrennixBootShell();
         setStalled(false);

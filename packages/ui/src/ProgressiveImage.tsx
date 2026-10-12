@@ -56,6 +56,7 @@ export function ProgressiveImage({
   const onLoadEndRef = useRef(onLoadEnd);
   onLoadRef.current = onLoad;
   onLoadEndRef.current = onLoadEnd;
+  const imageStartedAt = useRef(typeof performance !== "undefined" ? performance.now() : Date.now());
   const revealKey = `${uri}:${retryKey}`;
   const revealKeyRef = useRef(revealKey);
   if (revealKeyRef.current !== revealKey) {
@@ -66,6 +67,12 @@ export function ProgressiveImage({
   const reveal = () => {
     if (revealedRef.current) return;
     revealedRef.current = true;
+    if (typeof __DEV__ !== "undefined" && __DEV__) {
+      const elapsedMs = Math.round(
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) - imageStartedAt.current
+      );
+      console.info("[image-perf] ready", { elapsed_ms: elapsedMs });
+    }
     setLoaded(true);
     onLoadRef.current?.();
     onLoadEndRef.current?.();
@@ -87,6 +94,7 @@ export function ProgressiveImage({
 
     opacity.setValue(0);
     setLoaded(false);
+    imageStartedAt.current = typeof performance !== "undefined" ? performance.now() : Date.now();
   }, [uri, retryKey, opacity]);
 
   const handleRetry = () => {
@@ -107,6 +115,12 @@ export function ProgressiveImage({
       return;
     }
     setFailed(true);
+    if (typeof __DEV__ !== "undefined" && __DEV__) {
+      const elapsedMs = Math.round(
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) - imageStartedAt.current
+      );
+      console.info("[image-perf] failed", { elapsed_ms: elapsedMs });
+    }
     onError?.();
   };
 
@@ -173,7 +187,7 @@ const styles = StyleSheet.create({
   wrap: {
     position: "relative",
     overflow: "hidden",
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceElevated,
     width: "100%",
     height: "100%",
   },
