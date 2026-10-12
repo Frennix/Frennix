@@ -1,5 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import { createNativeAuthController } from "@/lib/native-auth-controller";
+import { createNativeAuthController, type NativeAuthHydrateResult } from "@/lib/native-auth-controller";
 import type { NativeAuthKeyValue } from "@/lib/native-auth-chunk-store";
 
 /**
@@ -47,7 +47,7 @@ export function nativePersistedSessionIsRestorable(): Promise<boolean> {
   return nativeAuth.persistedSessionIsRestorable();
 }
 
-export function hydrateNativeAuthStorage(): Promise<void> {
+export function hydrateNativeAuthStorage(): Promise<NativeAuthHydrateResult> {
   return nativeAuth.hydrate();
 }
 

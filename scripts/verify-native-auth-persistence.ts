@@ -104,8 +104,16 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
     run: () => {
       const source = read("providers/AuthProvider.tsx");
       const hydrateAt = source.indexOf("await hydrateNativeAuthStorage()");
+      const unavailableAt = source.indexOf('reason: "keychain-unavailable"');
       const shortcutAt = source.indexOf('reason: "no-persisted-token"');
-      assert(hydrateAt > 0 && shortcutAt > hydrateAt, "hydrate must run before the no-token sign-out");
+      assert(
+        hydrateAt > 0 && unavailableAt > hydrateAt && shortcutAt > unavailableAt,
+        "a Keychain read failure must return before the no-token sign-out"
+      );
+      const index = read("app/index.tsx");
+      const failureAt = index.indexOf("nativeSessionRestoreFailed && !session");
+      const loginAt = index.indexOf("if (!session || !hasPersistedAuthToken())");
+      assert(failureAt > 0 && loginAt > failureAt, "read failure must show retry before the login redirect");
     },
   },
   {
@@ -406,6 +414,62 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
         parsePersistedAuthRecord(await restarted.storage.getItem(SESSION_KEY)).accessToken === "new-access",
         "restart must restore the refreshed access token"
       );
+    },
+  },
+  {
+    name: "Startup distinguishes a saved session, a missing session, and a temporary read failure",
+    run: async () => {
+      const store = memoryStore();
+      const saved = sessionJson("saved-access", 40);
+      await writeCommittedAuthValue(store, SESSION_KEY, chunkForSecureStore(saved));
+
+      const restored = createNativeAuthController(store, SESSION_KEY);
+      assert((await restored.hydrate()) === "restored", "a readable session must restore");
+      assert(restored.hasAccessToken(), "restore must keep the access token in memory");
+
+      const empty = createNativeAuthController(memoryStore(), SESSION_KEY);
+      let emptyDeletes = 0;
+      const originalEmptyDelete = empty.storage.removeItem.bind(empty.storage);
+      empty.storage.removeItem = async (key) => {
+        emptyDeletes += 1;
+        await originalEmptyDelete(key);
+      };
+      assert((await empty.hydrate()) === "missing", "readable empty storage is a missing session");
+      assert(!empty.hasAccessToken(), "a missing session must not look signed in");
+      assert(emptyDeletes === 0, "a missing session must not delete storage during read");
+
+      const deletes: string[] = [];
+      let failReads = true;
+      const flaky: NativeAuthKeyValue = {
+        async getItem(key) {
+          if (failReads) throw new Error("keychain locked");
+          return store.getItem(key);
+        },
+        setItem: (key, value) => store.setItem(key, value),
+        async deleteItem(key) {
+          deletes.push(key);
+          await store.deleteItem(key);
+        },
+      };
+      const blocked = createNativeAuthController(flaky, SESSION_KEY);
+      assert((await blocked.hydrate()) === "unavailable", "a thrown read is temporary, not missing");
+      assert(!blocked.hasAccessToken(), "a failed read must not present the user as signed in");
+      assert(deletes.length === 0, "a failed read must not delete stored credentials");
+      assert(
+        parsePersistedAuthRecord(await readCommittedAuthValue(store, SESSION_KEY)).accessToken === "saved-access",
+        "the saved session must remain after a failed read"
+      );
+
+      failReads = false;
+      assert((await blocked.hydrate()) === "restored", "retry must recover once Keychain can be read");
+      assert(
+        parsePersistedAuthRecord(await blocked.storage.getItem(SESSION_KEY)).accessToken === "saved-access",
+        "retry must return the same saved session"
+      );
+
+      blocked.clearSync();
+      await blocked.flush();
+      assert(!(await blocked.persistedSessionIsRestorable()), "intentional logout still clears the saved session");
     },
   },
 ];

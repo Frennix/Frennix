@@ -15,6 +15,9 @@ import {
 
 const KEY_PATTERN = /^[A-Za-z0-9._-]+$/;
 
+/** restored: a saved access token was read. missing: storage was readable and empty. unavailable: the read failed and stored credentials were left untouched. */
+export type NativeAuthHydrateResult = "restored" | "missing" | "unavailable";
+
 function secureStoreKey(key: string): string {
   if (KEY_PATTERN.test(key)) return key;
   return key.replace(/[^A-Za-z0-9._-]/g, "_");
@@ -154,8 +157,17 @@ export function createNativeAuthController(backend: NativeAuthKeyValue, sessionK
       });
     },
 
-    async hydrate(): Promise<void> {
-      await storage.getItem(sessionKey);
+    async hydrate(): Promise<NativeAuthHydrateResult> {
+      try {
+        const value = await storage.getItem(sessionKey);
+        return parsePersistedAuthRecord(value).accessToken ? "restored" : "missing";
+      } catch (error) {
+        console.warn(
+          "[auth] native session restore failed",
+          error instanceof Error ? error.message : "storage"
+        );
+        return "unavailable";
+      }
     },
 
     storage,

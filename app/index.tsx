@@ -34,6 +34,8 @@ export default function Index() {
     loading,
     profileLoading,
     profileFetchFailed,
+    nativeSessionRestoreFailed,
+    retryNativeSessionRestore,
     refreshProfile,
     signOut,
   } = useAuth();
@@ -48,6 +50,8 @@ export default function Index() {
         loading={loading}
         profileLoading={profileLoading}
         profileFetchFailed={profileFetchFailed}
+        nativeSessionRestoreFailed={nativeSessionRestoreFailed}
+        retryNativeSessionRestore={retryNativeSessionRestore}
         refreshProfile={refreshProfile}
         signOut={signOut}
       />
@@ -63,6 +67,8 @@ function IndexGate({
   loading,
   profileLoading,
   profileFetchFailed,
+  nativeSessionRestoreFailed,
+  retryNativeSessionRestore,
   refreshProfile,
   signOut,
 }: {
@@ -73,6 +79,8 @@ function IndexGate({
   loading: boolean;
   profileLoading: boolean;
   profileFetchFailed: boolean;
+  nativeSessionRestoreFailed: boolean;
+  retryNativeSessionRestore: ReturnType<typeof useAuth>["retryNativeSessionRestore"];
   refreshProfile: ReturnType<typeof useAuth>["refreshProfile"];
   signOut: ReturnType<typeof useAuth>["signOut"];
 }) {
@@ -187,6 +195,20 @@ function IndexGate({
 
   if (passwordRecovery && session) {
     return <Redirect href="/reset-password" />;
+  }
+
+  if (nativeSessionRestoreFailed && !session) {
+    return (
+      <StartupRetryScreen
+        title="Couldn't open your saved login"
+        message="Your saved login is still on this phone. Frennix could not read it, so you have not been signed in or signed out."
+        detail="Retry when your phone is unlocked. Log out only if you want to remove the saved login."
+        onRetry={() => {
+          void retryNativeSessionRestore();
+        }}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   if (!session || !hasPersistedAuthToken()) {
