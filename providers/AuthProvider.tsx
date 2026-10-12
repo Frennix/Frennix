@@ -26,7 +26,8 @@ import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
-import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
+import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, finishClearingPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
+import { blockNativeAuthPersistence, hydrateNativeAuthStorage, resumeNativeAuthPersistence } from "@/lib/native-auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
 import { markDevStartupPerf } from "@/lib/dev-startup-perf";
@@ -57,6 +58,9 @@ interface AuthContextValue {
   authBootstrapTimedOut: boolean;
   /** Profile fetch failed without cache — show retry, do not sign out. */
   profileFetchFailed: boolean;
+  /** Keychain could not be read. The saved session was not deleted. */
+  nativeSessionRestoreFailed: boolean;
+  retryNativeSessionRestore: () => Promise<void>;
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
   refreshProfile: (userIdOrProfile?: string | Profile) => Promise<void>;
@@ -74,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [authBootstrapTimedOut, setAuthBootstrapTimedOut] = useState(false);
   const [profileFetchFailed, setProfileFetchFailed] = useState(false);
+  const [nativeSessionRestoreFailed, setNativeSessionRestoreFailed] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(() => isWebRecoveryHash());
   const passwordRecoveryRef = useRef(passwordRecovery);
   const authEpochRef = useRef(0);
@@ -123,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearAllPersistedAuth();
     }
     clearAllPersistedAuth();
+    await finishClearingPersistedAuth();
     clearSignedOutState();
   }, [clearSignedOutState]);
 
@@ -236,23 +242,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     authEpochRef.current += 1;
-    explicitSignOutRef.current = true;
     signOutInProgressRef.current = true;
     const userId = sessionRef.current?.user?.id ?? null;
-
-    sessionRef.current = null;
-    profileRef.current = null;
-    resolvedProfileUserIdRef.current = null;
-    clearAllPersistedAuth();
-    clearCachedProfile();
-    clearAuthenticatedStartupComplete();
-    setSession(null);
-    setProfile(null);
-    setPasswordRecovery(false);
-    setProfileLoading(false);
-    setLoading(false);
+    blockNativeAuthPersistence();
 
     try {
+      explicitSignOutRef.current = true;
+      clearAllPersistedAuth();
+      await finishClearingPersistedAuth();
+
+      sessionRef.current = null;
+      profileRef.current = null;
+      resolvedProfileUserIdRef.current = null;
+      clearCachedProfile();
+      clearAuthenticatedStartupComplete();
+      setSession(null);
+      setProfile(null);
+      setPasswordRecovery(false);
+      setProfileLoading(false);
+      setLoading(false);
+
       await stopPresenceTracking(true, "auth-signOut", userId);
       resetMessagingRealtimeState();
       try {
@@ -261,7 +270,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Local session and storage are already cleared.
       }
       clearAllPersistedAuth();
+      await finishClearingPersistedAuth();
+    } catch (error) {
+      explicitSignOutRef.current = false;
+      try {
+        await hydrateNativeAuthStorage();
+      } catch {
+        // The sign-out error is the one the caller must see.
+      }
+      throw error;
     } finally {
+      resumeNativeAuthPersistence();
       signOutInProgressRef.current = false;
     }
   }, []);
@@ -272,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (explicitSignOutRef.current && !nextSession) {
         clearAllPersistedAuth();
+        await finishClearingPersistedAuth();
         if (epoch !== authEpochRef.current) return;
         setSession(null);
         setProfile(null);
@@ -294,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await finishClearingPersistedAuth();
         nextSession = null;
       }
 
@@ -373,6 +394,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loadProfileForUser]
   );
 
+  const retryNativeSessionRestore = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    setNativeSessionRestoreFailed(false);
+    setLoading(true);
+    const restored = await hydrateNativeAuthStorage();
+    if (restored === "unavailable") {
+      setSession(null);
+      setProfile(null);
+      setNativeSessionRestoreFailed(true);
+      setLoading(false);
+      setProfileLoading(false);
+      return;
+    }
+    setNativeSessionRestoreFailed(false);
+    if (restored === "missing" || !hasPersistedAuthToken()) {
+      setSession(null);
+      setProfile(null);
+      setLoading(false);
+      setProfileLoading(false);
+      return;
+    }
+    try {
+      const nextSession = await getSession();
+      if (!nextSession?.user.id) {
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await getSupabase().auth.getUser();
+      if (error || !data.user) {
+        await invalidatePersistedSession("getUser");
+        return;
+      }
+      await applySession(nextSession);
+    } catch (error) {
+      console.error(
+        "[auth] native session restore failed",
+        error instanceof Error ? error.message : "storage"
+      );
+      setSession(null);
+      setNativeSessionRestoreFailed(true);
+      setLoading(false);
+      setProfileLoading(false);
+    }
+  }, [applySession, invalidatePersistedSession]);
+
   const refreshAuthOnResume = useCallback(async () => {
     if (signOutInProgressRef.current) return;
 
@@ -406,6 +473,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function bootstrapAuth() {
       logStartupStep("auth:init:start", { phase: "bootstrap" });
+      if (Platform.OS !== "web") {
+        const restored = await hydrateNativeAuthStorage();
+        if (restored === "unavailable") {
+          setSession(null);
+          setProfile(null);
+          setNativeSessionRestoreFailed(true);
+          setLoading(false);
+          setProfileLoading(false);
+          logStartupStep("auth:init:end", { signedOut: false, reason: "keychain-unavailable" });
+          return;
+        }
+        setNativeSessionRestoreFailed(false);
+      }
       if (typeof window !== "undefined" && isWebRecoveryHash()) {
         try {
           const isRecovery = await withTimeout(
@@ -435,6 +515,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (initialUrl) await handleRecoveryUrl(initialUrl);
 
       if (clearExpiredPersistedAuth()) {
+        await finishClearingPersistedAuth();
         try {
           await supabaseSignOut();
         } catch {
@@ -448,6 +529,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await finishClearingPersistedAuth();
         await applySession(null);
         logStartupStep("auth:init:end", { signedOut: true, reason: "no-persisted-token" });
         return;
@@ -501,6 +583,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await finishClearingPersistedAuth();
         initialSession = null;
       }
 
@@ -669,6 +752,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authReady,
       authBootstrapTimedOut,
       profileFetchFailed,
+      nativeSessionRestoreFailed,
+      retryNativeSessionRestore,
       passwordRecovery,
       clearPasswordRecovery,
       refreshProfile,
@@ -683,6 +768,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authReady,
       authBootstrapTimedOut,
       profileFetchFailed,
+      nativeSessionRestoreFailed,
+      retryNativeSessionRestore,
       passwordRecovery,
       clearPasswordRecovery,
       refreshProfile,

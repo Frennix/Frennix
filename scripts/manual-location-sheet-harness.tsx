@@ -82,6 +82,8 @@ export function ManualLocationSheetHarness() {
       profileLoading: false,
       authBootstrapTimedOut: false,
       profileFetchFailed: false,
+      nativeSessionRestoreFailed: false,
+      retryNativeSessionRestore: async () => undefined,
       passwordRecovery: false,
       clearPasswordRecovery: () => undefined,
       refreshProfile: async (updated?: string | Profile) => {

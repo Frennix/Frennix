@@ -12,6 +12,7 @@
     "verify:supabase": "npx tsx scripts/verify-supabase-init.ts",
     "verify:expo-image": "npx tsx scripts/verify-expo-image.ts",
     "verify:auth-resume": "npx tsx scripts/verify-auth-resume.ts",
+    "verify:native-auth-persistence": "npx tsx scripts/verify-native-auth-persistence.ts",
     "verify:post-login": "npx tsx scripts/verify-post-login.ts",
     "verify:beta-startup": "node scripts/verify-beta-startup.mjs http://127.0.0.1:local",
     "audit:post-login-shell": "npx tsx scripts/audit-post-login-shell.ts",
