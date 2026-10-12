@@ -26,7 +26,7 @@ import { registerForPushNotifications } from "@/lib/notifications";
 import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/recovery-session";
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
-import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
+import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, finishClearingPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
 import { hydrateNativeAuthStorage } from "@/lib/native-auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
@@ -124,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearAllPersistedAuth();
     }
     clearAllPersistedAuth();
+    await finishClearingPersistedAuth();
     clearSignedOutState();
   }, [clearSignedOutState]);
 
@@ -245,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profileRef.current = null;
     resolvedProfileUserIdRef.current = null;
     clearAllPersistedAuth();
+    await finishClearingPersistedAuth();
     clearCachedProfile();
     clearAuthenticatedStartupComplete();
     setSession(null);
@@ -262,6 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Local session and storage are already cleared.
       }
       clearAllPersistedAuth();
+      await finishClearingPersistedAuth();
     } finally {
       signOutInProgressRef.current = false;
     }
@@ -273,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (explicitSignOutRef.current && !nextSession) {
         clearAllPersistedAuth();
+        await finishClearingPersistedAuth();
         if (epoch !== authEpochRef.current) return;
         setSession(null);
         setProfile(null);
@@ -295,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await finishClearingPersistedAuth();
         nextSession = null;
       }
 
@@ -446,6 +451,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (initialUrl) await handleRecoveryUrl(initialUrl);
 
       if (clearExpiredPersistedAuth()) {
+        await finishClearingPersistedAuth();
         try {
           await supabaseSignOut();
         } catch {
@@ -459,6 +465,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await finishClearingPersistedAuth();
         await applySession(null);
         logStartupStep("auth:init:end", { signedOut: true, reason: "no-persisted-token" });
         return;
@@ -512,6 +519,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           clearAllPersistedAuth();
         }
+        await finishClearingPersistedAuth();
         initialSession = null;
       }
 
