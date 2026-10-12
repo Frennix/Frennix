@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import {
   clearNativeAuthStorageSync,
   flushNativeAuthStorage,
+  nativePersistedSessionIsRestorable,
   nativeSessionHasAccessToken,
   nativeSessionIsExpiredWithoutRefresh,
 } from "@/lib/native-auth-storage";
@@ -73,26 +74,29 @@ export function clearAllPersistedAuth(): boolean {
 }
 
 /**
- * Native logout queues a Keychain delete. Wait for it, and retry if a write fails,
- * so a completed sign-out does not leave a restorable session.
+ * Wait until the native session can no longer be restored.
+ * A storage failure is thrown so sign-out is not treated as complete.
  */
 export async function finishClearingPersistedAuth(): Promise<void> {
   if (Platform.OS === "web") return;
+  let lastError: unknown = new Error("Native sign-out did not invalidate the persisted session");
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       await flushNativeAuthStorage();
-      return;
     } catch (error) {
-      if (attempt === 2) {
-        console.warn(
-          "[auth] failed to clear native session",
-          error instanceof Error ? error.message : "storage"
-        );
-        return;
-      }
-      clearAllPersistedAuth();
+      lastError = error;
     }
+    try {
+      if (!(await nativePersistedSessionIsRestorable())) return;
+      lastError = new Error("Native sign-out did not invalidate the persisted session");
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < 2) clearAllPersistedAuth();
   }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Native sign-out did not invalidate the persisted session");
 }
 
 /** Drop in-memory session when browser storage no longer has a token. */

@@ -3,7 +3,7 @@
  * Guards native session persistence without changing the web localStorage path.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   chunkForSecureStore,
   isExpiredNativeSessionWithoutRefresh,
@@ -24,7 +24,11 @@ import {
   type NativeAuthKeyValue,
 } from "../lib/native-auth-chunk-store";
 
-const ROOT = join(import.meta.dirname, "..");
+const scriptPath = process.argv[1];
+if (!scriptPath) {
+  throw new Error("verify-native-auth-persistence could not resolve its path");
+}
+const ROOT = join(dirname(scriptPath), "..");
 
 function read(relativePath: string) {
   return readFileSync(join(ROOT, relativePath), "utf8");
@@ -175,6 +179,15 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
       assert(
         clearAt > signOutAt && finishAt > clearAt && supabaseAt > finishAt,
         "sign-out must wait for the Keychain clear before Supabase"
+      );
+      const blockAt = auth.indexOf("blockNativeAuthPersistence()", signOutAt);
+      assert(blockAt > signOutAt && blockAt < finishAt, "writes must be blocked before the Keychain clear");
+      const finishSource = read("lib/auth-storage.ts");
+      const finishFn = finishSource.slice(finishSource.indexOf("export async function finishClearingPersistedAuth"));
+      assert(finishFn.includes("throw lastError"), "a failed Keychain clear must reject sign-out");
+      assert(
+        !finishFn.includes("console.warn"),
+        "sign-out must not treat a failed clear as success"
       );
     },
   },
@@ -331,6 +344,68 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
       await auth.flush();
       assert((await auth.storage.getItem(SESSION_KEY)) == null, "logout must win over an in-flight write");
       assert(!auth.hasAccessToken(), "memory mirror must stay signed out");
+    },
+  },
+  {
+    name: "Successful logout then restart cannot restore the session",
+    run: async () => {
+      const store = memoryStore();
+      const auth = createNativeAuthController(store, SESSION_KEY);
+      await auth.storage.setItem(SESSION_KEY, sessionJson("signed-in", 80));
+      auth.blockWrites();
+      auth.clearSync();
+      await auth.flush();
+      await auth.storage.setItem(SESSION_KEY, sessionJson("refresh-during-logout", 40));
+      assert(!(await auth.persistedSessionIsRestorable()), "completed logout must leave nothing restorable");
+      auth.resumeWrites();
+      const restarted = createNativeAuthController(store, SESSION_KEY);
+      await restarted.hydrate();
+      assert(!restarted.hasAccessToken(), "a cold start after logout must stay signed out");
+      assert((await restarted.storage.getItem(SESSION_KEY)) == null, "restart must not read the old session");
+    },
+  },
+  {
+    name: "A failed commit-marker delete does not count as logout",
+    run: async () => {
+      const store = memoryStore();
+      const auth = createNativeAuthController(store, SESSION_KEY);
+      await auth.storage.setItem(SESSION_KEY, sessionJson("keep-me", 40));
+      const originalDelete = store.deleteItem.bind(store);
+      store.deleteItem = async (key) => {
+        if (key.endsWith(".commit")) throw new Error("keychain delete failed");
+        await originalDelete(key);
+      };
+      auth.clearSync();
+      let rejected = false;
+      try {
+        await auth.flush();
+      } catch (error) {
+        rejected = error instanceof Error && error.message === "keychain delete failed";
+      }
+      assert(rejected, "commit-marker deletion failure must reject the clear");
+      assert(await auth.persistedSessionIsRestorable(), "the previous session must still be restorable");
+      const restarted = createNativeAuthController(store, SESSION_KEY);
+      await restarted.hydrate();
+      assert(
+        parsePersistedAuthRecord(await restarted.storage.getItem(SESSION_KEY)).accessToken === "keep-me",
+        "restart after a failed logout must restore the same session"
+      );
+    },
+  },
+  {
+    name: "Token refresh restoration returns the new access token",
+    run: async () => {
+      const store = memoryStore();
+      const auth = createNativeAuthController(store, SESSION_KEY);
+      await auth.storage.setItem(SESSION_KEY, sessionJson("old-access", 90));
+      await auth.storage.setItem(SESSION_KEY, sessionJson("new-access", 90));
+      const restarted = createNativeAuthController(store, SESSION_KEY);
+      await restarted.hydrate();
+      assert(restarted.hasAccessToken(), "a refreshed session must survive restart");
+      assert(
+        parsePersistedAuthRecord(await restarted.storage.getItem(SESSION_KEY)).accessToken === "new-access",
+        "restart must restore the refreshed access token"
+      );
     },
   },
 ];

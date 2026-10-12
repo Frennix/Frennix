@@ -31,8 +31,20 @@ export function clearNativeAuthStorageSync(): boolean {
 }
 
 /** Wait until the queued Keychain clear or write has finished. */
+export function blockNativeAuthPersistence(): void {
+  nativeAuth.blockWrites();
+}
+
+export function resumeNativeAuthPersistence(): void {
+  nativeAuth.resumeWrites();
+}
+
 export function flushNativeAuthStorage(): Promise<void> {
   return nativeAuth.flush();
+}
+
+export function nativePersistedSessionIsRestorable(): Promise<boolean> {
+  return nativeAuth.persistedSessionIsRestorable();
 }
 
 export function hydrateNativeAuthStorage(): Promise<void> {

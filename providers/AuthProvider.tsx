@@ -27,7 +27,7 @@ import { establishSessionFromUrl, urlLooksLikePasswordRecovery } from "@/lib/rec
 import { startPresenceTracking, stopPresenceTracking } from "@/lib/presence";
 import { AsyncTimeoutError, withTimeout } from "@/lib/async-timeout";
 import { hasPersistedAuthToken, clearExpiredPersistedAuth, clearAllPersistedAuth, finishClearingPersistedAuth, sessionMatchesPersistedAuth } from "@/lib/auth-storage";
-import { hydrateNativeAuthStorage } from "@/lib/native-auth-storage";
+import { blockNativeAuthPersistence, hydrateNativeAuthStorage, resumeNativeAuthPersistence } from "@/lib/native-auth-storage";
 import { reportStartupStall } from "@/lib/startup-diagnostics";
 import { recordWebStartupCheckpoint, redactUserId } from "@/lib/web-startup-checkpoints";
 import { markDevStartupPerf } from "@/lib/dev-startup-perf";
@@ -238,24 +238,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     authEpochRef.current += 1;
-    explicitSignOutRef.current = true;
     signOutInProgressRef.current = true;
     const userId = sessionRef.current?.user?.id ?? null;
-
-    sessionRef.current = null;
-    profileRef.current = null;
-    resolvedProfileUserIdRef.current = null;
-    clearAllPersistedAuth();
-    await finishClearingPersistedAuth();
-    clearCachedProfile();
-    clearAuthenticatedStartupComplete();
-    setSession(null);
-    setProfile(null);
-    setPasswordRecovery(false);
-    setProfileLoading(false);
-    setLoading(false);
+    blockNativeAuthPersistence();
 
     try {
+      explicitSignOutRef.current = true;
+      clearAllPersistedAuth();
+      await finishClearingPersistedAuth();
+
+      sessionRef.current = null;
+      profileRef.current = null;
+      resolvedProfileUserIdRef.current = null;
+      clearCachedProfile();
+      clearAuthenticatedStartupComplete();
+      setSession(null);
+      setProfile(null);
+      setPasswordRecovery(false);
+      setProfileLoading(false);
+      setLoading(false);
+
       await stopPresenceTracking(true, "auth-signOut", userId);
       resetMessagingRealtimeState();
       try {
@@ -265,7 +267,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       clearAllPersistedAuth();
       await finishClearingPersistedAuth();
+    } catch (error) {
+      explicitSignOutRef.current = false;
+      try {
+        await hydrateNativeAuthStorage();
+      } catch {
+        // The sign-out error is the one the caller must see.
+      }
+      throw error;
     } finally {
+      resumeNativeAuthPersistence();
       signOutInProgressRef.current = false;
     }
   }, []);

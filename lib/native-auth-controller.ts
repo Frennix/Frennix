@@ -22,6 +22,7 @@ function secureStoreKey(key: string): string {
 
 export function createNativeAuthController(backend: NativeAuthKeyValue, sessionKey: string) {
   let storageGeneration = 0;
+  let writesBlocked = false;
   let snapshot: PersistedAuthRecord = EMPTY_AUTH_RECORD;
   let idle: Promise<void> = Promise.resolve();
   let lastResult: Promise<void> = Promise.resolve();
@@ -64,6 +65,10 @@ export function createNativeAuthController(backend: NativeAuthKeyValue, sessionK
       touchedKeys.add(key);
       const generationAtWrite = storageGeneration;
       await enqueueStorageOperation(async () => {
+        if (writesBlocked) {
+          if (key === sessionKey) snapshot = EMPTY_AUTH_RECORD;
+          return;
+        }
         const chunks = chunkForSecureStore(value);
         if (chunks.length > NATIVE_AUTH_MAX_CHUNK_SLOTS) {
           throw new Error("Native auth session chunk count is outside the supported range");
@@ -129,8 +134,24 @@ export function createNativeAuthController(backend: NativeAuthKeyValue, sessionK
       return hadToken;
     },
 
+    blockWrites(): void {
+      writesBlocked = true;
+    },
+
+    resumeWrites(): void {
+      writesBlocked = false;
+    },
+
     flush(): Promise<void> {
       return lastResult;
+    },
+
+    /** True only when a committed access token can still be read back after a restart. */
+    async persistedSessionIsRestorable(): Promise<boolean> {
+      return enqueueStorageOperation(async () => {
+        const raw = await readCommittedAuthValue(backend, secureStoreKey(sessionKey));
+        return Boolean(parsePersistedAuthRecord(raw).accessToken);
+      });
     },
 
     async hydrate(): Promise<void> {
